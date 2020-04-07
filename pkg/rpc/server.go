@@ -1,3 +1,5 @@
+// This package represents the GRPC server exposing functions to interoperate
+// with the node components as well as the wallet
 package rpc
 
 import (
@@ -26,11 +28,13 @@ type nodeServer struct {
 	rpcBus *rpcbus.RPCBus
 }
 
-type RPCSrvWrapper struct {
+// SrvWrapper is a wrapper for the grpc server
+type SrvWrapper struct {
 	grpcServer *grpc.Server
 }
 
-func (r *RPCSrvWrapper) Shutdown() {
+// Shutdown the wrapper
+func (r *SrvWrapper) Shutdown() {
 	r.grpcServer.GracefulStop()
 }
 
@@ -38,7 +42,7 @@ func (r *RPCSrvWrapper) Shutdown() {
 // the rust process. It only returns an error, as we want to keep the
 // gRPC service running until the process is killed, thus we do not
 // need to return the server itself.
-func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*RPCSrvWrapper, error) {
+func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*SrvWrapper, error) {
 
 	conf := config.Get().RPC
 	l, err := net.Listen(conf.Network, conf.Address)
@@ -72,7 +76,7 @@ func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*RPCSrvWrapper, error) {
 	grpc.EnableTracing = false
 
 	node.RegisterNodeServer(grpcServer, &nodeServer{rpcBus})
-	wrapper := &RPCSrvWrapper{grpcServer}
+	wrapper := &SrvWrapper{grpcServer}
 
 	// This function is blocking, so we run it in a goroutine
 	go func() {
@@ -88,6 +92,9 @@ func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*RPCSrvWrapper, error) {
 	return wrapper, nil
 }
 
+// SelectTx returns the transactions from the Mempool. It accepts a
+// SelectRequest carrying either the ID of a specific transaction or the types
+// of transactions as in "COINBASE", "BID", "STAKE", "STANDARD", "TIMELOCK", "CONTRACT"
 func (n *nodeServer) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {
 	txs, err := n.rpcBus.Call(topics.GetMempoolView, rpcbus.NewRequest(req), 5*time.Second)
 	if err != nil {
@@ -97,6 +104,7 @@ func (n *nodeServer) SelectTx(ctx context.Context, req *node.SelectRequest) (*no
 	return txs.(*node.SelectResponse), nil
 }
 
+// CreateWallet creates a new wallet from a password or seed
 func (n *nodeServer) CreateWallet(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
 	resp, err := n.rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(c), 5*time.Second)
 	if err != nil {
@@ -106,6 +114,7 @@ func (n *nodeServer) CreateWallet(ctx context.Context, c *node.CreateRequest) (*
 	return resp.(*node.LoadResponse), nil
 }
 
+// LoadWallet from a password
 func (n *nodeServer) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node.LoadResponse, error) {
 	resp, err := n.rpcBus.Call(topics.LoadWallet, rpcbus.NewRequest(l), 5*time.Second)
 	if err != nil {
@@ -115,6 +124,7 @@ func (n *nodeServer) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node
 	return resp.(*node.LoadResponse), nil
 }
 
+// CreateFromSeed creates a wallet from a seed
 func (n *nodeServer) CreateFromSeed(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
 	resp, err := n.rpcBus.Call(topics.CreateFromSeed, rpcbus.NewRequest(c), 5*time.Second)
 	if err != nil {
@@ -276,10 +286,10 @@ func loadTLSFiles(enable bool, certFile, keyFile, network string) (grpc.ServerOp
 	}
 
 	recommendedVer := "1.3"
-	if i.SecurityVersion != recommendedVer {
+	if i.SecurityVersion != recommendedVer { //nolint
 		log.Warnf("Recommended TLS version is %s", recommendedVer)
 	}
 
-	tlsVersion = i.SecurityVersion
+	tlsVersion = i.SecurityVersion //nolint
 	return grpc.Creds(creds), tlsVersion
 }

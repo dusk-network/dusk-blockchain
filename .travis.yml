@@ -1,9 +1,14 @@
-dist: xenial
 
 language: go
 
+cache:
+  directories:
+    - $HOME/.cache/go-build
+    - $GOPATH/pkg/mod
+
 go:
   - 1.13.x
+
 
 # Only clone the most recent commit.
 git:

@@ -16,8 +16,12 @@ output = "debug"
 [logger.monitor]
 # enabling log based monitoring
 enabled = false
-# file whereto dumping info parsed by monitor
-target = "/var/log/dusk-monitor"
+rpc="grpc"
+# transport
+transport="unix"
+# target
+address="/tmp/dusk-monitor.sock"
+
 # tell logger to stream errors and warnings to monitoring process
 streamErrors=true
     
@@ -32,7 +36,8 @@ port=7000
 
 [network.seeder]
 # array of seeder servers
-addresses=["voucher.dusk.network:8081"]
+addresses=["127.0.0.1:8081"]
+#addresses=["voucher.dusk.network:8081"]
 # fixed network addresses to setup local P2P network
 # supported only in testnet
 fixed = []

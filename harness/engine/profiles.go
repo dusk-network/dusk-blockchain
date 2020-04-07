@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Profiles is a map with the node name as key and Profile function
 type Profiles map[string]func(index int, node *DuskNode, walletPath string)
 
 var profileList Profiles

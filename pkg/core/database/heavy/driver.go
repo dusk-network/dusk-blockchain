@@ -28,13 +28,14 @@ func (d *driver) Name() string {
 }
 
 func init() {
-	driver := driver{}
-	err := database.Register(&driver)
+	d := driver{}
+	err := database.Register(&d)
 	if err != nil {
 		log.Panic(err)
 	}
 }
 
+// CreateDBConnection creates a connection with the DB using the `heavy` driver
 func CreateDBConnection() (database.Driver, database.DB) {
 	drvr, err := database.From(cfg.Get().Database.Driver)
 	if err != nil {

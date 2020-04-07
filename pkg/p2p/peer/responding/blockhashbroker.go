@@ -47,7 +47,7 @@ func (b *BlockHashBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 		height++
 
 		var hash []byte
-		err := b.db.View(func(t database.Transaction) error {
+		err = b.db.View(func(t database.Transaction) error {
 			hash, err = t.FetchBlockHashByHeight(height)
 			return err
 		})
@@ -105,6 +105,6 @@ func marshalInv(inv *peermsg.Inv) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	topics.Prepend(buf, topics.Inv)
+	_ = topics.Prepend(buf, topics.Inv)
 	return buf, nil
 }

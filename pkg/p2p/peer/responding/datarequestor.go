@@ -30,7 +30,7 @@ func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus, responseChan chan<-
 	}
 }
 
-// AskForMissingItems takes an inventory message, checks it for any items that the node
+// RequestMissingItems takes an inventory message, checks it for any items that the node
 // is missing, puts these items in a GetData wire message, and sends it off to the peer's
 // outgoing message queue, requesting the items in full.
 func (d *DataRequestor) RequestMissingItems(m *bytes.Buffer) error {
@@ -117,7 +117,7 @@ func marshalGetData(getData *peermsg.Inv) (*bytes.Buffer, error) {
 func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction, error) {
 
 	buf := new(bytes.Buffer)
-	buf.Write(txID)
+	_, _ = buf.Write(txID)
 	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
 	if err != nil {
 		return nil, err

@@ -23,7 +23,8 @@ const (
 )
 
 var (
-	// ErrExceedMaxLen max message size of a frame on the wire
+	//ErrExceedMaxLen is the error thrown if the message size exceeds the max
+	//frame length
 	ErrExceedMaxLen = errors.New("message size exceeds max frame length")
 )
 
@@ -137,6 +138,9 @@ func getOutboundIP() net.IP {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	_ = conn.Close()
@@ -201,7 +205,7 @@ func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) [
 	port := getBytesFromUint16(uint16(peerAddr.Port))
 	copy(enc[6:8], port[0:2])
 	// Append Payload
-	copy(enc[8:encodedLen], payload[0:len(payload)])
+	copy(enc[8:encodedLen], payload[0:])
 	return enc
 }
 
@@ -226,7 +230,7 @@ func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []by
 	port := getBytesFromUint16(uint16(tcpAddr.Port))
 	copy(enc[6:8], port[0:2])
 	// Append Payload
-	copy(enc[8:encodedLen], payload[0:len(payload)])
+	copy(enc[8:encodedLen], payload[0:])
 	return enc
 }
 

@@ -8,6 +8,9 @@ import (
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
+// Event represents a Score event which is for internal use only (as it lacks
+// some of the necessary fields for being propagated, which are decorated into
+// a Score)
 // TODO: consider embedding this into message.Score
 type Event struct {
 	header.Header
@@ -23,6 +26,7 @@ func New() *Event {
 	}
 }
 
+// Marshal a score event into a buffer
 // TODO: get rid of serialization
 func Marshal(b *bytes.Buffer, s Event) error {
 	if err := encoding.WriteVarBytes(b, s.Proof.Proof); err != nil {
@@ -44,6 +48,7 @@ func Marshal(b *bytes.Buffer, s Event) error {
 	return encoding.WriteBLS(b, s.Seed)
 }
 
+// Unmarshal a score event from a buffer
 func Unmarshal(b *bytes.Buffer, s *Event) error {
 	if err := encoding.ReadVarBytes(b, &s.Proof.Proof); err != nil {
 		return err

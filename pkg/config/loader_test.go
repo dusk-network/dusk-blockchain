@@ -28,11 +28,11 @@ func TestDefaultConfigTOML(t *testing.T) {
 		t.Errorf("Failed parse: %v", err)
 	}
 
-	if Get().General.Network != "testnet" {
+	if Get().General.Network != "testnet" { //nolint
 		t.Error("Invalid general/network value")
 	}
 
-	if Get().Logger.Level != "debug" {
+	if Get().Logger.Level != "debug" { //nolint
 		t.Error("Invalid logger level")
 	}
 }

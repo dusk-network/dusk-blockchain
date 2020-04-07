@@ -8,18 +8,27 @@ import (
 	"strings"
 )
 
+// All represents the bitmap of the whole set
 const All uint64 = math.MaxUint64
 
+// Set is an ordered set of big.Int
 type Set []*big.Int
 
-func (v Set) Len() int           { return len(v) }
-func (v Set) Swap(i, j int)      { v[i], v[j] = v[j], v[i] }
+// Len complies with the Sort interface
+func (v Set) Len() int { return len(v) }
+
+// Swap complies with the Sort interface
+func (v Set) Swap(i, j int) { v[i], v[j] = v[j], v[i] }
+
+// Less complies with the Sort interface
 func (v Set) Less(i, j int) bool { return v[i].Cmp(v[j]) < 0 }
 
+// New creates a new instance of a sorted set
 func New() Set {
 	return make([]*big.Int, 0)
 }
 
+// Equal tests a set for equality
 func (v Set) Equal(other Set) bool {
 	sort.Sort(other)
 	for i := 0; i < len(v); i++ {
@@ -123,7 +132,7 @@ func (v *Set) Bits(subset Set) uint64 {
 	head, subset = subset[0], subset[1:]
 	for i, elem := range *v {
 		if elem.Cmp(head) == 0 {
-			ret |= (1 << uint(i)) // flip the i-th bit to 1
+			ret |= 1 << uint(i) // flip the i-th bit to 1
 			if len(subset) == 0 {
 				break
 			}
@@ -136,19 +145,20 @@ func (v *Set) Bits(subset Set) uint64 {
 func (v Set) String() string {
 	var str strings.Builder
 	for i, bi := range v {
-		str.WriteString("idx: ")
-		str.WriteString(strconv.Itoa(i))
-		str.WriteString(" nr: ")
-		str.WriteString(shortStr(bi))
-		str.WriteString("\n")
+		_, _ = str.WriteString("idx: ")
+		_, _ = str.WriteString(strconv.Itoa(i))
+		_, _ = str.WriteString(" nr: ")
+		_, _ = str.WriteString(shortStr(bi))
+		_, _ = str.WriteString("\n")
 	}
 	return str.String()
 }
 
+// Whole returns the bitmap of all the elements within the set
 func (v Set) Whole() uint64 {
 	ret := uint64(0)
 	for i := range v {
-		ret |= (1 << uint(i))
+		ret |= 1 << uint(i)
 	}
 	return ret
 }
@@ -156,8 +166,8 @@ func (v Set) Whole() uint64 {
 func shortStr(i *big.Int) string {
 	var str strings.Builder
 	iStr := i.String()
-	str.WriteString(iStr[:3])
-	str.WriteString("...")
-	str.WriteString(iStr[len(iStr)-3:])
+	_, _ = str.WriteString(iStr[:3])
+	_, _ = str.WriteString("...")
+	_, _ = str.WriteString(iStr[len(iStr)-3:])
 	return str.String()
 }

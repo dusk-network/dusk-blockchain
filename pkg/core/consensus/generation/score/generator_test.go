@@ -3,7 +3,7 @@ package score
 import (
 	"testing"
 
-	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"

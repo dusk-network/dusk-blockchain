@@ -1,43 +1,75 @@
 package main
 
 import (
-	"fmt"
-	"github.com/sirupsen/logrus"
+	"strings"
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/monitor"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	l "github.com/sirupsen/logrus"
 )
 
-var lg = logrus.WithField("process", "monitoring")
+var lg = log.WithField("process", "monitoring")
 
-// ConnectToLogMonitor launches the monitoring process in a goroutine. The goroutine performs 5 attempts before giving up
-func ConnectToLogMonitor(bus eventbus.Broker) error {
-	if cfg.Get().General.Network == "testnet" && cfg.Get().Logger.Monitor.Enabled {
-		monitorURL := cfg.Get().Logger.Monitor.Target
-		lg.Infof("Connecting to log process on %v\n", monitorURL)
-		go startMonitoring(bus, monitorURL)
+// StopFunc is invoked when the monitor should be stopped. It is intended to
+// perform the closing operations on the GRPC server and connections
+type StopFunc func()
+
+// LaunchMonitor creates a Supervisor if the configuration demands it, and starts it
+func LaunchMonitor(bus eventbus.Broker) (StopFunc, error) {
+	supervisor, err := NewSupervisor(bus)
+	if err != nil {
+		return func() {}, err
 	}
 
-	return nil
+	if supervisor == nil {
+		return func() {}, nil
+	}
+
+	if err := supervisor.Start(); err != nil {
+		return func() {}, err
+	}
+
+	return func() {
+		_ = supervisor.Stop()
+	}, nil
 }
 
-func startMonitoring(bus eventbus.Broker, monURL string) {
-	for i := 0; i < 5; i++ {
-		lg.Traceln("Trying to (re)start the monitoring process")
-		supervisor, err := monitor.Launch(bus, monURL)
+// ParseMonitorConfiguration collects parameters of the monitoring client
+func ParseMonitorConfiguration() (rpcType, target string, streamErrors bool) {
+	mon := cfg.Get().Logger.Monitor
+	rpcType = strings.ToLower(mon.Rpc)
+	transport := strings.ToLower(mon.Transport)
+	addr := strings.ToLower(mon.Address)
+
+	target = transport + "://" + addr
+	lg.WithField("process", "monitoring").Info("Monitor configuration parsed: sending data to", target)
+
+	streamErrors = cfg.Get().Logger.Monitor.StreamErrors
+	return
+}
+
+// NewSupervisor creates a new monitor.Supervisor which notifies a remote monitoring server with alerts and data
+func NewSupervisor(bus eventbus.Broker) (monitor.Supervisor, error) {
+	if cfg.Get().General.Network == "testnet" && cfg.Get().Logger.Monitor.Enabled {
+		rpc, target, streamErrors := ParseMonitorConfiguration()
+
+		blockTimeThreshold := 20 * time.Second
+		supervisor, err := monitor.New(bus, blockTimeThreshold, rpc, target)
 		if err != nil {
-			lg.Warnln(fmt.Sprintf("error in starting the monitoring. Attempt: %d. Error: %s", i, err.Error()))
-			delay := 2 + 2*i
-			lg.Warnln(fmt.Sprintf("waiting for %d before retrying", delay))
-			time.Sleep(time.Duration(delay) * time.Second)
-			continue
+			lg.WithError(err).Errorln("Monitoring could not get started")
+			return nil, err
 		}
-		if cfg.Get().Logger.Monitor.StreamErrors {
-			logrus.AddHook(supervisor)
+
+		if streamErrors {
+			lg.Infoln("adding supervisor as logrus hook so to send errors to", target)
+			l.AddHook(supervisor)
 		}
-		return
+
+		lg.Debugln("monitor instantiated")
+		return supervisor, nil
 	}
-	lg.Errorln("Monitoring could not get started")
+
+	return nil, nil
 }

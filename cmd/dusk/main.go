@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"os"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 var app = cli.NewApp()
@@ -42,7 +43,7 @@ func main() {
 
 func handlePanic() {
 	if r := recover(); r != nil {
-		log.WithError(fmt.Errorf("%+v", r)).Error(fmt.Sprintf("Application panic"))
+		log.WithError(fmt.Errorf("%+v", r)).Errorln("Application panic")
 	}
 	time.Sleep(time.Second * 1)
 }

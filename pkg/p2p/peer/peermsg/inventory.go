@@ -9,11 +9,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
+// InvType is a byte describing the Inventory type
 type InvType uint8
 
 var (
+	//InvTypeMempoolTx is the inventory type for unconfirmed Txs
 	InvTypeMempoolTx InvType = 0
-	InvTypeBlock     InvType = 1
+	// InvTypeBlock is the inventory type for confirmed Txs
+	InvTypeBlock InvType = 1
 
 	supportedInvTypes = [2]InvType{
 		InvTypeMempoolTx,
@@ -21,25 +24,28 @@ var (
 	}
 )
 
+// InvVect represents a request of sort for Inventory data
 type InvVect struct {
 	Type InvType // Type of data
 	Hash []byte  // Hash of the data
 }
 
+// Inv contains a list of Inventory vector
 type Inv struct {
 	InvList []InvVect
 }
 
-func (i *Inv) Encode(w *bytes.Buffer) error {
-	if uint32(len(i.InvList)) > config.Get().Mempool.MaxInvItems {
+// Encode an Inventory request into a buffer
+func (inv *Inv) Encode(w *bytes.Buffer) error {
+	if uint32(len(inv.InvList)) > config.Get().Mempool.MaxInvItems {
 		return errors.New("inv message is too large")
 	}
 
-	if err := encoding.WriteVarInt(w, uint64(len(i.InvList))); err != nil {
+	if err := encoding.WriteVarInt(w, uint64(len(inv.InvList))); err != nil {
 		return err
 	}
 
-	for _, vect := range i.InvList {
+	for _, vect := range inv.InvList {
 		if !supportedInvType(vect.Type) {
 			return fmt.Errorf("not supported inventory data type %d", vect.Type)
 		}
@@ -60,10 +66,11 @@ func (i *Inv) Encode(w *bytes.Buffer) error {
 	return nil
 }
 
+// Decode an Inventory from a buffer
 func (inv *Inv) Decode(r *bytes.Buffer) error {
-	lenVect, err := encoding.ReadVarInt(r)
-	if err != nil {
-		return err
+	lenVect, e := encoding.ReadVarInt(r)
+	if e != nil {
+		return e
 	}
 
 	if lenVect > uint64(config.Get().Mempool.MaxInvItems) {
@@ -84,7 +91,7 @@ func (inv *Inv) Decode(r *bytes.Buffer) error {
 		}
 
 		inv.InvList[i].Hash = make([]byte, 32)
-		if err = encoding.Read256(r, inv.InvList[i].Hash); err != nil {
+		if err := encoding.Read256(r, inv.InvList[i].Hash); err != nil {
 			return err
 		}
 	}
@@ -92,6 +99,7 @@ func (inv *Inv) Decode(r *bytes.Buffer) error {
 	return nil
 }
 
+// AddItem to an Inventory
 func (inv *Inv) AddItem(t InvType, hash []byte) {
 	item := InvVect{
 		Type: t,

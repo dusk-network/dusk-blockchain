@@ -63,10 +63,14 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 		return errors.New("invalid query")
 	}
 
+	//nolint:gosec
 	resp, err := http.Post(addr, "application/json", &buf)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
 		return err
@@ -85,7 +89,9 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	client := pb.NewNodeClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -110,7 +116,9 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	client := pb.NewNodeClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -149,6 +157,7 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 	return err
 }
 
+// ConstructWireFrame creates a frame according to the wire protocol
 func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.Buffer) ([]byte, error) {
 	// Write magic
 	buf := magic.ToBuffer()
@@ -171,6 +180,7 @@ func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.B
 	return frame.Bytes(), nil
 }
 
+// WriteFrame writes a frame to a buffer
 // TODO: remove *bytes.Buffer from the returned parameters
 func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 
@@ -196,9 +206,7 @@ func (n *Network) WaitUntil(t *testing.T, ind uint, targetHeight uint64, waitFor
 
 	condition := func() bool {
 		// Construct query to fetch block height
-		query := fmt.Sprintf(
-			"{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}",
-		)
+		query := "{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}"
 
 		var result map[string]map[string][]map[string]map[string]int
 		if err := n.SendQuery(ind, query, &result); err != nil {

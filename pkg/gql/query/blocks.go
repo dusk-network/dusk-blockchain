@@ -80,8 +80,8 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 	}
 
 	// resolve argument range (range of blocks)
-	heightRange, ok := p.Args[blockRangeArg].([]interface{})
-	if ok && len(heightRange) == 2 {
+	heightRange, found := p.Args[blockRangeArg].([]interface{})
+	if found && len(heightRange) == 2 {
 		from, ok := heightRange[0].(int)
 		if !ok {
 			return nil, errors.New("range `from` value not int64")
@@ -95,16 +95,16 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 		return b.fetchBlocksByHeights(db, int64(from), int64(to))
 	}
 
-	offset, ok := p.Args[blockLastArg].(int)
-	if ok {
+	offset, offsetOK := p.Args[blockLastArg].(int)
+	if offsetOK {
 		if offset <= 0 {
 			return nil, errors.New("invalid offset")
 		}
 		return b.fetchBlocksByHeights(db, int64(offset)*-1, -1)
 	}
 
-	date, ok := p.Args[blockSinceArg].(time.Time)
-	if ok {
+	date, dateOK := p.Args[blockSinceArg].(time.Time)
+	if dateOK {
 		return b.fetchBlocksByDate(db, date)
 	}
 
@@ -246,7 +246,7 @@ func (b blocks) fetchBlocksByDate(db database.DB, sinceDate time.Time) ([]*block
 			return err
 		}
 
-		hash, err := t.FetchBlockHashByHeight(uint64(height))
+		hash, err := t.FetchBlockHashByHeight(height)
 		if err != nil {
 			return err
 		}

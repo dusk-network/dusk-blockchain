@@ -49,20 +49,26 @@ func TestReader(t *testing.T) {
 
 	go peerReader.ReadLoop()
 
-	go func() {
+	errChan := make(chan error, 1)
+	go func(eChan chan error) {
 		msg := makeAgreementGossip(10)
 		buf, err := message.Marshal(msg)
 		if err != nil {
-			t.Fatal(err)
+			eChan <- err
 		}
 		if err := g.Process(&buf); err != nil {
-			t.Fatal(err)
+			eChan <- err
 		}
 		client.Write(buf.Bytes())
-	}()
+	}(errChan)
 
 	// We should get the message through this channel
-	<-agreementChan
+	select {
+	case err := <-errChan:
+		t.Fatal(err)
+
+	case <-agreementChan:
+	}
 }
 
 // Test the functionality of the peer.Writer through the use of the ring buffer.
@@ -71,7 +77,9 @@ func TestWriteRingBuffer(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
-		defer p.Conn.Close()
+		defer func() {
+			_ = p.Conn.Close()
+		}()
 	}
 
 	ev := makeAgreementGossip(10)
@@ -122,7 +130,9 @@ func BenchmarkWriter(b *testing.B) {
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
-		defer p.Conn.Close()
+		defer func() {
+			_ = p.Conn.Close()
+		}()
 	}
 
 	msg := makeAgreementGossip(10)
@@ -133,6 +143,7 @@ func BenchmarkWriter(b *testing.B) {
 	}
 }
 
+//nolint:unparam
 func makeAgreementGossip(keyAmount int) message.Message {
 	p, keys := consensus.MockProvisioners(keyAmount)
 	aggro := message.MockAgreement(make([]byte, 32), 1, 1, keys, p)

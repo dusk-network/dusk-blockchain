@@ -21,7 +21,9 @@ func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 	if err != nil {
 		log.Panic(err)
 	}
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	log.Infof("Starting UDP Listener on %s", lAddr.String())
 
@@ -44,18 +46,20 @@ func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 
 // Gets the local address of the sender `Peer` and the UDPAddress of the
 // receiver `Peer` and sends to it a UDP Packet with the payload inside.
-func sendUDPPacket(netw string, laddr, raddr net.UDPAddr, payload []byte) {
+func sendUDPPacket(laddr, raddr net.UDPAddr, payload []byte) {
 
-	log.WithField("dest", raddr.String()).Tracef("Dialing %s", netw)
+	log.WithField("dest", raddr.String()).Tracef("Dialing udp")
 
 	// Send from same IP that the UDP listener is bound on but choose random port
 	laddr.Port = 0
-	conn, err := net.DialUDP(netw, &laddr, &raddr)
+	conn, err := net.DialUDP("udp", &laddr, &raddr)
 	if err != nil {
 		log.WithError(err).Warn("Could not establish a connection with the dest Peer.")
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	log.WithField("src", conn.LocalAddr().String()).
 		WithField("dest", raddr.String()).Traceln("Sending udp")
@@ -79,7 +83,9 @@ func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 	if err != nil {
 		log.Panic(err)
 	}
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	log.Infof("Starting TCP Listener on %s", lAddr.String())
 
@@ -123,7 +129,9 @@ func sendTCPStream(raddr net.UDPAddr, payload []byte) {
 		log.WithError(err).Warnf("Could not establish a peer connection %s.", raddr.String())
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	log.WithField("src", conn.LocalAddr().String()).
 		WithField("dest", raddr.String()).Traceln("Sending tcp")

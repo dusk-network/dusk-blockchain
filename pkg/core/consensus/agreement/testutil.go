@@ -1,6 +1,8 @@
 package agreement
 
 import (
+	"sync"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -20,6 +22,7 @@ type Helper struct {
 	nr              int
 }
 
+// WireAgreement ...
 func WireAgreement(nrProvisioners int) (*consensus.Coordinator, *Helper) {
 	eb := eventbus.New()
 	h := NewHelper(eb, nrProvisioners)
@@ -58,8 +61,16 @@ func (hlp *Helper) createResultChan() {
 // SendBatch let agreement collect  additional batches of consensus events
 func (hlp *Helper) SendBatch(hash []byte) {
 	batch := hlp.Spawn(hash)
-	for _, ev := range batch {
-		go hlp.Aggro.CollectAgreementEvent(ev)
+	var wg sync.WaitGroup
+	// Tell the 'wg' WaitGroup how many threads/goroutines
+	//   that are about to run concurrently.
+	wg.Add(len(batch))
+	for i := 0; i < len(batch); i++ {
+		go func(i int) {
+			defer wg.Done()
+			ev := batch[i]
+			_ = hlp.Aggro.CollectAgreementEvent(ev)
+		}(i)
 	}
 }
 
@@ -79,6 +90,7 @@ func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
 	hlp.Aggro.Initialize(consensus.NewSimplePlayer(), nil, ru)
 }
 
+// LaunchHelper configures and launches a LaunchHelper
 func LaunchHelper(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
 	hlp := NewHelper(eb, nr)
 	roundUpdate := consensus.MockRoundUpdate(1, hlp.P, nil)

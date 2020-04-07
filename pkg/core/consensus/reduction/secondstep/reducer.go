@@ -19,7 +19,6 @@ import (
 var _ consensus.Component = (*Reducer)(nil)
 
 var emptyHash = [32]byte{}
-var regenerationPackage = new(bytes.Buffer)
 var lg = log.WithField("process", "second-step reduction")
 
 // Reducer for the second step. This reducer starts whenever it receives an internal
@@ -91,6 +90,9 @@ func (r *Reducer) Finalize() {
 	r.timer.Stop()
 }
 
+// Collect complies with the consensus.Component interface. It gathers
+// a message.Reduction, verifies its signature and forwards it to the
+// aggregator
 func (r *Reducer) Collect(e consensus.InternalPacket) error {
 	ev := e.(message.Reduction)
 	hdr := ev.State()
@@ -141,7 +143,7 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) error {
 
 var restartFactory = consensus.Restarter{}
 
-// Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
+// Halt is used by either the Aggregator in case of successful reduction or the timer in case of a timeout.
 // In the latter case no agreement message is pushed forward
 func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 	lg.WithField("id", r.reductionID).Traceln("halted")
@@ -161,7 +163,9 @@ func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 	restart := r.signer.Compose(restartFactory)
 	msg := message.New(topics.Restart, restart)
 
-	r.signer.SendInternally(topics.Restart, msg, r.ID())
+	if err := r.signer.SendInternally(topics.Restart, msg, r.ID()); err != nil {
+		lg.WithError(err).Warnln("sending a restart after a Halt triggered error")
+	}
 }
 
 // CollectStepVotes is triggered when the first StepVotes get published by the
@@ -180,7 +184,7 @@ func (r *Reducer) CollectStepVotes(e consensus.InternalPacket) error {
 
 	if r.handler.AmMember(r.round, step) {
 		// propagating a new StepVoteMsg with the right step
-		r.sendReduction(step, hdr.BlockHash)
+		return r.sendReduction(step, hdr.BlockHash)
 	}
 	return nil
 }
@@ -202,7 +206,7 @@ func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*message.StepVote
 	ev.VotesPerStep = svs
 
 	msg := message.New(topics.Agreement, *ev)
-	// then we forward the marshalled Agreement to the store to be sent
+	// then we forward the marshaled Agreement to the store to be sent
 	if err := r.signer.Gossip(msg, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in gossiping the agreement")
 	}

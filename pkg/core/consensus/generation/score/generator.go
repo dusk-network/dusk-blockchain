@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -20,7 +20,7 @@ import (
 var _ consensus.Component = (*Generator)(nil)
 
 var emptyHash [32]byte
-var lg *log.Entry = log.WithField("process", "score generator")
+var lg = log.WithField("process", "score generator")
 
 // NewComponent returns an uninitialized Generator.
 func NewComponent(publisher eventbus.Publisher, consensusKeys key.ConsensusKeys, d, k ristretto.Scalar) *Generator {
@@ -133,6 +133,7 @@ func (g *Generator) Prove(seed []byte, bidList user.BidList) zkproof.ZkProof {
 	return zkproof.Prove(g.d, g.k, seedScalar, bidListScalars)
 }
 
+// Collect complies to the consensus.Component interface
 func (g *Generator) Collect(e consensus.InternalPacket) error {
 	defer func() {
 		g.lock.Lock()

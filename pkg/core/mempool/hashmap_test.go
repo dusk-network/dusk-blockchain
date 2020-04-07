@@ -32,7 +32,7 @@ func TestSortedKeys(t *testing.T) {
 	}
 
 	// Iterate through all tx expecting each one has lower fee than
-	// the previos one
+	// the previous one
 	var prevVal uint64
 	prevVal = math.MaxUint64
 

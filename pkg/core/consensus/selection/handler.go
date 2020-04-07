@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -15,6 +15,8 @@ import (
 var _ Handler = (*ScoreHandler)(nil)
 
 type (
+	// ScoreHandler manages the score threshold, performs verification of
+	// message.Score, keeps tab of the highest score so far
 	ScoreHandler struct {
 		bidList user.BidList
 
@@ -35,6 +37,7 @@ type (
 	}
 )
 
+// NewScoreHandler returns a new instance if ScoreHandler
 func NewScoreHandler(bidList user.BidList) *ScoreHandler {
 	return &ScoreHandler{
 		bidList:   bidList,
@@ -42,12 +45,16 @@ func NewScoreHandler(bidList user.BidList) *ScoreHandler {
 	}
 }
 
+// ResetThreshold resets the score threshold that sets the absolute minimum for
+// a score to be eligible for sending
 func (sh *ScoreHandler) ResetThreshold() {
 	sh.lock.Lock()
 	defer sh.lock.Unlock()
 	sh.threshold.Reset()
 }
 
+// LowerThreshold lowers the threshold after a timespan when no BlockGenerator
+// could send a valid score
 func (sh *ScoreHandler) LowerThreshold() {
 	sh.lock.Lock()
 	defer sh.lock.Unlock()
@@ -59,6 +66,7 @@ func (sh *ScoreHandler) Priority(first, second message.Score) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }
 
+// Verify a score by delegating the ZK library to validate the proof
 func (sh *ScoreHandler) Verify(m message.Score) error {
 	// Check threshold
 	sh.lock.RLock()

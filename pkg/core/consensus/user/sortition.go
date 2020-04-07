@@ -29,11 +29,6 @@ func (v VotingCommittee) Size() int {
 	return v.TotalOccurrences()
 }
 
-// Remove a member from the VotingCommittee by its BLS public key.
-func (v *VotingCommittee) Remove(pk []byte) bool {
-	return v.Remove(pk)
-}
-
 // MemberKeys returns the BLS public keys of all the members in a VotingCommittee.
 func (v VotingCommittee) MemberKeys() [][]byte {
 	return v.Unravel()
@@ -55,7 +50,7 @@ func createSortitionHash(round uint64, step uint8, i int) ([]byte, error) {
 	msg := make([]byte, 12)
 	binary.LittleEndian.PutUint64(msg[:8], round)
 	binary.LittleEndian.PutUint32(msg[8:12], uint32(i))
-	msg = append(msg, byte(step))
+	msg = append(msg, step)
 	return hash.Sha3256(msg)
 }
 
@@ -186,9 +181,7 @@ func copyMembers(members map[string]*Member) map[string]*Member {
 			PublicKeyBLS: v.PublicKeyBLS,
 		}
 
-		for _, stake := range v.Stakes {
-			member.Stakes = append(member.Stakes, stake)
-		}
+		member.Stakes = append(member.Stakes, v.Stakes...)
 		m[k] = member
 	}
 

@@ -28,6 +28,9 @@ type BrokerPool struct {
 	workers         []*Broker
 }
 
+// NewPool intantiates the specified amount of brokers and run them in separate
+// goroutines. Thus it returns a new BrokerPool instance populated with said
+// brokers
 func NewPool(eventBus *eventbus.EventBus, brokersNum, clientsPerBroker uint) *BrokerPool {
 
 	bp := new(BrokerPool)
@@ -48,6 +51,11 @@ func NewPool(eventBus *eventbus.EventBus, brokersNum, clientsPerBroker uint) *Br
 	return bp
 }
 
+// PushConn pushes a websocket connection to the broker pool. If all brokers
+// are busy the connection gets discarded
+// TODO: it appears that the connection is not actually discarded. Maybe the GC
+// finalizes it, but it should be checked what exactly happens to the
+// connection if all brokers are busy
 func (bp *BrokerPool) PushConn(conn *websocket.Conn) {
 
 	if conn == nil {
@@ -61,6 +69,7 @@ func (bp *BrokerPool) PushConn(conn *websocket.Conn) {
 	}
 }
 
+// Close the BrokerPool by closing the underlying connection channel
 func (bp *BrokerPool) Close() {
 
 	// Closing the shared chan will trigger a cascading teardown procedure for

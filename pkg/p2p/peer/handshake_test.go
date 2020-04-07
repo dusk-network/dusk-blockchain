@@ -25,18 +25,20 @@ func TestHandshake(t *testing.T) {
 	go func() {
 		peerReader, err := helper.StartPeerReader(srv, eb, rpcBus, counter, nil)
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 
 		if err := peerReader.Accept(); err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 	}()
 
 	time.Sleep(500 * time.Millisecond)
 	g := processing.NewGossip(protocol.TestNet)
 	pw := peer.NewWriter(client, g, eb)
-	defer pw.Conn.Close()
+	defer func() {
+		_ = pw.Conn.Close()
+	}()
 	if err := pw.Handshake(); err != nil {
 		t.Fatal(err)
 	}

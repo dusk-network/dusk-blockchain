@@ -9,6 +9,11 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
+// Message is the core of the message-oriented architecture of the node. It is
+// particularly important within the consensus, but in practice any component
+// ends up dealing with it. It encapsulates the data exchanged by different
+// nodes as well as internal components. The Message transits inside of the
+// eventbus and is de- serialized through the Gossip procedure
 type Message interface {
 	//fmt.Stringer
 	Category() topics.Topic
@@ -17,19 +22,21 @@ type Message interface {
 	Id() []byte
 }
 
+// Serializable allows to set a payload
 type Serializable interface {
 	SetPayload(interface{})
 }
 
+// SerializableMessage is a Serializable and a Message
 type SerializableMessage interface {
 	Message
 	Serializable
 }
 
 // simple is a utility struct that encapsulates the data received by another
-// peer and provides protocol-level unmarshalling. It is intended to be
+// peer and provides protocol-level unmarshaling. It is intended to be
 // immutable but also lazy, and therefore it includes the capability to cache the
-// Marshalled form
+// Marshaled form
 type simple struct {
 	// category is normally equivalent to the topic, but can sometimes differ
 	// since it actually describes the type of the Payload rather than the
@@ -38,45 +45,43 @@ type simple struct {
 	// Payload carries the payload of the message, if it can be parsed at
 	// protocol level
 	payload interface{}
-	// cached marshalled form with Category
-	marshalled *bytes.Buffer
+	// cached marshaled form with Category
+	marshaled *bytes.Buffer
 }
 
 func (m simple) String() string {
 	var sb strings.Builder
-	sb.WriteString("category: ")
-	sb.WriteString(m.category.String())
-	sb.WriteString("\n")
-	sb.WriteString("payload: [\n")
+	_, _ = sb.WriteString("category: ")
+	_, _ = sb.WriteString(m.category.String())
+	_, _ = sb.WriteString("\n")
+	_, _ = sb.WriteString("payload: [\n")
 	if m.payload == nil {
-		sb.WriteString("<payload is nil>")
+		_, _ = sb.WriteString("<payload is nil>")
 	} else {
 		str, ok := m.payload.(fmt.Stringer)
 		if ok {
-			sb.WriteString(str.String())
+			_, _ = sb.WriteString(str.String())
 		} else {
-			sb.WriteString("<payload is non-empty but not a Stringer>")
+			_, _ = sb.WriteString("<payload is non-empty but not a Stringer>")
 		}
 	}
-	sb.WriteString("\n]\n")
-	sb.WriteString("\n")
+	_, _ = sb.WriteString("\n]\n")
+	_, _ = sb.WriteString("\n")
 	return sb.String()
 
 }
 
+// Id is the Id the Message
+// nolint:golint
 func (m simple) Id() []byte {
-	if m.marshalled == nil {
+	if m.marshaled == nil {
 		buf, err := Marshal(m)
 		if err != nil {
 			panic(err)
 		}
-		m.marshalled = &buf
+		m.marshaled = &buf
 	}
-	return m.marshalled.Bytes()
-}
-
-func (m *simple) setPayload(i interface{}) {
-	m.payload = i
+	return m.marshaled.Bytes()
 }
 
 func (m simple) Category() topics.Topic {
@@ -93,7 +98,7 @@ func (m *simple) SetPayload(payload interface{}) {
 
 func (m simple) Equal(other Message) bool {
 	msg, ok := other.(*simple)
-	return ok && bytes.Equal(msg.marshalled.Bytes(), msg.marshalled.Bytes())
+	return ok && bytes.Equal(msg.marshaled.Bytes(), msg.marshaled.Bytes())
 }
 
 // New creates a new Message
@@ -101,18 +106,18 @@ func New(t topics.Topic, payload interface{}) Message {
 	return &simple{category: t, payload: payload}
 }
 
-func newMsg(t topics.Topic) *simple {
-	return &simple{category: t}
-}
+//func newMsg(t topics.Topic) *simple {
+//	return &simple{category: t}
+//}
 
 func (m *simple) initPayloadBuffer(b bytes.Buffer) {
-	if m.marshalled == nil {
-		m.marshalled = bytes.NewBuffer(b.Bytes())
+	if m.marshaled == nil {
+		m.marshaled = bytes.NewBuffer(b.Bytes())
 	}
 }
 
 // Unmarshal mutates the buffer by extracting the topic. It create the Message
-// by setting the topic and unmarshalling the payload into the proper structure
+// by setting the topic and unmarshaling the payload into the proper structure
 // It also caches the serialized form within the message
 func Unmarshal(b *bytes.Buffer) (Message, error) {
 	var err error
@@ -153,7 +158,7 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 func Marshal(s Message) (bytes.Buffer, error) {
 	var buf bytes.Buffer
 	// if it is a simple message, first we check if this message carries a
-	// cache of its marshalled form first
+	// cache of its marshaled form first
 	m, ok := s.(simple)
 
 	if !ok { // it is not a cacheable message. We simply marshal without caring for any optimization
@@ -164,13 +169,13 @@ func Marshal(s Message) (bytes.Buffer, error) {
 	}
 
 	// it is a simple message
-	if m.marshalled != nil {
-		// the message has cached its marshalled form
-		b := *m.marshalled
+	if m.marshaled != nil {
+		// the message has cached its marshaled form
+		b := *m.marshaled
 		return b, nil
 	}
 
-	// this message has never been marshalled before
+	// this message has never been marshaled before
 	if err := marshal(m, &buf); err != nil {
 		return bytes.Buffer{}, err
 	}
@@ -187,9 +192,9 @@ func marshal(s Message, b *bytes.Buffer) error {
 		return nil
 	}
 
-	switch payload.(type) {
+	switch payload := payload.(type) {
 	case bytes.Buffer:
-		*b = payload.(bytes.Buffer)
+		*b = payload
 
 	default:
 		if err := marshalMessage(s.Category(), payload, b); err != nil {
@@ -223,7 +228,7 @@ func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) 
 		agreement := payload.(Agreement)
 		err = MarshalAgreement(buf, agreement)
 	default:
-		return fmt.Errorf("unsupported marshalling of message type: %v", topic.String())
+		return fmt.Errorf("unsupported marshaling of message type: %v", topic.String())
 	}
 
 	if err != nil {

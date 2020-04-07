@@ -2,14 +2,14 @@ package transactor
 
 import (
 	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 
-	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-crypto/mlsag"
+	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
 	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 func fetchBlockHeightAndState(db database.DB, height uint64) (*block.Block, []byte, error) {
@@ -43,7 +43,7 @@ func fetchDecoys(numMixins int) []mlsag.PubKeys {
 
 	var pubKeys []mlsag.PubKeys
 	var decoys []ristretto.Point
-	db.View(func(t database.Transaction) error {
+	_ = db.View(func(t database.Transaction) error {
 		decoys = t.FetchDecoys(numMixins)
 		return nil
 	})

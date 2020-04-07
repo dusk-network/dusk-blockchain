@@ -33,7 +33,7 @@ func TestGeneration(t *testing.T) {
 	h.TriggerBlockGeneration()
 
 	// Should receive a Score and Candidate message from the generator
-	_ = <-h.ScoreChan
+	<-h.ScoreChan
 	candidateMsg := <-h.CandidateChan
 	c := candidateMsg.Payload().(message.Candidate)
 

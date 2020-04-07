@@ -17,7 +17,7 @@ import (
 	logger "github.com/sirupsen/logrus"
 )
 
-var log *logger.Entry = logger.WithFields(logger.Fields{"process": "synchronizer"})
+var log = logger.WithFields(logger.Fields{"process": "synchronizer"})
 
 // ChainSynchronizer is the component responsible for keeping the node in sync with the
 // rest of the network. It sits between the peer and the chain, as a sort of gateway for
@@ -130,7 +130,7 @@ func (s *ChainSynchronizer) setHighestSeen(height uint64) {
 	s.lock.Unlock()
 }
 
-// TODO: interface - get rid of the marshalling
+// TODO: interface - get rid of the marshaling
 func (s *ChainSynchronizer) publishHighestSeen(height uint64) {
 	msg := message.New(topics.HighestSeen, height)
 	s.publisher.Publish(topics.HighestSeen, msg)
@@ -146,6 +146,7 @@ func createGetBlocksMsg(latestHash []byte) *peermsg.GetBlocks {
 	return msg
 }
 
+//nolint:unparam
 func marshalGetBlocks(msg *peermsg.GetBlocks) (*bytes.Buffer, error) {
 	buf := topics.GetBlocks.ToBuffer()
 	if err := msg.Encode(&buf); err != nil {

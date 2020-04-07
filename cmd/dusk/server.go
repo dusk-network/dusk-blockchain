@@ -2,8 +2,9 @@ package main
 
 import (
 	"bytes"
-	"github.com/sirupsen/logrus"
 	"net"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
@@ -28,16 +29,20 @@ var logServer = logrus.WithField("process", "server")
 
 // Server is the main process of the node
 type Server struct {
-	eventBus   *eventbus.EventBus
-	rpcBus     *rpcbus.RPCBus
-	chain      *chain.Chain
-	dupeMap    *dupemap.DupeMap
-	counter    *chainsync.Counter
-	gossip     *processing.Gossip
-	rpcWrapper *rpc.RPCSrvWrapper
+	eventBus      *eventbus.EventBus
+	rpcBus        *rpcbus.RPCBus
+	chain         *chain.Chain
+	dupeMap       *dupemap.DupeMap
+	counter       *chainsync.Counter
+	gossip        *processing.Gossip
+	rpcWrapper    *rpc.SrvWrapper
+	cancelMonitor StopFunc
 }
 
-// Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
+// Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
+// launches a new `CommitteeStore`, launches the Blockchain process, creates
+// and launches a monitor client (if configuration demands it), and inits the
+// Stake and Blind Bid channels
 func Setup() *Server {
 	// creating the eventbus
 	eventBus := eventbus.New()
@@ -72,11 +77,11 @@ func Setup() *Server {
 
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
-		if gqlServer, err := gql.NewHTTPServer(eventBus, rpcBus); err != nil {
-			log.Errorf("GraphQL http server error: %s", err.Error())
+		if gqlServer, e := gql.NewHTTPServer(eventBus, rpcBus); e != nil {
+			log.Errorf("GraphQL http server error: %v", e)
 		} else {
-			if err := gqlServer.Start(); err != nil {
-				log.Errorf("GraphQL failed to start: %s", err.Error())
+			if e := gqlServer.Start(); e != nil {
+				log.Errorf("GraphQL failed to start: %v", e)
 			}
 		}
 	}
@@ -100,9 +105,11 @@ func Setup() *Server {
 	go transactorComponent.Listen()
 
 	// Connecting to the log based monitoring system
-	if err := ConnectToLogMonitor(eventBus); err != nil {
+	stopFunc, err := LaunchMonitor(eventBus)
+	if err != nil {
 		log.Panic(err)
 	}
+	srv.cancelMonitor = stopFunc
 
 	return srv
 }
@@ -169,4 +176,5 @@ func (s *Server) Close() {
 	_ = s.chain.Close()
 	s.rpcBus.Close()
 	s.rpcWrapper.Shutdown()
+	s.cancelMonitor()
 }
