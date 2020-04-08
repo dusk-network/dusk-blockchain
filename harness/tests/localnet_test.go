@@ -53,7 +53,7 @@ func TestMain(m *testing.M) {
 	err = localNet.Bootstrap(workspace)
 
 	if err == engine.ErrDisabledHarness {
-		os.RemoveAll(workspace)
+		_ = os.RemoveAll(workspace)
 		os.Exit(0)
 	}
 
@@ -69,7 +69,7 @@ func TestMain(m *testing.M) {
 
 	if *engine.KeepAlive != true {
 		localNet.Teardown()
-		os.RemoveAll(workspace)
+		_ = os.RemoveAll(workspace)
 	}
 
 	os.Exit(code)
@@ -82,7 +82,7 @@ func TestSendBidTransaction(t *testing.T) {
 
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 
-	// Send request to all nodes to loadWallet
+	t.Log("Send request to all nodes to loadWallet")
 	for i := 0; i < localNetSize; i++ {
 		_, err := localNet.LoadWalletCmd(uint(i), walletsPass)
 		if err != nil {
@@ -90,7 +90,7 @@ func TestSendBidTransaction(t *testing.T) {
 		}
 	}
 
-	// Send request to node 0 to generate and process a Bid transaction
+	t.Log("Send request to node 0 to generate and process a Bid transaction")
 	txidBytes, err := localNet.SendBidCmd(0, 10, 10)
 	if err != nil {
 		t.Fatal(err.Error())
@@ -99,7 +99,7 @@ func TestSendBidTransaction(t *testing.T) {
 	txID := hex.EncodeToString(txidBytes)
 	t.Logf("Bid transaction id: %s", txID)
 
-	// Ensure all nodes have accepted this transaction at the same height
+	t.Log("Ensure all nodes have accepted this transaction at the same height")
 	blockhash := ""
 	for i := 0; i < len(localNet.Nodes); i++ {
 
@@ -127,7 +127,7 @@ func TestCatchup(t *testing.T) {
 
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 
-	// Send request to all nodes to loadWallet. This will start consensus
+	t.Log("Send request to all nodes to loadWallet. This will start consensus")
 	for i := 0; i < localNetSize; i++ {
 		if _, err := localNet.LoadWalletCmd(uint(i), walletsPass); err != nil {
 			st := status.Convert(err)
@@ -138,10 +138,10 @@ func TestCatchup(t *testing.T) {
 		}
 	}
 
-	// Wait till we are at height 3
+	t.Log("Wait till we are at height 3")
 	localNet.WaitUntil(t, 0, 3, 3*time.Minute, 5*time.Second)
 
-	// Start a new node. This node falls behind during consensus
+	t.Log("Start a new node. This node falls behind during consensus")
 	ind := localNetSize
 	node := engine.NewDuskNode(9500+ind, 9000+ind, "default")
 	localNet.Nodes = append(localNet.Nodes, node)
@@ -150,9 +150,9 @@ func TestCatchup(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	// Wait for two more blocks
+	t.Log("Wait for two more blocks")
 	localNet.WaitUntil(t, 0, 5, 2*time.Minute, 5*time.Second)
 
-	// Ensure the new node has been synced up
+	t.Log("Ensure the new node has been synced up")
 	localNet.WaitUntil(t, uint(ind), 5, 2*time.Minute, 5*time.Second)
 }

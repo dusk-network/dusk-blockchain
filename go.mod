@@ -27,7 +27,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/urfave/cli v1.22.3
 	golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
-	golang.org/x/tools v0.0.0-20200403190813-44a64ad78b9b // indirect
+	golang.org/x/tools v0.0.0-20200403190813-44a64ad78b9b
 	google.golang.org/grpc v1.28.0
 )
 
