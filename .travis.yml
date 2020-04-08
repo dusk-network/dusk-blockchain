@@ -1,4 +1,3 @@
-
 language: go
 
 cache:
@@ -20,7 +19,7 @@ matrix:
       script:
         - make lint
 
-    - name: "Tests"
+    - name: "Unit Tests"
       before_script:
         - go get ./...
 
@@ -33,6 +32,7 @@ matrix:
 
       after_success:
         - bash <(curl -s https://codecov.io/bash)
-    - name: "Harness"
+
+    - name: "Test Harness"
         script:
           - make test-harness-ci
