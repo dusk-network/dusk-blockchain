@@ -13,6 +13,10 @@ test: ## Run unittests
 	@go test $(TFLAGS) -p 1 -short ${PKG_LIST}
 test-harness: ## Run harness tests
 	@go test -v --count=1 --test.timeout=0 ./harness/... -args -enable
+get-blindbid: ## download dusk-blindbidproof
+	@wget -P ${PWD}/bin/ https://github.com/dusk-network/dusk-blindbidproof/releases/download/v0.1.0/blindbid-linux-amd64 && chmod +x ${PWD}/bin/blindbid-linux-amd64
+test-harness-ci: get-blindbid build
+	NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_BLINDBID=${PWD}/bin/blindbid-linux-amd64 DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="default" make test-harness
 race: dep ## Run data race detector
 	@go test $(TFLAGS) -race -v ${PKG_LIST}
 coverage: ## Generate global code coverage report

@@ -33,3 +33,6 @@ matrix:
 
       after_success:
         - bash <(curl -s https://codecov.io/bash)
+    - name: "Harness"
+        script:
+          - make test-harness-ci

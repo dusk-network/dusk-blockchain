@@ -3,8 +3,10 @@ package tests
 import (
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -13,8 +15,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	localNetSize = 10
+var (
+	localNetSizeStr = os.Getenv("NETWORK_SIZE")
+	localNetSize    = 10
 )
 
 var localNet engine.Network
@@ -30,6 +33,14 @@ func TestMain(m *testing.M) {
 	workspace, err = ioutil.TempDir(os.TempDir(), "localnet-")
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if localNetSizeStr != "" {
+		currentLocalNetSize, err := strconv.Atoi(localNetSizeStr)
+		if err == nil {
+			fmt.Println("Going to setup NETWORK_SIZE with custom value", "currentLocalNetSize", currentLocalNetSize)
+			localNetSize = currentLocalNetSize
+		}
 	}
 
 	// Create a network of N nodes
