@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 	l "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "monitoring")
+var lg = logrus.WithField("process", "monitoring")
 
 // StopFunc is invoked when the monitor should be stopped. It is intended to
 // perform the closing operations on the GRPC server and connections
