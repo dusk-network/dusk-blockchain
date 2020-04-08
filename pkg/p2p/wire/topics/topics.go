@@ -70,6 +70,8 @@ const (
 	VerifyCandidateBlock
 	GetLastCertificate
 	SendMempoolTx
+	ValidateStateTransition
+	ExecuteStateTransition
 
 	// Cross-process RPCBus topics
 	// Wallet
@@ -156,6 +158,8 @@ var Topics = [...]topicBuf{
 	{VerifyCandidateBlock, *(bytes.NewBuffer([]byte{byte(VerifyCandidateBlock)})), "verifycandidateblock"},
 	{GetLastCertificate, *(bytes.NewBuffer([]byte{byte(GetLastCertificate)})), "getlastcertificate"},
 	{SendMempoolTx, *(bytes.NewBuffer([]byte{byte(SendMempoolTx)})), "sendmempooltx"},
+	{ValidateStateTransition, *(bytes.NewBuffer([]byte{byte(ValidateStateTransition)})), "validatestatetransition"},
+	{ExecuteStateTransition, *(bytes.NewBuffer([]byte{byte(ExecuteStateTransition)})), "executestatetransition"},
 	{GetMempoolView, *(bytes.NewBuffer([]byte{byte(GetMempoolView)})), "getmempoolview"},
 	{CreateWallet, *(bytes.NewBuffer([]byte{byte(CreateWallet)})), "createwallet"},
 	{CreateFromSeed, *(bytes.NewBuffer([]byte{byte(CreateFromSeed)})), "createfromseed"},
