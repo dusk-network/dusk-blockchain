@@ -15,6 +15,7 @@ import (
 // over the RPCBus.
 type Client struct {
 	phoenix.RuskClient
+	conn           *grpc.ClientConn
 	validateSTChan chan rpcbus.Request
 	executeSTChan  chan rpcbus.Request
 }
@@ -26,13 +27,16 @@ type Client struct {
 // As the Rusk server is a fundamental part of the node functionality,
 // this function will panic if the connection can not be established
 // successfully.
-func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) {
+func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) *Client {
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(3*time.Second))
 	if err != nil {
 		panic(err)
 	}
 
-	c := Client{RuskClient: phoenix.NewRuskClient(conn)}
+	c := &Client{
+		RuskClient: phoenix.NewRuskClient(conn),
+		conn:       conn,
+	}
 	if err := registerMethod(rpcBus, topics.ValidateStateTransition, &c.validateSTChan); err != nil {
 		panic(err)
 	}
@@ -41,6 +45,7 @@ func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) {
 	}
 
 	go c.listen()
+	return c
 }
 
 // re-usable function to register channels to RPCBus topics
@@ -49,7 +54,7 @@ func registerMethod(rpcBus *rpcbus.RPCBus, topic topics.Topic, c *chan rpcbus.Re
 	return rpcBus.Register(topic, *c)
 }
 
-func (c Client) listen() {
+func (c *Client) listen() {
 	for {
 		select {
 		case r := <-c.validateSTChan:
@@ -58,4 +63,8 @@ func (c Client) listen() {
 			// TODO: add case for execute state transition
 		}
 	}
+}
+
+func (c *Client) Close() error {
+	return c.conn.Close()
 }

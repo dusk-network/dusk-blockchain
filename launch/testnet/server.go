@@ -33,6 +33,7 @@ type Server struct {
 	counter    *chainsync.Counter
 	gossip     *processing.Gossip
 	rpcWrapper *rpc.RPCSrvWrapper
+	rpcClient  *rpc.Client
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
@@ -70,7 +71,7 @@ func Setup() *Server {
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	// rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
+	client := rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
 
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
@@ -93,6 +94,7 @@ func Setup() *Server {
 		counter:    counter,
 		gossip:     processing.NewGossip(protocol.TestNet),
 		rpcWrapper: rpcWrapper,
+		rpcClient:  client,
 	}
 
 	// Setting up the transactor component
@@ -183,4 +185,5 @@ func (s *Server) Close() {
 	s.chain.Close()
 	s.rpcBus.Close()
 	s.rpcWrapper.Shutdown()
+	_ = s.rpcClient.Close()
 }
