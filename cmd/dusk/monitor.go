@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/sirupsen/logrus"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/monitor"
