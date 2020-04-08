@@ -28,7 +28,10 @@ type Client struct {
 // this function will panic if the connection can not be established
 // successfully.
 func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) *Client {
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(3*time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		panic(err)
 	}
@@ -65,6 +68,7 @@ func (c *Client) listen() {
 	}
 }
 
+// Close the connection to the gRPC server.
 func (c *Client) Close() error {
 	return c.conn.Close()
 }
