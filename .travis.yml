@@ -34,5 +34,5 @@ matrix:
         - bash <(curl -s https://codecov.io/bash)
 
     - name: "Test Harness"
-        script:
-          - make test-harness-ci
+      script:
+        - make test-harness-ci
