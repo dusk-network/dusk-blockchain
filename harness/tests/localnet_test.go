@@ -36,8 +36,8 @@ func TestMain(m *testing.M) {
 	}
 
 	if localNetSizeStr != "" {
-		currentLocalNetSize, err := strconv.Atoi(localNetSizeStr)
-		if err == nil {
+		currentLocalNetSize, currentErr := strconv.Atoi(localNetSizeStr)
+		if currentErr == nil {
 			fmt.Println("Going to setup NETWORK_SIZE with custom value", "currentLocalNetSize", currentLocalNetSize)
 			localNetSize = currentLocalNetSize
 		}
