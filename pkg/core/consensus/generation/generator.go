@@ -1,19 +1,12 @@
 package generation
 
 import (
-	"bytes"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 var _ consensus.Component = (*Generator)(nil)
-
-var emptyHash [32]byte
-var emptyPayload = new(bytes.Buffer)
-
-var genMessage = message.New(topics.Generation, nil)
 
 var restartFactory = consensus.Restarter{}
 

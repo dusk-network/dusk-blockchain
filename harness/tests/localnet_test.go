@@ -1,18 +1,16 @@
 package tests
 
 import (
+	"encoding/hex"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/harness/engine"
 	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -20,6 +18,7 @@ const (
 )
 
 var localNet engine.Network
+var workspace string
 
 // TestMain sets up a temporarily local network of N nodes running from genesis block
 // The network should be fully functioning and ready to accept messaging
@@ -27,18 +26,15 @@ func TestMain(m *testing.M) {
 
 	flag.Parse()
 
-	workspace, err := ioutil.TempDir(os.TempDir(), "localnet-")
+	var err error
+	workspace, err = ioutil.TempDir(os.TempDir(), "localnet-")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Create a network of N nodes
 	for i := 0; i < localNetSize; i++ {
-		node := engine.NewDuskNode(
-			strconv.Itoa(9500+i),
-			strconv.Itoa(9000+i),
-			"default",
-		)
+		node := engine.NewDuskNode(9500+i, 9000+i, "default")
 		localNet.Nodes = append(localNet.Nodes, node)
 	}
 
@@ -74,72 +70,42 @@ func TestMain(m *testing.M) {
 func TestSendBidTransaction(t *testing.T) {
 
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
-	if len(walletsPass) == 0 {
-		t.Logf("Empty DUSK_WALLET_PASS")
-	}
 
 	// Send request to all nodes to loadWallet
 	for i := 0; i < localNetSize; i++ {
-		_, err := localNet.SendCommand(uint(i), "loadwallet", []string{walletsPass})
+		_, err := localNet.LoadWalletCmd(uint(i), walletsPass)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
 	}
 
 	// Send request to node 0 to generate and process a Bid transaction
-	data, err := localNet.SendCommand(0, "bid", []string{"10", "10"})
+	txidBytes, err := localNet.SendBidCmd(0, 10, 10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	txid := strings.Trim(data, "Success! TxID: ")
-	t.Logf("Bid transaction id: %s", txid)
+	txID := hex.EncodeToString(txidBytes)
+	t.Logf("Bid transaction id: %s", txID)
 
 	// Ensure all nodes have accepted this transaction at the same height
 	blockhash := ""
-	for i, node := range localNet.Nodes {
-		condition := func() bool {
-			// Construct query to fetch txid
-			query := fmt.Sprintf(
-				"{\"query\" : \"{ transactions (txid: \\\"%s\\\") { txid blockhash } }\"}",
-				txid)
+	for i := 0; i < len(localNet.Nodes); i++ {
 
-			var resp map[string]map[string][]map[string]string
-			err := localNet.SendQuery(uint(i), query, &resp)
-			if err != nil {
-				return false
-			}
+		bh := localNet.WaitUntilTx(t, uint(i), txID)
 
-			result, ok := resp["data"]
-			if !ok {
-				return false
-			}
-
-			if len(result["transactions"]) == 0 {
-				// graphql request processed but still txid not found
-				return false
-			}
-
-			if i == 0 {
-				blockhash = result["transactions"][0]["blockhash"]
-			}
-
-			if len(blockhash) != 0 && blockhash != result["transactions"][0]["blockhash"] {
-				// the case where the network has inconsistency and same tx has been
-				// accepted within different blocks
-				return false
-			}
-
-			if result["transactions"][0]["txid"] != txid {
-				return false
-			}
-
-			return true
+		if len(bh) == 0 {
+			t.Fatal("empty blockhash")
 		}
 
-		// asserts that given condition will be met in 1 minute, by checking condition function each second.
-		if !assert.Eventuallyf(t, condition, 1*time.Minute, time.Second, "failed node %s", node.Id) {
-			break
+		if len(blockhash) != 0 && blockhash != bh {
+			// the case where the network has inconsistency and same tx has been
+			// accepted within different blocks
+			t.Fatal("same tx hash has been accepted within different blocks")
+		}
+
+		if i == 0 {
+			blockhash = bh
 		}
 	}
 }
@@ -147,72 +113,35 @@ func TestSendBidTransaction(t *testing.T) {
 // TestCatchup tests that a node which falls behind during consensus
 // will properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
+
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
-	if len(walletsPass) == 0 {
-		t.Logf("Empty DUSK_WALLET_PASS")
-	}
 
-	// Send request to all nodes to loadWallet
+	// Send request to all nodes to loadWallet. This will start consensus
 	for i := 0; i < localNetSize; i++ {
-		_, err := localNet.SendCommand(uint(i), "loadwallet", []string{walletsPass})
-		if err != nil {
-			t.Fatal(err.Error())
+		if _, err := localNet.LoadWalletCmd(uint(i), walletsPass); err != nil {
+			st := status.Convert(err)
+			if st.Message() != "wallet is already loaded" {
+				// Better use of gRPC code 'st.Code()' later
+				log.Fatal(err)
+			}
 		}
 	}
 
-	waitHeight := 6
-	waitUntil := func() bool {
-		// Construct query to fetch block height
-		query := fmt.Sprintf(
-			"{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}",
-		)
+	// Wait till we are at height 3
+	localNet.WaitUntil(t, 0, 3, 3*time.Minute, 5*time.Second)
 
-		var result map[string]map[string][]map[string]map[string]int
-		if err := localNet.SendQuery(1, query, &result); err != nil {
-			return false
-		}
+	// Start a new node. This node falls behind during consensus
+	ind := localNetSize
+	node := engine.NewDuskNode(9500+ind, 9000+ind, "default")
+	localNet.Nodes = append(localNet.Nodes, node)
 
-		if result["data"]["blocks"][0]["header"]["height"] >= waitHeight {
-			return true
-		}
-
-		return false
-	}
-
-	// Wait till we are at height 6
-	assert.Eventually(t, waitUntil, 200*time.Second, 5*time.Second)
-
-	// Stop consensus for node 0
-	if _, err := localNet.SendCommand(0, "publishTopic", []string{"stopconsensus", ""}); err != nil {
-		t.Fatal(err)
+	if err := localNet.StartNode(ind, node, workspace); err != nil {
+		t.Fatal(err.Error())
 	}
 
 	// Wait for two more blocks
-	waitHeight += 2
-	assert.Eventually(t, waitUntil, 100*time.Second, 5*time.Second)
+	localNet.WaitUntil(t, 0, 5, 2*time.Minute, 5*time.Second)
 
-	// Ensure node syncs up
-	ensureSynced := func() bool {
-		// Construct query to fetch block height
-		query := fmt.Sprintf(
-			"{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}",
-		)
-
-		var result map[string]map[string][]map[string]map[string]int
-		if err := localNet.SendQuery(0, query, &result); err != nil {
-			return false
-		}
-
-		heightNode0 := result["data"]["blocks"][0]["header"]["height"]
-		var result2 map[string]map[string][]map[string]map[string]int
-		if err := localNet.SendQuery(1, query, &result2); err != nil {
-			return false
-		}
-
-		heightNode1 := result2["data"]["blocks"][0]["header"]["height"]
-
-		return heightNode0 == heightNode1
-	}
-
-	assert.Eventually(t, ensureSynced, 200*time.Second, 1*time.Second)
+	// Ensure the new node has been synced up
+	localNet.WaitUntil(t, uint(ind), 5, 2*time.Minute, 5*time.Second)
 }

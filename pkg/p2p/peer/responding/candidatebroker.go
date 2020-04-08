@@ -9,17 +9,20 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
+// CandidateBroker holds instances to RPCBus and responseChan
 type CandidateBroker struct {
 	rpcBus       *rpcbus.RPCBus
 	responseChan chan<- *bytes.Buffer
 }
 
+// NewCandidateBroker will create new CandidateBroker
 func NewCandidateBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer) *CandidateBroker {
 	return &CandidateBroker{rpcBus, responseChan}
 }
 
+// ProvideCandidate for a given (m *bytes.Buffer)
 func (c *CandidateBroker) ProvideCandidate(m *bytes.Buffer) error {
-	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.Request{*m, make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*m), 5*time.Second)
 	if err != nil {
 		return err
 	}

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/stretchr/testify/assert"
 )
@@ -41,7 +40,6 @@ func btoi(k key.ConsensusKeys) *big.Int {
 // Test that provisioners are sorted properly.
 func TestMemberAt(t *testing.T) {
 	nr := 50
-	p := &user.Provisioners{}
 	var ks sortedKeys
 	p, k := consensus.MockProvisioners(nr)
 	ks = append(ks, k...)

@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 const (
@@ -141,11 +141,16 @@ func (l *loader) prefetchChainTip() error {
 	// Verify chain state. There shouldn't be any blocks higher than chainTip
 	err = l.db.View(func(t database.Transaction) error {
 		nextHeight := l.chainTip.Header.Height + 1
-		hash, err := t.FetchBlockHashByHeight(nextHeight)
-		// Check if
-		if err == nil && len(hash) > 0 {
+		hash, e := t.FetchBlockHashByHeight(nextHeight)
+		// Check if error is nil and the hash is set
+		if e == nil && len(hash) > 0 {
 			return fmt.Errorf("state points at %d height but the tip is higher", l.chainTip.Header.Height)
 		}
+		// TODO: this throws ErrBlockNotFound in tests. Should we propagate the
+		// error?
+		//if e != nil {
+		//	return e
+		//}
 		return nil
 	})
 

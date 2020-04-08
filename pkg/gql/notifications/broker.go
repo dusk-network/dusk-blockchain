@@ -29,7 +29,6 @@ var log = logger.WithField("process", "broker")
 // Broker is implemented in a non-blocking manner. That means it should not be
 // blocked on mutex-lock, chan push or any I/O operation.
 // It should not expose anything than a channel.
-
 type Broker struct {
 	id uint
 
@@ -45,21 +44,25 @@ type Broker struct {
 	// Events
 	eventBus          eventbus.Broker
 	acceptedBlockChan chan block.Block
-	acceptedBlockId   uint32
+	acceptedBlockID   uint32
 }
 
+// NewBroker creates a new Broker instance
 func NewBroker(id uint, eventBus eventbus.Broker, maxClientsCount uint, connChan chan wsConn) *Broker {
 
 	b := new(Broker)
 	b.eventBus = eventBus
 	b.ConnectionChan = connChan
-	b.acceptedBlockChan, b.acceptedBlockId = consensus.InitAcceptedBlockUpdate(eventBus)
+	b.acceptedBlockChan, b.acceptedBlockID = consensus.InitAcceptedBlockUpdate(eventBus)
 	b.clients = list.New()
 	b.maxClientsCount = maxClientsCount
 	b.id = id
 	return b
 }
 
+// Run represents the main loop of the Broker, where block data get piped to
+// incoming connections. Connections are put in Idle state after 30 seconds of
+// inactivity
 func (b *Broker) Run() {
 
 	// Teardown procedure for the Broker
@@ -70,7 +73,7 @@ func (b *Broker) Run() {
 		log.Infof("Terminating broker %d", b.id)
 
 		// Unsubscribe from all eventBus events
-		b.eventBus.Unsubscribe(topics.AcceptedBlock, b.acceptedBlockId)
+		b.eventBus.Unsubscribe(topics.AcceptedBlock, b.acceptedBlockID)
 
 		// Terminate all clients goroutines
 		for e := b.clients.Front(); e != nil; e = e.Next() {
@@ -88,12 +91,11 @@ func (b *Broker) Run() {
 		select {
 		// new client connection from webserver
 		case conn, isOpen := <-b.ConnectionChan:
-			if isOpen {
-				b.handleConn(conn)
-			} else {
+			if !isOpen {
 				// Terminate the broker when the shared connChan is closed
 				return
 			}
+			b.handleConn(conn)
 		// new accepted block from node
 		case blk := <-b.acceptedBlockChan:
 			b.handleBlock(blk)

@@ -30,6 +30,7 @@ func loadResponse(pubKey []byte) *node.LoadResponse {
 	return &node.LoadResponse{Key: pk}
 }
 
+// Listen to Wallet requests
 func (t *Transactor) Listen() {
 	for {
 		select {
@@ -79,12 +80,12 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) error, name 
 
 	if err := handler(r); err != nil {
 		log.Errorf("Failed %s request: %v", name, err)
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: err}
 		return
 	}
 
 	log.Infof("Handled %s request", name)
-	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+	r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}}
 }
 
 func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
@@ -101,7 +102,7 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- rpcbus.Response{loadResponse([]byte(pubKey)), nil}
+	r.RespChan <- rpcbus.Response{Resp: loadResponse([]byte(pubKey)), Err: nil}
 
 	return nil
 }
@@ -117,7 +118,7 @@ func (t *Transactor) handleAddress(r rpcbus.Request) error {
 	}
 
 	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(addr)}}
-	r.RespChan <- rpcbus.Response{resp, nil}
+	r.RespChan <- rpcbus.Response{Resp: resp, Err: nil}
 	return nil
 }
 
@@ -129,11 +130,6 @@ func (t *Transactor) handleGetTxHistory(r rpcbus.Request) error {
 	records, err := t.w.FetchTxHistory()
 	if err != nil {
 		return err
-	}
-
-	if len(records) == 0 {
-		r.RespChan <- rpcbus.Response{*bytes.NewBufferString("No records found."), nil}
-		return nil
 	}
 
 	resp := &node.TxHistoryResponse{Records: make([]*node.TxRecord, len(records))}
@@ -148,7 +144,7 @@ func (t *Transactor) handleGetTxHistory(r rpcbus.Request) error {
 		}
 	}
 
-	r.RespChan <- rpcbus.Response{resp, nil}
+	r.RespChan <- rpcbus.Response{Resp: resp, Err: nil}
 	return nil
 }
 
@@ -165,7 +161,7 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 
 	// Sync with genesis if this is a new wallet
 	if _, err := t.w.GetSavedHeight(); err != nil {
-		t.w.UpdateWalletHeight(0)
+		_ = t.w.UpdateWalletHeight(0)
 		b := cfg.DecodeGenesis()
 		// call wallet.CheckBlock
 		if _, _, err := t.w.CheckWireBlock(*b); err != nil {
@@ -175,7 +171,7 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 
 	t.launchConsensus()
 	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}
-	r.RespChan <- rpcbus.Response{resp, nil}
+	r.RespChan <- rpcbus.Response{Resp: resp, Err: nil}
 
 	return nil
 }
@@ -193,7 +189,7 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- rpcbus.Response{&node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}, nil}
+	r.RespChan <- rpcbus.Response{Resp: &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}, Err: nil}
 
 	return nil
 }
@@ -223,7 +219,7 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{&node.TransferResponse{Hash: txid}, nil}
+	r.RespChan <- rpcbus.Response{Resp: &node.TransferResponse{Hash: txid}, Err: nil}
 	return nil
 }
 
@@ -248,7 +244,7 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{&node.TransferResponse{Hash: txid}, nil}
+	r.RespChan <- rpcbus.Response{Resp: &node.TransferResponse{Hash: txid}, Err: nil}
 
 	return nil
 }
@@ -274,7 +270,7 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{&node.TransferResponse{Hash: txid}, nil}
+	r.RespChan <- rpcbus.Response{Resp: &node.TransferResponse{Hash: txid}, Err: nil}
 
 	return nil
 }
@@ -292,7 +288,7 @@ func (t *Transactor) handleBalance(r rpcbus.Request) error {
 
 	log.Tracef("wallet balance: %d, mempool balance: %d", unlockedBalance, lockedBalance)
 
-	r.RespChan <- rpcbus.Response{&node.BalanceResponse{UnlockedBalance: unlockedBalance, LockedBalance: lockedBalance}, nil}
+	r.RespChan <- rpcbus.Response{Resp: &node.BalanceResponse{UnlockedBalance: unlockedBalance, LockedBalance: lockedBalance}, Err: nil}
 	return nil
 }
 
@@ -302,7 +298,7 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 	}
 
 	// Retrieve mempool txs
-	resp, err := t.rb.Call(topics.GetMempoolTxs, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err := t.rb.Call(topics.GetMempoolTxs, rpcbus.Request{Params: bytes.Buffer{}, RespChan: make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		return err
 	}
@@ -315,7 +311,7 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 
 	log.Tracef("unconfirmed wallet balance: %d", unconfirmedBalance)
 
-	r.RespChan <- rpcbus.Response{&node.BalanceResponse{UnlockedBalance: unconfirmedBalance}, nil}
+	r.RespChan <- rpcbus.Response{Resp: &node.BalanceResponse{UnlockedBalance: unconfirmedBalance}, Err: nil}
 	return nil
 }
 
@@ -324,7 +320,7 @@ func (t *Transactor) handleAutomateConsensusTxs(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Consensus transactions are now being automated."}, nil}
+	r.RespChan <- rpcbus.Response{Resp: &node.GenericResponse{Response: "Consensus transactions are now being automated."}, Err: nil}
 	return nil
 }
 
@@ -334,7 +330,7 @@ func (t *Transactor) handleClearWalletDatabase(r rpcbus.Request) error {
 			return err
 		}
 
-		r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Wallet database deleted."}, nil}
+		r.RespChan <- rpcbus.Response{Resp: &node.GenericResponse{Response: "Wallet database deleted."}, Err: nil}
 		return nil
 	}
 
@@ -342,23 +338,23 @@ func (t *Transactor) handleClearWalletDatabase(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Wallet database deleted."}, nil}
+	r.RespChan <- rpcbus.Response{Resp: &node.GenericResponse{Response: "Wallet database deleted."}, Err: nil}
 	return nil
 }
 
 func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
-	r.RespChan <- rpcbus.Response{&node.WalletStatusResponse{Loaded: t.w != nil}, nil}
+	r.RespChan <- rpcbus.Response{Resp: &node.WalletStatusResponse{Loaded: t.w != nil}, Err: nil}
 	return nil
 }
 
 func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	hash, err := tx.CalculateHash()
 	if err != nil {
-		// If we found a valid bid tx, we should under no circumstance have issues marshalling it
-		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
+		// If we found a valid bid tx, we should under no circumstance have issues marshaling it
+		return nil, fmt.Errorf("error encoding transaction: %v", err)
 	}
 
-	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.Request{tx, make(chan rpcbus.Response, 1)}, 0)
+	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.Request{Params: tx, RespChan: make(chan rpcbus.Response, 1)}, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -366,6 +362,7 @@ func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	return hash, nil
 }
 
+//nolint:unparam
 func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
 	if t.w == nil {
 		return

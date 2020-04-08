@@ -47,6 +47,7 @@ func (hlp *Helper) FailOnVerification(flag bool) {
 	hlp.failOnVerification = flag
 }
 
+// FailOnFetching sets the failOnFetching flag
 func (hlp *Helper) FailOnFetching(flag bool) {
 	hlp.lock.Lock()
 	defer hlp.lock.Unlock()
@@ -69,29 +70,31 @@ func (hlp *Helper) shouldFailVerification() bool {
 
 func (hlp *Helper) provideCandidateBlock() {
 	c := make(chan rpcbus.Request, 1)
-	hlp.RBus.Register(topics.GetCandidate, c)
+	_ = hlp.RBus.Register(topics.GetCandidate, c)
 	for {
 		r := <-c
 		if hlp.shouldFailFetching() {
-			r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("could not get candidate block")}
+			r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("could not get candidate block"))
 			continue
 		}
 
-		r.RespChan <- rpcbus.Response{message.Candidate{}, nil}
+		r.RespChan <- rpcbus.NewResponse(message.Candidate{}, nil)
 	}
 }
 
 func (hlp *Helper) processCandidateVerificationRequest() {
 	v := make(chan rpcbus.Request, 1)
-	hlp.RBus.Register(topics.VerifyCandidateBlock, v)
+	if err := hlp.RBus.Register(topics.VerifyCandidateBlock, v); err != nil {
+		panic(err)
+	}
 	for {
 		r := <-v
 		if hlp.shouldFailVerification() {
-			r.RespChan <- rpcbus.Response{nil, errors.New("verification failed")}
+			r.RespChan <- rpcbus.NewResponse(nil, errors.New("verification failed"))
 			continue
 		}
 
-		r.RespChan <- rpcbus.Response{nil, nil}
+		r.RespChan <- rpcbus.NewResponse(nil, nil)
 	}
 }
 
@@ -105,10 +108,10 @@ func (hlp *Helper) createResultChan() {
 func (hlp *Helper) ActivateReduction(hash []byte) {
 	hlp.CollectionWaitGroup.Wait()
 	hdr := header.Header{BlockHash: hash, Round: hlp.Round, Step: hlp.Step(), PubKeyBLS: hlp.PubKeyBLS}
-	hlp.Reducer.(*Reducer).CollectBestScore(hdr)
+	_ = hlp.Reducer.(*Reducer).CollectBestScore(hdr)
 }
 
-// NextBatch forwards additional batches of consensus.Event. It takes care of marshalling the right Step when creating the Signature
+// NextBatch forwards additional batches of consensus.Event. It takes care of marshaling the right Step when creating the Signature
 func (hlp *Helper) NextBatch() []byte {
 	blockHash, _ := crypto.RandEntropy(32)
 	hlp.ActivateReduction(blockHash)

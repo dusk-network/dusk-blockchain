@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Ensure that the behaviour of the validator works as intended.
+// Ensure that the behavior of the validator works as intended.
 // It should republish blocks with a correct hash and root.
 func TestValidatorValidBlock(t *testing.T) {
 	// Send it over to the validator

@@ -21,7 +21,7 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
-var log *logger.Entry = logger.WithFields(logger.Fields{"process": "gql"})
+var log = logger.WithFields(logger.Fields{"prefix": "gql"})
 
 const (
 	endpointWS  = "/ws"
@@ -69,19 +69,19 @@ func (s *Server) Start() error {
 		ReadTimeout: time.Second * 10,
 	}
 
+	conf := cfg.Get().Gql
 	if err := s.EnableGraphQL(mux); err != nil {
 		return err
 	}
 
-	nc := cfg.Get().Gql.Notification
-	if nc.BrokersNum > 0 {
+	if conf.Notification.BrokersNum > 0 {
 		if err := s.EnableNotifications(mux); err != nil {
 			return err
 		}
 	}
 
 	// Set up HTTP Server over TCP
-	l, err := net.Listen("tcp", cfg.Get().Gql.Address)
+	l, err := net.Listen(conf.Network, conf.Address)
 	if err != nil {
 		return err
 	}
@@ -97,12 +97,15 @@ func (s *Server) Start() error {
 // Listen on the http server.
 func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
 
-	g := cfg.Get().Gql
-	log.Infof("HTTP server listening on %v", g.Address)
+	conf := cfg.Get().Gql
+
+	log.WithField("net", conf.Network).
+		WithField("addr", conf.Address).
+		WithField("tls", conf.EnableTLS).Infof("GraphQL HTTP server listening")
 
 	var err error
-	if g.EnableTLS {
-		err = httpServer.ServeTLS(s.listener, g.CertFile, g.KeyFile)
+	if conf.EnableTLS {
+		err = httpServer.ServeTLS(s.listener, conf.CertFile, conf.KeyFile)
 	} else {
 		err = httpServer.Serve(s.listener)
 	}
@@ -114,6 +117,8 @@ func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
 	}
 }
 
+// EnableGraphQL sets up the GraphQL service, wires the request handler, sets
+// the limiter, instantiates the Schema and creates a DB connection
 func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
 
 	// GraphQL service
@@ -148,6 +153,8 @@ func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
 	return nil
 }
 
+// EnableNotifications uses the configured amount of brokers and clients (per
+// broker) to push graphql notifications over websocket
 func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 
 	nc := cfg.Get().Gql.Notification
@@ -194,7 +201,7 @@ func (s *Server) Stop() error {
 	s.started = false
 	s.pool.Close()
 	if err := s.listener.Close(); err != nil {
-		log.Errorf("error shutting down, %v\n", err)
+		log.Errorf("error shutting down, %v", err)
 		return err
 	}
 

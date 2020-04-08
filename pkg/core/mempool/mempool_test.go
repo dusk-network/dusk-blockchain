@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -83,7 +82,7 @@ func TestMain(m *testing.M) {
 		for {
 			tx, err := streamer.Read()
 			if err != nil {
-				fmt.Errorf(err.Error())
+				log.Panic(err)
 			}
 
 			c.mu.Lock()
@@ -259,7 +258,7 @@ func TestRemoveAccepted(t *testing.T) {
 
 	for _, tx := range txs {
 		// We avoid sharing this pointer between the mempool and the block
-		// by marshalling and unmarshalling the tx
+		// by marshaling and unmarshaling the tx
 		buf := new(bytes.Buffer)
 		if err := message.MarshalTx(buf, tx); err != nil {
 			t.Fatal(err)
@@ -313,7 +312,7 @@ func TestDoubleSpent(t *testing.T) {
 	}
 
 	// Create double-spent tx by replicating an already added txs but with
-	// differnt TxID
+	// different TxID
 	tx := helper.RandomStandardTx(t, false)
 
 	// Inputs
@@ -403,7 +402,7 @@ func TestMempoolView(t *testing.T) {
 	}
 
 	// First, let's just get the entire view
-	resp, err := c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{&node.SelectRequest{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err := c.rpcBus.Call(topics.GetMempoolView, rpcbus.NewRequest(&node.SelectRequest{}), 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,7 +413,7 @@ func TestMempoolView(t *testing.T) {
 
 	// Now, we single out one hash from the bunch
 	hash := hex.EncodeToString(txs[7].StandardTx().TxID)
-	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{&node.SelectRequest{Id: hash}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.NewRequest(&node.SelectRequest{Id: hash}), 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +426,7 @@ func TestMempoolView(t *testing.T) {
 	}
 
 	// Let's filter for just stakes
-	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{&node.SelectRequest{Types: []node.TxType{node.TxType(2)}}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.NewRequest(&node.SelectRequest{Types: []node.TxType{node.TxType(2)}}), 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}

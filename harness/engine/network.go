@@ -22,11 +22,12 @@ var (
 	// It's useful when additional manual tests should be done
 	KeepAlive = flag.Bool("keepalive", false, "Keep Test Harness alive after tests pass")
 
-	// Errors
-	// ErrDisabledHarness
+	// ErrDisabledHarness yields a disabled test harness
 	ErrDisabledHarness = errors.New("disabled test harness")
 )
 
+// Network describes the current network configuration in terms of nodes and
+// processes
 type Network struct {
 	Nodes     []*DuskNode
 	processes []*os.Process
@@ -47,7 +48,7 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	initProfiles()
 
-	blockchainExec, blindBidExec, seederExec, err := n.getExec()
+	_, _, seederExec, err := n.getExec()
 	if err != nil {
 		return err
 	}
@@ -64,34 +65,8 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	// Foreach node read localNet.Nodes, configure and run new nodes
 	for i, node := range n.Nodes {
-
-		// create node folder
-		nodeDir := workspace + "/node-" + node.Id
-		err := os.Mkdir(nodeDir, os.ModeDir|os.ModePerm)
+		err := n.StartNode(i, node, workspace)
 		if err != nil {
-			return err
-		}
-
-		node.Dir = nodeDir
-
-		// Load wallet path as walletX.dat are hard-coded for now
-		// Later they could be generated on the fly per each test execution
-		walletsPath, _ := os.Getwd()
-		walletsPath += "/../data/"
-
-		// Generate node default config file
-		tomlFilePath, err := n.generateConfig(i, walletsPath)
-		if err != nil {
-			return err
-		}
-
-		// Run dusk-blockchain node process
-		if err := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); err != nil {
-			return err
-		}
-
-		// Run blindbid node process
-		if err := n.start(nodeDir, blindBidExec); err != nil {
 			return err
 		}
 	}
@@ -104,10 +79,53 @@ func (n *Network) Bootstrap(workspace string) error {
 	return nil
 }
 
+// Teardown the network
 func (n *Network) Teardown() {
-	for _, process := range n.processes {
-		_ = process.Kill()
+	for _, p := range n.processes {
+		if err := p.Signal(os.Interrupt); err != nil {
+			log.Warn(err)
+		}
 	}
+}
+
+// StartNode locally
+func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
+
+	blockchainExec, blindBidExec, _, err := n.getExec()
+	if err != nil {
+		return err
+	}
+
+	// create node folder
+	nodeDir := workspace + "/node-" + node.Id
+	if e := os.Mkdir(nodeDir, os.ModeDir|os.ModePerm); e != nil {
+		return e
+	}
+
+	node.Dir = nodeDir
+
+	// Load wallet path as walletX.dat are hard-coded for now
+	// Later they could be generated on the fly per each test execution
+	walletsPath, _ := os.Getwd()
+	walletsPath += "/../data/"
+
+	// Generate node default config file
+	tomlFilePath, tomlErr := n.generateConfig(i, walletsPath)
+	if tomlErr != nil {
+		return tomlErr
+	}
+
+	// Run dusk-blockchain node process
+	if startErr := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); startErr != nil {
+		return startErr
+	}
+
+	// Run blindbid node process
+	if bbErr := n.start(nodeDir, blindBidExec); bbErr != nil {
+		return bbErr
+	}
+
+	return nil
 }
 
 // generateConfig loads config profile assigned to this node
@@ -141,14 +159,15 @@ func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, erro
 
 // Start an OS process with TMPDIR=nodeDir, manageable by the network
 func (n *Network) start(nodeDir string, name string, arg ...string) error {
+	//TODO: is this really required ?
+	//nolint:gosec
 	cmd := exec.Command(name, arg...)
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
 	if err := cmd.Start(); err != nil {
 		return err
-	} else {
-		n.processes = append(n.processes, cmd.Process)
 	}
 
+	n.processes = append(n.processes, cmd.Process)
 	return nil
 }
 

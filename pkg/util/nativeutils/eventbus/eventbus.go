@@ -1,15 +1,11 @@
 package eventbus
 
 import (
-	"time"
-
 	lg "github.com/sirupsen/logrus"
 )
 
 var _ Broker = (*EventBus)(nil)
 
-var napTime = 1 * time.Millisecond
-var _signal struct{}
 var logEB = lg.WithField("process", "eventbus")
 
 // TopicProcessor is the interface for preprocessing events belonging to a specific topic

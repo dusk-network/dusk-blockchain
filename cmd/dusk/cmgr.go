@@ -3,8 +3,6 @@ package main
 import (
 	"net"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // CmgrConfig is the config file for the node connection manager
@@ -19,6 +17,7 @@ type connmgr struct {
 }
 
 //NewConnMgr creates a new connection manager
+//nolint:golint
 func NewConnMgr(cfg CmgrConfig) *connmgr {
 	cnnmgr := &connmgr{
 		cfg,
@@ -32,16 +31,15 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 		}
 
 		defer func() {
-			listener.Close()
+			_ = listener.Close()
 		}()
 
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				log.WithFields(log.Fields{
-					"process": "connection manager",
-					"error":   err,
-				}).Warnln("error accepting connection request")
+				log.WithField("process", "connection manager").
+					WithError(err).
+					Warnln("error accepting connection request")
 				continue
 			}
 

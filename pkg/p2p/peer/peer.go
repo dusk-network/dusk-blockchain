@@ -24,7 +24,7 @@ import (
 var readWriteTimeout = 60 * time.Second // Max idle time for a peer
 var keepAliveTime = 30 * time.Second    // Send keepalive message after inactivity for this amount of time
 
-var l *log.Entry = log.WithField("process", "peer")
+var l = log.WithField("process", "peer")
 
 // Connection holds the TCP connection to another node, and it's known protocol magic.
 // The `net.Conn` is guarded by a mutex, to allow both multicast and one-to-one
@@ -149,9 +149,9 @@ func (c *Connection) ReadMessage() ([]byte, error) {
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
-func (p *Writer) Connect() error {
-	if err := p.Handshake(); err != nil {
-		p.Conn.Close()
+func (w *Writer) Connect() error {
+	if err := w.Handshake(); err != nil {
+		_ = w.Conn.Close()
 		return err
 	}
 
@@ -161,7 +161,7 @@ func (p *Writer) Connect() error {
 // Accept will perform the protocol handshake with the peer.
 func (p *Reader) Accept() error {
 	if err := p.Handshake(); err != nil {
-		p.Conn.Close()
+		_ = p.Conn.Close()
 		return err
 	}
 
@@ -185,7 +185,7 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 
 func (w *Writer) onDisconnect() {
 	log.Infof("Connection to %s terminated", w.Connection.RemoteAddr().String())
-	w.Conn.Close()
+	_ = w.Conn.Close()
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
 }
 
@@ -227,7 +227,9 @@ func (p *Reader) ReadLoop() {
 }
 
 func (p *Reader) readLoop() {
-	defer p.Conn.Close()
+	defer func() {
+		_ = p.Conn.Close()
+	}()
 
 	// Set up a timer, which triggers the sending of a `keepalive` message
 	// when fired.
@@ -281,7 +283,7 @@ func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
 		for {
 			select {
 			case <-t.C:
-				p.Connection.keepAlive()
+				_ = p.Connection.keepAlive()
 			case <-quitChan:
 				t.Stop()
 				return
@@ -311,7 +313,7 @@ func (c *Connection) keepAlive() error {
 // and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
 	c.lock.Lock()
-	c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
+	_ = c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	n, err := c.Conn.Write(b)
 	c.lock.Unlock()
 	return n, err

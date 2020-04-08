@@ -25,15 +25,15 @@ func (s storedAgreements) Less(i, j int) bool {
 
 func (s storedAgreements) String() string {
 	var sb strings.Builder
-	sb.WriteString("[\n")
+	_, _ = sb.WriteString("[\n")
 	for i, aggro := range s {
 		if i > 0 {
-			sb.WriteString("\n")
+			_, _ = sb.WriteString("\n")
 		}
-		sb.WriteString(aggro.String())
+		_, _ = sb.WriteString(aggro.String())
 	}
-	sb.WriteString("\n")
-	sb.WriteString("]")
+	_, _ = sb.WriteString("\n")
+	_, _ = sb.WriteString("]")
 	return sb.String()
 }
 
@@ -51,10 +51,10 @@ func newStore() *store {
 func (s *store) String() string {
 	var sb strings.Builder
 	for k, v := range s.collected {
-		sb.WriteString(strconv.Itoa(int(k)))
-		sb.WriteString(": ")
-		sb.WriteString(v.String())
-		sb.WriteString("\n")
+		_, _ = sb.WriteString(strconv.Itoa(int(k)))
+		_, _ = sb.WriteString(": ")
+		_, _ = sb.WriteString(v.String())
+		_, _ = sb.WriteString("\n")
 	}
 	return sb.String()
 }

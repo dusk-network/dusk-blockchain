@@ -14,7 +14,9 @@ type loggerConfiguration struct {
 // log based monitoring defined in pkg/eventmon/logger
 type logMonitorConfiguration struct {
 	Enabled      bool
-	Target       string
+	Rpc          string //nolint
+	Transport    string
+	Address      string
 	StreamErrors bool
 }
 
@@ -59,13 +61,19 @@ type profileConfiguration struct {
 type rpcConfiguration struct {
 	Network string
 	Address string
-	// Enabled bool
-	// User    string
-	// Pass    string
+
+	EnableTLS bool
+	CertFile  string
+	KeyFile   string
+
+	User string
+	Pass string
 }
 
 type gqlConfiguration struct {
+	// TODO: Keep 'Enabled' option?
 	Enabled bool
+	Network string
 	Address string
 
 	EnableTLS bool

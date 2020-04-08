@@ -9,7 +9,7 @@ import (
 )
 
 // Config package should avoid importing any dusk-go packages in order to
-// prevent any cyclic-dependancy issues
+// prevent any cyclic-dependency issues
 
 const (
 	// current working dir
@@ -22,6 +22,7 @@ var (
 	r *Registry
 )
 
+// Base configurations structure
 type Base struct {
 	// UsedConfigFile points at the loaded config file
 	UsedConfigFile string
@@ -33,6 +34,7 @@ type Base struct {
 	ConfigFileName string
 
 	// custom commandline loader
+	//nolint
 	loadFlagsFn func() (string, error)
 }
 

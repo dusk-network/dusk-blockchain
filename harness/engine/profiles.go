@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Profiles is a map with the node name as key and Profile function
 type Profiles map[string]func(index int, node *DuskNode, walletPath string)
 
 var profileList Profiles
@@ -16,11 +17,20 @@ var profileList Profiles
 func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Reset()
 	viper.Set("general.network", "testnet")
+	viper.Set("general.walletonly", "false")
+
 	viper.Set("logger.output", node.Dir+"/dusk")
 	viper.Set("gql.address", node.Cfg.Gql.Address)
+	viper.Set("gql.network", node.Cfg.Gql.Network)
 	viper.Set("gql.enabled", "true")
+
 	viper.Set("rpc.network", node.Cfg.RPC.Network)
-	viper.Set("rpc.address", node.Cfg.RPC.Address)
+	if node.Cfg.RPC.Network == "unix" {
+		viper.Set("rpc.address", node.Dir+node.Cfg.RPC.Address)
+	} else {
+		viper.Set("rpc.address", node.Cfg.RPC.Address)
+	}
+
 	viper.Set("rpc.enabled", "true")
 	viper.Set("database.driver", heavy.DriverName)
 	viper.Set("database.dir", node.Dir+"/chain/")
@@ -31,6 +41,8 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("mempool.maxSizeMB", "100")
 	viper.Set("mempool.poolType", "hashmap")
 	viper.Set("mempool.preallocTxs", "100")
+	viper.Set("mempool.maxInvItems", "10000")
+
 	viper.Set("consensus.defaultlocktime", 1000)
 	viper.Set("consensus.defaultoffset", 10)
 	viper.Set("consensus.defaultamount", 50)

@@ -28,7 +28,9 @@ func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r *http.Request,
 
 	// Read and close JSON request body
 	body, err := ioutil.ReadAll(r.Body)
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 	if err != nil {
 		msg := fmt.Sprintf("%d error request: %v", http.StatusBadRequest, err)
 		log.Error(msg)
@@ -54,7 +56,7 @@ func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r *http.Request,
 		RequestString:  req.Query,
 		VariableValues: req.Variables,
 		OperationName:  req.Operation,
-		Context:        context.WithValue(context.Background(), "database", db),
+		Context:        context.WithValue(context.Background(), "database", db), //nolint
 	})
 
 	// Error check
