@@ -63,7 +63,9 @@ func (c *Client) listen() {
 		case r := <-c.validateSTChan:
 			resp, err := c.ValidateStateTransition(context.Background(), &phoenix.ValidateStateTransitionRequest{Txs: r.Params.([]*phoenix.Transaction)})
 			r.RespChan <- rpcbus.NewResponse(resp, err)
-			// TODO: add case for execute state transition
+		case r := <-c.executeSTChan:
+			// TODO: add implementation for execute state transition
+			r.RespChan <- rpcbus.NewResponse(nil, nil)
 		}
 	}
 }
