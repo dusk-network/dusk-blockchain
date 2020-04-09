@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/phoenix"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -33,7 +34,7 @@ func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) *Client {
 
 	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	c := &Client{
@@ -41,10 +42,10 @@ func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) *Client {
 		conn:       conn,
 	}
 	if err := registerMethod(rpcBus, topics.ValidateStateTransition, &c.validateSTChan); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	if err := registerMethod(rpcBus, topics.ExecuteStateTransition, &c.executeSTChan); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	go c.listen()
