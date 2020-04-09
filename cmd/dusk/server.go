@@ -29,14 +29,14 @@ var logServer = logrus.WithField("process", "server")
 
 // Server is the main process of the node
 type Server struct {
-	eventBus      *eventbus.EventBus
-	rpcBus        *rpcbus.RPCBus
-	chain         *chain.Chain
-	dupeMap       *dupemap.DupeMap
-	counter       *chainsync.Counter
-	gossip        *processing.Gossip
-	rpcWrapper    *rpc.SrvWrapper
-	rpcClient     *rpc.Client
+	eventBus   *eventbus.EventBus
+	rpcBus     *rpcbus.RPCBus
+	chain      *chain.Chain
+	dupeMap    *dupemap.DupeMap
+	counter    *chainsync.Counter
+	gossip     *processing.Gossip
+	rpcWrapper *rpc.SrvWrapper
+	// rpcClient     *rpc.Client
 	cancelMonitor StopFunc
 }
 
@@ -78,7 +78,7 @@ func Setup() *Server {
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	client := rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
+	// client := rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
 
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
@@ -100,7 +100,7 @@ func Setup() *Server {
 		counter:    counter,
 		gossip:     processing.NewGossip(protocol.TestNet),
 		rpcWrapper: rpcWrapper,
-		rpcClient:  client,
+		// rpcClient:  client,
 	}
 
 	// Setting up the transactor component
@@ -182,6 +182,6 @@ func (s *Server) Close() {
 	_ = s.chain.Close()
 	s.rpcBus.Close()
 	s.rpcWrapper.Shutdown()
-	_ = s.rpcClient.Close()
+	// _ = s.rpcClient.Close()
 	s.cancelMonitor()
 }

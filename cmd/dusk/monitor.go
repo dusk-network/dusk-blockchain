@@ -4,13 +4,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/monitor"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	l "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "monitoring")
+var lg = logrus.WithField("process", "monitoring")
 
 // StopFunc is invoked when the monitor should be stopped. It is intended to
 // perform the closing operations on the GRPC server and connections
@@ -64,7 +65,7 @@ func NewSupervisor(bus eventbus.Broker) (monitor.Supervisor, error) {
 
 		if streamErrors {
 			lg.Infoln("adding supervisor as logrus hook so to send errors to", target)
-			l.AddHook(supervisor)
+			logrus.AddHook(supervisor)
 		}
 
 		lg.Debugln("monitor instantiated")
