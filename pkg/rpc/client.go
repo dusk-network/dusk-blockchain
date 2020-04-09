@@ -7,7 +7,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/phoenix"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
