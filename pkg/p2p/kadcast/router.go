@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/prometheus/common/log"
 )
 
 // K is the number of peers that a node will send on
@@ -70,9 +72,16 @@ func (router *Router) getPeerSortDist(refPeer Peer) []PeerSort {
 	var peerList []Peer
 	router.tree.mu.RLock()
 	for buckIdx, bucket := range router.tree.buckets {
-		// Skip bucket 0
-		if buckIdx != 0 {
-			peerList = append(peerList[:], bucket.entries[:]...)
+		if buckIdx == 0 {
+			// Look for neighbor peer in spanning tree
+			for _, p := range bucket.entries {
+				if !router.MyPeerInfo.IsEqual(p) {
+					// neighbor peer
+					peerList = append(peerList, p)
+				}
+			}
+		} else {
+			peerList = append(peerList, bucket.entries[:]...)
 		}
 	}
 	router.tree.mu.RUnlock()
@@ -235,17 +244,41 @@ func (router *Router) sendNodes(receiver Peer) {
 // BroadcastPacket sends a `CHUNKS` message across the network
 // following the Kadcast broadcasting rules with the specified height.
 func (router *Router) broadcastPacket(height byte, tipus byte, payload []byte) {
+
+	myPeer := router.MyPeerInfo
+
 	// Get `Beta` random peers from each Bucket.
 	router.tree.mu.RLock()
 	for _, bucket := range router.tree.buckets {
-		// Skip first bucket from the iteration (it contains our peer).
+
+		if len(bucket.entries) == 0 {
+			continue
+		}
+
+		var destPeer *Peer
 		if bucket.idLength == 0 {
+			// the bucket B 0 only holds one specific node of distance one
+			for _, p := range bucket.entries {
+				// Find neighbor peer
+				if !router.MyPeerInfo.IsEqual(p) {
+					destPeer = &p
+					break
+				}
+			}
+
+		} else {
+			destPeer, _ = bucket.getRandomPeer()
+		}
+
+		if destPeer == nil {
 			continue
 		}
-		destPeer, err := bucket.getRandomPeer()
-		if err != nil {
+
+		if myPeer.IsEqual(*destPeer) {
+			log.Error("Destination peer must be different from the source peer")
 			continue
 		}
+
 		// Create empty packet and set headers.
 		var p Packet
 		// Set headers info.
