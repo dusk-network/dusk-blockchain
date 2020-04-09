@@ -223,6 +223,7 @@ func handleChunks(packet Packet, router *Router) error {
 	// Verify chunkID on the memmoryMap. If we already have it stored,+
 	// means that the packet is repeated and we just ignore it.
 	if _, ok := router.ChunkIDmap[*chunkID]; ok {
+		router.Duplicated = true
 		return fmt.Errorf("chunk %s already registered", hex.EncodeToString((*chunkID)[:]))
 	}
 
@@ -234,12 +235,15 @@ func handleChunks(packet Packet, router *Router) error {
 	}
 	router.MapMutex.Unlock()
 
-	// Verify height, if != 0, decrease it by one and broadcast the
-	// packet again.
-	if height > 0 {
-		router.broadcastPacket(height-1, 0, payload)
-	}
-
 	// TODO: HERE WE SHOULD SEND THE PAYLOAD TO THE `EVENTBUS`.
+
+	/*
+		When a node receives a CHUNK, it repeats the process in a store-and-
+		forward manner: it buffers the data, picks a random node from its
+		buckets up to (but not including) height h, and forwards the CHUNK
+		with a smaller value for h accordingly.
+	*/
+	router.broadcastPacket(height, 0, payload)
+
 	return nil
 }

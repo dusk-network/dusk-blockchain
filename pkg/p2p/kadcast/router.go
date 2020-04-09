@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // K is the number of peers that a node will send on
@@ -40,6 +40,7 @@ type Router struct {
 	StoreChunks bool
 	MapMutex    sync.RWMutex
 	ChunkIDmap  map[[16]byte][]byte
+	Duplicated  bool
 }
 
 // MakeRouter allows to create a router which holds the peerInfo and
@@ -245,29 +246,39 @@ func (router *Router) sendNodes(receiver Peer) {
 // following the Kadcast broadcasting rules with the specified height.
 func (router *Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 
+	if height > byte(len(router.tree.buckets)) || height == 0 {
+		return
+	}
+
 	myPeer := router.MyPeerInfo
 
-	// Get `Beta` random peers from each Bucket.
-	router.tree.mu.RLock()
-	for _, bucket := range router.tree.buckets {
+	var i byte
+	for i = 0; i <= height-1; i++ {
 
-		if len(bucket.entries) == 0 {
+		// this should be always a deep copy of a bucket from the tree
+		var b bucket
+		router.tree.mu.RLock()
+		b = router.tree.buckets[i]
+		router.tree.mu.RUnlock()
+
+		if len(b.entries) == 0 {
+			// Empty bucket, no need to proceed
 			continue
 		}
 
 		var destPeer *Peer
-		if bucket.idLength == 0 {
+		if b.idLength == 0 {
 			// the bucket B 0 only holds one specific node of distance one
-			for _, p := range bucket.entries {
+			for _, p := range b.entries {
 				// Find neighbor peer
 				if !router.MyPeerInfo.IsEqual(p) {
 					destPeer = &p
 					break
 				}
 			}
-
 		} else {
-			destPeer, _ = bucket.getRandomPeer()
+			// TODO: Pick multiple random peers from a bucket
+			destPeer, _ = b.getRandomPeer()
 		}
 
 		if destPeer == nil {
@@ -279,21 +290,23 @@ func (router *Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 			continue
 		}
 
+		log.Tracef("Sending Chunks msg with height %d from %s to %s", i, myPeer.String(), destPeer.String())
+
 		// Create empty packet and set headers.
 		var p Packet
 		// Set headers info.
 		p.setHeadersInfo(tipus, router)
 		// Set payload.
-		p.setChunksPayloadInfo(height, payload)
+		p.setChunksPayloadInfo(i, payload)
 		sendTCPStream(destPeer.getUDPAddr(), marshalPacket(p))
 	}
-	router.tree.mu.RUnlock()
+
 }
 
 // StartPacketBroadcast sends a `CHUNKS` message across the network
 // following the Kadcast broadcasting rules with the InitHeight.
-func (router *Router) StartPacketBroadcast(tipus byte, payload []byte) {
-	router.broadcastPacket(InitHeight, tipus, payload)
+func (router *Router) StartPacketBroadcast(payload []byte) {
+	router.broadcastPacket(InitHeight, 0, payload)
 }
 
 // GetTotalPeers the total amount of peers that a `Peer` is connected to
