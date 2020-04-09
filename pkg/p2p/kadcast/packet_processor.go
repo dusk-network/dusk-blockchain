@@ -16,24 +16,23 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 	// Instantiate now the variables to not pollute
 	// the stack.
 	var err error
-	var byteNum int
 	var senderAddr *net.UDPAddr
 	var tcpPayload []byte
-	var packet Packet
-	chunkIDmap := make(map[[16]byte]bool)
 
 	for {
 		// Get all of the packets that are now on the queue.
 		queuePackets, _ := queue.GetAll()
 		for _, item := range queuePackets {
 			// Get items from the queue packet taken.
-			byteNum, senderAddr, tcpPayload, err = decodeRedPacket(item)
+			_, senderAddr, tcpPayload, err = decodeRedPacket(item)
 			if err != nil {
 				log.WithError(err).Warn("Error decoding the TCP packet taken from the ring.")
 				continue
 			}
 			// Build packet struct
-			packet = getPacketFromStream(tcpPayload[:])
+			var packet Packet
+			unmarshalPacket(tcpPayload[:], &packet)
+
 			// Extract headers info.
 			tipus, senderID, nonce, peerRecepPort := packet.getHeadersInfo()
 
@@ -48,17 +47,20 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 			// Build Peer info and put the right port on it subsituting the one
 			// used to send the message by the one where the peer wants to receive
 			// the messages.
-			ip, _ := getPeerNetworkInfo(*senderAddr)
+			ip := getPeerNetworkInfo(*senderAddr)
 			port := binary.LittleEndian.Uint16(peerRecepPort[:])
 			peerInf := MakePeer(ip, port)
 
 			switch tipus {
 			case 0:
 				{
-					handleChunks(chunkIDmap, peerInf, packet, router, byteNum)
-					log.WithField(
-						"Source-IP", peerInf.ip[:],
-					).Infoln("Received CHUNKS message")
+					if err := handleChunks(packet, router); err != nil {
+						log.WithField("peer", router.MyPeerInfo.String()).Warnln(err)
+					} else {
+						log.WithField("from", peerInf.String()).
+							WithField("peer", router.MyPeerInfo.String()).
+							Trace("Received CHUNKS message")
+					}
 				}
 			}
 		}
@@ -75,7 +77,7 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 	var byteNum int
 	var senderAddr *net.UDPAddr
 	var udpPayload []byte
-	var packet Packet
+
 	for {
 		// Get all of the packets that are now on the queue.
 		queuePackets, _ := queue.GetAll()
@@ -86,13 +88,14 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 				log.WithError(err).Warn("Error decoding the UDP packet taken from the ring.")
 				continue
 			}
+
 			// Build packet struct
-			packet = getPacketFromStream(udpPayload[:])
+			var packet Packet
+			unmarshalPacket(udpPayload[:], &packet)
+
 			// Extract headers info.
 			tipus, senderID, nonce, peerRecepPort := packet.getHeadersInfo()
 
-			// Verify IDNonce
-			//err = verifyIDNonce(senderID, nonce)
 			// If we get an error, we just skip the whole process since the
 			// Peer was not validated.
 			if err := verifyIDNonce(senderID, nonce); err != nil {
@@ -103,7 +106,7 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 			// Build Peer info and put the right port on it subsituting the one
 			// used to send the message by the one where the peer wants to receive
 			// the messages.
-			ip, _ := getPeerNetworkInfo(*senderAddr)
+			ip := getPeerNetworkInfo(*senderAddr)
 			port := binary.LittleEndian.Uint16(peerRecepPort[:])
 			peerInf := MakePeer(ip, port)
 
@@ -111,25 +114,25 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 			switch tipus {
 			case 0:
 				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Received PING message")
+					"src", peerInf.String(),
+				).Traceln("Received PING message")
 				handlePing(peerInf, router)
 			case 1:
 				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Received PONG message")
+					"src", peerInf.String(),
+				).Traceln("Received PONG message")
 				handlePong(peerInf, router)
 
 			case 2:
 				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Received FIND_NODES message")
+					"src", peerInf.String(),
+				).Traceln("Received FIND_NODES message")
 				handleFindNodes(peerInf, router)
 
 			case 3:
 				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Received NODES message")
+					"src", peerInf.String(),
+				).Traceln("Received NODES message")
 				handleNodes(peerInf, packet, router, byteNum)
 			}
 		}

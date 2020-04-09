@@ -5,10 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"log"
+	"math/bits"
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/sirupsen/logrus"
 
 	"golang.org/x/crypto/sha3"
 
@@ -41,30 +42,28 @@ func xor(a [16]byte, b [16]byte) [16]byte {
 
 // Computes the XOR distance between 2 different
 // ids and classifies it between the range 0-128.
-func idXor(a [16]byte, b [16]byte) uint16 {
+func idXor(a [16]byte, b [16]byte) (uint16, [16]byte) {
 	distance := xor(a, b)
-	return classifyDistance(distance)
+	return classifyDistance(distance), distance
 }
 
-// This function gets the XOR distance as a byte-array
-// and collapses it to classify the distance on one of the
-// 128 buckets.
-func classifyDistance(arr [16]byte) uint16 {
-	var collDist uint16 = 0
-	for i := 0; i < 16; i++ {
-		collDist += countSetBits(arr[i])
-	}
-	return collDist
-}
+// classifyDistance calculates floor of log2 of the distance between two nodes
+// As per that, classifyDistance returns rank of most significant bit in LE format
+func classifyDistance(distance [16]byte) uint16 {
 
-// Counts the number of setted bits in the given byte.
-func countSetBits(byt byte) uint16 {
-	var count uint16 = 0
-	for byt != 0 {
-		count += uint16(byt & 1)
-		byt >>= 1
+	for i := len(distance) - 1; i >= 0; i-- {
+		if distance[i] == 0 {
+			continue
+		}
+		// Len8 returns the minimum number of bits required to represent x
+		// That said, most significant bit rank in Little Endian
+		msbRank := bits.Len8(distance[i])
+		msbRank--
+
+		pos := uint16(msbRank + i*8)
+		return pos
 	}
-	return count
+	return 0
 }
 
 // Evaluates if an XOR-distance of two peers is
@@ -83,12 +82,30 @@ func xorIsBigger(a [16]byte, b [16]byte) bool {
 // Performs the hash of the wallet public
 // IP address and gets the first 16 bytes of
 // it.
-func computePeerID(externIP [4]byte) [16]byte {
+func computePeerID(ip [4]byte, port uint16) [16]byte {
+
+	seed := make([]byte, 2)
+	binary.LittleEndian.PutUint16(seed, port)
+	seed = append(seed, ip[:]...)
+
+	doubleLenID := sha3.Sum256(seed[:])
 	var halfLenID [16]byte
-	doubleLenID := sha3.Sum256(externIP[:])
 	copy(halfLenID[:], doubleLenID[0:16])
+
 	return halfLenID
 }
+
+/*
+// computePeerDummyID is helpful on simplifying ID on local net
+func computePeerDummyID(ip [4]byte, port uint16) [16]byte {
+	var id [16]byte
+	port -= 9000
+	seed := make([]byte, 16)
+	binary.LittleEndian.PutUint16(seed, port)
+	copy(id[:], seed[0:16])
+	return id
+}
+*/
 
 // This function is a middleware that allows the peer to verify
 // other Peers nonce's and validate them if they are correct.
@@ -114,38 +131,35 @@ func computeChunkID(chunk []byte) [16]byte {
 
 // ------------------ NET UTILS ------------------ //
 
-// Gets the local IP address of the machine where
-// the node is running in `net.UDPAddr` format.
-//
-// Panics if it there's not connection.
-func getLocalUDPAddress() net.UDPAddr {
+// Get outbound IP returns local address
+// TODO To be replaced with config param
+func getOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		logrus.WithError(err).Warn("Network Unreachable.")
+		log.Fatal(err)
 	}
 	defer func() {
 		_ = conn.Close()
 	}()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return *localAddr
+	_ = conn.Close()
+
+	return localAddr.IP
 }
 
-// Gets the local IP address of the machine where
-// the node is running in `net.UDPAddr` format.
-//
-// Panics if it there's not connection.
-func getLocalTCPAddress() net.TCPAddr {
-	conn, err := net.Dial("tcp", "8.8.8.8:80")
-	if err != nil {
-		logrus.WithError(err).Warn("Network Unreachable.")
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
+// Format the UDP address, the UDP listener binds on
+func getLocalUDPAddress(port int) net.UDPAddr {
+	laddr := net.UDPAddr{IP: getOutboundIP()}
+	laddr.Port = port
+	return laddr
+}
 
-	localAddr := conn.LocalAddr().(*net.TCPAddr)
-	return *localAddr
+// Gets the TCP address, the TCP listener binds on
+func getLocalTCPAddress(port int) net.TCPAddr {
+	laddr := net.TCPAddr{IP: getOutboundIP()}
+	laddr.Port = port
+	return laddr
 }
 
 // ------------------ ENC/DEC UTILS ------------------ //
@@ -182,7 +196,11 @@ func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) [
 	// Append it to the resulting slice.
 	copy(enc[0:2], numBytes[0:2])
 	// Append Peer IP.
-	copy(enc[2:6], peerAddr.IP[0:4])
+
+	l := len(peerAddr.IP)
+	ip := peerAddr.IP[l-4 : l]
+
+	copy(enc[2:6], ip)
 	// Append Port
 	port := getBytesFromUint16(uint16(peerAddr.Port))
 	copy(enc[6:8], port[0:2])
@@ -194,7 +212,7 @@ func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) [
 // Encodes received TCP packets to send it through the
 // Ring to the packetProcess rutine.
 func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []byte {
-	peerDataStr := peerAddr.String()
+
 	encodedLen := len(payload) + 8
 	enc := make([]byte, encodedLen)
 	// Get numBytes as slice of bytes.
@@ -202,9 +220,15 @@ func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []by
 	// Append it to the resulting slice.
 	copy(enc[0:2], numBytes[0:2])
 	// Append Peer IP.
-	copy(enc[2:6], peerDataStr[0:4])
+
+	tcpAddr, _ := net.ResolveTCPAddr(peerAddr.Network(), peerAddr.String())
+	l := len(tcpAddr.IP)
+	ip := tcpAddr.IP[l-4 : l]
+
+	copy(enc[2:6], ip)
 	// Append Port
-	copy(enc[6:8], peerDataStr[4:6])
+	port := getBytesFromUint16(uint16(tcpAddr.Port))
+	copy(enc[6:8], port[0:2])
 	// Append Payload
 	copy(enc[8:encodedLen], payload[0:])
 	return enc
@@ -225,7 +249,7 @@ func decodeRedPacket(packet []byte) (int, *net.UDPAddr, []byte, error) {
 	peerAddr := net.UDPAddr{
 		IP:   ip,
 		Port: port,
-		Zone: "N/A",
+		Zone: "",
 	}
 	return byteNum, &peerAddr, payload, nil
 }
@@ -234,7 +258,7 @@ func readTCPFrame(r io.Reader) ([]byte, int, error) {
 
 	// Read frame length.
 	ln := make([]byte, 4)
-	n, err := io.ReadFull(r, ln)
+	_, err := io.ReadFull(r, ln)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -245,8 +269,9 @@ func readTCPFrame(r io.Reader) ([]byte, int, error) {
 	}
 
 	// Read packet payload
+	var n int
 	payload := make([]byte, length)
-	if _, err := io.ReadFull(r, payload); err != nil {
+	if n, err = io.ReadFull(r, payload); err != nil {
 		return nil, 0, err
 	}
 

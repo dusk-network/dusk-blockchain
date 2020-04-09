@@ -32,17 +32,28 @@ type Router struct {
 	MyPeerInfo    Peer
 	// Holds the Nonce that satisfies: `H(ID || Nonce) < Tdiff`.
 	myPeerNonce uint32
+
+	// Store all received Chunk payload. Useful on testing.
+	// Will be removed when kadcast is integrated with eventbus
+	StoreChunks bool
+	MapMutex    sync.RWMutex
+	ChunkIDmap  map[[16]byte][]byte
 }
 
 // MakeRouter allows to create a router which holds the peerInfo and
 // also the routing tree information.
 func MakeRouter(externIP [4]byte, port uint16) Router {
 	myPeer := MakePeer(externIP, port)
+	return makeRouterFromPeer(myPeer)
+}
+
+func makeRouterFromPeer(peer Peer) Router {
 	return Router{
-		tree:          makeTree(myPeer),
-		myPeerUDPAddr: myPeer.getUDPAddr(),
-		MyPeerInfo:    myPeer,
-		myPeerNonce:   myPeer.computePeerNonce(),
+		tree:          makeTree(peer),
+		myPeerUDPAddr: peer.getUDPAddr(),
+		MyPeerInfo:    peer,
+		myPeerNonce:   peer.computePeerNonce(),
+		ChunkIDmap:    make(map[[16]byte][]byte),
 	}
 }
 
@@ -55,14 +66,16 @@ func MakeRouter(externIP [4]byte, port uint16) Router {
 
 // Returns the complete list of Peers in order to be sorted
 // as they have the xor distance in respec to a Peer as a parameter.
-func (router Router) getPeerSortDist(refPeer Peer) []PeerSort {
+func (router *Router) getPeerSortDist(refPeer Peer) []PeerSort {
 	var peerList []Peer
+	router.tree.mu.RLock()
 	for buckIdx, bucket := range router.tree.buckets {
 		// Skip bucket 0
 		if buckIdx != 0 {
 			peerList = append(peerList[:], bucket.entries[:]...)
 		}
 	}
+	router.tree.mu.RUnlock()
 	var peerListSort []PeerSort
 	for _, peer := range peerList {
 		// We don't want to return the Peer struct of the Peer
@@ -92,7 +105,7 @@ func (a ByXORDist) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 // Returns a list of the selected number of closest peers
 // in respect to a certain `Peer`.
-func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
+func (router *Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 	var xPeers []Peer
 	peerList := router.getPeerSortDist(refPeer)
 	sort.Sort(ByXORDist(peerList))
@@ -117,7 +130,7 @@ func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 // for the `PONG` message arrivals.
 // Then looks for the closest peer to the node itself into the
 // buckets and returns it.
-func (router Router) pollClosestPeer(t time.Duration) Peer {
+func (router *Router) pollClosestPeer(t time.Duration) Peer {
 	var wg sync.WaitGroup
 	var ps []Peer
 	wg.Add(1)
@@ -137,11 +150,12 @@ func (router Router) pollClosestPeer(t time.Duration) Peer {
 // the node knows and waits for a certain time in order to wait
 // for the `PONG` message arrivals.
 // Returns back the new number of peers the node is connected to.
-func (router Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) uint64 {
+func (router *Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) uint64 {
 	var wg sync.WaitGroup
 	var peerNum uint64
 
 	wg.Add(1)
+
 	for _, peer := range bootNodes {
 		router.sendPing(peer)
 	}
@@ -159,69 +173,70 @@ func (router Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) u
 // ------- Packet-sending utilities for the Router ------- //
 
 // Builds and sends a `PING` packet
-func (router Router) sendPing(receiver Peer) {
+func (router *Router) sendPing(receiver Peer) {
 	// Build empty packet.
-	var packet Packet
+	var p Packet
 	// Fill the headers with the type, ID, Nonce and destPort.
-	packet.setHeadersInfo(0, router, receiver)
+	p.setHeadersInfo(0, router)
 
 	// Since return values from functions are not addressable, we need to
 	// allocate the receiver UDPAddr
 	destUDPAddr := receiver.getUDPAddr()
 	// Send the packet
-	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
+	sendUDPPacket(router.myPeerUDPAddr, destUDPAddr, marshalPacket(p))
 }
 
 // Builds and sends a `PONG` packet
-func (router Router) sendPong(receiver Peer) {
+func (router *Router) sendPong(receiver Peer) {
 	// Build empty packet.
-	var packet Packet
+	var p Packet
 	// Fill the headers with the type, ID, Nonce and destPort.
-	packet.setHeadersInfo(1, router, receiver)
+	p.setHeadersInfo(1, router)
 
 	// Since return values from functions are not addressable, we need to
 	// allocate the receiver UDPAddr
 	destUDPAddr := receiver.getUDPAddr()
 	// Send the packet
-	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
+	sendUDPPacket(router.myPeerUDPAddr, destUDPAddr, marshalPacket(p))
 }
 
 // Builds and sends a `FIND_NODES` packet.
-func (router Router) sendFindNodes() {
+func (router *Router) sendFindNodes() {
 	// Get `Alpha` closest nodes to me.
 	destPeers := router.getXClosestPeersTo(Alpha, router.MyPeerInfo)
 	// Fill the headers with the type, ID, Nonce and destPort.
 	for _, peer := range destPeers {
 		// Build the packet
-		var packet Packet
-		packet.setHeadersInfo(2, router, peer)
+		var p Packet
+		p.setHeadersInfo(2, router)
 		// We don't need to add the ID to the payload snce we already have
 		// it in the headers.
 		// Send the packet
-		sendUDPPacket("udp", peer.getUDPAddr(), packet.asBytes())
+		sendUDPPacket(router.myPeerUDPAddr, peer.getUDPAddr(), marshalPacket(p))
 	}
 }
 
 // Builds and sends a `NODES` packet.
-func (router Router) sendNodes(receiver Peer) {
+func (router *Router) sendNodes(receiver Peer) {
 	// Build empty packet
-	var packet Packet
+	var p Packet
 	// Set headers
-	packet.setHeadersInfo(3, router, receiver)
+	p.setHeadersInfo(3, router)
 	// Set payload with the `k` peers closest to receiver.
-	peersToSend := packet.setNodesPayload(router, receiver)
+	peersToSend := p.setNodesPayload(router, receiver)
 	// If we don't have any peers to announce, we just skip sending
 	// the `NODES` messsage.
 	if peersToSend == 0 {
 		return
 	}
-	sendUDPPacket("udp", receiver.getUDPAddr(), packet.asBytes())
+	sendUDPPacket(router.myPeerUDPAddr, receiver.getUDPAddr(), marshalPacket(p))
 }
 
 // BroadcastPacket sends a `CHUNKS` message across the network
 // following the Kadcast broadcasting rules with the specified height.
-func (router Router) broadcastPacket(height byte, tipus byte, payload []byte) {
+func (router *Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 	// Get `Beta` random peers from each Bucket.
+	router.tree.mu.RLock()
 	for _, bucket := range router.tree.buckets {
 		// Skip first bucket from the iteration (it contains our peer).
 		if bucket.idLength == 0 {
@@ -232,17 +247,23 @@ func (router Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 			continue
 		}
 		// Create empty packet and set headers.
-		var packet Packet
+		var p Packet
 		// Set headers info.
-		packet.setHeadersInfo(tipus, router, *destPeer)
+		p.setHeadersInfo(tipus, router)
 		// Set payload.
-		packet.setChunksPayloadInfo(height, payload)
-		sendTCPStream(destPeer.getUDPAddr(), packet.asBytes())
+		p.setChunksPayloadInfo(height, payload)
+		sendTCPStream(destPeer.getUDPAddr(), marshalPacket(p))
 	}
+	router.tree.mu.RUnlock()
 }
 
 // StartPacketBroadcast sends a `CHUNKS` message across the network
 // following the Kadcast broadcasting rules with the InitHeight.
-func (router Router) StartPacketBroadcast(tipus byte, payload []byte) {
+func (router *Router) StartPacketBroadcast(tipus byte, payload []byte) {
 	router.broadcastPacket(InitHeight, tipus, payload)
+}
+
+// GetTotalPeers the total amount of peers that a `Peer` is connected to
+func (router *Router) GetTotalPeers() uint64 {
+	return router.tree.getTotalPeers()
 }

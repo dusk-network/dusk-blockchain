@@ -3,17 +3,13 @@ package kadcast
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"math"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
-func TestConv(t *testing.T) {
-	var slce []byte = []byte{0, 0}
-	peerNum := binary.BigEndian.Uint16(slce)
-	fmt.Printf("%v", peerNum)
-}
 func TestPOW(t *testing.T) {
 	a := Peer{
 		ip:   [4]byte{192, 169, 1, 1},
@@ -62,5 +58,37 @@ func TestReadTCPFrameErr(t *testing.T) {
 	}
 	if err != ErrExceedMaxLen {
 		t.Error("expect frame size error")
+	}
+}
+
+// TestClassifyDistance compares classifyDistance result with the result of the
+// floor of log2 calculation over 64bits distances
+func TestClassifyDistance(t *testing.T) {
+
+	c := 0
+	for {
+
+		b, _ := crypto.RandEntropy(8)
+		var distance [16]byte
+		copy(distance[:], b)
+
+		result := float64(classifyDistance(distance))
+
+		v := binary.LittleEndian.Uint64(distance[:])
+		expected := math.Floor(math.Log2(float64(v)))
+
+		if expected != result {
+			t.Error("classifyDistance result not equal floor(log2(distance))")
+		}
+
+		if c++; c == 10 {
+			break
+		}
+	}
+
+	// check corner cases
+	var distance [16]byte
+	if classifyDistance(distance) != 0 {
+		t.Errorf("invalid calculation on 0 distance")
 	}
 }

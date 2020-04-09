@@ -2,6 +2,7 @@ package kadcast
 
 import (
 	"net"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -14,56 +15,59 @@ import (
 // the packets to the circularQueue.
 func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 
-	lAddr := getLocalUDPAddress()
-	// Set listening port.
-	lAddr.Port = int(MyPeerInfo.port)
-PacketConnCreation:
+	lAddr := getLocalUDPAddress(int(MyPeerInfo.port))
 	// listen to incoming udp packets
-	pc, err := net.ListenUDP(netw, &lAddr)
+	listener, err := net.ListenUDP(netw, &lAddr)
 	if err != nil {
 		log.Panic(err)
 	}
-	// Set initial deadline.
-	_ = pc.SetDeadline(time.Now().Add(time.Minute))
+	defer func() {
+		_ = listener.Close()
+	}()
 
-	// Instantiate the buffer
-	buffer := make([]byte, 1024)
+	log.Infof("Starting UDP Listener on %s", lAddr.String())
+
 	for {
 		// Read UDP packet.
-		byteNum, uAddr, err := pc.ReadFromUDP(buffer)
-
+		_ = listener.SetDeadline(time.Now().Add(5 * time.Minute))
+		buffer := make([]byte, 1024)
+		byteNum, uAddr, err := listener.ReadFromUDP(buffer)
 		if err != nil {
 			log.WithError(err).Warn("Error on packet read")
-			_ = pc.Close()
-			goto PacketConnCreation
+			return
 		}
-		// Set a new deadline for the connection.
-		_ = pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
 		encodedPack := encodeReadUDPPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
+		buffer = nil
 	}
 }
 
 // Gets the local address of the sender `Peer` and the UDPAddress of the
 // receiver `Peer` and sends to it a UDP Packet with the payload inside.
-//nolint:unparam
-func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
-	localAddr := getLocalUDPAddress()
-	conn, err := net.DialUDP(netw, &localAddr, &addr)
+func sendUDPPacket(laddr, raddr net.UDPAddr, payload []byte) {
+
+	log.WithField("dest", raddr.String()).Tracef("Dialing udp")
+
+	// Send from same IP that the UDP listener is bound on but choose random port
+	laddr.Port = 0
+	conn, err := net.DialUDP("udp", &laddr, &raddr)
 	if err != nil {
-		log.WithError(err).Warn("Could not stablish a connection with the dest Peer.")
+		log.WithError(err).Warn("Could not establish a connection with the dest Peer.")
 		return
 	}
 	defer func() {
 		_ = conn.Close()
 	}()
 
+	log.WithField("src", conn.LocalAddr().String()).
+		WithField("dest", raddr.String()).Traceln("Sending udp")
+
 	// Simple write
 	_, err = conn.Write(payload)
 	if err != nil {
-		log.WithError(err).Warn("Error while witting to the file descriptor.")
+		log.WithError(err).Warn("Error while writing to the filedescriptor.")
 		return
 	}
 }
@@ -72,60 +76,69 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 // executes it's processing inside a gorutine by sending
 // the packets to the circularQueue.
 func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
-	lAddr := getLocalTCPAddress()
-	// Set listening port.
-	lAddr.Port = int(MyPeerInfo.port)
-PacketConnCreation:
+
+	lAddr := getLocalTCPAddress(int(MyPeerInfo.port))
 	// listen to incoming TCP packets
 	listener, err := net.ListenTCP(netw, &lAddr)
 	if err != nil {
 		log.Panic(err)
 	}
+	defer func() {
+		_ = listener.Close()
+	}()
+
+	log.Infof("Starting TCP Listener on %s", lAddr.String())
 
 	for {
-		_ = listener.SetDeadline(time.Now().Add(time.Minute))
-		pc, err := listener.AcceptTCP()
+		_ = listener.SetDeadline(time.Now().Add(5 * time.Minute))
+		conn, err := listener.AcceptTCP()
 		if err != nil {
 			log.WithError(err).Warn("Error on tcp accept")
-			goto PacketConnCreation
+			return
 		}
 
 		// Read frame payload
 		// Set a new deadline for the connection.
-		_ = pc.SetDeadline(time.Now().Add(time.Minute))
+		_ = conn.SetDeadline(time.Now().Add(time.Minute))
 
-		payload, byteNum, err := readTCPFrame(pc)
+		payload, byteNum, err := readTCPFrame(conn)
 		if err != nil {
 			log.WithError(err).Warn("Error on frame read")
-			_ = pc.Close()
+			_ = conn.Close()
 			continue
 		}
 
-		uAddr := pc.RemoteAddr()
-
 		// Serialize the packet.
-		encodedPack := encodeReadTCPPacket(uint16(byteNum), uAddr, payload[:])
+		encodedPack := encodeReadTCPPacket(uint16(byteNum), conn.RemoteAddr(), payload[:])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
 		payload = nil
+
+		// Current impl expects only one TCPFrame per connection
+		_ = conn.Close()
 	}
 }
 
 // Opens a TCP connection with the peer sent on the params and transmits
 // a stream of bytes. Once transmitted, closes the connection.
-func sendTCPStream(addr net.UDPAddr, payload []byte) {
-	conn, err := net.Dial("tcp", string(addr.IP)+":"+string(addr.Port))
+func sendTCPStream(raddr net.UDPAddr, payload []byte) {
+
+	address := raddr.IP.String() + ":" + strconv.Itoa(raddr.Port)
+	conn, err := net.Dial("tcp4", address)
 	if err != nil {
-		log.WithError(err).Warn("Could not stablish a connection with the dest Peer.")
+		log.WithError(err).Warnf("Could not establish a peer connection %s.", raddr.String())
 		return
 	}
 	defer func() {
 		_ = conn.Close()
 	}()
 
+	log.WithField("src", conn.LocalAddr().String()).
+		WithField("dest", raddr.String()).Traceln("Sending tcp")
+
 	// Write our message to the connection.
 	if err = writeTCPFrame(conn, payload); err != nil {
-		log.WithError(err).Warnf("Could not write to addr %s", addr.String())
+		log.WithError(err).Warnf("Could not write to addr %s", raddr.String())
 		return
 	}
 }

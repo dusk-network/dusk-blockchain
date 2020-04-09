@@ -50,6 +50,12 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 func StartNetworkDiscovery(router *Router) {
 	// Get closest actual Peer.
 	previousClosestArr := router.getXClosestPeersTo(1, router.MyPeerInfo)
+
+	if len(previousClosestArr) == 0 {
+		log.Error("couldn't find closest peers")
+		return
+	}
+
 	previousClosest := previousClosestArr[0]
 
 	// Ask for new peers, wait for `PONG` arrivals and get the

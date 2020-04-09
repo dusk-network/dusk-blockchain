@@ -2,6 +2,8 @@ package kadcast
 
 import (
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"net"
 
 	"golang.org/x/crypto/sha3"
@@ -24,19 +26,21 @@ type Peer struct {
 // MakePeer constructs a `Peer` by setting it's IP, Port
 // and computing and setting it's ID.
 func MakePeer(ip [4]byte, port uint16) Peer {
-	id := computePeerID(ip)
+	id := computePeerID(ip, port)
 	peer := Peer{ip, port, id}
 	return peer
 }
 
 // Deserializes a `Peer` structure as an array of bytes
 // that allows to send it through a wire.
-func (peer Peer) deserialize() []byte {
+func marshalPeer(peer *Peer) []byte {
 	serPeer := make([]byte, 22)
 	// Add Peer IP.
+
 	copy(serPeer[0:4], peer.ip[0:4])
 	// Serialize and add Peer port.
-	portByt := getBytesFromUint16(peer.port)
+	portByt := make([]byte, 2)
+	binary.LittleEndian.PutUint16(portByt, peer.port)
 	copy(serPeer[4:6], portByt[0:2])
 	// Add Peer ID.
 	copy(serPeer[6:22], peer.id[0:16])
@@ -45,10 +49,11 @@ func (peer Peer) deserialize() []byte {
 
 // Serializes an array of bytes that contains a Peer
 // on it returning a `Peer` structure.
-func serializePeer(peerBytes []byte) Peer {
+func unmarshalPeer(peerBytes []byte) Peer {
 	// Get Ip
 	var ip [4]byte
 	copy(ip[:], peerBytes[0:4])
+
 	// Get Port
 	port := binary.LittleEndian.Uint16(peerBytes[4:6])
 	// Get Id
@@ -84,8 +89,8 @@ func (peer Peer) computePeerNonce() uint32 {
 	}
 }
 
-// Computes the XOR distance between two Peers.
-func (peer Peer) computeDistance(otherPeer Peer) uint16 {
+// computeDistance returns both bucket number and XOR distance between two Peers.
+func (peer Peer) computeDistance(otherPeer Peer) (uint16, [16]byte) {
 	return idXor(peer.id, otherPeer.id)
 }
 
@@ -95,16 +100,19 @@ func (peer Peer) getUDPAddr() net.UDPAddr {
 	return net.UDPAddr{
 		IP:   peer.ip[:],
 		Port: int(peer.port),
-		Zone: "N/A",
+		Zone: "",
 	}
 }
 
+func (peer Peer) String() string {
+	return fmt.Sprintf("%v:%d, %s", peer.ip, peer.port, hex.EncodeToString(peer.id[:])[0:6])
+}
+
 // Builds the Peer info from a UPDAddress struct.
-//nolint:unparam
-func getPeerNetworkInfo(udpAddress net.UDPAddr) ([4]byte, uint16) {
+func getPeerNetworkInfo(udpAddress net.UDPAddr) [4]byte {
 	var ip [4]byte
 	copy(ip[:], udpAddress.IP[:])
-	return ip, uint16(udpAddress.Port)
+	return ip
 }
 
 // PeerSort is a helper type to sort `Peers`

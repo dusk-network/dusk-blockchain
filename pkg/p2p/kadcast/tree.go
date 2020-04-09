@@ -1,9 +1,12 @@
 package kadcast
 
+import "sync"
+
 // Tree stores `L` buckets inside of it.
 // This is basically the routing info of every peer.
 type Tree struct {
 	buckets [128]bucket
+	mu      sync.RWMutex
 }
 
 // Allocates space for a tree and returns an empty intance of it.
@@ -23,20 +26,23 @@ func makeTree(myPeer Peer) Tree {
 
 // Classifies and adds a Peer to the routing storage tree.
 func (tree *Tree) addPeer(myPeer Peer, otherPeer Peer) {
-	idl := myPeer.computeDistance(otherPeer)
-	if idl == 0 {
-		return
+	idl, _ := myPeer.computeDistance(otherPeer)
+	if idl != 0 {
+		tree.mu.Lock()
+		tree.buckets[idl].addPeer(otherPeer)
+		tree.mu.Unlock()
 	}
-	tree.buckets[idl].addPeer(otherPeer)
 }
 
 // Returns the total amount of peers that a `Peer` is connected to.
 func (tree *Tree) getTotalPeers() uint64 {
+	tree.mu.RLock()
 	var count uint64 = 0
 	for i, bucket := range tree.buckets {
 		if i != 0 {
 			count += uint64(bucket.peerCount)
 		}
 	}
+	tree.mu.RUnlock()
 	return count
 }
