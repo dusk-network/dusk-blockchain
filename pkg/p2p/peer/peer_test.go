@@ -1,4 +1,4 @@
-package peer_test
+package peer
 
 import (
 	"bytes"
@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -22,7 +20,7 @@ import (
 
 var receiveFn = func(c net.Conn) {
 	for {
-		c.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
 		buf := make([]byte, 1024)
 		if _, err := c.Read(buf); err != nil {
 			break
@@ -37,7 +35,9 @@ func TestReader(t *testing.T) {
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
-	peerReader, err := helper.StartPeerReader(srv, eb, rpcBus, chainsync.NewCounter(eb), nil)
+	counter := chainsync.NewCounter(eb)
+
+	peerReader, err := StartPeerReader(srv, eb, rpcBus, counter, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestReader(t *testing.T) {
 		if err := g.Process(&buf); err != nil {
 			eChan <- err
 		}
-		client.Write(buf.Bytes())
+		_, _ = client.Write(buf.Bytes())
 	}(errChan)
 
 	// We should get the message through this channel
@@ -77,9 +77,7 @@ func TestWriteRingBuffer(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
-		defer func() {
-			_ = p.Conn.Close()
-		}()
+		_ = p.Conn.Close()
 	}
 
 	ev := makeAgreementGossip(10)
@@ -104,7 +102,7 @@ func TestWriteLoop(t *testing.T) {
 
 	go func(g *processing.Gossip) {
 		responseChan := make(chan *bytes.Buffer)
-		writer := peer.NewWriter(client, g, bus, 30*time.Millisecond)
+		writer := NewWriter(client, g, bus, 30*time.Millisecond)
 		go writer.Serve(responseChan, make(chan struct{}, 1))
 
 		bufCopy := buf
@@ -130,9 +128,7 @@ func BenchmarkWriter(b *testing.B) {
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
-		defer func() {
-			_ = p.Conn.Close()
-		}()
+		_ = p.Conn.Close()
 	}
 
 	msg := makeAgreementGossip(10)
@@ -150,10 +146,10 @@ func makeAgreementGossip(keyAmount int) message.Message {
 	return message.New(topics.Agreement, aggro)
 }
 
-func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *peer.Writer {
+func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *Writer {
 	client, srv := net.Pipe()
 	g := processing.NewGossip(protocol.TestNet)
-	pw := peer.NewWriter(client, g, bus)
+	pw := NewWriter(client, g, bus)
 	go receiveFunc(srv)
 	return pw
 }
