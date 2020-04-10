@@ -5,9 +5,9 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 // Factory creates a second step reduction Component

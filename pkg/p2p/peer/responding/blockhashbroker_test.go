@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 // Test the behavior of the block hash broker, upon receiving a GetBlocks message.

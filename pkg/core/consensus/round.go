@@ -8,12 +8,12 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-crypto/bls"
-	"github.com/dusk-network/dusk-wallet/v2/key"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -8,12 +8,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
-	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	log "github.com/sirupsen/logrus"
 )
 

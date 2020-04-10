@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-wallet/v2/block"
-	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	log "github.com/sirupsen/logrus"
 )
 

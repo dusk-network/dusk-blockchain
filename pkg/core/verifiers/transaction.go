@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/pkg/errors"
 )
 

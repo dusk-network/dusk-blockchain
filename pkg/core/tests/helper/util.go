@@ -6,6 +6,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -14,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/stretchr/testify/assert"
 )
 

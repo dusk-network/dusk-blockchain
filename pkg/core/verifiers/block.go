@@ -7,10 +7,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-crypto/bls"
-	"github.com/dusk-network/dusk-wallet/v2/block"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 // CheckBlock will verify whether a block is valid according to the rules of the consensus

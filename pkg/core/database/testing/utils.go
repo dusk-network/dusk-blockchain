@@ -5,9 +5,9 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 var (

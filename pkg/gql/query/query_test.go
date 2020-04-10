@@ -9,11 +9,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	core "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-wallet/v2/block"
-	core "github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/graphql-go/graphql"
 )
 

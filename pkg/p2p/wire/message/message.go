@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 // Message is the core of the message-oriented architecture of the node. It is
