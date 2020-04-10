@@ -38,6 +38,7 @@ func fetchBlockHeightAndState(db database.DB, height uint64) (*block.Block, []by
 	return blk, state.TipHash, nil
 }
 
+// Deprecated: phoenix/feature-363
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
 	_, db := heavy.CreateDBConnection()
 

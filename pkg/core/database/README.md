@@ -10,8 +10,8 @@ Package database represents a database layer in Dusk Network. Current design sho
 Interfaces exposed to upper layers:
 
 - `database.Driver`: DB connection initiator. Inspired by database/sql/driver
-- `database.DB`: A thin layer on top of database.Tx providing a manageable Tx execution. Inspired by BoltDB
 - `database.Tx`: A transaction layer tightly coupled with DUSK block chain specifics to fully benefit from underlying storage capabilities
+- `database.DB`: A thin layer on top of database.Tx providing a manageable Tx execution. Inspired by BoltDB
 
 
 ### Available Drivers

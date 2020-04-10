@@ -17,7 +17,7 @@ import (
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
-//nolint
+// Transactor is the interface toward the wallet
 type Transactor struct { // TODO: rename
 	w                 *wallet.Wallet
 	db                database.DB
