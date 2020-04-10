@@ -77,7 +77,7 @@ func (pac *Packet) setHeadersInfo(tipus byte, router *Router) {
 // target Peer.
 func (pac *Packet) setNodesPayload(router *Router, targetPeer Peer) int {
 	// Get `K` closest peers to `targetPeer`.
-	kClosestPeers := router.getXClosestPeersTo(K, targetPeer)
+	kClosestPeers := router.getXClosestPeersTo(DefaultKNumber, targetPeer)
 	// Compute the amount of Peers that will be sent and add it
 	// as a two-byte array.
 	numBytes := make([]byte, 2)
@@ -223,7 +223,9 @@ func handleChunks(packet Packet, router *Router) error {
 	// Verify chunkID on the memmoryMap. If we already have it stored,+
 	// means that the packet is repeated and we just ignore it.
 	if _, ok := router.ChunkIDmap[*chunkID]; ok {
+		router.MapMutex.Lock()
 		router.Duplicated = true
+		router.MapMutex.Unlock()
 		return fmt.Errorf("chunk %s already registered", hex.EncodeToString((*chunkID)[:]))
 	}
 
