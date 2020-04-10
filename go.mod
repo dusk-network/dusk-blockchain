@@ -29,6 +29,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
 	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
 	google.golang.org/grpc v1.28.0
+	gotest.tools v2.2.0+incompatible
 )
 
 go 1.13
