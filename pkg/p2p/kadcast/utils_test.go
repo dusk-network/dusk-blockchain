@@ -92,3 +92,32 @@ func TestClassifyDistance(t *testing.T) {
 		t.Errorf("invalid calculation on 0 distance")
 	}
 }
+
+func TestGenerateRandomDelegates(t *testing.T) {
+
+	ip := [4]byte{127, 0, 0, 1}
+	id := [16]byte{1, 2, 3, 4}
+
+	in := make([]Peer, 10)
+	for i := 0; i < len(in); i++ {
+		in[i] = Peer{ip, uint16(i), id}
+	}
+
+	for i := 0; i < len(in); i++ {
+		var beta uint8 = uint8(i)
+		out := make([]Peer, 0)
+		generateRandomDelegates(beta, in, &out)
+
+		if len(out) != int(beta) {
+			t.Errorf("could not manage to generate %d delegates", beta)
+		}
+	}
+
+	beta := uint8(len(in) * 2)
+	out := make([]Peer, 0)
+	generateRandomDelegates(beta, in, &out)
+
+	if len(out) != len(in) {
+		t.Error("could not manage to generate n delegates")
+	}
+}

@@ -9,10 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// K is the number of peers that a node will send on
-// a `NODES` message.
-const K int = 20
-
 // Alpha is the number of nodes to which a node will
 // ask for new nodes with `FIND_NODES` messages.
 const Alpha int = 3
@@ -24,6 +20,10 @@ const InitHeight byte = 128
 // Router holds all of the data needed to interact with
 // the routing data and also the networking utils.
 type Router struct {
+
+	// number of delegates per bucket
+	beta uint8
+
 	// Tree represents the routing structure.
 	tree Tree
 	// Even the port and the IP are the same info, the difference
@@ -57,6 +57,7 @@ func makeRouterFromPeer(peer Peer) Router {
 		MyPeerInfo:    peer,
 		myPeerNonce:   peer.computePeerNonce(),
 		ChunkIDmap:    make(map[[16]byte][]byte),
+		beta:          DefaultMaxBetaDelegates,
 	}
 }
 
@@ -142,18 +143,22 @@ func (router *Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 // buckets and returns it.
 func (router *Router) pollClosestPeer(t time.Duration) Peer {
 	var wg sync.WaitGroup
-	var ps []Peer
+
 	wg.Add(1)
 	router.sendFindNodes()
 
+	var p Peer
 	timer := time.AfterFunc(t, func() {
-		ps = router.getXClosestPeersTo(1, router.MyPeerInfo)
+		ps := router.getXClosestPeersTo(DefaultAlphaClosestNodes, router.MyPeerInfo)
+		if len(ps) > 0 {
+			p = ps[0]
+		}
 		wg.Done()
 	})
 
 	wg.Wait()
 	timer.Stop()
-	return ps[0]
+	return p
 }
 
 // Sends a `PING` messages to the bootstrap nodes that
@@ -262,45 +267,58 @@ func (router *Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 		router.tree.mu.RUnlock()
 
 		if len(b.entries) == 0 {
-			// Empty bucket, no need to proceed
 			continue
 		}
 
-		var destPeer *Peer
+		delegates := make([]Peer, 0)
+
 		if b.idLength == 0 {
 			// the bucket B 0 only holds one specific node of distance one
 			for _, p := range b.entries {
 				// Find neighbor peer
 				if !router.MyPeerInfo.IsEqual(p) {
-					destPeer = &p
+					delegates = append(delegates, p)
 					break
 				}
 			}
 		} else {
-			// TODO: Pick multiple random peers from a bucket
-			destPeer, _ = b.getRandomPeer()
+			/*
+				Instead of having a single delegate per bucket, we select β delegates.
+				This severely increases the probability that at least one out of the
+				multiple selected nodes is honest and reachable.
+			*/
+
+			in := make([]Peer, len(b.entries))
+			copy(in, b.entries)
+
+			if err := generateRandomDelegates(router.beta, in, &delegates); err != nil {
+				log.WithError(err).Warn("generate random delegates failed")
+			}
 		}
 
-		if destPeer == nil {
-			continue
+		// For each of the delegates found from this bucket, make an attempt to
+		// repropagate CHUNK message
+		for _, destPeer := range delegates {
+
+			if myPeer.IsEqual(destPeer) {
+				log.Error("Destination peer must be different from the source peer")
+				continue
+			}
+
+			log.WithField("from", myPeer.String()).
+				WithField("to", destPeer.String()).
+				WithField("Height", height).
+				Trace("Sending CHUNKS message")
+
+			// Create empty packet and set headers.
+			var p Packet
+			// Set headers info.
+			p.setHeadersInfo(tipus, router)
+			// Set payload.
+			p.setChunksPayloadInfo(i, payload)
+			sendTCPStream(destPeer.getUDPAddr(), marshalPacket(p))
 		}
-
-		if myPeer.IsEqual(*destPeer) {
-			log.Error("Destination peer must be different from the source peer")
-			continue
-		}
-
-		log.Tracef("Sending Chunks msg with height %d from %s to %s", i, myPeer.String(), destPeer.String())
-
-		// Create empty packet and set headers.
-		var p Packet
-		// Set headers info.
-		p.setHeadersInfo(tipus, router)
-		// Set payload.
-		p.setChunksPayloadInfo(i, payload)
-		sendTCPStream(destPeer.getUDPAddr(), marshalPacket(p))
 	}
-
 }
 
 // StartPacketBroadcast sends a `CHUNKS` message across the network
