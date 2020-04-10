@@ -1,19 +1,9 @@
 package kadcast
 
-import (
-	"errors"
-	"math/rand"
-)
-
-// MaxBucketPeers represents the maximum
-//number of peers that a `bucket` can hold.
-var MaxBucketPeers uint8 = 25
-
 // bucket stores peer info of the peers that are at a certain
 // distance range to the peer itself.
 type bucket struct {
 	idLength         uint8
-	peerCount        uint8
 	totalPeersPassed uint64
 	// Should always be less than `MaxBucketPeers`
 	entries []Peer
@@ -31,8 +21,7 @@ func makeBucket(idlen uint8) bucket {
 	return bucket{
 		idLength:         idlen,
 		totalPeersPassed: 0,
-		peerCount:        0,
-		entries:          make([]Peer, 0, MaxBucketPeers),
+		entries:          make([]Peer, 0, DefaultMaxBucketPeers),
 		lru:              make(map[Peer]uint64),
 		lruPresent:       make(map[Peer]bool),
 	}
@@ -66,27 +55,16 @@ func (b *bucket) removePeerAtIndex(index int) []Peer {
 	return b.entries[:len(b.entries)-1]
 }
 
-// Picks a random Peer from the bucket and returns it.
-func (b bucket) getRandomPeer() (*Peer, error) {
-	if b.peerCount == 0 {
-		// If the bucket has no nodes inside, we return an error.
-		return nil, errors.New("bucket empty")
-	}
-	maxVal := len(b.entries)
-	return &b.entries[rand.Intn(maxVal)], nil
-}
-
 // Adds a `Peer` to the `bucket` entries list.
-// It also increments the peerCount all according
 // the LRU policy.
 func (b *bucket) addPeer(peer Peer) {
+
 	// Check if the entries set can hold more peers.
-	if len(b.entries) < int(MaxBucketPeers) {
+	if len(b.entries) < int(DefaultMaxBucketPeers) {
 		// Insert it into the set if not present
 		// on the current entries set.
 		if !b.lruPresent[peer] {
 			b.entries = append(b.entries, peer)
-			b.peerCount++
 			b.lruPresent[peer] = true
 		}
 		// Store recently used peer.

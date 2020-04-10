@@ -45,10 +45,8 @@ func (tree *Tree) addPeer(myPeer Peer, otherPeer Peer) {
 func (tree *Tree) getTotalPeers() uint64 {
 	tree.mu.RLock()
 	var count uint64 = 0
-	for i, bucket := range tree.buckets {
-		if i != 0 {
-			count += uint64(bucket.peerCount)
-		}
+	for _, bucket := range tree.buckets {
+		count += uint64(len(bucket.entries))
 	}
 	tree.mu.RUnlock()
 	return count
