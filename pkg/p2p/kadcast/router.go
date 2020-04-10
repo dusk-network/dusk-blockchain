@@ -52,7 +52,7 @@ func MakeRouter(externIP [4]byte, port uint16) Router {
 
 func makeRouterFromPeer(peer Peer) Router {
 	return Router{
-		tree:          makeTree(peer),
+		tree:          makeTree(),
 		myPeerUDPAddr: peer.getUDPAddr(),
 		MyPeerInfo:    peer,
 		myPeerNonce:   peer.computePeerNonce(),

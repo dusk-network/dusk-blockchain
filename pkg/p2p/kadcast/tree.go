@@ -10,9 +10,7 @@ type Tree struct {
 }
 
 // Allocates space for a tree and returns an empty intance of it.
-//
-// It also sets our `Peer` info in the lowest order bucket.
-func makeTree(myPeer Peer) Tree {
+func makeTree() Tree {
 	var bucketList [128]bucket
 	for i := 0; i < 128; i++ {
 		bucketList[i] = makeBucket(uint8(i))
