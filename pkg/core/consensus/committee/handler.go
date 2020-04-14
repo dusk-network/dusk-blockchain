@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 )
 
 // PregenerationAmount is the size of a pregenerated committee

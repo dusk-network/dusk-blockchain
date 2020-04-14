@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/monitor"
-	"github.com/dusk-network/dusk-wallet/v2/block"
 	g "google.golang.org/grpc"
 )
 

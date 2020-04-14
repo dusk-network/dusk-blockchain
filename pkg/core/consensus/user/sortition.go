@@ -5,9 +5,9 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -7,8 +7,6 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 .PHONY: all dep build clean test coverage coverhtml lint
 all: build
 lint: ## Lint the files
-	GOBIN=$(PWD)/bin go run scripts/build.go install
-	@sleep 1
 	GOBIN=$(PWD)/bin go run scripts/build.go lint
 test: ## Run unittests
 	@go test $(TFLAGS) -p 1 -short ${PKG_LIST}

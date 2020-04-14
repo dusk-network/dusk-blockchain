@@ -8,15 +8,15 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/v2/block"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-wallet/v2/key"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -241,6 +241,6 @@ func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []by
 	_ = tx.AddReward(*rewardReceiver, reward)
 
 	// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
-	// This could be achieved with a request to dusk-wallet/v2
+	// This could be achieved with a request to dusk-blockchain/pkg/core/data
 	return tx
 }

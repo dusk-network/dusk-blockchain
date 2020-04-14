@@ -7,9 +7,9 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/mlsag"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 // UnmarshalTxMessage unmarshals a Message carrying a tx from a buffer

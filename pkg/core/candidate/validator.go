@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
-	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 // Validate complies with the republisher.Validator interface. It internally invokes ValidateCandidate

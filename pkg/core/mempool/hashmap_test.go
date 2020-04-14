@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 func TestSortedKeys(t *testing.T) {

@@ -10,11 +10,11 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
-	"github.com/dusk-network/dusk-wallet/v2/key"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
-	"github.com/dusk-network/dusk-wallet/v2/wallet"
 )
 
 var testnet = byte(2)

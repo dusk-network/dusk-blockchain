@@ -11,9 +11,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/v2/key"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/monitor"
-	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 //NotifyBlockUpdate sends an alert with the Block data any time a new block is
