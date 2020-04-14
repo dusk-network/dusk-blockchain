@@ -10,15 +10,11 @@ type Tree struct {
 }
 
 // Allocates space for a tree and returns an empty intance of it.
-//
-// It also sets our `Peer` info in the lowest order bucket.
-func makeTree(myPeer Peer) Tree {
+func makeTree() Tree {
 	var bucketList [128]bucket
 	for i := 0; i < 128; i++ {
 		bucketList[i] = makeBucket(uint8(i))
 	}
-	// Add my `Peer` info on the lowest `bucket`.
-	bucketList[0].addPeer(myPeer)
 	return Tree{
 		buckets: bucketList,
 	}
@@ -26,22 +22,29 @@ func makeTree(myPeer Peer) Tree {
 
 // Classifies and adds a Peer to the routing storage tree.
 func (tree *Tree) addPeer(myPeer Peer, otherPeer Peer) {
-	idl, _ := myPeer.computeDistance(otherPeer)
-	if idl != 0 {
-		tree.mu.Lock()
-		tree.buckets[idl].addPeer(otherPeer)
-		tree.mu.Unlock()
+
+	// routing state should not include myPeer
+	if myPeer.IsEqual(otherPeer) {
+		return
 	}
+
+	idl, _ := myPeer.computeDistance(otherPeer)
+
+	// addPeer allows adding any peer with distance higher than 0. It allows a
+	// peer with distance 0 only if it differs from myPeer. This is the
+	// neighbor peer from the spanning tree myPeer belongs to.
+
+	tree.mu.Lock()
+	tree.buckets[idl].addPeer(otherPeer)
+	tree.mu.Unlock()
 }
 
 // Returns the total amount of peers that a `Peer` is connected to.
 func (tree *Tree) getTotalPeers() uint64 {
 	tree.mu.RLock()
 	var count uint64 = 0
-	for i, bucket := range tree.buckets {
-		if i != 0 {
-			count += uint64(bucket.peerCount)
-		}
+	for _, bucket := range tree.buckets {
+		count += uint64(len(bucket.entries))
 	}
 	tree.mu.RUnlock()
 	return count

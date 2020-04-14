@@ -17,6 +17,7 @@ matrix:
   include:
     - name: "Lint"
       script:
+        - rm -rf $HOME/.cache/golangci-lint || true
         - make lint
 
     - name: "Unit Tests"

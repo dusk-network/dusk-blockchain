@@ -32,3 +32,22 @@ func TestPeerMarshaling(t *testing.T) {
 		t.Error("port numbers not equal")
 	}
 }
+
+func TestPeerIsEqual(t *testing.T) {
+
+	ip := [4]byte{127, 0, 0, 1}
+	id := [16]byte{1, 2, 3, 4}
+	var port uint16 = 9876
+
+	p1 := Peer{ip, port, id}
+	p2 := Peer{ip, port, id}
+
+	if !p1.IsEqual(p2) {
+		t.Error("expect they are equal")
+	}
+
+	p2.port = 0
+	if p1.IsEqual(p2) {
+		t.Error("expect they are not equal")
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"math/bits"
+	"math/rand"
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -99,7 +100,7 @@ func computePeerID(ip [4]byte, port uint16) [16]byte {
 // computePeerDummyID is helpful on simplifying ID on local net
 func computePeerDummyID(ip [4]byte, port uint16) [16]byte {
 	var id [16]byte
-	port -= 9000
+	port -= 10000
 	seed := make([]byte, 16)
 	binary.LittleEndian.PutUint16(seed, port)
 	copy(id[:], seed[0:16])
@@ -302,4 +303,28 @@ func writeTCPFrame(w io.Writer, payload []byte) error {
 	}
 
 	return nil
+}
+
+// generateRandomDelegates selects n random and distinct items from `in` and
+// copy them into `out` slice (no duplicates)
+func generateRandomDelegates(beta uint8, in []Peer, out *[]Peer) error {
+
+	if in == nil || out == nil {
+		return errors.New("invalid in/out params")
+	}
+
+	if len(in) == 0 || len(*out) == int(beta) {
+		return nil
+	}
+
+	maxVal := len(in)
+	// TODO: Consider crypto/rand here
+	ind := rand.Intn(maxVal)
+
+	*out = append(*out, in[ind])
+
+	in[ind] = in[len(in)-1]
+	in = in[:len(in)-1]
+
+	return generateRandomDelegates(beta, in, out)
 }

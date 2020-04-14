@@ -5,11 +5,9 @@ import (
 	"sort"
 	"sync"
 	"time"
-)
 
-// K is the number of peers that a node will send on
-// a `NODES` message.
-const K int = 20
+	log "github.com/sirupsen/logrus"
+)
 
 // Alpha is the number of nodes to which a node will
 // ask for new nodes with `FIND_NODES` messages.
@@ -22,6 +20,10 @@ const InitHeight byte = 128
 // Router holds all of the data needed to interact with
 // the routing data and also the networking utils.
 type Router struct {
+
+	// number of delegates per bucket
+	beta uint8
+
 	// Tree represents the routing structure.
 	tree Tree
 	// Even the port and the IP are the same info, the difference
@@ -38,6 +40,7 @@ type Router struct {
 	StoreChunks bool
 	MapMutex    sync.RWMutex
 	ChunkIDmap  map[[16]byte][]byte
+	Duplicated  bool
 }
 
 // MakeRouter allows to create a router which holds the peerInfo and
@@ -49,11 +52,12 @@ func MakeRouter(externIP [4]byte, port uint16) Router {
 
 func makeRouterFromPeer(peer Peer) Router {
 	return Router{
-		tree:          makeTree(peer),
+		tree:          makeTree(),
 		myPeerUDPAddr: peer.getUDPAddr(),
 		MyPeerInfo:    peer,
 		myPeerNonce:   peer.computePeerNonce(),
 		ChunkIDmap:    make(map[[16]byte][]byte),
+		beta:          DefaultMaxBetaDelegates,
 	}
 }
 
@@ -70,9 +74,16 @@ func (router *Router) getPeerSortDist(refPeer Peer) []PeerSort {
 	var peerList []Peer
 	router.tree.mu.RLock()
 	for buckIdx, bucket := range router.tree.buckets {
-		// Skip bucket 0
-		if buckIdx != 0 {
-			peerList = append(peerList[:], bucket.entries[:]...)
+		if buckIdx == 0 {
+			// Look for neighbor peer in spanning tree
+			for _, p := range bucket.entries {
+				if !router.MyPeerInfo.IsEqual(p) {
+					// neighbor peer
+					peerList = append(peerList, p)
+				}
+			}
+		} else {
+			peerList = append(peerList, bucket.entries[:]...)
 		}
 	}
 	router.tree.mu.RUnlock()
@@ -132,18 +143,22 @@ func (router *Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 // buckets and returns it.
 func (router *Router) pollClosestPeer(t time.Duration) Peer {
 	var wg sync.WaitGroup
-	var ps []Peer
+
 	wg.Add(1)
 	router.sendFindNodes()
 
+	var p Peer
 	timer := time.AfterFunc(t, func() {
-		ps = router.getXClosestPeersTo(1, router.MyPeerInfo)
+		ps := router.getXClosestPeersTo(DefaultAlphaClosestNodes, router.MyPeerInfo)
+		if len(ps) > 0 {
+			p = ps[0]
+		}
 		wg.Done()
 	})
 
 	wg.Wait()
 	timer.Stop()
-	return ps[0]
+	return p
 }
 
 // Sends a `PING` messages to the bootstrap nodes that
@@ -235,32 +250,81 @@ func (router *Router) sendNodes(receiver Peer) {
 // BroadcastPacket sends a `CHUNKS` message across the network
 // following the Kadcast broadcasting rules with the specified height.
 func (router *Router) broadcastPacket(height byte, tipus byte, payload []byte) {
-	// Get `Beta` random peers from each Bucket.
-	router.tree.mu.RLock()
-	for _, bucket := range router.tree.buckets {
-		// Skip first bucket from the iteration (it contains our peer).
-		if bucket.idLength == 0 {
-			continue
-		}
-		destPeer, err := bucket.getRandomPeer()
-		if err != nil {
-			continue
-		}
-		// Create empty packet and set headers.
-		var p Packet
-		// Set headers info.
-		p.setHeadersInfo(tipus, router)
-		// Set payload.
-		p.setChunksPayloadInfo(height, payload)
-		sendTCPStream(destPeer.getUDPAddr(), marshalPacket(p))
+
+	if height > byte(len(router.tree.buckets)) || height == 0 {
+		return
 	}
-	router.tree.mu.RUnlock()
+
+	myPeer := router.MyPeerInfo
+
+	var i byte
+	for i = 0; i <= height-1; i++ {
+
+		// this should be always a deep copy of a bucket from the tree
+		var b bucket
+		router.tree.mu.RLock()
+		b = router.tree.buckets[i]
+		router.tree.mu.RUnlock()
+
+		if len(b.entries) == 0 {
+			continue
+		}
+
+		delegates := make([]Peer, 0)
+
+		if b.idLength == 0 {
+			// the bucket B 0 only holds one specific node of distance one
+			for _, p := range b.entries {
+				// Find neighbor peer
+				if !router.MyPeerInfo.IsEqual(p) {
+					delegates = append(delegates, p)
+					break
+				}
+			}
+		} else {
+			/*
+				Instead of having a single delegate per bucket, we select β delegates.
+				This severely increases the probability that at least one out of the
+				multiple selected nodes is honest and reachable.
+			*/
+
+			in := make([]Peer, len(b.entries))
+			copy(in, b.entries)
+
+			if err := generateRandomDelegates(router.beta, in, &delegates); err != nil {
+				log.WithError(err).Warn("generate random delegates failed")
+			}
+		}
+
+		// For each of the delegates found from this bucket, make an attempt to
+		// repropagate CHUNK message
+		for _, destPeer := range delegates {
+
+			if myPeer.IsEqual(destPeer) {
+				log.Error("Destination peer must be different from the source peer")
+				continue
+			}
+
+			log.WithField("from", myPeer.String()).
+				WithField("to", destPeer.String()).
+				WithField("Height", height).
+				Trace("Sending CHUNKS message")
+
+			// Create empty packet and set headers.
+			var p Packet
+			// Set headers info.
+			p.setHeadersInfo(tipus, router)
+			// Set payload.
+			p.setChunksPayloadInfo(i, payload)
+			sendTCPStream(destPeer.getUDPAddr(), marshalPacket(p))
+		}
+	}
 }
 
 // StartPacketBroadcast sends a `CHUNKS` message across the network
 // following the Kadcast broadcasting rules with the InitHeight.
-func (router *Router) StartPacketBroadcast(tipus byte, payload []byte) {
-	router.broadcastPacket(InitHeight, tipus, payload)
+func (router *Router) StartPacketBroadcast(payload []byte) {
+	router.broadcastPacket(InitHeight, 0, payload)
 }
 
 // GetTotalPeers the total amount of peers that a `Peer` is connected to
