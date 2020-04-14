@@ -1,7 +1,10 @@
 package kadcast
 
 import (
+	"bytes"
 	"encoding/hex"
+	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	log "github.com/sirupsen/logrus"
@@ -11,11 +14,7 @@ import (
 func TraceRoutingState(r *Router) {
 	peer := r.MyPeerInfo
 	log.Tracef("this_peer: %s, bucket peers num %d", peer.String(), r.tree.getTotalPeers())
-	for bucketID, b := range r.tree.buckets {
-		if bucketID == 0 {
-			continue
-		}
-
+	for _, b := range r.tree.buckets {
 		for _, p := range b.entries {
 			_, dist := peer.computeDistance(p)
 			log.Tracef("bucket: %d, peer: %s, distance: %s", b.idLength, p.String(), hex.EncodeToString(dist[:]))
@@ -43,9 +42,13 @@ func TestNode(port int) *Router {
 
 	log.Infof("Starting Kadcast Node on: %s", peer.String())
 
-	// Force each node to store all chunk messages
-	// Needed only for testing purposes
+	// Force each node to store all chunk messages Needed only for testing
+	// purposes
 	router.StoreChunks = true
+
+	// Set beta delegates to 1 so we can expect only one message per node
+	// optimal broadcast (no duplicates)
+	router.beta = 1
 
 	// Initialize the UDP server
 	udpQueue := ring.NewBuffer(500)
@@ -75,9 +78,16 @@ func TestNetwork(num int, basePort int) ([]*Router, error) {
 
 	for i := 0; i < num; i++ {
 		r := TestNode(basePort + i)
-		bootstrapNodes = append(bootstrapNodes, r.MyPeerInfo)
+
+		if i != 0 {
+			bootstrapNodes = append(bootstrapNodes, r.MyPeerInfo)
+		}
+
 		routers = append(routers, r)
 	}
+
+	// Give all peers a second to start their udp/tcp listeners
+	time.Sleep(1 * time.Second)
 
 	// Start Bootstrapping process.
 	err := InitBootstrap(routers[0], bootstrapNodes)
@@ -87,8 +97,51 @@ func TestNetwork(num int, basePort int) ([]*Router, error) {
 
 	// Once the bootstrap succeeded, start the network discovery.
 	for _, r := range routers {
-		StartNetworkDiscovery(r)
+		StartNetworkDiscovery(r, 1*time.Second)
 	}
 
+	time.Sleep(1 * time.Second)
+
 	return routers, nil
+}
+
+// TestReceivedChunckOnce ensures the all network nodes have received the
+// msgPayload only once
+func TestReceivedChunckOnce(t *testing.T, nodes []*Router, senderIndex int, msgPayload []byte) {
+
+	// Verify if all nodes have received the payload
+	failed := false
+	for i, r := range nodes {
+
+		// Sender of CHUNK message not needed to be tested
+		if senderIndex == i {
+			continue
+		}
+
+		received := false
+		duplicated := false
+		r.MapMutex.RLock()
+		for _, chunk := range r.ChunkIDmap {
+			if bytes.Equal(chunk, msgPayload) {
+				received = true
+				break
+			}
+		}
+		duplicated = r.Duplicated
+		r.MapMutex.RUnlock()
+
+		if !received {
+			failed = true
+			t.Logf("Peer %s did not receive CHUNK message", r.MyPeerInfo.String())
+		}
+
+		if duplicated {
+			failed = true
+			t.Logf("Peer %s receive same CHUNK message more than once", r.MyPeerInfo.String())
+		}
+	}
+
+	if failed {
+		t.Fatal("Broadcast procedure has failed")
+	}
 }

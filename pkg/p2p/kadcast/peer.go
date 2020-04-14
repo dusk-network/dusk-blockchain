@@ -1,6 +1,7 @@
 package kadcast
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -106,6 +107,24 @@ func (peer Peer) getUDPAddr() net.UDPAddr {
 
 func (peer Peer) String() string {
 	return fmt.Sprintf("%v:%d, %s", peer.ip, peer.port, hex.EncodeToString(peer.id[:])[0:6])
+}
+
+// IsEqual returns true if two peers tuples are identical
+func (peer Peer) IsEqual(p Peer) bool {
+
+	if !bytes.Equal(peer.id[:], p.id[:]) {
+		return false
+	}
+
+	if !bytes.Equal(peer.ip[:], p.ip[:]) {
+		return false
+	}
+
+	if peer.port != p.port {
+		return false
+	}
+
+	return true
 }
 
 // Builds the Peer info from a UPDAddress struct.
