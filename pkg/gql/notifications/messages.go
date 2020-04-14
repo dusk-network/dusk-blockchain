@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 )
 
 // BlockMsg represents the data need by Explorer UI on each new block accepted

@@ -8,11 +8,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/v2/key"
 	log "github.com/sirupsen/logrus"
 )
 

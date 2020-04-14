@@ -6,9 +6,9 @@ import (
 	"container/list"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-wallet/v2/block"
 	logger "github.com/sirupsen/logrus"
 )
 

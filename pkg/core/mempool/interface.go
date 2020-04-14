@@ -3,7 +3,7 @@ package mempool
 import (
 	"time"
 
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
 type txHash [32]byte

@@ -2,8 +2,8 @@ package consensus
 
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 // MockRoundUpdate mocks a round update
