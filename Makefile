@@ -38,3 +38,4 @@ install-tools:
 	go get -u github.com/karalabe/xgo
 dusk-linux: install-tools
 	xgo --go=latest --targets=linux/amd64 -out=./bin/dusk ./cmd/dusk
+#	xgo --go=latest --targets=linux/386 -out=./bin/dusk  ./cmd/dusk #405
