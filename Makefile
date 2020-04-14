@@ -36,9 +36,18 @@ help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 install-tools:
 	go get -u github.com/karalabe/xgo
-cross: install-tools dusk-linux dusk-darwin
+cross: install-tools dusk-linux dusk-linux-arm dusk-darwin dusk-windows
 dusk-linux: install-tools
 	xgo --go=latest --targets=linux/amd64 -out=./bin/dusk ./cmd/dusk
-#	xgo --go=latest --targets=linux/386 -out=./bin/dusk  ./cmd/dusk #405
+	#xgo --go=latest --targets=linux/386 -out=./bin/dusk  ./cmd/dusk #405
+dusk-linux-arm: install-tools
+	#xgo --go=latest --targets=linux/arm-5 -out=./bin/dusk ./cmd/dusk #405
+	#xgo --go=latest --targets=linux/arm-6 -out=./bin/dusk ./cmd/dusk #405
+	#xgo --go=latest --targets=linux/arm-7 -out=./bin/dusk ./cmd/dusk #405
+	xgo --go=latest --targets=linux/arm64 -out=./bin/dusk ./cmd/dusk
 dusk-darwin: install-tools
 	xgo --go=latest --targets=darwin/amd64 -out=./bin/dusk ./cmd/dusk
+	#xgo --go=latest --targets=darwin/386 -out=./bin/dusk ./cmd/dusk #405
+dusk-windows: install-tools
+	#xgo --go=latest --targets=windows/amd64 -out=./bin/dusk ./cmd/dusk #407
+	#xgo --go=latest --targets=windows/386 -out=./bin/dusk ./cmd/dusk #407
