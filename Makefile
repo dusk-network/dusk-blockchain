@@ -36,6 +36,9 @@ help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 install-tools:
 	go get -u github.com/karalabe/xgo
+cross: install-tools dusk-linux dusk-darwin
 dusk-linux: install-tools
 	xgo --go=latest --targets=linux/amd64 -out=./bin/dusk ./cmd/dusk
 #	xgo --go=latest --targets=linux/386 -out=./bin/dusk  ./cmd/dusk #405
+dusk-darwin: install-tools
+	xgo --go=latest --targets=darwin/amd64 -out=./bin/dusk ./cmd/dusk
