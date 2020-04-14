@@ -34,3 +34,7 @@ clean: ## Remove previous build
 	@go clean -testcache
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+install-tools:
+	go get -u github.com/karalabe/xgo
+dusk-linux: install-tools
+	xgo --go=latest --targets=linux/amd64 -out=./bin/dusk ./cmd/dusk
