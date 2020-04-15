@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,9 +13,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc"
 )
 
 // PublishTopic publishes an event bus topic to the specified node via
@@ -79,59 +76,59 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 	return nil
 }
 
-// LoadWalletCmd sends gRPC command LoadWallet and returns pubkey (if loaded)
-func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
-
-	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
-
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	client := pb.NewNodeClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	req := pb.LoadRequest{Password: password}
-	resp, err := client.LoadWallet(ctx, &req)
-	if err != nil {
-		return "", err
-	}
-
-	return string(resp.GetKey().PublicKey), nil
-}
-
-// SendBidCmd sends gRPC command SendBid and returns tx hash
-func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
-
-	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
-
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	client := pb.NewNodeClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	req := pb.ConsensusTxRequest{Amount: amount, LockTime: locktime}
-	resp, err := client.SendBid(ctx, &req)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp.Hash, nil
-}
+//// LoadWalletCmd sends gRPC command LoadWallet and returns pubkey (if loaded)
+//func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
+//
+//	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
+//
+//	// Set up a connection to the server.
+//	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+//	if err != nil {
+//		return "", err
+//	}
+//	defer func() {
+//		_ = conn.Close()
+//	}()
+//
+//	client := pb.NewNodeClient(conn)
+//	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+//	defer cancel()
+//
+//	req := pb.LoadRequest{Password: password}
+//	resp, err := client.LoadWallet(ctx, &req)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	return string(resp.GetKey().PublicKey), nil
+//}
+//
+//// SendBidCmd sends gRPC command SendBid and returns tx hash
+//func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
+//
+//	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
+//
+//	// Set up a connection to the server.
+//	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+//	if err != nil {
+//		return nil, err
+//	}
+//	defer func() {
+//		_ = conn.Close()
+//	}()
+//
+//	client := pb.NewNodeClient(conn)
+//	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+//	defer cancel()
+//
+//	req := pb.ConsensusTxRequest{Amount: amount, LockTime: locktime}
+//	resp, err := client.SendBid(ctx, &req)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return resp.Hash, nil
+//}
 
 // SendWireMsg sends a P2P message to the specified network node
 // NB: Handshaking procedure must be performed prior to the message sending

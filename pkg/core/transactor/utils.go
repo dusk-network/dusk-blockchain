@@ -1,15 +1,11 @@
 package transactor
 
 import (
-	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 )
 
 func fetchBlockHeightAndState(db database.DB, height uint64) (*block.Block, []byte, error) {
@@ -38,30 +34,30 @@ func fetchBlockHeightAndState(db database.DB, height uint64) (*block.Block, []by
 	return blk, state.TipHash, nil
 }
 
-// Deprecated: phoenix/feature-363
-func fetchDecoys(numMixins int) []mlsag.PubKeys {
-	_, db := heavy.CreateDBConnection()
-
-	var pubKeys []mlsag.PubKeys
-	var decoys []ristretto.Point
-	_ = db.View(func(t database.Transaction) error {
-		decoys = t.FetchDecoys(numMixins)
-		return nil
-	})
-
-	// Potential panic if the database does not have enough decoys
-	for i := 0; i < numMixins; i++ {
-		var keyVector mlsag.PubKeys
-		keyVector.AddPubKey(decoys[i])
-
-		var secondaryKey ristretto.Point
-		secondaryKey.Rand()
-		keyVector.AddPubKey(secondaryKey)
-
-		pubKeys = append(pubKeys, keyVector)
-	}
-	return pubKeys
-}
+//// Deprecated: phoenix/feature-363
+//func fetchDecoys(numMixins int) []mlsag.PubKeys {
+//	_, db := heavy.CreateDBConnection()
+//
+//	var pubKeys []mlsag.PubKeys
+//	var decoys []ristretto.Point
+//	_ = db.View(func(t database.Transaction) error {
+//		decoys = t.FetchDecoys(numMixins)
+//		return nil
+//	})
+//
+//	// Potential panic if the database does not have enough decoys
+//	for i := 0; i < numMixins; i++ {
+//		var keyVector mlsag.PubKeys
+//		keyVector.AddPubKey(decoys[i])
+//
+//		var secondaryKey ristretto.Point
+//		secondaryKey.Rand()
+//		keyVector.AddPubKey(secondaryKey)
+//
+//		pubKeys = append(pubKeys, keyVector)
+//	}
+//	return pubKeys
+//}
 
 func fetchInputs(netPrefix byte, db *walletdb.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
 	// Fetch all inputs from database that are >= totalAmount

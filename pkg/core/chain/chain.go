@@ -18,7 +18,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 
@@ -706,7 +705,7 @@ func (c *Chain) provideRoundResults(r rpcbus.Request) {
 
 func (c *Chain) provideSyncProgress(r rpcbus.Request) {
 	if c.highestSeen == 0 {
-		r.RespChan <- rpcbus.NewResponse(&node.SyncProgressResponse{Progress: 0}, nil)
+		//r.RespChan <- rpcbus.NewResponse(&node.SyncProgressResponse{Progress: 0}, nil)
 		return
 	}
 
@@ -723,7 +722,7 @@ func (c *Chain) provideSyncProgress(r rpcbus.Request) {
 		progressPercentage = 100
 	}
 
-	r.RespChan <- rpcbus.NewResponse(&node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil)
+	//r.RespChan <- rpcbus.NewResponse(&node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil)
 }
 
 // mocks an intermediate block with a coinbase attributed to a standard
@@ -809,7 +808,7 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 		log.Panic(err)
 	}
 
-	r.RespChan <- rpcbus.NewResponse(&node.GenericResponse{Response: "Blockchain deleted. Syncing from scratch..."}, nil)
+	//r.RespChan <- rpcbus.NewResponse(&node.GenericResponse{Response: "Blockchain deleted. Syncing from scratch..."}, nil)
 }
 
 func (c *Chain) resetState() error {

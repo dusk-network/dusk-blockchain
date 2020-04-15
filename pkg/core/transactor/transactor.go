@@ -81,9 +81,9 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 		clearWalletDatabaseChan:   make(chan rpcbus.Request, 1),
 	}
 
-	if t.fetchDecoys == nil {
-		t.fetchDecoys = fetchDecoys
-	}
+	//if t.fetchDecoys == nil {
+	//	t.fetchDecoys = fetchDecoys
+	//}
 
 	if t.fetchInputs == nil {
 		t.fetchInputs = fetchInputs

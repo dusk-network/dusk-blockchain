@@ -6,7 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/phoenix"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"google.golang.org/grpc"
 )
 
@@ -14,7 +14,7 @@ import (
 // the server on startup, and then handles requests from other components
 // over the RPCBus.
 type Client struct {
-	phoenix.RuskClient
+	rusk.RuskClient
 	conn           *grpc.ClientConn
 	validateSTChan chan rpcbus.Request
 	executeSTChan  chan rpcbus.Request
@@ -37,7 +37,7 @@ func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) *Client {
 	}
 
 	c := &Client{
-		RuskClient: phoenix.NewRuskClient(conn),
+		RuskClient: rusk.NewRuskClient(conn),
 		conn:       conn,
 	}
 	if err := registerMethod(rpcBus, topics.ValidateStateTransition, &c.validateSTChan); err != nil {
@@ -61,7 +61,7 @@ func (c *Client) listen() {
 	for {
 		select {
 		case r := <-c.validateSTChan:
-			resp, err := c.ValidateStateTransition(context.Background(), &phoenix.ValidateStateTransitionRequest{Txs: r.Params.([]*phoenix.Transaction)})
+			resp, err := c.ValidateStateTransition(context.Background(), &rusk.ValidateStateTransitionRequest{Txs: r.Params.([]*rusk.Transaction)})
 			r.RespChan <- rpcbus.NewResponse(resp, err)
 		case r := <-c.executeSTChan:
 			// TODO: add implementation for execute state transition
