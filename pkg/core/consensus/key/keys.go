@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/dusk-network/dusk-crypto/bls"
-	"golang.org/x/crypto/ed25519"
 )
 
 // Keys are the keys used during consensus
@@ -13,9 +12,6 @@ type Keys struct {
 	BLSPubKey      *bls.PublicKey
 	BLSPubKeyBytes []byte
 	BLSSecretKey   *bls.SecretKey
-	EdPubKey       *ed25519.PublicKey
-	EdPubKeyBytes  []byte
-	EdSecretKey    *ed25519.PrivateKey
 }
 
 // NewRandKeys will generate and return new bls and ed25519
@@ -41,17 +37,9 @@ func NewKeysFromReader(r io.Reader) (Keys, error) {
 		return Keys{}, err
 	}
 
-	edPub, edPriv, err := ed25519.GenerateKey(r)
-	if err != nil {
-		return Keys{}, err
-	}
-
 	return Keys{
 		BLSPubKey:      blsPub,
 		BLSSecretKey:   blsPriv,
-		EdPubKey:       &edPub,
-		EdPubKeyBytes:  []byte(edPub),
-		EdSecretKey:    &edPriv,
 		BLSPubKeyBytes: blsPub.Marshal(),
 	}, nil
 }
@@ -66,19 +54,9 @@ func NewKeysFromBytes(seed []byte) (Keys, error) {
 		return Keys{}, err
 	}
 
-	r = bytes.NewBuffer(seed)
-	r.Grow(len(seed))
-	edPub, edPriv, err := ed25519.GenerateKey(r)
-	if err != nil {
-		return Keys{}, err
-	}
-
 	return Keys{
 		BLSPubKey:      blsPub,
 		BLSSecretKey:   blsPriv,
-		EdPubKey:       &edPub,
-		EdPubKeyBytes:  []byte(edPub),
-		EdSecretKey:    &edPriv,
 		BLSPubKeyBytes: blsPub.Marshal(),
 	}, nil
 }

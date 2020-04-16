@@ -13,7 +13,6 @@ type (
 	// Member contains the bytes of a provisioner's Ed25519 public key,
 	// the bytes of his BLS public key, and how much he has staked.
 	Member struct {
-		PublicKeyEd  []byte
 		PublicKeyBLS []byte
 		Stakes       []Stake
 	}
@@ -150,10 +149,6 @@ func MarshalProvisioners(r *bytes.Buffer, p *Provisioners) error {
 }
 
 func marshalMember(r *bytes.Buffer, member Member) error {
-	if err := encoding.Write256(r, member.PublicKeyEd); err != nil {
-		return err
-	}
-
 	if err := encoding.WriteVarBytes(r, member.PublicKeyBLS); err != nil {
 		return err
 	}
@@ -218,11 +213,6 @@ func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 
 func unmarshalMember(r *bytes.Buffer) (*Member, error) {
 	member := &Member{}
-	member.PublicKeyEd = make([]byte, 32)
-	if err := encoding.Read256(r, member.PublicKeyEd); err != nil {
-		return nil, err
-	}
-
 	if err := encoding.ReadVarBytes(r, &member.PublicKeyBLS); err != nil {
 		return nil, err
 	}

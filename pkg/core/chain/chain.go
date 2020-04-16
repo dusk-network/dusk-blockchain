@@ -32,7 +32,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"golang.org/x/crypto/ed25519"
 )
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
@@ -138,6 +137,9 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		rebuildChainChan:         rebuildChainChan,
 	}
 
+	// TODO feature-419: the Genesis block should be decoded by the startup
+	// process and passed along wherever needed. This would guarantee
+	// separation of concerns when testing
 	// If the `prevBlock` is genesis, we add an empty intermediate block.
 	genesis := cfg.DecodeGenesis()
 	if bytes.Equal(chain.prevBlock.Header.Hash, genesis.Header.Hash) {
@@ -356,7 +358,7 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight ui
 		switch tx.Type() {
 		case transactions.StakeType:
 			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake.PubKeyEd, stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
+			if err := c.addProvisioner(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
 				l.Errorf("adding provisioner failed: %s", err.Error())
 			}
 		case transactions.BidType:
@@ -442,7 +444,7 @@ func (c *Chain) restoreConsensusData() error {
 				// Only add them if their stake is still valid
 				if searchingHeight+t.Lock > currentHeight {
 					amount := t.Outputs[0].EncryptedAmount.BigInt().Uint64()
-					if err := c.addProvisioner(t.PubKeyEd, t.PubKeyBLS, amount, searchingHeight+2, searchingHeight+t.Lock); err != nil {
+					if err := c.addProvisioner(t.PubKeyBLS, amount, searchingHeight+2, searchingHeight+t.Lock); err != nil {
 						return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
 					}
 				}
@@ -481,11 +483,7 @@ func (c *Chain) removeExpiredProvisioners(round uint64) {
 }
 
 // addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
-func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
-	if len(pubKeyEd) != 32 {
-		return fmt.Errorf("public key is %v bytes long instead of 32", len(pubKeyEd))
-	}
-
+func (c *Chain) addProvisioner(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
 	if len(pubKeyBLS) != 129 {
 		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
@@ -504,7 +502,6 @@ func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, startHeight, 
 	// This is a new provisioner, so let's initialize the Member struct and add them to the list
 	c.p.Set.Insert(pubKeyBLS)
 	m := &user.Member{}
-	m.PublicKeyEd = ed25519.PublicKey(pubKeyEd)
 
 	m.PublicKeyBLS = pubKeyBLS
 	m.AddStake(stake)

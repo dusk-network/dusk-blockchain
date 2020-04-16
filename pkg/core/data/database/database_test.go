@@ -196,7 +196,7 @@ func randTxForRecord(t transactions.TxType) (transactions.Transaction, *key.Priv
 	case transactions.BidType:
 		tx, _ = transactions.NewBid(0, 1, 100, 5000, make([]byte, 32))
 	case transactions.StakeType:
-		tx, _ = transactions.NewStake(0, 1, 100, 2130, make([]byte, 32), make([]byte, 129))
+		tx, _ = transactions.NewStake(0, 1, 100, 2130, make([]byte, 129))
 	case transactions.CoinbaseType:
 		tx = transactions.NewCoinbase(make([]byte, 100), make([]byte, 32), 2)
 	}

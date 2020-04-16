@@ -14,6 +14,7 @@ import (
 )
 
 func TestCorrectBidValues(t *testing.T) {
+	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	eb := eventbus.New()
 	keys, _ := key.NewRandKeys()
 	_, db := lite.CreateDBConnection()
@@ -49,6 +50,7 @@ func TestCorrectBidValues(t *testing.T) {
 	assert.Equal(t, k2, c.k.Bytes())
 }
 
+//nolint:unused
 func addBidValues(db database.DB, lockTime uint64) ([]byte, []byte, error) {
 	var d ristretto.Scalar
 	d.Rand()

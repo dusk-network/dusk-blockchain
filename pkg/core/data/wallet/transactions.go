@@ -19,9 +19,8 @@ func (w *Wallet) NewStandardTx(fee int64) (*transactions.Standard, error) {
 
 // NewStakeTx creates a new Stake transaction
 func (w *Wallet) NewStakeTx(fee int64, lockTime uint64, amount ristretto.Scalar) (*transactions.Stake, error) {
-	edPubBytes := w.consensusKeys.EdPubKeyBytes
 	blsPubBytes := w.consensusKeys.BLSPubKeyBytes
-	tx, err := transactions.NewStake(0, w.netPrefix, fee, lockTime, edPubBytes, blsPubBytes)
+	tx, err := transactions.NewStake(0, w.netPrefix, fee, lockTime, blsPubBytes)
 	if err != nil {
 		return nil, err
 	}

@@ -41,10 +41,8 @@ func TestNewWallet(t *testing.T) {
 
 	assert.Equal(t, w.PublicKey(), loadedWallet.PublicKey())
 
-	assert.Equal(t, w.consensusKeys.EdSecretKey, loadedWallet.consensusKeys.EdSecretKey)
 	assert.Equal(t, w.consensusKeys.BLSSecretKey, loadedWallet.consensusKeys.BLSSecretKey)
 	assert.True(t, bytes.Equal(w.consensusKeys.BLSPubKeyBytes, loadedWallet.consensusKeys.BLSPubKeyBytes))
-
 }
 
 func TestReceivedTx(t *testing.T) {

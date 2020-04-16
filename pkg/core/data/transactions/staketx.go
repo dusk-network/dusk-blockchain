@@ -10,12 +10,11 @@ import (
 // Stake encapsulates a Stake transaction
 type Stake struct {
 	*Timelock
-	PubKeyEd  []byte
 	PubKeyBLS []byte
 }
 
 // NewStake creates a new Stake transaction
-func NewStake(ver uint8, netPrefix byte, fee int64, lock uint64, pubKeyEd, pubKeyBLS []byte) (*Stake, error) {
+func NewStake(ver uint8, netPrefix byte, fee int64, lock uint64, pubKeyBLS []byte) (*Stake, error) {
 	tx, err := NewTimelock(ver, netPrefix, fee, lock)
 	if err != nil {
 		return nil, err
@@ -24,7 +23,6 @@ func NewStake(ver uint8, netPrefix byte, fee int64, lock uint64, pubKeyEd, pubKe
 	tx.TxType = StakeType
 	return &Stake{
 		tx,
-		pubKeyEd,
 		pubKeyBLS,
 	}, nil
 }
@@ -70,10 +68,6 @@ func (s *Stake) Equals(t Transaction) bool {
 		return false
 	}
 
-	if !bytes.Equal(s.PubKeyEd, other.PubKeyEd) {
-		return false
-	}
-
 	if !bytes.Equal(s.PubKeyBLS, other.PubKeyBLS) {
 		return false
 	}
@@ -88,10 +82,6 @@ func (s *Stake) LockTime() uint64 {
 
 func marshalStake(b *bytes.Buffer, s *Stake) error {
 	if err := marshalTimelock(b, s.Timelock); err != nil {
-		return err
-	}
-
-	if err := binary.Write(b, binary.BigEndian, s.PubKeyEd); err != nil {
 		return err
 	}
 
