@@ -5,7 +5,7 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
@@ -15,7 +15,7 @@ import (
 
 func TestCorrectBidValues(t *testing.T) {
 	eb := eventbus.New()
-	keys, _ := key.NewRandConsensusKeys()
+	keys, _ := key.NewRandKeys()
 	_, db := lite.CreateDBConnection()
 
 	f := NewFactory(eb, keys, db)

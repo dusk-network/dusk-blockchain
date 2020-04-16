@@ -10,7 +10,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
@@ -205,7 +205,7 @@ func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, 
 // Mock a Header
 func Mock() Header {
 	hash, _ := crypto.RandEntropy(32)
-	k, _ := key.NewRandConsensusKeys()
+	k, _ := key.NewRandKeys()
 	pubkey := k.BLSPubKeyBytes
 	buf := make([]byte, 8)
 	_, _ = crand.Read(buf)

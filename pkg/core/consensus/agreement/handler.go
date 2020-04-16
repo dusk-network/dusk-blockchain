@@ -8,9 +8,9 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
@@ -36,7 +36,7 @@ type handler struct {
 
 // NewHandler returns an initialized handler.
 //nolint:golint
-func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *handler {
+func NewHandler(keys key.Keys, p user.Provisioners) *handler {
 	return &handler{
 		Handler: committee.NewHandler(keys, p),
 	}

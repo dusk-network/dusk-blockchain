@@ -3,7 +3,7 @@ package agreement
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -19,7 +19,7 @@ type agreement struct {
 	eventPlayer  consensus.EventPlayer
 	handler      *handler
 	accumulator  *Accumulator
-	keys         key.ConsensusKeys
+	keys         key.Keys
 	workerAmount int
 	quitChan     chan struct{}
 
@@ -28,7 +28,7 @@ type agreement struct {
 }
 
 // newComponent is used by the agreement factory to instantiate the component
-func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAmount int) *agreement {
+func newComponent(publisher eventbus.Publisher, keys key.Keys, workerAmount int) *agreement {
 	return &agreement{
 		publisher:    publisher,
 		keys:         keys,

@@ -3,7 +3,7 @@ package agreement
 import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
@@ -12,13 +12,13 @@ import (
 // Factory creates the agreement component.
 type Factory struct {
 	broker       eventbus.Broker
-	keys         key.ConsensusKeys
+	keys         key.Keys
 	workerAmount int
 	Republisher  *republisher.Republisher
 }
 
 // NewFactory instantiates a Factory.
-func NewFactory(broker eventbus.Broker, keys key.ConsensusKeys) *Factory {
+func NewFactory(broker eventbus.Broker, keys key.Keys) *Factory {
 	amount := cfg.Get().Performance.AccumulatorWorkers
 	r := republisher.New(broker, topics.Agreement)
 

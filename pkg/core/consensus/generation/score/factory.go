@@ -3,7 +3,7 @@ package score
 import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -14,18 +14,18 @@ import (
 type Factory struct {
 	Bus eventbus.Broker
 	db  database.DB
-	key.ConsensusKeys
+	key.Keys
 }
 
 // NewFactory instantiates a Factory.
-func NewFactory(broker eventbus.Broker, consensusKeys key.ConsensusKeys, db database.DB) *Factory {
+func NewFactory(broker eventbus.Broker, consensusKeys key.Keys, db database.DB) *Factory {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
 	return &Factory{
-		Bus:           broker,
-		db:            db,
-		ConsensusKeys: consensusKeys,
+		Bus:  broker,
+		db:   db,
+		Keys: consensusKeys,
 	}
 }
 
@@ -54,5 +54,5 @@ func (f *Factory) Instantiate() consensus.Component {
 		log.WithField("process", "score generator factory").WithError(err).Errorln("could not unmarshal K bytes into a scalar")
 	}
 
-	return NewComponent(f.Bus, f.ConsensusKeys, dScalar, kScalar)
+	return NewComponent(f.Bus, f.Keys, dScalar, kScalar)
 }
