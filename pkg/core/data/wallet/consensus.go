@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-func generateConsensusKeys(seed []byte) (key.ConsensusKeys, error) {
+func generateKeys(seed []byte) (key.Keys, error) {
 	// Consensus keys require >80 bytes of seed, so we will hash seed twice and concatenate
 	// both hashes to get 128 bytes
 
@@ -18,7 +18,7 @@ func generateConsensusKeys(seed []byte) (key.ConsensusKeys, error) {
 
 	consensusSeed := append(seedHash[:], secondSeedHash[:]...)
 
-	return key.NewConsensusKeysFromBytes(consensusSeed)
+	return key.NewKeysFromBytes(consensusSeed)
 }
 
 func generateM(PrivateSpend []byte, index uint32) []byte {

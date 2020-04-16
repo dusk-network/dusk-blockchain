@@ -23,7 +23,7 @@ var emptyHash = [32]byte{}
 type Reducer struct {
 	broker      eventbus.Broker
 	rpcBus      *rpcbus.RPCBus
-	keys        key.ConsensusKeys
+	keys        key.Keys
 	eventPlayer consensus.EventPlayer
 	signer      consensus.Signer
 
@@ -37,7 +37,7 @@ type Reducer struct {
 }
 
 // NewComponent returns an uninitialized reduction component.
-func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) reduction.Reducer {
+func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Keys, timeOut time.Duration) reduction.Reducer {
 	return &Reducer{
 		broker:  broker,
 		rpcBus:  rpcBus,

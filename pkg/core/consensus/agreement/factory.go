@@ -12,13 +12,13 @@ import (
 // Factory creates the agreement component.
 type Factory struct {
 	broker       eventbus.Broker
-	keys         key.ConsensusKeys
+	keys         key.Keys
 	workerAmount int
 	Republisher  *republisher.Republisher
 }
 
 // NewFactory instantiates a Factory.
-func NewFactory(broker eventbus.Broker, keys key.ConsensusKeys) *Factory {
+func NewFactory(broker eventbus.Broker, keys key.Keys) *Factory {
 	amount := cfg.Get().Performance.AccumulatorWorkers
 	r := republisher.New(broker, topics.Agreement)
 

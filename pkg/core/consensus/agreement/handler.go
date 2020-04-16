@@ -36,7 +36,7 @@ type handler struct {
 
 // NewHandler returns an initialized handler.
 //nolint:golint
-func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *handler {
+func NewHandler(keys key.Keys, p user.Provisioners) *handler {
 	return &handler{
 		Handler: committee.NewHandler(keys, p),
 	}

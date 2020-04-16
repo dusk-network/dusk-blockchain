@@ -23,13 +23,13 @@ var emptyHash [32]byte
 var lg = log.WithField("process", "score generator")
 
 // NewComponent returns an uninitialized Generator.
-func NewComponent(publisher eventbus.Publisher, consensusKeys key.ConsensusKeys, d, k ristretto.Scalar) *Generator {
+func NewComponent(publisher eventbus.Publisher, consensusKeys key.Keys, d, k ristretto.Scalar) *Generator {
 	return &Generator{
-		publisher:     publisher,
-		ConsensusKeys: consensusKeys,
-		k:             k,
-		d:             d,
-		threshold:     consensus.NewThreshold(),
+		publisher: publisher,
+		Keys:      consensusKeys,
+		k:         k,
+		d:         d,
+		threshold: consensus.NewThreshold(),
 	}
 }
 
@@ -41,7 +41,7 @@ type Generator struct {
 	roundInfo consensus.RoundUpdate
 	seed      []byte
 	d, k      ristretto.Scalar
-	key.ConsensusKeys
+	key.Keys
 	lock      sync.RWMutex
 	threshold *consensus.Threshold
 
@@ -199,7 +199,7 @@ func inBidList(d, k ristretto.Scalar, bidList user.BidList) bool {
 }
 
 func (g *Generator) sign(seed []byte) ([]byte, error) {
-	signedSeed, err := bls.Sign(g.ConsensusKeys.BLSSecretKey, g.ConsensusKeys.BLSPubKey, seed)
+	signedSeed, err := bls.Sign(g.Keys.BLSSecretKey, g.Keys.BLSPubKey, seed)
 	if err != nil {
 		return nil, err
 	}

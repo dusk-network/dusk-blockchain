@@ -24,7 +24,7 @@ type (
 
 // NewHandler will return a Handler, injected with the passed committee
 // and an unmarshaller which uses the injected validation function.
-func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *Handler {
+func NewHandler(keys key.Keys, p user.Provisioners) *Handler {
 	return &Handler{
 		Handler: committee.NewHandler(keys, p),
 	}

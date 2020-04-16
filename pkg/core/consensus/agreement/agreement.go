@@ -19,7 +19,7 @@ type agreement struct {
 	eventPlayer  consensus.EventPlayer
 	handler      *handler
 	accumulator  *Accumulator
-	keys         key.ConsensusKeys
+	keys         key.Keys
 	workerAmount int
 	quitChan     chan struct{}
 
@@ -28,7 +28,7 @@ type agreement struct {
 }
 
 // newComponent is used by the agreement factory to instantiate the component
-func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAmount int) *agreement {
+func newComponent(publisher eventbus.Publisher, keys key.Keys, workerAmount int) *agreement {
 	return &agreement{
 		publisher:    publisher,
 		keys:         keys,

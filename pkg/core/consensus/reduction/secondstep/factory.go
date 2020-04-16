@@ -14,12 +14,12 @@ import (
 type Factory struct {
 	Bus     eventbus.Broker
 	RBus    *rpcbus.RPCBus
-	Keys    key.ConsensusKeys
+	Keys    key.Keys
 	timeout time.Duration
 }
 
 // NewFactory creates a Factory
-func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeout time.Duration) *Factory {
+func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Keys, timeout time.Duration) *Factory {
 	return &Factory{
 		broker,
 		rpcBus,
@@ -35,7 +35,7 @@ func (f *Factory) Instantiate() consensus.Component {
 }
 
 // CreateReducer is callback used by reduction.Helper to wire up the tests
-var CreateReducer reduction.FactoryFunc = func(eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeout time.Duration) reduction.Reducer {
+var CreateReducer reduction.FactoryFunc = func(eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, keys key.Keys, timeout time.Duration) reduction.Reducer {
 	f := NewFactory(eb, rpcBus, keys, timeout)
 	a := f.Instantiate()
 	return a.(*Reducer)

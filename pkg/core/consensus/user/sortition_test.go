@@ -18,7 +18,7 @@ func TestRemove(t *testing.T) {
 	nr := 5
 	committee := &user.VotingCommittee{sortedset.NewCluster()}
 	for i := 0; i < nr; i++ {
-		k, _ := key.NewRandConsensusKeys()
+		k, _ := key.NewRandKeys()
 		bk := (&big.Int{}).SetBytes(k.BLSPubKeyBytes)
 		committee.Set = append(committee.Set, bk)
 	}

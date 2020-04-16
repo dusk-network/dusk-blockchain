@@ -54,7 +54,7 @@ func TestVoteSetUnMarshal(t *testing.T) {
 }
 
 func newReductionEvent(round uint64, step uint8) message.Reduction {
-	k, _ := key.NewRandConsensusKeys()
+	k, _ := key.NewRandKeys()
 	blockHash, _ := crypto.RandEntropy(32)
 	sig, err := bls.Sign(k.BLSSecretKey, k.BLSPubKey, blockHash)
 	if err != nil {

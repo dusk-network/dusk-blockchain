@@ -16,13 +16,13 @@ import (
 type Factory struct {
 	Bus         eventbus.Broker
 	RBus        *rpcbus.RPCBus
-	Keys        key.ConsensusKeys
+	Keys        key.Keys
 	timeout     time.Duration
 	Republisher *republisher.Republisher
 }
 
 // NewFactory instantiates a Factory
-func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeout time.Duration) *Factory {
+func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Keys, timeout time.Duration) *Factory {
 	r := republisher.New(broker, topics.Reduction)
 	return &Factory{
 		broker,
@@ -40,7 +40,7 @@ func (f *Factory) Instantiate() consensus.Component {
 }
 
 // CreateReducer is a reduction.FactoryFunc
-func CreateReducer(broker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeout time.Duration) reduction.Reducer {
+func CreateReducer(broker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, keys key.Keys, timeout time.Duration) reduction.Reducer {
 	f := NewFactory(broker, rpcBus, keys, timeout)
 	component := f.Instantiate()
 	return component.(*Reducer)

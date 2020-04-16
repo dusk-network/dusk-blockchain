@@ -35,7 +35,7 @@ type Wallet struct {
 	netPrefix byte
 
 	keyPair       *key.Key
-	consensusKeys *consensuskey.ConsensusKeys
+	consensusKeys *consensuskey.Keys
 
 	fetchDecoys transactions.FetchDecoys
 	fetchInputs FetchInputs
@@ -61,7 +61,7 @@ func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.
 		}
 
 		// Ensure the seed can be used for generating a BLS keypair.
-		_, err = generateConsensusKeys(seed)
+		_, err = generateKeys(seed)
 		if err == nil {
 			break
 		}
@@ -85,7 +85,7 @@ func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, fDecoys transact
 		return nil, err
 	}
 
-	consensusKeys, err := generateConsensusKeys(seed)
+	consensusKeys, err := generateKeys(seed)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func LoadFromFile(netPrefix byte, db *database.DB, fDecoys transactions.FetchDec
 		return nil, err
 	}
 
-	consensusKeys, err := generateConsensusKeys(seed)
+	consensusKeys, err := generateKeys(seed)
 	if err != nil {
 		return nil, err
 	}
@@ -253,8 +253,8 @@ func (w *Wallet) PublicAddress() (string, error) {
 	return pubAddr.String(), nil
 }
 
-// ConsensusKeys returns the BLS keys
-func (w *Wallet) ConsensusKeys() consensuskey.ConsensusKeys {
+// Keys returns the BLS keys
+func (w *Wallet) Keys() consensuskey.Keys {
 	return *w.consensusKeys
 }
 

@@ -111,7 +111,7 @@ func MarshalCandidate(b *bytes.Buffer, c Candidate) error {
 }
 
 // MockCertificate mocks a certificate
-func MockCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
+func MockCertificate(hash []byte, round uint64, keys []key.Keys, p *user.Provisioners) *block.Certificate {
 	votes := GenVotes(hash, round, 3, keys, p)
 	return &block.Certificate{
 		StepOneBatchedSig: votes[0].Signature.Compress(),

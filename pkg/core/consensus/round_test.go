@@ -152,7 +152,7 @@ func TestQueueDispatchAgreement(t *testing.T) {
 // Initialize a coordinator with a single component.
 func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Component) {
 	bus := eventbus.New()
-	keys, err := key.NewRandConsensusKeys()
+	keys, err := key.NewRandKeys()
 	if err != nil {
 		t.Fatal(err)
 	}

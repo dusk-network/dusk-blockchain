@@ -67,7 +67,7 @@ func NewHelper(eb *eventbus.EventBus) *Helper {
 	factory := NewFactory(eb, 1000*time.Millisecond)
 	s := factory.Instantiate()
 	sel := s.(*Selector)
-	keys, _ := key.NewRandConsensusKeys()
+	keys, _ := key.NewRandKeys()
 	hlp := &Helper{
 		Factory:       factory,
 		BidList:       bidList,
@@ -94,7 +94,7 @@ func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 func (h *Helper) Spawn(hash []byte) []message.Score {
 	evs := make([]message.Score, 0, len(h.BidList))
 	for i := 0; i < len(h.BidList); i++ {
-		keys, _ := key.NewRandConsensusKeys()
+		keys, _ := key.NewRandKeys()
 		hdr := header.Header{
 			Round:     h.Round,
 			Step:      h.Step(),

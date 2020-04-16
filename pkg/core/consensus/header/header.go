@@ -205,7 +205,7 @@ func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, 
 // Mock a Header
 func Mock() Header {
 	hash, _ := crypto.RandEntropy(32)
-	k, _ := key.NewRandConsensusKeys()
+	k, _ := key.NewRandKeys()
 	pubkey := k.BLSPubKeyBytes
 	buf := make([]byte, 8)
 	_, _ = crand.Read(buf)

@@ -63,8 +63,8 @@ func TestStepVotesAdd(t *testing.T) {
 	assert.NoError(t, bls.Verify(sv.Apk, hash, sv.Signature))
 }
 
-func genKeys(set *sortedset.Set) key.ConsensusKeys {
-	k, _ := key.NewRandConsensusKeys()
+func genKeys(set *sortedset.Set) key.Keys {
+	k, _ := key.NewRandKeys()
 	set.Insert(k.BLSPubKeyBytes)
 	return k
 }

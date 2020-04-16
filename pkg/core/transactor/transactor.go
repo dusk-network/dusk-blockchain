@@ -176,7 +176,7 @@ func (t *Transactor) launchMaintainer() error {
 	}
 
 	log.Infof("maintainer is starting")
-	m := maintainer.New(t.eb, t.rb, t.w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k))
+	m := maintainer.New(t.eb, t.rb, t.w.Keys().BLSPubKeyBytes, zkproof.CalculateM(k))
 	go m.Listen()
 	t.maintainerStarted = true
 	return nil

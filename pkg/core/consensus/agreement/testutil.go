@@ -16,7 +16,7 @@ import (
 type Helper struct {
 	Bus             *eventbus.EventBus
 	P               *user.Provisioners
-	Keys            []key.ConsensusKeys
+	Keys            []key.Keys
 	Aggro           *agreement
 	CertificateChan chan message.Message
 	nr              int

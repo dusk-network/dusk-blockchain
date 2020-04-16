@@ -10,7 +10,7 @@ import (
 
 // Test that NewRandKeys does not ever return an EOF error
 func TestNewRandKeys(t *testing.T) {
-	keys, err := NewRandConsensusKeys()
+	keys, err := NewRandKeys()
 	if err == io.EOF {
 		t.Fatal("got EOF: NewRandKeys should never give an EOF error")
 	}
@@ -20,18 +20,18 @@ func TestNewRandKeys(t *testing.T) {
 }
 
 func TestDeterministicKeyGen(t *testing.T) {
-	var firstKeyPair, secondKeyPair ConsensusKeys
+	var firstKeyPair, secondKeyPair Keys
 	for {
 		seed, err := crypto.RandEntropy(128)
 		assert.Nil(t, err)
 
-		firstKeyPair, err = NewConsensusKeysFromBytes(seed)
+		firstKeyPair, err = NewKeysFromBytes(seed)
 		if err == io.EOF {
 			continue
 		}
 		assert.Nil(t, err)
 
-		secondKeyPair, err = NewConsensusKeysFromBytes(seed)
+		secondKeyPair, err = NewKeysFromBytes(seed)
 		if err == io.EOF {
 			continue
 		}

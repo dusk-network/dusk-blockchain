@@ -23,7 +23,7 @@ func TestCreateVotingCommittee(t *testing.T) {
 	assert.Equal(t, 50, committee.Size())
 }
 
-type sortedKeys []key.ConsensusKeys
+type sortedKeys []key.Keys
 
 func (s sortedKeys) Len() int      { return len(s) }
 func (s sortedKeys) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
@@ -32,7 +32,7 @@ func (s sortedKeys) Less(i, j int) bool {
 	return btoi(s[i]).Cmp(btoi(s[j])) < 0
 }
 
-func btoi(k key.ConsensusKeys) *big.Int {
+func btoi(k key.Keys) *big.Int {
 	b := k.BLSPubKeyBytes
 	return (&big.Int{}).SetBytes(b)
 }

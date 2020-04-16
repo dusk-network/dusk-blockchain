@@ -10,7 +10,7 @@ import (
 )
 
 func TestVerifyBLSSignature(t *testing.T) {
-	k, _ := key.NewRandConsensusKeys()
+	k, _ := key.NewRandKeys()
 	payload := bytes.NewBufferString("this is a test message").Bytes()
 
 	sig, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, payload)

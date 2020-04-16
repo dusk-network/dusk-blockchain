@@ -41,7 +41,7 @@ func (m *mockSigner) SendInternally(topic topics.Topic, msg message.Message, id 
 }
 
 // FactoryFunc is a shorthand for the reduction factories to create a Reducer
-type FactoryFunc func(*eventbus.EventBus, *rpcbus.RPCBus, key.ConsensusKeys, time.Duration) Reducer
+type FactoryFunc func(*eventbus.EventBus, *rpcbus.RPCBus, key.Keys, time.Duration) Reducer
 
 // Helper for reducing test boilerplate
 type Helper struct {
@@ -49,7 +49,7 @@ type Helper struct {
 	Reducer   Reducer
 	Bus       *eventbus.EventBus
 	RBus      *rpcbus.RPCBus
-	Keys      []key.ConsensusKeys
+	Keys      []key.Keys
 	P         *user.Provisioners
 	signer    consensus.Signer
 	nr        int

@@ -15,7 +15,7 @@ import (
 
 func TestCorrectBidValues(t *testing.T) {
 	eb := eventbus.New()
-	keys, _ := key.NewRandConsensusKeys()
+	keys, _ := key.NewRandKeys()
 	_, db := lite.CreateDBConnection()
 
 	f := NewFactory(eb, keys, db)

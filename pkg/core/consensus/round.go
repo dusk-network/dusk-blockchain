@@ -162,7 +162,7 @@ func (s *roundStore) DispatchFinalize() {
 type Coordinator struct {
 	*SyncState
 	eventBus   *eventbus.EventBus
-	keys       key.ConsensusKeys
+	keys       key.Keys
 	factories  []ComponentFactory
 	eventqueue *Queue
 	roundQueue *Queue
@@ -177,7 +177,7 @@ type Coordinator struct {
 }
 
 // Start the coordinator by wiring the listener to the RoundUpdate
-func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...ComponentFactory) *Coordinator {
+func Start(eventBus *eventbus.EventBus, keys key.Keys, factories ...ComponentFactory) *Coordinator {
 	pkBuf := new(bytes.Buffer)
 
 	if err := encoding.WriteVarBytes(pkBuf, keys.BLSPubKeyBytes); err != nil {
