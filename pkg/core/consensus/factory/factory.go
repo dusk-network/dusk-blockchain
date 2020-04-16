@@ -8,10 +8,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	pkey "github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
@@ -26,13 +27,13 @@ type ConsensusFactory struct {
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 
-	walletPubKey *key.PublicKey
+	walletPubKey *pkey.PublicKey
 	key.ConsensusKeys
 	timerLength time.Duration
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, walletPubKey *key.PublicKey, keys key.ConsensusKeys) *ConsensusFactory {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, walletPubKey *pkey.PublicKey, keys key.ConsensusKeys) *ConsensusFactory {
 	return &ConsensusFactory{
 		eventBus:      eventBus,
 		rpcBus:        rpcBus,

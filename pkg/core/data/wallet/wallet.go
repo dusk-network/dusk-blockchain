@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
@@ -34,7 +35,7 @@ type Wallet struct {
 	netPrefix byte
 
 	keyPair       *key.Key
-	consensusKeys *key.ConsensusKeys
+	consensusKeys *consensuskey.ConsensusKeys
 
 	fetchDecoys transactions.FetchDecoys
 	fetchInputs FetchInputs
@@ -253,7 +254,7 @@ func (w *Wallet) PublicAddress() (string, error) {
 }
 
 // ConsensusKeys returns the BLS keys
-func (w *Wallet) ConsensusKeys() key.ConsensusKeys {
+func (w *Wallet) ConsensusKeys() consensuskey.ConsensusKeys {
 	return *w.consensusKeys
 }
 
