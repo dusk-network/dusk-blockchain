@@ -5,15 +5,15 @@ require (
 	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/dusk-network/dusk-crypto v0.1.1
 	github.com/dusk-network/dusk-protobuf v0.0.0-20200407194617-fa317d3cf76a
+	github.com/dusk-network/dusk-wallet/v2 v2.0.2
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/go-chi/render v1.0.1
-	github.com/golang/snappy v0.0.1 // indirect
 	github.com/golangci/golangci-lint v1.24.0 // indirect
-	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/gorilla/websocket v1.4.0
 	github.com/graphql-go/graphql v0.7.8
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/machinebox/graphql v0.2.2
+	github.com/manifoldco/promptui v0.3.2
 	github.com/matryer/is v1.2.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pelletier/go-toml v1.5.0 // indirect
