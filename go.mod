@@ -11,6 +11,7 @@ require (
 	github.com/golangci/golangci-lint v1.24.0 // indirect
 	github.com/gorilla/websocket v1.4.0
 	github.com/graphql-go/graphql v0.7.8
+	github.com/karalabe/xgo v0.0.0-20191115072854-c5ccff8648a7 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/machinebox/graphql v0.2.2
 	github.com/manifoldco/promptui v0.7.0
