@@ -10,21 +10,23 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-type nodeClient struct {
+// NodeClient holds node related fields
+type NodeClient struct {
 	dialTimeout int64
 	NodeClient  node.NodeClient
 	conn        *grpc.ClientConn
 }
 
-func NewNodeClient() *nodeClient {
-	return &nodeClient{
+// NewNodeClient holds a nodeClient with fixed dialTimeout of 5s
+func NewNodeClient() *NodeClient {
+	return &NodeClient{
 		dialTimeout: 5,
 	}
 }
 
-// createClient initialize a grpcClient to dusk-blockchain node grpc interface.
+// Connect initialize a grpcClient to dusk-blockchain node grpc interface.
 // For over-tcp communication, it could enable TLS and Basic Authentication
-func (c *nodeClient) Connect(conf rpcConfiguration) error {
+func (c *NodeClient) Connect(conf rpcConfiguration) error {
 
 	addr := conf.Address
 	if conf.Network == "unix" {
@@ -88,13 +90,15 @@ func (c *nodeClient) Connect(conf rpcConfiguration) error {
 	return nil
 }
 
-func (c *nodeClient) Close() {
+// Close conn
+func (c *NodeClient) Close() {
 	if c.conn != nil {
 		_ = c.conn.Close()
 	}
 }
 
-func (c *nodeClient) Ping() error {
+// Ping not yet implemented
+func (c *NodeClient) Ping() error {
 	// TODO:
 	return nil
 }

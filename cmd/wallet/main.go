@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/dusk-network/dusk-blockchain/cmd/wallet/conf"
-	"github.com/dusk-network/dusk-blockchain/cmd/wallet/prompt"
 	"os"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/cmd/wallet/conf"
+	"github.com/dusk-network/dusk-blockchain/cmd/wallet/prompt"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 )

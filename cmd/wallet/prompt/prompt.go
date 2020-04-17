@@ -56,7 +56,7 @@ func WalletMenu(client node.NodeClient) error {
 		if err != nil {
 			return err
 		}
-		_, _ = fmt.Fprintf(os.Stdout, "Sync progress: %.2f%", resp.Progress)
+		_, _ = fmt.Fprintf(os.Stdout, "sync progress: %.2f ", resp.Progress)
 
 		prompt := promptui.Select{
 			Label: "Select action",
@@ -133,20 +133,20 @@ func formatRecords(resp *node.TxHistoryResponse) strings.Builder {
 	s := strings.Builder{}
 	for _, record := range resp.Records {
 		if record.Direction == node.Direction_IN {
-			s.WriteString("IN / ")
+			_, _ = s.WriteString("IN / ")
 		} else {
-			s.WriteString("OUT / ")
+			_, _ = s.WriteString("OUT / ")
 		}
 		// Height
-		s.WriteString(strconv.FormatUint(record.Height, 10) + " / ")
+		_, _ = s.WriteString(strconv.FormatUint(record.Height, 10) + " / ")
 		// Time
-		s.WriteString(time.Unix(record.Timestamp, 0).Format(time.UnixDate) + " / ")
+		_, _ = s.WriteString(time.Unix(record.Timestamp, 0).Format(time.UnixDate) + " / ")
 		// Amount
-		s.WriteString(fmt.Sprintf("%.8f DUSK", float64(record.Amount)/float64(wallet.DUSK)) + " / ")
+		_, _ = s.WriteString(fmt.Sprintf("%.8f DUSK", float64(record.Amount)/float64(wallet.DUSK)) + " / ")
 		// Unlock height
-		s.WriteString("Unlocks at " + strconv.FormatUint(record.UnlockHeight, 10) + " / ")
+		_, _ = s.WriteString("Unlocks at " + strconv.FormatUint(record.UnlockHeight, 10) + " / ")
 
-		s.WriteString("\n")
+		_, _ = s.WriteString("\n")
 	}
 
 	return s

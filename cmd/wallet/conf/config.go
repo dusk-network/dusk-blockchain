@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Registry holds General and RPC
 type Registry struct {
 	General generalConfiguration
 	RPC     rpcConfiguration
@@ -31,6 +32,7 @@ type rpcConfiguration struct {
 	Pass string
 }
 
+// InitConfig will init the config vars from viper
 func InitConfig() Registry {
 	viper.SetConfigName("dusk")
 	viper.AddConfigPath(".")
