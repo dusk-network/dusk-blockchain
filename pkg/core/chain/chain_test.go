@@ -7,9 +7,9 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -172,7 +172,7 @@ func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 	}()
 }
 
-func createMockedCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
+func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user.Provisioners) *block.Certificate {
 	votes := message.GenVotes(hash, round, 3, keys, p)
 	return &block.Certificate{
 		StepOneBatchedSig: votes[0].Signature.Compress(),
@@ -293,7 +293,7 @@ func TestRemoveExpired(t *testing.T) {
 func TestRemove(t *testing.T) {
 	_, _, c := setupChainTest(t, false)
 
-	keys, _ := key.NewRandConsensusKeys()
+	keys, _ := key.NewRandKeys()
 	if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +312,7 @@ func TestRemoveExpiredProvisioners(t *testing.T) {
 	_, _, c := setupChainTest(t, false)
 
 	for i := 0; i < 10; i++ {
-		keys, _ := key.NewRandConsensusKeys()
+		keys, _ := key.NewRandKeys()
 		if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 			t.Fatal(err)
 		}

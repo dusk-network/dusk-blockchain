@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
@@ -258,7 +258,7 @@ func newAgreement() *Agreement {
 
 // SignAgreement signs an aggregated agreement event
 // XXX: either use this function or delete it!! Right now it is not used
-func SignAgreement(a *Agreement, keys key.ConsensusKeys) error {
+func SignAgreement(a *Agreement, keys key.Keys) error {
 	buffer := new(bytes.Buffer)
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {
 		return err
@@ -369,7 +369,7 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 
 // MockAgreement returns a mocked Agreement Event, to be used for testing purposes.
 // It includes a vararg iterativeIdx to help avoiding duplicates when testing
-func MockAgreement(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, p *user.Provisioners, iterativeIdx ...int) Agreement {
+func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners, iterativeIdx ...int) Agreement {
 	// Make sure we create an event made by an actual voting committee member
 	c := p.CreateVotingCommittee(round, step, len(keys))
 	cKeys := createCommitteeKeySet(c, keys)
@@ -401,7 +401,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.ConsensusKe
 }
 
 //MockCommitteeVoteSet mocks a VoteSet
-func MockCommitteeVoteSet(p *user.Provisioners, k []key.ConsensusKeys, hash []byte, committeeSize int, round uint64, step uint8) []Reduction {
+func MockCommitteeVoteSet(p *user.Provisioners, k []key.Keys, hash []byte, committeeSize int, round uint64, step uint8) []Reduction {
 	c1 := p.CreateVotingCommittee(round, step-2, len(k))
 	c2 := p.CreateVotingCommittee(round, step-1, len(k))
 	cKeys1 := createCommitteeKeySet(c1, k)
@@ -412,7 +412,7 @@ func MockCommitteeVoteSet(p *user.Provisioners, k []key.ConsensusKeys, hash []by
 
 // GenVotes randomly generates a slice of StepVotes with the indicated length.
 // Albeit random, the generation is consistent with the rules of Votes
-func GenVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, p *user.Provisioners) []*StepVotes {
+func GenVotes(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners) []*StepVotes {
 	if len(keys) < 2 {
 		panic("At least two votes are required to mock an Agreement")
 	}
@@ -437,7 +437,7 @@ func createBitSet(set sortedset.Set, round uint64, step uint8, size int, p *user
 	return committee.Bits(set)
 }
 
-func createCommitteeKeySet(c user.VotingCommittee, k []key.ConsensusKeys) (keys []key.ConsensusKeys) {
+func createCommitteeKeySet(c user.VotingCommittee, k []key.Keys) (keys []key.Keys) {
 	committeeKeys := c.MemberKeys()
 
 	for _, cKey := range committeeKeys {
@@ -452,7 +452,7 @@ func createCommitteeKeySet(c user.VotingCommittee, k []key.ConsensusKeys) (keys 
 	return keys
 }
 
-func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys) (*StepVotes, sortedset.Set) {
+func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Keys) (*StepVotes, sortedset.Set) {
 	set := sortedset.New()
 	stepVotes := NewStepVotes()
 	for _, k := range keys {

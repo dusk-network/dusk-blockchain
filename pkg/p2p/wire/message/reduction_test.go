@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-crypto/bls"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -54,7 +54,7 @@ func TestVoteSetUnMarshal(t *testing.T) {
 }
 
 func newReductionEvent(round uint64, step uint8) message.Reduction {
-	k, _ := key.NewRandConsensusKeys()
+	k, _ := key.NewRandKeys()
 	blockHash, _ := crypto.RandEntropy(32)
 	sig, err := bls.Sign(k.BLSSecretKey, k.BLSPubKey, blockHash)
 	if err != nil {

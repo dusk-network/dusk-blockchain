@@ -1,8 +1,8 @@
 package consensus
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -58,12 +58,12 @@ func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) R
 //}
 
 // MockProvisioners mock a Provisioner set
-func MockProvisioners(amount int) (*user.Provisioners, []key.ConsensusKeys) {
+func MockProvisioners(amount int) (*user.Provisioners, []key.Keys) {
 	p := user.NewProvisioners()
 
-	k := make([]key.ConsensusKeys, amount)
+	k := make([]key.Keys, amount)
 	for i := 0; i < amount; i++ {
-		keys, _ := key.NewRandConsensusKeys()
+		keys, _ := key.NewRandKeys()
 		member := MockMember(keys)
 
 		p.Members[string(keys.BLSPubKeyBytes)] = member
@@ -74,7 +74,7 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.ConsensusKeys) {
 }
 
 // MockMember mocks a Provisioner
-func MockMember(keys key.ConsensusKeys) *user.Member {
+func MockMember(keys key.Keys) *user.Member {
 	member := &user.Member{}
 	member.PublicKeyEd = keys.EdPubKeyBytes
 	member.PublicKeyBLS = keys.BLSPubKeyBytes

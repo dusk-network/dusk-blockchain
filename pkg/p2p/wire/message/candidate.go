@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 )
 
@@ -111,7 +111,7 @@ func MarshalCandidate(b *bytes.Buffer, c Candidate) error {
 }
 
 // MockCertificate mocks a certificate
-func MockCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
+func MockCertificate(hash []byte, round uint64, keys []key.Keys, p *user.Provisioners) *block.Certificate {
 	votes := GenVotes(hash, round, 3, keys, p)
 	return &block.Certificate{
 		StepOneBatchedSig: votes[0].Signature.Compress(),
