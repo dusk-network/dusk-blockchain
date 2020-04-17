@@ -12,8 +12,8 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
-// ConnectToSeeder initializes the connection with the Voucher Seeder
-func ConnectToSeeder() []string {
+// ConnectToVoucher initializes the connection with the Voucher Seeder
+func ConnectToVoucher() []string {
 	if cfg.Get().General.Network == "testnet" {
 		fixedNetwork := cfg.Get().Network.Seeder.Fixed
 		if len(fixedNetwork) > 0 {
@@ -30,7 +30,7 @@ func ConnectToSeeder() []string {
 
 	conn, err := net.Dial("tcp", seeders[0])
 	if err != nil {
-		log.Panic(err)
+		log.WithError(err).Panic("Could not connect to voucher")
 	}
 	log.Debugln("connected to voucher seeder")
 
