@@ -45,19 +45,20 @@ install-tools:
 	go get -u github.com/karalabe/xgo
 cross: \
 	dusk-linux dusk-linux-arm dusk-darwin dusk-windows \
-	voucher-linux voucher-linux-arm voucher-darwin voucher-windows
+	voucher-linux voucher-linux-arm voucher-darwin voucher-windows \
+	wallet-linux wallet-linux-arm wallet-darwin wallet-windows \
 ###################################DUSK#################################################
 dusk-linux: install-tools
 	xgo --go=latest --targets=linux/amd64 -out=./bin/dusk ./cmd/dusk
-	#xgo --go=latest --targets=linux/386 -out=./bin/dusk  ./cmd/dusk #405
+	xgo --go=latest --targets=linux/386 -out=./bin/dusk  ./cmd/dusk
 dusk-linux-arm: install-tools
-	#xgo --go=latest --targets=linux/arm-5 -out=./bin/dusk ./cmd/dusk #405
-	#xgo --go=latest --targets=linux/arm-6 -out=./bin/dusk ./cmd/dusk #405
-	#xgo --go=latest --targets=linux/arm-7 -out=./bin/dusk ./cmd/dusk #405
+	xgo --go=latest --targets=linux/arm-5 -out=./bin/dusk ./cmd/dusk
+	xgo --go=latest --targets=linux/arm-6 -out=./bin/dusk ./cmd/dusk
+	xgo --go=latest --targets=linux/arm-7 -out=./bin/dusk ./cmd/dusk
 	xgo --go=latest --targets=linux/arm64 -out=./bin/dusk ./cmd/dusk
 dusk-darwin: install-tools
 	xgo --go=latest --targets=darwin/amd64 -out=./bin/dusk ./cmd/dusk
-	#xgo --go=latest --targets=darwin/386 -out=./bin/dusk ./cmd/dusk #405
+	xgo --go=latest --targets=darwin/386 -out=./bin/dusk ./cmd/dusk
 dusk-windows: install-tools
 	#xgo --go=latest --targets=windows/amd64 -out=./bin/dusk ./cmd/dusk #407
 	#xgo --go=latest --targets=windows/386 -out=./bin/dusk ./cmd/dusk #407
@@ -76,4 +77,19 @@ voucher-darwin: install-tools
 voucher-windows: install-tools
 	xgo --go=latest --targets=windows/amd64 -out=./bin/voucher ./cmd/voucher
 	xgo --go=latest --targets=windows/386 -out=./bin/voucher ./cmd/voucher
+###################################WALLET###############################################
+wallet-linux: install-tools
+	xgo --go=latest --targets=linux/amd64 -out=./bin/wallet ./cmd/wallet
+	xgo --go=latest --targets=linux/386 -out=./bin/wallet  ./cmd/wallet
+wallet-linux-arm: install-tools
+	xgo --go=latest --targets=linux/arm-5 -out=./bin/wallet ./cmd/wallet
+	xgo --go=latest --targets=linux/arm-6 -out=./bin/wallet ./cmd/wallet
+	xgo --go=latest --targets=linux/arm-7 -out=./bin/wallet ./cmd/wallet
+	xgo --go=latest --targets=linux/arm64 -out=./bin/wallet ./cmd/wallet
+wallet-darwin: install-tools
+	xgo --go=latest --targets=darwin/amd64 -out=./bin/wallet ./cmd/wallet
+	xgo --go=latest --targets=darwin/386 -out=./bin/wallet ./cmd/wallet
+wallet-windows: install-tools
+	#xgo --go=latest --targets=windows/amd64 -out=./bin/wallet ./cmd/wallet #407
+	#xgo --go=latest --targets=windows/386 -out=./bin/wallet ./cmd/wallet #407
 ########################################################################################
