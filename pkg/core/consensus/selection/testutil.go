@@ -6,8 +6,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -67,7 +67,7 @@ func NewHelper(eb *eventbus.EventBus) *Helper {
 	factory := NewFactory(eb, 1000*time.Millisecond)
 	s := factory.Instantiate()
 	sel := s.(*Selector)
-	keys, _ := key.NewRandConsensusKeys()
+	keys, _ := key.NewRandKeys()
 	hlp := &Helper{
 		Factory:       factory,
 		BidList:       bidList,
@@ -94,7 +94,7 @@ func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 func (h *Helper) Spawn(hash []byte) []message.Score {
 	evs := make([]message.Score, 0, len(h.BidList))
 	for i := 0; i < len(h.BidList); i++ {
-		keys, _ := key.NewRandConsensusKeys()
+		keys, _ := key.NewRandKeys()
 		hdr := header.Header{
 			Round:     h.Round,
 			Step:      h.Step(),

@@ -6,9 +6,9 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
@@ -24,7 +24,7 @@ type (
 
 // NewHandler will return a Handler, injected with the passed committee
 // and an unmarshaller which uses the injected validation function.
-func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *Handler {
+func NewHandler(keys key.Keys, p user.Provisioners) *Handler {
 	return &Handler{
 		Handler: committee.NewHandler(keys, p),
 	}

@@ -10,9 +10,9 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -109,7 +109,7 @@ func TestSendOnce(t *testing.T) {
 	}
 }
 
-func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request, *user.Provisioners, key.ConsensusKeys, ristretto.Scalar) {
+func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request, *user.Provisioners, key.Keys, ristretto.Scalar) {
 	// Initial setup
 	bus := eventbus.New()
 	rpcBus := rpcbus.New()
@@ -138,7 +138,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	k, err := w.ReconstructK()
 	assert.NoError(t, err)
 	mScalar := zkproof.CalculateM(k)
-	m := maintainer.New(bus, rpcBus, w.ConsensusKeys().BLSPubKeyBytes, mScalar)
+	m := maintainer.New(bus, rpcBus, w.Keys().BLSPubKeyBytes, mScalar)
 	go m.Listen()
 
 	// Mock provisioners, and insert our wallet values
@@ -149,7 +149,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	err = rpcBus.Register(topics.SendMempoolTx, c)
 	require.Nil(t, err)
 
-	return bus, c, p, w.ConsensusKeys(), mScalar
+	return bus, c, p, w.Keys(), mScalar
 }
 
 func receiveTxs(c chan rpcbus.Request) []transactions.Transaction {

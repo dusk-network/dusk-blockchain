@@ -4,8 +4,8 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -16,7 +16,7 @@ import (
 type Helper struct {
 	Bus             *eventbus.EventBus
 	P               *user.Provisioners
-	Keys            []key.ConsensusKeys
+	Keys            []key.Keys
 	Aggro           *agreement
 	CertificateChan chan message.Message
 	nr              int

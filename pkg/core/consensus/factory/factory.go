@@ -8,10 +8,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	pkey "github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
@@ -26,19 +27,19 @@ type ConsensusFactory struct {
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 
-	walletPubKey *key.PublicKey
-	key.ConsensusKeys
+	walletPubKey *pkey.PublicKey
+	key.Keys
 	timerLength time.Duration
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, walletPubKey *key.PublicKey, keys key.ConsensusKeys) *ConsensusFactory {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, walletPubKey *pkey.PublicKey, keys key.Keys) *ConsensusFactory {
 	return &ConsensusFactory{
-		eventBus:      eventBus,
-		rpcBus:        rpcBus,
-		walletPubKey:  walletPubKey,
-		ConsensusKeys: keys,
-		timerLength:   timerLength,
+		eventBus:     eventBus,
+		rpcBus:       rpcBus,
+		walletPubKey: walletPubKey,
+		Keys:         keys,
+		timerLength:  timerLength,
 	}
 }
 
@@ -48,12 +49,12 @@ func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	gen := generation.NewFactory()
 	cgen := candidate.NewFactory(c.eventBus, c.rpcBus, c.walletPubKey)
-	sgen := score.NewFactory(c.eventBus, c.ConsensusKeys, nil)
+	sgen := score.NewFactory(c.eventBus, c.Keys, nil)
 	sel := selection.NewFactory(c.eventBus, c.timerLength)
-	redFirstStep := firststep.NewFactory(c.eventBus, c.rpcBus, c.ConsensusKeys, c.timerLength)
-	redSecondStep := secondstep.NewFactory(c.eventBus, c.rpcBus, c.ConsensusKeys, c.timerLength)
-	agr := agreement.NewFactory(c.eventBus, c.ConsensusKeys)
+	redFirstStep := firststep.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
+	redSecondStep := secondstep.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
+	agr := agreement.NewFactory(c.eventBus, c.Keys)
 
-	consensus.Start(c.eventBus, c.ConsensusKeys, cgen, sgen, sel, redFirstStep, redSecondStep, agr, gen)
+	consensus.Start(c.eventBus, c.Keys, cgen, sgen, sel, redFirstStep, redSecondStep, agr, gen)
 	log.WithField("process", "factory").Info("Consensus Started")
 }

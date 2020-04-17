@@ -8,8 +8,8 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
-// ConsensusKeys are the keys used during consensus
-type ConsensusKeys struct {
+// Keys are the keys used during consensus
+type Keys struct {
 	BLSPubKey      *bls.PublicKey
 	BLSPubKeyBytes []byte
 	BLSSecretKey   *bls.SecretKey
@@ -18,13 +18,13 @@ type ConsensusKeys struct {
 	EdSecretKey    *ed25519.PrivateKey
 }
 
-// NewRandConsensusKeys will generate and return new bls and ed25519
+// NewRandKeys will generate and return new bls and ed25519
 // keys to be used in consensus
-func NewRandConsensusKeys() (ConsensusKeys, error) {
-	var keys ConsensusKeys
+func NewRandKeys() (Keys, error) {
+	var keys Keys
 	var err error
 	for {
-		keys, err = NewConsensusKeysFromReader(nil)
+		keys, err = NewKeysFromReader(nil)
 		if err == io.EOF {
 			continue
 		}
@@ -34,19 +34,19 @@ func NewRandConsensusKeys() (ConsensusKeys, error) {
 	return keys, err
 }
 
-// NewConsensusKeysFromReader takes a reader and uses it as a seed for generating random ConsensusKeys
-func NewConsensusKeysFromReader(r io.Reader) (ConsensusKeys, error) {
+// NewKeysFromReader takes a reader and uses it as a seed for generating random Keys
+func NewKeysFromReader(r io.Reader) (Keys, error) {
 	blsPub, blsPriv, err := bls.GenKeyPair(r)
 	if err != nil {
-		return ConsensusKeys{}, err
+		return Keys{}, err
 	}
 
 	edPub, edPriv, err := ed25519.GenerateKey(r)
 	if err != nil {
-		return ConsensusKeys{}, err
+		return Keys{}, err
 	}
 
-	return ConsensusKeys{
+	return Keys{
 		BLSPubKey:      blsPub,
 		BLSSecretKey:   blsPriv,
 		EdPubKey:       &edPub,
@@ -56,24 +56,24 @@ func NewConsensusKeysFromReader(r io.Reader) (ConsensusKeys, error) {
 	}, nil
 }
 
-// NewConsensusKeysFromBytes gets an array of bytes as seed for the pseudo-random generation of ConsensusKeys
-func NewConsensusKeysFromBytes(seed []byte) (ConsensusKeys, error) {
+// NewKeysFromBytes gets an array of bytes as seed for the pseudo-random generation of Keys
+func NewKeysFromBytes(seed []byte) (Keys, error) {
 
 	r := bytes.NewBuffer(seed)
 	r.Grow(len(seed))
 	blsPub, blsPriv, err := bls.GenKeyPair(r)
 	if err != nil {
-		return ConsensusKeys{}, err
+		return Keys{}, err
 	}
 
 	r = bytes.NewBuffer(seed)
 	r.Grow(len(seed))
 	edPub, edPriv, err := ed25519.GenerateKey(r)
 	if err != nil {
-		return ConsensusKeys{}, err
+		return Keys{}, err
 	}
 
-	return ConsensusKeys{
+	return Keys{
 		BLSPubKey:      blsPub,
 		BLSSecretKey:   blsPriv,
 		EdPubKey:       &edPub,

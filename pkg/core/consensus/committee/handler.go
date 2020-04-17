@@ -4,8 +4,8 @@ import (
 	"math"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 )
 
 // PregenerationAmount is the size of a pregenerated committee
@@ -15,7 +15,7 @@ var PregenerationAmount uint8 = 8
 // committee. It generates and maintains a list of active and valid committee members and
 // handle the votes
 type Handler struct {
-	key.ConsensusKeys
+	key.Keys
 	Provisioners user.Provisioners
 	Committees   []user.VotingCommittee
 	lock         sync.RWMutex
@@ -23,17 +23,17 @@ type Handler struct {
 
 // NewHandler creates a new committee.Handler by instantiating the committee
 // slice, setting the keys and setting the Provisioner set
-func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *Handler {
+func NewHandler(keys key.Keys, p user.Provisioners) *Handler {
 	return &Handler{
-		ConsensusKeys: keys,
-		Committees:    make([]user.VotingCommittee, math.MaxUint8),
-		Provisioners:  p,
+		Keys:         keys,
+		Committees:   make([]user.VotingCommittee, math.MaxUint8),
+		Provisioners: p,
 	}
 }
 
 // AmMember checks if we are part of the committee for a given round and step.
 func (b *Handler) AmMember(round uint64, step uint8, maxSize int) bool {
-	return b.IsMember(b.ConsensusKeys.BLSPubKeyBytes, round, step, maxSize)
+	return b.IsMember(b.Keys.BLSPubKeyBytes, round, step, maxSize)
 }
 
 // IsMember checks if a provisioner with a given BLS public key is

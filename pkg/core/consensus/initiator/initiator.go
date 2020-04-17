@@ -30,7 +30,7 @@ func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *w
 func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) error {
 	// Setting up the consensus factory
 	pubKey := w.PublicKey()
-	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, &pubKey, w.ConsensusKeys())
+	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, &pubKey, w.Keys())
 	f.StartConsensus()
 
 	// If we are on genesis, we should kickstart the consensus

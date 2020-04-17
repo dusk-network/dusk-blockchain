@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-crypto/bls"
@@ -129,7 +129,7 @@ func MarshalVoteSet(r *bytes.Buffer, evs []Reduction) error {
 
 // MockReduction mocks a Reduction event and returns it.
 // It includes a vararg iterativeIdx to help avoiding duplicates when testing
-func MockReduction(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, iterativeIdx ...int) Reduction {
+func MockReduction(hash []byte, round uint64, step uint8, keys []key.Keys, iterativeIdx ...int) Reduction {
 	idx := 0
 	if len(iterativeIdx) != 0 {
 		idx = iterativeIdx[0]
@@ -150,7 +150,7 @@ func MockReduction(hash []byte, round uint64, step uint8, keys []key.ConsensusKe
 }
 
 // MockVotes mocks a slice of Reduction events and returns it.
-func MockVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, amount int) []Reduction {
+func MockVotes(hash []byte, round uint64, step uint8, keys []key.Keys, amount int) []Reduction {
 	var voteSet []Reduction
 	for i := 0; i < amount; i++ {
 		r := MockReduction(hash, round, step, keys, i)
@@ -162,7 +162,7 @@ func MockVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, 
 
 // MockVoteSet mocks a slice of Reduction events for two adjacent steps,
 // and returns it.
-func MockVoteSet(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, amount int) []Reduction {
+func MockVoteSet(hash []byte, round uint64, step uint8, keys []key.Keys, amount int) []Reduction {
 	if step < uint8(2) {
 		panic("Need at least 2 steps to create an Agreement")
 	}
@@ -174,7 +174,7 @@ func MockVoteSet(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys
 }
 
 // createVoteSet creates and returns a set of Reduction votes for two steps.
-func createVoteSet(k1, k2 []key.ConsensusKeys, hash []byte, size int, round uint64, step uint8) (events []Reduction) {
+func createVoteSet(k1, k2 []key.Keys, hash []byte, size int, round uint64, step uint8) (events []Reduction) {
 	// We can not have duplicates in the vote set.
 	duplicates := make(map[string]struct{})
 	// We need 75% of the committee size worth of events to reach quorum.
