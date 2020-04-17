@@ -104,7 +104,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	t.put(key, value)
 
 	//fix for #405
-	if uint32(len(b.Txs)) > math.MaxUint32 {
+	if uint64(len(b.Txs)) > math.MaxUint32 {
 		return errors.New("too many transactions")
 	}
 
