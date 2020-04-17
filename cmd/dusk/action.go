@@ -90,8 +90,8 @@ func action(ctx *cli.Context) error {
 		OnConn:   srv.OnConnection,
 	})
 
-	// fetch neighbors addresses from the Seeder
-	ips := ConnectToSeeder()
+	// fetch neighbors addresses from the Voucher
+	ips := ConnectToVoucher()
 
 	// trying to connect to the peers
 	for _, ip := range ips {
