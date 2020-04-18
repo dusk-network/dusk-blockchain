@@ -100,6 +100,9 @@ func (l *DBLoader) BlockAt(searchingHeight uint64) (block.Block, error) {
 		return err
 	})
 
+	if err != nil {
+		return block.Block{}, err
+	}
 	return *blk, err
 }
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -185,16 +186,16 @@ func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user
 	}
 }
 
-func createLoader(t *testing.T) *DBLoader {
+func createLoader() *DBLoader {
 	_, db := heavy.CreateDBConnection()
-	fakeGenesis := helper.GenesisMock(t, 10)
-	return NewDBLoader(db, fakeGenesis)
+	genesis := cfg.DecodeGenesis()
+	return NewDBLoader(db, genesis)
 }
 
 func TestFetchTip(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	loader := createLoader(t)
+	loader := createLoader()
 	chain, err := New(eb, rpc, nil, loader, &MockVerifier{})
 
 	assert.Nil(t, err)
@@ -217,7 +218,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	chain, err := New(eb, rpc, counter, createLoader(t), &MockVerifier{})
+	chain, err := New(eb, rpc, counter, createLoader(), &MockVerifier{})
 	assert.Nil(t, err)
 
 	// Add some provisioners to our chain, including one that is just about to expire
@@ -248,7 +249,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 func TestAddAndRemoveBid(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	c, err := New(eb, rpc, nil, createLoader(t), &MockVerifier{})
+	c, err := New(eb, rpc, nil, createLoader(), &MockVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,7 +442,7 @@ func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpc
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	loader := createLoader(t)
+	loader := createLoader()
 	c, err := New(eb, rpc, counter, loader, &MockVerifier{})
 	if err != nil {
 		t.Fatal(err)
