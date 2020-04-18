@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -74,4 +75,8 @@ func TestEncodeDecodeHeader(t *testing.T) {
 
 	// Check both structs are equal
 	assert.True(hdr.Equals(decHdr))
+}
+
+func TestDecodeLegacyGenesis(t *testing.T) { //nolint
+	config.DecodeGenesis()
 }

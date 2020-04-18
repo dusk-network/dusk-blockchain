@@ -18,7 +18,7 @@ import (
 
 // Test basic storage-related functionality.
 func TestStoreFetchClear(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
+	//t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	c := newStore()
 
 	// Store a candidate
