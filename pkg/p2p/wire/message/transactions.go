@@ -57,7 +57,7 @@ func UnmarshalTx(r *bytes.Buffer) (transactions.Transaction, error) {
 			return nil, err
 		}
 
-		err = UnmarshalLegacyStake(r, tx)
+		err = UnmarshalStake(r, tx)
 		return tx, err
 	case transactions.CoinbaseType:
 		tx := &transactions.Coinbase{TxType: transactions.TxType(txType)}
