@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -29,8 +28,6 @@ import (
 // This test ensures the correct behavior from the Chain, when
 // accepting a block from a peer.
 func TestAcceptFromPeer(t *testing.T) {
-	// this test uses config.DecodeGenesis
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	eb, _, c := setupChainTest(t, false)
 	stopConsensusChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
@@ -97,8 +94,6 @@ func TestAcceptFromPeer(t *testing.T) {
 // This test ensures the correct behavior when accepting a block
 // directly from the consensus.
 func TestAcceptIntermediate(t *testing.T) {
-	// this test uses config.DecodeGenesis
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	eb, rpc, c := setupChainTest(t, false)
 	go c.Listen()
 	intermediateChan := make(chan message.Message, 1)
@@ -141,8 +136,6 @@ func TestAcceptIntermediate(t *testing.T) {
 }
 
 func TestReturnOnNilIntermediateBlock(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
-
 	eb, _, c := setupChainTest(t, false)
 	intermediateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
@@ -199,7 +192,6 @@ func createLoader(t *testing.T) *DBLoader {
 }
 
 func TestFetchTip(t *testing.T) {
-	//t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	loader := createLoader(t)
@@ -222,11 +214,11 @@ func TestFetchTip(t *testing.T) {
 // TODO: this test currently doesn't test anything meaningful, and
 // should be refactored or removed.
 func TestCertificateExpiredProvisioner(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
+	//t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	chain, err := New(eb, rpc, counter, NewMockLoader(), &MockVerifier{})
+	chain, err := New(eb, rpc, counter, createLoader(t), &MockVerifier{})
 	assert.Nil(t, err)
 
 	// Add some provisioners to our chain, including one that is just about to expire
@@ -255,10 +247,9 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 }
 
 func TestAddAndRemoveBid(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	c, err := New(eb, rpc, nil, NewMockLoader(), &MockVerifier{})
+	c, err := New(eb, rpc, nil, createLoader(t), &MockVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +264,6 @@ func TestAddAndRemoveBid(t *testing.T) {
 }
 
 func TestRemoveExpired(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	_, _, c := setupChainTest(t, false)
 
 	for i := 0; i < 10; i++ {
@@ -304,7 +294,6 @@ func TestRemoveExpired(t *testing.T) {
 
 // Add and then a remove a provisioner, to check if removal works properly.
 func TestRemove(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	_, _, c := setupChainTest(t, false)
 
 	keys, _ := key.NewRandKeys()
@@ -323,7 +312,6 @@ func TestRemove(t *testing.T) {
 }
 
 func TestRemoveExpiredProvisioners(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	_, _, c := setupChainTest(t, false)
 
 	for i := 0; i < 10; i++ {
@@ -348,8 +336,6 @@ func TestRemoveExpiredProvisioners(t *testing.T) {
 }
 
 func TestRebuildChain(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
-
 	eb, rb, c := setupChainTest(t, true)
 	catchClearWalletDatabaseRequest(rb)
 	go c.Listen()
@@ -365,7 +351,8 @@ func TestRebuildChain(t *testing.T) {
 	assert.NoError(t, c.AcceptBlock(*blk))
 
 	// Chain prevBlock should now no longer be genesis
-	genesis := cfg.DecodeGenesis()
+	genesis := c.loader.(*DBLoader).genesis
+	//genesis := cfg.DecodeGenesis()
 	assert.False(t, genesis.Equals(&c.prevBlock))
 
 	// Let's manually update some of the in-memory state, as it is
@@ -455,8 +442,8 @@ func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpc
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	blockchain := make([]block.Block, 0)
-	c, err := New(eb, rpc, counter, &MockLoader{blockchain}, &MockVerifier{})
+	loader := createLoader(t)
+	c, err := New(eb, rpc, counter, loader, &MockVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
