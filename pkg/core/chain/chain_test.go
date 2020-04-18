@@ -214,7 +214,6 @@ func TestFetchTip(t *testing.T) {
 // TODO: this test currently doesn't test anything meaningful, and
 // should be refactored or removed.
 func TestCertificateExpiredProvisioner(t *testing.T) {
-	//t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)

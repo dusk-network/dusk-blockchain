@@ -11,7 +11,6 @@ import (
 // Ensure that the behavior of the validator works as intended.
 // It should republish blocks with a correct hash and root.
 func TestValidatorValidBlock(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	// Send it over to the validator
 	cm := mockCandidate()
 	msg := message.New(topics.Candidate, cm)
@@ -21,7 +20,6 @@ func TestValidatorValidBlock(t *testing.T) {
 // Ensure that blocks with an invalid hash or tx root will not be
 // republished.
 func TestValidatorInvalidBlock(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	cm := mockCandidate()
 	// Remove one of the transactions to remove the integrity of
 	// the merkle root
