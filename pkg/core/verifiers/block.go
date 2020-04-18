@@ -9,45 +9,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-crypto/bls"
 )
-
-// CheckBlock will verify whether a block is valid according to the rules of the consensus
-// returns nil if a block is valid
-func CheckBlock(db database.DB, prevBlock block.Block, blk block.Block) error {
-	// 1. Check that we have not seen this block before
-	err := db.View(func(t database.Transaction) error {
-		_, err := t.FetchBlockExists(blk.Header.Hash)
-		return err
-	})
-
-	if err != database.ErrBlockNotFound {
-		if err == nil {
-			err = errors.New("block already exists")
-		}
-		return err
-	}
-
-	if err := CheckBlockHeader(prevBlock, blk); err != nil {
-		return err
-	}
-
-	if err := CheckMultiCoinbases(blk.Txs); err != nil {
-		return err
-	}
-
-	for i, merklePayload := range blk.Txs {
-		tx, ok := merklePayload.(transactions.Transaction)
-		if !ok {
-			return errors.New("tx does not implement the transaction interface")
-		}
-		if err := CheckTx(db, uint64(i), uint64(blk.Header.Timestamp), tx); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // CheckBlockCertificate ensures that the block certificate is valid.
 func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) error {

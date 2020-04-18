@@ -2,63 +2,147 @@ package chain
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 )
 
 const (
-	sanityCheckHeight uint64 = 10
+	// SanityCheckHeight is the suggested amount of blocks to check when
+	// calling Loader.PerformSanityCheck
+	SanityCheckHeight uint64 = 10
 )
 
-// loader performs database prefetching and sanityChecks at node startup
-type loader struct {
+// DBLoader performs database prefetching and sanityChecks at node startup
+type DBLoader struct {
 	db database.DB
+
+	// Unsure if the genesis block needs to be here
+	genesis *block.Block
 
 	// Output prefetched data
 	chainTip *block.Block
 }
 
-func newLoader(db database.DB) (*loader, error) {
+// CheckBlock will verify whether a block is valid according to the rules of the consensus
+// returns nil if a block is valid
+func (l *DBLoader) CheckBlock(prevBlock block.Block, blk block.Block) error {
+	// 1. Check that we have not seen this block before
+	err := l.db.View(func(t database.Transaction) error {
+		_, err := t.FetchBlockExists(blk.Header.Hash)
+		return err
+	})
 
-	l := &loader{db: db}
-
-	// Prefetch data from database that is needed by the node in advance
-	if err := l.prefetch(); err != nil {
-		return nil, err
-	}
-
-	// Perform database sanity check to ensure the database state is rational
-	// before boostrapping all node subsystems
-	if err := l.sanityCheck(); err != nil {
-		return nil, err
-	}
-
-	return l, nil
-}
-
-func (l *loader) prefetch() error {
-
-	if err := l.prefetchChainTip(); err != nil {
+	if err != database.ErrBlockNotFound {
+		if err == nil {
+			err = errors.New("block already exists")
+		}
 		return err
 	}
 
+	if err := verifiers.CheckBlockHeader(prevBlock, blk); err != nil {
+		return err
+	}
+
+	if err := verifiers.CheckMultiCoinbases(blk.Txs); err != nil {
+		return err
+	}
+
+	for i, merklePayload := range blk.Txs {
+		tx, ok := merklePayload.(transactions.Transaction)
+		if !ok {
+			return errors.New("tx does not implement the transaction interface")
+		}
+		if err := verifiers.CheckTx(l.db, uint64(i), uint64(blk.Header.Timestamp), tx); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func (l *loader) sanityCheck() error {
+// NewDBLoader returns a Loader which gets the Chain Tip from the DB
+func NewDBLoader(db database.DB, genesis *block.Block) *DBLoader {
+	return &DBLoader{db: db, genesis: genesis}
+}
 
+// Height returns the height of the blockchain stored in the DB
+func (l *DBLoader) Height() (uint64, error) {
 	var height uint64
-	// Verify first N blocks
-	prevBlock := cfg.DecodeGenesis()
+	err := l.db.View(func(t database.Transaction) error {
+		var err error
+		height, err = t.FetchCurrentHeight()
+		return err
+	})
+	return height, err
+}
+
+// Append stores a block in the DB
+func (l *DBLoader) Append(blk *block.Block) error {
+	return l.db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(blk)
+	})
+}
+
+// BlockAt returns the block stored at a given height
+func (l *DBLoader) BlockAt(searchingHeight uint64) (block.Block, error) {
+	var blk *block.Block
+	err := l.db.View(func(t database.Transaction) error {
+		hash, err := t.FetchBlockHashByHeight(searchingHeight)
+		if err != nil {
+			return err
+		}
+
+		blk, err = t.FetchBlock(hash)
+		return err
+	})
+
+	return *blk, err
+}
+
+// Clear the underlying DB
+func (l *DBLoader) Clear() error {
+	return l.db.Update(func(t database.Transaction) error {
+		return t.ClearDatabase()
+	})
+}
+
+// Close the underlying DB usign the drivers
+func (l *DBLoader) Close(driver string) error {
+	log.Info("Close database")
+	drvr, err := database.From(driver)
+	if err != nil {
+		return err
+	}
+
+	return drvr.Close()
+}
+
+// PerformSanityCheck checks the head and the tail of the blockchain to avoid
+// inconsistencies and a faulty bootstrap
+func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmount uint64) error {
+	var height uint64
+	var prevBlock *block.Block
+
+	if startAt > 0 {
+		return errors.New("performing sanity checks from arbitrary points is not supported yet")
+	}
+
+	if startAt == 0 {
+		prevBlock = l.genesis
+	}
+
 	prevHeader := prevBlock.Header
+	// Verify first N blocks
 	err := l.db.View(func(t database.Transaction) error {
 
-		// Verify genesis. Failure here would mostly occur if mainnet node
+		// This will most likely verify genesis, unless the startAt parameter
+		// is set to some other height. In case of genesis, failure here would mostly occur if mainnet node
 		// loads testnet blockchain
-		hash, err := t.FetchBlockHashByHeight(0)
+		hash, err := t.FetchBlockHashByHeight(startAt)
 		if err != nil {
 			return err
 		}
@@ -67,7 +151,7 @@ func (l *loader) sanityCheck() error {
 			return fmt.Errorf("invalid genesis block")
 		}
 
-		for height = 1; height <= sanityCheckHeight; height++ {
+		for height = 1; height <= firstBlocksAmount; height++ {
 			hash, err := t.FetchBlockHashByHeight(height)
 
 			if err == database.ErrBlockNotFound {
@@ -98,25 +182,27 @@ func (l *loader) sanityCheck() error {
 		return err
 	}
 
-	//TODO: Verify blocks latest N blocks
-
+	//TODO: Verify lastBlockAmount blocks
 	return nil
 }
 
-func (l *loader) prefetchChainTip() error {
-
+// LoadTip returns the tip of the chain
+func (l *DBLoader) LoadTip() (*block.Block, error) {
+	var tip *block.Block
 	err := l.db.Update(func(t database.Transaction) error {
 
 		s, err := t.FetchState()
 		if err != nil {
+			// TODO: maybe log the error here and diversify between empty
+			// results and actual errors
 
 			// Store Genesis Block, if a modern node runs
-			b := cfg.DecodeGenesis()
-			err := t.StoreBlock(b)
+			err := t.StoreBlock(l.genesis)
 			if err != nil {
 				return err
 			}
-			l.chainTip = b
+			tip = l.genesis
+
 		} else {
 			// Reconstruct chain tip
 			h, err := t.FetchBlockHeader(s.TipHash)
@@ -129,22 +215,22 @@ func (l *loader) prefetchChainTip() error {
 				return err
 			}
 
-			l.chainTip = &block.Block{Header: h, Txs: txs}
+			tip = &block.Block{Header: h, Txs: txs}
 		}
 		return nil
 	})
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Verify chain state. There shouldn't be any blocks higher than chainTip
 	err = l.db.View(func(t database.Transaction) error {
-		nextHeight := l.chainTip.Header.Height + 1
+		nextHeight := tip.Header.Height + 1
 		hash, e := t.FetchBlockHashByHeight(nextHeight)
 		// Check if error is nil and the hash is set
 		if e == nil && len(hash) > 0 {
-			return fmt.Errorf("state points at %d height but the tip is higher", l.chainTip.Header.Height)
+			return fmt.Errorf("state points at %d height but the tip is higher", tip.Header.Height)
 		}
 		// TODO: this throws ErrBlockNotFound in tests. Should we propagate the
 		// error?
@@ -154,5 +240,10 @@ func (l *loader) prefetchChainTip() error {
 		return nil
 	})
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	l.chainTip = tip
+	return tip, nil
 }

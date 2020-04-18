@@ -12,6 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
@@ -191,26 +192,29 @@ func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user
 	}
 }
 
+func createLoader(t *testing.T) *DBLoader {
+	_, db := heavy.CreateDBConnection()
+	fakeGenesis := helper.GenesisMock(t, 10)
+	return NewDBLoader(db, fakeGenesis)
+}
+
 func TestFetchTip(t *testing.T) {
-	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
+	//t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	chain, err := New(eb, rpc, nil)
+	loader := createLoader(t)
+	chain, err := New(eb, rpc, nil, loader, &MockVerifier{})
 
 	assert.Nil(t, err)
-	defer func() {
-		err = chain.Close()
-	}()
 
 	// on a modern chain, state(tip) must point at genesis
 	var s *database.State
-	err = chain.db.View(func(t database.Transaction) error {
+	err = loader.db.View(func(t database.Transaction) error {
 		s, err = t.FetchState()
 		return err
 	})
 
 	assert.Nil(t, err)
-
 	assert.Equal(t, chain.prevBlock.Header.Hash, s.TipHash)
 }
 
@@ -222,11 +226,8 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	chain, err := New(eb, rpc, counter)
+	chain, err := New(eb, rpc, counter, NewMockLoader(), &MockVerifier{})
 	assert.Nil(t, err)
-	defer func() {
-		_ = chain.Close()
-	}()
 
 	// Add some provisioners to our chain, including one that is just about to expire
 	p, k := consensus.MockProvisioners(3)
@@ -257,7 +258,7 @@ func TestAddAndRemoveBid(t *testing.T) {
 	t.Skip("feature-419: Genesis block is broken. Unskip after moving to smart contract staking")
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	c, err := New(eb, rpc, nil)
+	c, err := New(eb, rpc, nil, NewMockLoader(), &MockVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +455,8 @@ func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpc
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	c, err := New(eb, rpc, counter)
+	blockchain := make([]block.Block, 0)
+	c, err := New(eb, rpc, counter, &MockLoader{blockchain}, &MockVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
