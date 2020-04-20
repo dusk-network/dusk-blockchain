@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
@@ -31,13 +32,36 @@ var logServer = logrus.WithField("process", "server")
 type Server struct {
 	eventBus   *eventbus.EventBus
 	rpcBus     *rpcbus.RPCBus
-	chain      *chain.Chain
+	loader     chain.Loader
 	dupeMap    *dupemap.DupeMap
 	counter    *chainsync.Counter
 	gossip     *processing.Gossip
 	rpcWrapper *rpc.SrvWrapper
 	// rpcClient     *rpc.Client
 	cancelMonitor StopFunc
+}
+
+// LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
+// component and performs a DB sanity check
+func LaunchChain(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter) (chain.Loader, error) {
+	// creating and firing up the chain process
+	genesis := cfg.DecodeGenesis()
+	_, db := heavy.CreateDBConnection()
+	l := chain.NewDBLoader(db, genesis)
+
+	chainProcess, err := chain.New(eventBus, rpcBus, counter, l, l)
+	if err != nil {
+		return nil, err
+	}
+
+	// Perform database sanity check to ensure that it is rational before
+	// bootstrapping all node subsystems
+	if err := l.PerformSanityCheck(0, 10, 0); err != nil {
+		return nil, err
+	}
+
+	go chainProcess.Listen()
+	return l, nil
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
@@ -56,12 +80,11 @@ func Setup() *Server {
 	m := mempool.NewMempool(eventBus, rpcBus, nil)
 	m.Run()
 
-	// creating and firing up the chain process
-	chainProcess, err := chain.New(eventBus, rpcBus, counter)
+	chainDBLoader, err := LaunchChain(eventBus, rpcBus, counter)
+
 	if err != nil {
 		log.Panic(err)
 	}
-	go chainProcess.Listen()
 
 	// Setting up the candidate broker
 	candidateBroker := candidate.NewBroker(eventBus, rpcBus)
@@ -95,7 +118,7 @@ func Setup() *Server {
 	srv := &Server{
 		eventBus:   eventBus,
 		rpcBus:     rpcBus,
-		chain:      chainProcess,
+		loader:     chainDBLoader,
 		dupeMap:    dupeBlacklist,
 		counter:    counter,
 		gossip:     processing.NewGossip(protocol.TestNet),
@@ -179,7 +202,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 // Close the chain and the connections created through the RPC bus
 func (s *Server) Close() {
 	// TODO: disconnect peers
-	_ = s.chain.Close()
+	_ = s.loader.Close(cfg.Get().Database.Driver)
 	s.rpcBus.Close()
 	s.rpcWrapper.Shutdown()
 	// _ = s.rpcClient.Close()

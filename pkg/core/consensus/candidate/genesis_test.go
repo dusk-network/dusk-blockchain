@@ -57,7 +57,7 @@ func TestGenesisBlock(t *testing.T) {
 	buf.Write(blob)
 
 	b := block.NewBlock()
-	if err := message.UnmarshalBlock(&buf, b); err != nil {
+	if err := message.UnmarshalLegacyBlock(&buf, b); err != nil {
 		t.Fatalf("expecting decodable cfg.TestNetGenesisBlob %s", err.Error())
 	}
 

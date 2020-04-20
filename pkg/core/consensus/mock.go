@@ -76,7 +76,6 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.Keys) {
 // MockMember mocks a Provisioner
 func MockMember(keys key.Keys) *user.Member {
 	member := &user.Member{}
-	member.PublicKeyEd = keys.EdPubKeyBytes
 	member.PublicKeyBLS = keys.BLSPubKeyBytes
 	member.Stakes = make([]user.Stake, 1)
 	member.Stakes[0].Amount = 500

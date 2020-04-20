@@ -155,10 +155,9 @@ func RandomStandardTx(t *testing.T, malformed bool) *transactions.Standard {
 
 // RandomStakeTx returns a random stake tx for testing
 func RandomStakeTx(t *testing.T, malformed bool) (*transactions.Stake, error) {
-	edKey := RandomSlice(t, 32)
 	blsKey := RandomSlice(t, 33)
 
-	tx, err := transactions.NewStake(0, 2, fee, lockTime, edKey, blsKey)
+	tx, err := transactions.NewStake(0, 2, fee, lockTime, blsKey)
 	if err != nil {
 		return tx, err
 	}

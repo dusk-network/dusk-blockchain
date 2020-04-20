@@ -177,7 +177,6 @@ func copyMembers(members map[string]*Member) map[string]*Member {
 	m := make(map[string]*Member)
 	for k, v := range members {
 		member := &Member{
-			PublicKeyEd:  v.PublicKeyEd,
 			PublicKeyBLS: v.PublicKeyBLS,
 		}
 

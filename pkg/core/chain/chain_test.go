@@ -12,6 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
@@ -162,6 +163,7 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	assert.Nil(t, c.intermediateBlock)
 }
 
+//nolint:unused
 func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 	c := make(chan rpcbus.Request, 1)
 	rpc.Register(topics.GetCandidate, c)
@@ -172,6 +174,7 @@ func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 	}()
 }
 
+//nolint:unused
 func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user.Provisioners) *block.Certificate {
 	votes := message.GenVotes(hash, round, 3, keys, p)
 	return &block.Certificate{
@@ -183,25 +186,28 @@ func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user
 	}
 }
 
+func createLoader() *DBLoader {
+	_, db := heavy.CreateDBConnection()
+	genesis := cfg.DecodeGenesis()
+	return NewDBLoader(db, genesis)
+}
+
 func TestFetchTip(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	chain, err := New(eb, rpc, nil)
+	loader := createLoader()
+	chain, err := New(eb, rpc, nil, loader, &MockVerifier{})
 
 	assert.Nil(t, err)
-	defer func() {
-		err = chain.Close()
-	}()
 
 	// on a modern chain, state(tip) must point at genesis
 	var s *database.State
-	err = chain.db.View(func(t database.Transaction) error {
+	err = loader.db.View(func(t database.Transaction) error {
 		s, err = t.FetchState()
 		return err
 	})
 
 	assert.Nil(t, err)
-
 	assert.Equal(t, chain.prevBlock.Header.Hash, s.TipHash)
 }
 
@@ -212,11 +218,8 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	chain, err := New(eb, rpc, counter)
+	chain, err := New(eb, rpc, counter, createLoader(), &MockVerifier{})
 	assert.Nil(t, err)
-	defer func() {
-		_ = chain.Close()
-	}()
 
 	// Add some provisioners to our chain, including one that is just about to expire
 	p, k := consensus.MockProvisioners(3)
@@ -246,7 +249,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 func TestAddAndRemoveBid(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	c, err := New(eb, rpc, nil)
+	c, err := New(eb, rpc, nil, createLoader(), &MockVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +297,7 @@ func TestRemove(t *testing.T) {
 	_, _, c := setupChainTest(t, false)
 
 	keys, _ := key.NewRandKeys()
-	if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
+	if err := c.addProvisioner(keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 		t.Fatal(err)
 	}
 
@@ -313,7 +316,7 @@ func TestRemoveExpiredProvisioners(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		keys, _ := key.NewRandKeys()
-		if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
+		if err := c.addProvisioner(keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -348,14 +351,15 @@ func TestRebuildChain(t *testing.T) {
 	assert.NoError(t, c.AcceptBlock(*blk))
 
 	// Chain prevBlock should now no longer be genesis
-	genesis := cfg.DecodeGenesis()
+	genesis := c.loader.(*DBLoader).genesis
+	//genesis := cfg.DecodeGenesis()
 	assert.False(t, genesis.Equals(&c.prevBlock))
 
 	// Let's manually update some of the in-memory state, as it is
 	// difficult to do this through mocked blocks in a test.
 	p, ks := consensus.MockProvisioners(5)
 	for _, k := range ks {
-		assert.NoError(t, c.addProvisioner(k.EdPubKeyBytes, k.BLSPubKeyBytes, 50000, 1, 2000))
+		assert.NoError(t, c.addProvisioner(k.BLSPubKeyBytes, 50000, 1, 2000))
 	}
 
 	c.lastCertificate = createMockedCertificate(c.intermediateBlock.Header.Hash, 2, ks, p)
@@ -391,6 +395,7 @@ func TestRebuildChain(t *testing.T) {
 	<-stopConsensusChan
 }
 
+//nolint:unused
 func createBid(t *testing.T) user.Bid {
 	b, err := crypto.RandEntropy(32)
 	if err != nil {
@@ -402,6 +407,7 @@ func createBid(t *testing.T) user.Bid {
 	return user.Bid{X: arr, M: arr, EndHeight: 1000}
 }
 
+//nolint:unused
 func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
 	c := make(chan rpcbus.Request, 1)
 	rb.Register(topics.ClearWalletDatabase, c)
@@ -414,6 +420,7 @@ func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
 // mock a block which can be accepted by the chain.
 // note that this is only valid for height 1, as the certificate
 // is not checked on height 1 (for network bootstrapping)
+//nolint:unused
 func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
 	// Create block 1
 	blk := helper.RandomBlock(t, 1, 1)
@@ -430,11 +437,13 @@ func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
 	return blk
 }
 
+//nolint:unused
 func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	c, err := New(eb, rpc, counter)
+	loader := createLoader()
+	c, err := New(eb, rpc, counter, loader, &MockVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}

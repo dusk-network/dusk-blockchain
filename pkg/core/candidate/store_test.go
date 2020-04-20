@@ -113,6 +113,7 @@ func TestRequestCandidate(t *testing.T) {
 
 // Mocks a candidate message. It is not in the message package since it uses
 // the genesis block as mockup block
+//nolint:unused
 func mockCandidate() message.Candidate {
 	genesis := config.DecodeGenesis()
 	cert := block.EmptyCertificate()

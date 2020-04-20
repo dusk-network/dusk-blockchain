@@ -152,6 +152,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	return bus, c, p, w.Keys(), mScalar
 }
 
+//nolint:unused
 func receiveTxs(c chan rpcbus.Request) []transactions.Transaction {
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
@@ -164,6 +165,7 @@ func receiveTxs(c chan rpcbus.Request) []transactions.Transaction {
 	return txs
 }
 
+//nolint:unused
 func createWallet(rpcBus *rpcbus.RPCBus, password string) error {
 	_, err := rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(&node.CreateRequest{Password: password}), 0)
 	return err

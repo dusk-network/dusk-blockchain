@@ -52,7 +52,7 @@ func UnmarshalTx(r *bytes.Buffer) (transactions.Transaction, error) {
 		err = UnmarshalBid(r, tx)
 		return tx, err
 	case transactions.StakeType:
-		tx, err := transactions.NewStake(0, 0, 0, 0, nil, nil)
+		tx, err := transactions.NewStake(0, 0, 0, 0, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -180,10 +180,6 @@ func MarshalStake(r *bytes.Buffer, tx *transactions.Stake) error {
 
 func marshalStake(r *bytes.Buffer, tx *transactions.Stake, encodeSignature bool) error {
 	if err := marshalTimelock(r, tx.Timelock, encodeSignature); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(r, tx.PubKeyEd); err != nil {
 		return err
 	}
 
@@ -323,8 +319,23 @@ func UnmarshalStake(r *bytes.Buffer, tx *transactions.Stake) error {
 		return err
 	}
 
-	tx.PubKeyEd = make([]byte, 32)
-	if err := encoding.Read256(r, tx.PubKeyEd); err != nil {
+	if err := encoding.ReadVarBytes(r, &tx.PubKeyBLS); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UnmarshalLegacyStake is Deprecated. It is used solely to allow reutilization
+// and parsing of the legacy Genesis Block
+func UnmarshalLegacyStake(r *bytes.Buffer, tx *transactions.Stake) error {
+	err := UnmarshalTimelock(r, tx.Timelock)
+	if err != nil {
+		return err
+	}
+
+	edwardField := make([]byte, 32)
+	if err := encoding.Read256(r, edwardField); err != nil {
 		return err
 	}
 

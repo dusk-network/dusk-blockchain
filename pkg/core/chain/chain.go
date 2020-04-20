@@ -3,7 +3,6 @@ package chain
 import (
 	"bytes"
 	"errors"
-	"math/big"
 	"time"
 
 	"encoding/binary"
@@ -11,9 +10,7 @@ import (
 	"sync"
 
 	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -22,30 +19,56 @@ import (
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"golang.org/x/crypto/ed25519"
 )
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
+
+// Verifier performs checks on the blockchain and potentially new incoming block
+type Verifier interface {
+	// PerformSanityCheck on first N blocks and M last blocks
+	PerformSanityCheck(uint64, uint64, uint64) error
+	// CheckBlock will verify whether a block is valid according to the rules of the consensus
+	CheckBlock(prevBlock block.Block, blk block.Block) error
+}
+
+// Loader is an interface which abstracts away the storage used by the Chain to
+// store the blockchain
+type Loader interface {
+	// LoadTip of the chain
+	LoadTip() (*block.Block, error)
+	// Clear removes everything from the DB
+	Clear() error
+	// Close the Loader and finalizes any pending connection
+	Close(string) error
+	// Height returns the current height as stored in the loader
+	Height() (uint64, error)
+	// BlockAt returns the block at a given height
+	BlockAt(uint64) (block.Block, error)
+	// Append a block on the storage
+	Append(*block.Block) error
+}
 
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
-	db       database.DB
 	p        *user.Provisioners
 	bidList  *user.BidList
 	counter  *chainsync.Counter
+
+	// loader abstracts away the persistence aspect of Block operations
+	loader Loader
+
+	// verifier performs verifications on the block
+	verifier Verifier
 
 	prevBlock block.Block
 	// protect prevBlock with mutex as it's touched out of the main chain loop
@@ -81,15 +104,14 @@ type Chain struct {
 	rebuildChainChan         <-chan rpcbus.Request
 }
 
-// New returns a new chain object
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter) (*Chain, error) {
-	_, db := heavy.CreateDBConnection()
-
-	l, err := newLoader(db)
-	if err != nil {
-		return nil, fmt.Errorf("error on loading chain db '%s' - %v", cfg.Get().Database.Dir, err)
-	}
-
+// New returns a new chain object. It accepts the EventBus (for messages coming
+// from (remote) consensus components, the RPCBus for dispatching synchronous
+// data related to Certificates, Blocks, Rounds and progress. It also accepts a
+// counter to manage the synchronization process and the hash of the genesis
+// block
+// TODO: the counter should be encapsulated in a specific component for
+// synchronization
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -123,8 +145,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 	chain := &Chain{
 		eventBus:                 eventBus,
 		rpcBus:                   rpcBus,
-		db:                       db,
-		prevBlock:                *l.chainTip,
 		p:                        user.NewProvisioners(),
 		bidList:                  &user.BidList{},
 		counter:                  counter,
@@ -136,21 +156,28 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		getRoundResultsChan:      getRoundResultsChan,
 		getSyncProgressChan:      getSyncProgressChan,
 		rebuildChainChan:         rebuildChainChan,
+		loader:                   loader,
+		verifier:                 verifier,
+	}
+
+	prevBlock, err := loader.LoadTip()
+	if err != nil {
+		return nil, err
 	}
 
 	// If the `prevBlock` is genesis, we add an empty intermediate block.
-	genesis := cfg.DecodeGenesis()
-	if bytes.Equal(chain.prevBlock.Header.Hash, genesis.Header.Hash) {
+	if prevBlock.Header.Height == 0 {
 		// TODO: maybe it would be better to have a consensus-compatible
 		// intermediate block and certificate.
 		chain.lastCertificate = block.EmptyCertificate()
-		blk, err := mockFirstIntermediateBlock(chain.prevBlock.Header)
+		blk, err := mockFirstIntermediateBlock(prevBlock.Header)
 		if err != nil {
 			return nil, err
 		}
 
 		chain.intermediateBlock = blk
 	}
+	chain.prevBlock = *prevBlock
 
 	if err := chain.restoreConsensusData(); err != nil {
 		log.WithError(err).Warnln("error in calling chain.restoreConsensusData from chain.New. The error is not propagated")
@@ -195,17 +222,6 @@ func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) {
 	copy(bid.M[:], tx.M)
 	bid.EndHeight = startHeight + tx.Lock
 	c.addBid(bid)
-}
-
-// Close the Chain DB
-func (c *Chain) Close() error {
-	log.Info("Close database")
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return err
-	}
-
-	return drvr.Close()
 }
 
 func (c *Chain) onAcceptBlock(m message.Message) error {
@@ -267,7 +283,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	l.Trace("verifying block")
 
 	// 1. Check that stateless and stateful checks pass
-	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
+	if err := c.verifier.CheckBlock(c.prevBlock, blk); err != nil {
 		l.WithError(err).Warnln("block verification failed")
 		return err
 	}
@@ -294,11 +310,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	// 4. Store block in database
 	l.Trace("storing block in db")
-	err := c.db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(&blk)
-	})
-
-	if err != nil {
+	if err := c.loader.Append(&blk); err != nil {
 		l.WithError(err).Errorln("block storing failed")
 		return err
 	}
@@ -356,7 +368,7 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight ui
 		switch tx.Type() {
 		case transactions.StakeType:
 			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake.PubKeyEd, stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
+			if err := c.addProvisioner(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
 				l.Errorf("adding provisioner failed: %s", err.Error())
 			}
 		case transactions.BidType:
@@ -376,7 +388,7 @@ func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
 	}
 	cm := r.Params.(message.Candidate)
 
-	err := verifiers.CheckBlock(c.db, *c.intermediateBlock, *cm.Block)
+	err := c.verifier.CheckBlock(*c.intermediateBlock, *cm.Block)
 	r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
 }
 
@@ -402,13 +414,7 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 // TODO: consensus data should be persisted to disk, to decrease
 // startup times
 func (c *Chain) restoreConsensusData() error {
-	var currentHeight uint64
-	err := c.db.View(func(t database.Transaction) error {
-		var err error
-		currentHeight, err = t.FetchCurrentHeight()
-		return err
-	})
-
+	currentHeight, err := c.loader.Height()
 	if err != nil {
 		log.WithError(err).Warnln("could not fetch current height from disk")
 		currentHeight = 0
@@ -420,18 +426,8 @@ func (c *Chain) restoreConsensusData() error {
 	}
 
 	for {
-		var blk *block.Block
-		err := c.db.View(func(t database.Transaction) error {
-			hash, err := t.FetchBlockHashByHeight(searchingHeight)
-			if err != nil {
-				return err
-			}
-
-			blk, err = t.FetchBlock(hash)
-			return err
-		})
-
-		if err != nil {
+		blk, loadErr := c.loader.BlockAt(searchingHeight)
+		if loadErr != nil {
 			log.WithError(err).Debugln("cannot fetch hash by heigth, quitting restoreConsensusData routine")
 			break
 		}
@@ -442,7 +438,7 @@ func (c *Chain) restoreConsensusData() error {
 				// Only add them if their stake is still valid
 				if searchingHeight+t.Lock > currentHeight {
 					amount := t.Outputs[0].EncryptedAmount.BigInt().Uint64()
-					if err := c.addProvisioner(t.PubKeyEd, t.PubKeyBLS, amount, searchingHeight+2, searchingHeight+t.Lock); err != nil {
+					if err := c.addProvisioner(t.PubKeyBLS, amount, searchingHeight+2, searchingHeight+t.Lock); err != nil {
 						return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
 					}
 				}
@@ -481,11 +477,7 @@ func (c *Chain) removeExpiredProvisioners(round uint64) {
 }
 
 // addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
-func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
-	if len(pubKeyEd) != 32 {
-		return fmt.Errorf("public key is %v bytes long instead of 32", len(pubKeyEd))
-	}
-
+func (c *Chain) addProvisioner(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
 	if len(pubKeyBLS) != 129 {
 		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
@@ -504,7 +496,6 @@ func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, startHeight, 
 	// This is a new provisioner, so let's initialize the Member struct and add them to the list
 	c.p.Set.Insert(pubKeyBLS)
 	m := &user.Member{}
-	m.PublicKeyEd = ed25519.PublicKey(pubKeyEd)
 
 	m.PublicKeyBLS = pubKeyBLS
 	m.AddStake(stake)
@@ -637,7 +628,7 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 			cm := m.Payload().(message.Candidate)
 
 			// Check block and certificate for correctness
-			if err := verifiers.CheckBlock(c.db, c.prevBlock, *cm.Block); err != nil {
+			if err := c.verifier.CheckBlock(c.prevBlock, *cm.Block); err != nil {
 				continue
 			}
 
@@ -726,49 +717,6 @@ func (c *Chain) provideSyncProgress(r rpcbus.Request) {
 	r.RespChan <- rpcbus.NewResponse(&node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil)
 }
 
-// mocks an intermediate block with a coinbase attributed to a standard
-// address. For use only when bootstrapping the network.
-func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, error) {
-	blk := block.NewBlock()
-	blk.Header.Seed = make([]byte, 33)
-	blk.Header.Height = 1
-	// Something above the genesis timestamp
-	blk.Header.Timestamp = 1570000000
-	blk.SetPrevBlock(prevBlockHeader)
-
-	tx := mockDeterministicCoinbase()
-	blk.AddTx(tx)
-	root, err := blk.CalculateRoot()
-	if err != nil {
-		return nil, err
-	}
-	blk.Header.TxRoot = root
-
-	hash, err := blk.CalculateHash()
-	if err != nil {
-		return nil, err
-	}
-	blk.Header.Hash = hash
-
-	return blk, nil
-}
-
-func mockDeterministicCoinbase() transactions.Transaction {
-	seed := make([]byte, 32)
-
-	keyPair := key.NewKeyPair(seed)
-	tx := transactions.NewCoinbase(make([]byte, 32), make([]byte, 32), 2)
-	var r ristretto.Scalar
-	r.SetZero()
-	tx.SetTxPubKey(r)
-
-	var reward ristretto.Scalar
-	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
-
-	_ = tx.AddReward(*keyPair.PublicKey(), reward)
-	return tx
-}
-
 func (c *Chain) rebuild(r rpcbus.Request) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -779,10 +727,7 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 
 	// Remove EVERYTHING from the database. This includes the genesis
 	// block, so we need to add it afterwards.
-	err := c.db.Update(func(t database.Transaction) error {
-		return t.ClearDatabase()
-	})
-	if err != nil {
+	if err := c.loader.Clear(); err != nil {
 		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, err)
 		return
 	}
@@ -791,13 +736,17 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 	// state is unrecoverable, as it deems the node totally useless.
 	// Therefore, any error encountered from now on is answered by
 	// a panic.
-
-	// Load genesis into database and set the chain tip
-	l, err := newLoader(c.db)
-	if err != nil {
-		log.Panic(err)
+	var tipErr error
+	var tip *block.Block
+	tip, tipErr = c.loader.LoadTip()
+	if tipErr != nil {
+		log.Panic(tipErr)
 	}
-	c.prevBlock = *l.chainTip
+
+	c.prevBlock = *tip
+	if unrecoverable := c.verifier.PerformSanityCheck(0, SanityCheckHeight, 0); unrecoverable != nil {
+		log.Panic(unrecoverable)
+	}
 
 	// Reset in-memory values
 	if err := c.resetState(); err != nil {

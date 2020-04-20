@@ -41,8 +41,6 @@ func TestDeterministicKeyGen(t *testing.T) {
 	}
 
 	assert.Equal(t, firstKeyPair.BLSPubKeyBytes, secondKeyPair.BLSPubKeyBytes)
-	assert.Equal(t, firstKeyPair.EdPubKeyBytes, secondKeyPair.EdPubKeyBytes)
 	assert.Equal(t, firstKeyPair.BLSSecretKey, secondKeyPair.BLSSecretKey)
-	assert.Equal(t, firstKeyPair.EdSecretKey, secondKeyPair.EdSecretKey)
 
 }
