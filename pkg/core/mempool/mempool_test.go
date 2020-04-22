@@ -92,7 +92,7 @@ func TestMain(m *testing.M) {
 	}(streamer, c)
 
 	// initiate a mempool with custom verification function
-	c.m = NewMempool(c.bus, c.rpcBus, verifyFunc)
+	c.m = NewMempool(c.bus, c.rpcBus, verifyFunc, nil)
 	c.m.Run()
 
 	code := m.Run()
