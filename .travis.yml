@@ -34,6 +34,7 @@ matrix:
       after_success:
         - bash <(curl -s https://codecov.io/bash)
 
-    - name: "Test Harness"
-      script:
-        - make test-harness-ci
+# Test Harness is disabled until refactor is completed
+#    - name: "Test Harness"
+#      script:
+#        - make test-harness-ci
