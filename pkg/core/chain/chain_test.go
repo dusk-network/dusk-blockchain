@@ -2,6 +2,7 @@ package chain
 
 import (
 	"bytes"
+	"context"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -372,9 +374,8 @@ func TestRebuildChain(t *testing.T) {
 	}
 
 	// Now, send a request to rebuild the chain
-	if _, err := rb.Call(topics.RebuildChain, rpcbus.NewRequest(bytes.Buffer{}), 5*time.Second); err != nil {
-		t.Fatal(err)
-	}
+	_, err := c.RebuildChain(context.Background(), &node.EmptyRequest{})
+	assert.NoError(t, err)
 
 	// We should be back at the genesis chain state
 	assert.True(t, genesis.Equals(&c.prevBlock))
