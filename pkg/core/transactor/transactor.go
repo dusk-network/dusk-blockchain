@@ -1,183 +1,96 @@
 package transactor
 
 import (
-	"errors"
+	"context"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	zkproof "github.com/dusk-network/dusk-zkproof"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"google.golang.org/grpc"
 )
 
 //nolint
 type Transactor struct { // TODO: rename
-	w                 *wallet.Wallet
-	db                database.DB
-	eb                *eventbus.EventBus
-	rb                *rpcbus.RPCBus
-	fetchDecoys       transactions.FetchDecoys
-	fetchInputs       wallet.FetchInputs
-	walletOnly        bool
-	maintainerStarted bool
+	db database.DB
+	eb *eventbus.EventBus
 
 	// Passed to the consensus component startup
-	c                 *chainsync.Counter
-	acceptedBlockChan <-chan block.Block
+	// c                 *chainsync.Counter
+	// acceptedBlockChan <-chan block.Block
 
-	// rpcbus channels
-	createWalletChan          chan rpcbus.Request
-	createFromSeedChan        chan rpcbus.Request
-	loadWalletChan            chan rpcbus.Request
-	sendBidTxChan             chan rpcbus.Request
-	sendStakeTxChan           chan rpcbus.Request
-	sendStandardTxChan        chan rpcbus.Request
-	getBalanceChan            chan rpcbus.Request
-	getUnconfirmedBalanceChan chan rpcbus.Request
-	getAddressChan            chan rpcbus.Request
-	getTxHistoryChan          chan rpcbus.Request
-	automateConsensusTxsChan  chan rpcbus.Request
-	isWalletLoadedChan        chan rpcbus.Request
-	clearWalletDatabaseChan   chan rpcbus.Request
+	grpcClient rusk.RuskClient
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
-	counter *chainsync.Counter, fdecoys transactions.FetchDecoys,
-	finputs wallet.FetchInputs, walletOnly bool) (*Transactor, error) {
+func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client rusk.RuskClient) *Transactor {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
 
 	t := &Transactor{
-		w:           nil,
-		db:          db,
-		eb:          eb,
-		rb:          rb,
-		c:           counter,
-		fetchDecoys: fdecoys,
-		fetchInputs: finputs,
-		walletOnly:  walletOnly,
-
-		createWalletChan:          make(chan rpcbus.Request, 1),
-		createFromSeedChan:        make(chan rpcbus.Request, 1),
-		loadWalletChan:            make(chan rpcbus.Request, 1),
-		sendBidTxChan:             make(chan rpcbus.Request, 1),
-		sendStakeTxChan:           make(chan rpcbus.Request, 1),
-		sendStandardTxChan:        make(chan rpcbus.Request, 1),
-		getBalanceChan:            make(chan rpcbus.Request, 1),
-		getUnconfirmedBalanceChan: make(chan rpcbus.Request, 1),
-		getAddressChan:            make(chan rpcbus.Request, 1),
-		getTxHistoryChan:          make(chan rpcbus.Request, 1),
-		automateConsensusTxsChan:  make(chan rpcbus.Request, 1),
-		isWalletLoadedChan:        make(chan rpcbus.Request, 1),
-		clearWalletDatabaseChan:   make(chan rpcbus.Request, 1),
+		db: db,
+		eb: eb,
+		// c:           counter,
+		grpcClient: client,
 	}
 
-	if t.fetchDecoys == nil {
-		t.fetchDecoys = fetchDecoys
+	if srv != nil {
+		node.RegisterWalletServer(srv, t)
+		node.RegisterTransactorServer(srv, t)
 	}
-
-	if t.fetchInputs == nil {
-		t.fetchInputs = fetchInputs
-	}
-
-	err := t.registerMethods()
-	if err != nil {
-		return nil, err
-	}
-
-	// topics.AcceptedBlock will be published by Chain subsystem when new block is accepted into blockchain
-	t.acceptedBlockChan, _ = consensus.InitAcceptedBlockUpdate(eb)
-	return t, err
+	return t
 }
 
-// registers all rpcBus channels
-func (t *Transactor) registerMethods() error {
-	if err := t.rb.Register(topics.LoadWallet, t.loadWalletChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.CreateWallet, t.createWalletChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.CreateFromSeed, t.createFromSeedChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.SendBidTx, t.sendBidTxChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.SendStakeTx, t.sendStakeTxChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.SendStandardTx, t.sendStandardTxChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.GetBalance, t.getBalanceChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.GetUnconfirmedBalance, t.getUnconfirmedBalanceChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.GetAddress, t.getAddressChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.GetTxHistory, t.getTxHistoryChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.AutomateConsensusTxs, t.automateConsensusTxsChan); err != nil {
-		return err
-	}
-
-	if err := t.rb.Register(topics.IsWalletLoaded, t.isWalletLoadedChan); err != nil {
-		return err
-	}
-
-	return t.rb.Register(topics.ClearWalletDatabase, t.clearWalletDatabaseChan)
+func (t *Transactor) GetTxHistory(ctx context.Context, e *node.EmptyRequest) (*node.TxHistoryResponse, error) {
+	return t.handleGetTxHistory()
 }
 
-// Wallet return wallet instance and err
-func (t *Transactor) Wallet() (*wallet.Wallet, error) {
-	if t.w == nil {
-		return nil, errWalletNotLoaded
-	}
-
-	return t.w, nil
+// CreateWallet creates a new wallet from a password or seed
+func (t *Transactor) CreateWallet(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
+	return t.handleCreateWallet(c)
 }
 
-func (t *Transactor) launchMaintainer() error {
-	if t.w == nil {
-		return errWalletNotLoaded
-	}
+// LoadWallet from a password
+func (t *Transactor) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node.LoadResponse, error) {
+	return t.handleLoadWallet(l)
+}
 
-	if t.maintainerStarted {
-		return errors.New("consensus transactions are already being automated")
-	}
+// CreateFromSeed creates a wallet from a seed
+func (t *Transactor) CreateFromSeed(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
+	return t.handleCreateFromSeed(c)
+}
 
-	k, err := t.w.ReconstructK()
-	if err != nil {
-		return err
-	}
+func (t *Transactor) ClearWalletDatabase(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
+	return t.handleClearWalletDatabase()
+}
 
-	log.Infof("maintainer is starting")
-	m := maintainer.New(t.eb, t.rb, t.w.Keys().BLSPubKeyBytes, zkproof.CalculateM(k))
-	go m.Listen()
-	t.maintainerStarted = true
-	return nil
+func (t *Transactor) CallContract(ctx context.Context, c *node.CallContractRequest) (*node.TransactionResponse, error) {
+	// TODO: implement
+	return nil, nil
+}
+
+func (t *Transactor) Transfer(ctx context.Context, tr *node.TransferRequest) (*node.TransactionResponse, error) {
+	return t.handleSendStandardTx(tr)
+}
+
+func (t *Transactor) Bid(ctx context.Context, c *node.BidRequest) (*node.TransactionResponse, error) {
+	return t.handleSendBidTx(c)
+}
+
+func (t *Transactor) Stake(ctx context.Context, c *node.StakeRequest) (*node.TransactionResponse, error) {
+	return t.handleSendStakeTx(c)
+}
+
+func (t *Transactor) GetWalletStatus(ctx context.Context, e *node.EmptyRequest) (*node.WalletStatusResponse, error) {
+	return t.handleIsWalletLoaded()
+}
+
+func (t *Transactor) GetAddress(ctx context.Context, e *node.EmptyRequest) (*node.LoadResponse, error) {
+	return t.handleAddress()
+}
+
+func (t *Transactor) GetBalance(ctx context.Context, e *node.EmptyRequest) (*node.BalanceResponse, error) {
+	return t.handleBalance()
 }
