@@ -685,6 +685,8 @@ func (c *Chain) provideRoundResults(r rpcbus.Request) {
 	r.RespChan <- rpcbus.NewResponse(*buf, nil)
 }
 
+// GetSyncProgress returns how close the node is to being sycned to the tip,
+// as a percentage value.
 func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
 	if c.highestSeen == 0 {
 		return &node.SyncProgressResponse{Progress: 0}, nil
@@ -706,6 +708,8 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 	return &node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil
 }
 
+// RebuildChain will delete all blocks except for the genesis block,
+// to allow for a full re-sync.
 func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

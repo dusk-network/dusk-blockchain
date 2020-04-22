@@ -10,6 +10,9 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+// SetupgRPCServer will create a new gRPC server with the correct authentication
+// and TLS settings. This server can then be used to register services.
+// Note that the server still needs to be turned on (`Serve`).
 func SetupgRPCServer() (*grpc.Server, error) {
 	conf := config.Get().RPC
 

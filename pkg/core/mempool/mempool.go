@@ -401,6 +401,7 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 	return outputTxs, err
 }
 
+// SelectTx will return a view of the mempool, with optional filters applied.
 func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {
 	txs := make([]transactions.Transaction, 0)
 	switch {
@@ -438,6 +439,8 @@ func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.S
 	return resp, nil
 }
 
+// GetUnconfirmedBalance will return the amount of DUSK that is in the mempool
+// for a given key.
 // TODO: implement
 func (m Mempool) GetUnconfirmedBalance(ctx context.Context, req *node.EmptyRequest) (*node.BalanceResponse, error) {
 	return nil, nil

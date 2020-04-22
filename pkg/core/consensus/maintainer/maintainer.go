@@ -67,6 +67,7 @@ func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m
 	return a
 }
 
+// AutomateConsensusTxs will automate the sending of stakes and bids.
 func (m *StakeAutomaton) AutomateConsensusTxs(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	if !m.running {
 		m.running = true

@@ -9,12 +9,13 @@ import (
 )
 
 var (
-	log = logger.WithFields(logger.Fields{"prefix": "transactor"})
+	log = logger.WithFields(logger.Fields{"prefix": "transactor"}) //nolint
 
-	errWalletNotLoaded     = errors.New("wallet is not loaded yet")
-	errWalletAlreadyLoaded = errors.New("wallet is already loaded")
+	errWalletNotLoaded     = errors.New("wallet is not loaded yet") //nolint
+	errWalletAlreadyLoaded = errors.New("wallet is already loaded") //nolint
 )
 
+//nolint
 func loadResponse(pubKey []byte) *node.LoadResponse {
 	pk := &node.PubKey{PublicKey: pubKey}
 	return &node.LoadResponse{Key: pk}
@@ -194,15 +195,6 @@ func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
 	return nil, nil
 }
 
-func (t *Transactor) handleAutomateConsensusTxs() (*node.GenericResponse, error) {
-	// if err := t.launchMaintainer(); err != nil {
-	// 	return nil, err
-	// }
-
-	// return &node.GenericResponse{Response: "Consensus transactions are now being automated."}, nil
-	return nil, nil
-}
-
 func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) {
 	// if t.w == nil {
 	// 	if err := os.RemoveAll(cfg.Get().Wallet.Store); err != nil {
@@ -225,6 +217,7 @@ func (t *Transactor) handleIsWalletLoaded() (*node.WalletStatusResponse, error) 
 	return nil, nil
 }
 
+//nolint:unused
 func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	// hash, err := tx.CalculateHash()
 	// if err != nil {
@@ -242,6 +235,7 @@ func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	return nil, nil
 }
 
+//nolint:unused
 func (t *Transactor) launchConsensus() {
 	// if !t.walletOnly {
 	// 	log.Tracef("Launch consensus")
@@ -249,6 +243,7 @@ func (t *Transactor) launchConsensus() {
 	// }
 }
 
+//nolint:unused
 func (t *Transactor) writeBidValues(tx transactions.Transaction) error {
 	// return t.db.Update(func(tr database.Transaction) error {
 	// 	k, err := t.w.ReconstructK()
