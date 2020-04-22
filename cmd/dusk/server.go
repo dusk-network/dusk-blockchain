@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
@@ -30,26 +31,26 @@ var logServer = logrus.WithField("process", "server")
 
 // Server is the main process of the node
 type Server struct {
-	eventBus   *eventbus.EventBus
-	rpcBus     *rpcbus.RPCBus
-	loader     chain.Loader
-	dupeMap    *dupemap.DupeMap
-	counter    *chainsync.Counter
-	gossip     *processing.Gossip
-	rpcWrapper *rpc.SrvWrapper
-	// rpcClient     *rpc.Client
+	eventBus      *eventbus.EventBus
+	rpcBus        *rpcbus.RPCBus
+	loader        chain.Loader
+	dupeMap       *dupemap.DupeMap
+	counter       *chainsync.Counter
+	gossip        *processing.Gossip
+	grpcServer    *grpc.Server
+	rpcClient     *rpc.Client
 	cancelMonitor StopFunc
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter) (chain.Loader, error) {
+func LaunchChain(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server) (chain.Loader, error) {
 	// creating and firing up the chain process
 	genesis := cfg.DecodeGenesis()
 	_, db := heavy.CreateDBConnection()
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(eventBus, rpcBus, counter, l, l)
+	chainProcess, err := chain.New(eventBus, rpcBus, counter, l, l, srv)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +70,11 @@ func LaunchChain(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *ch
 // and launches a monitor client (if configuration demands it), and inits the
 // Stake and Blind Bid channels
 func Setup() *Server {
+	grpcServer, err := rpc.SetupgRPCServer()
+	if err != nil {
+		log.Panic(err)
+	}
+
 	// creating the eventbus
 	eventBus := eventbus.New()
 
@@ -77,11 +83,14 @@ func Setup() *Server {
 	// creating the rpcbus
 	rpcBus := rpcbus.New()
 
-	m := mempool.NewMempool(eventBus, rpcBus, nil)
+	// Instantiate gRPC client
+	// TODO: get address from config
+	client := rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
+
+	m := mempool.NewMempool(eventBus, rpcBus, nil, grpcServer)
 	m.Run()
 
-	chainDBLoader, err := LaunchChain(eventBus, rpcBus, counter)
-
+	chainDBLoader, err := LaunchChain(eventBus, rpcBus, counter, grpcServer)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -92,16 +101,6 @@ func Setup() *Server {
 
 	// Setting up a dupemap
 	dupeBlacklist := launchDupeMap(eventBus)
-
-	// Instantiate gRPC server
-	rpcWrapper, err := rpc.StartgRPCServer(rpcBus)
-	if err != nil {
-		log.WithError(err).Errorln("could not start gRPC server")
-	}
-
-	// Instantiate gRPC client
-	// TODO: get address from config
-	// client := rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
 
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
@@ -122,16 +121,15 @@ func Setup() *Server {
 		dupeMap:    dupeBlacklist,
 		counter:    counter,
 		gossip:     processing.NewGossip(protocol.TestNet),
-		rpcWrapper: rpcWrapper,
-		// rpcClient:  client,
+		grpcServer: grpcServer,
+		rpcClient:  client,
 	}
 
 	// Setting up the transactor component
-	transactorComponent, err := transactor.New(eventBus, rpcBus, nil, srv.counter, nil, nil, cfg.Get().General.WalletOnly)
+	_ = transactor.New(eventBus, nil, grpcServer, client)
 	if err != nil {
 		log.Panic(err)
 	}
-	go transactorComponent.Listen()
 
 	// Connecting to the log based monitoring system
 	stopFunc, err := LaunchMonitor(eventBus)
@@ -139,6 +137,22 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 	srv.cancelMonitor = stopFunc
+
+	// Start serving from the gRPC server
+	go func() {
+		conf := cfg.Get().RPC
+		l, err := net.Listen(conf.Network, conf.Address)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		log.WithField("net", conf.Network).
+			WithField("addr", conf.Address).Infof("gRPC HTTP server listening")
+
+		if err := grpcServer.Serve(l); err != nil {
+			log.WithError(err).Warn("Serve returned err")
+		}
+	}()
 
 	return srv
 }
@@ -204,7 +218,7 @@ func (s *Server) Close() {
 	// TODO: disconnect peers
 	_ = s.loader.Close(cfg.Get().Database.Driver)
 	s.rpcBus.Close()
-	s.rpcWrapper.Shutdown()
-	// _ = s.rpcClient.Close()
+	s.grpcServer.GracefulStop()
+	_ = s.rpcClient.Close()
 	s.cancelMonitor()
 }
