@@ -2,6 +2,7 @@ package maintainer
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 
 	"github.com/bwesterb/go-ristretto"
@@ -15,9 +16,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 var l = log.WithField("process", "StakeAutomaton")
+
+// TODO: Logic needs to be adjusted to work with Rusk
 
 // The StakeAutomaton is a process that keeps note of when certain consensus transactions
 // expire, and makes sure the node remains within the bidlist/committee, when those
@@ -34,6 +38,8 @@ type StakeAutomaton struct {
 
 	bidEndHeight   uint64
 	stakeEndHeight uint64
+
+	running bool
 }
 
 // How many blocks away from expiration the transactions should be
@@ -43,8 +49,8 @@ const renewalOffset = 100
 // New creates a new instance of StakeAutomaton that is used to automate the
 // resending of stakes and alleviate the burden for a user to having to
 // manually manage restaking
-func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar) *StakeAutomaton {
-	return &StakeAutomaton{
+func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar, srv *grpc.Server) *StakeAutomaton {
+	a := &StakeAutomaton{
 		eventBroker:    eventBroker,
 		rpcBus:         rpcBus,
 		roundChan:      consensus.InitRoundUpdate(eventBroker),
@@ -52,7 +58,22 @@ func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m
 		m:              m,
 		bidEndHeight:   1,
 		stakeEndHeight: 1,
+		running:        false,
 	}
+
+	if srv != nil {
+		node.RegisterMaintainerServer(srv, a)
+	}
+	return a
+}
+
+func (m *StakeAutomaton) AutomateConsensusTxs(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
+	if !m.running {
+		m.running = true
+		go m.Listen()
+	}
+
+	return &node.GenericResponse{Response: "Maintainer started, consensus transactions are now being automated"}, nil
 }
 
 // Listen to round updates and takes the proper decision Stake-wise

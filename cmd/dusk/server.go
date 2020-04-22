@@ -131,6 +131,8 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
+	// TODO: maintainer should be started here
+
 	// Connecting to the log based monitoring system
 	stopFunc, err := LaunchMonitor(eventBus)
 	if err != nil {
