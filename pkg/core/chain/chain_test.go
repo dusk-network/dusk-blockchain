@@ -196,7 +196,7 @@ func TestFetchTip(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	loader := createLoader()
-	chain, err := New(eb, rpc, nil, loader, &MockVerifier{})
+	chain, err := New(eb, rpc, nil, loader, &MockVerifier{}, nil)
 
 	assert.Nil(t, err)
 
@@ -218,7 +218,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	chain, err := New(eb, rpc, counter, createLoader(), &MockVerifier{})
+	chain, err := New(eb, rpc, counter, createLoader(), &MockVerifier{}, nil)
 	assert.Nil(t, err)
 
 	// Add some provisioners to our chain, including one that is just about to expire
@@ -249,7 +249,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 func TestAddAndRemoveBid(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	c, err := New(eb, rpc, nil, createLoader(), &MockVerifier{})
+	c, err := New(eb, rpc, nil, createLoader(), &MockVerifier{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +443,7 @@ func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpc
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
 	loader := createLoader()
-	c, err := New(eb, rpc, counter, loader, &MockVerifier{})
+	c, err := New(eb, rpc, counter, loader, &MockVerifier{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
