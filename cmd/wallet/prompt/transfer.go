@@ -10,7 +10,7 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-func transferDusk(client node.NodeClient) (*node.TransferResponse, error) {
+func transferDusk(client node.TransactorClient) (*node.TransactionResponse, error) {
 	amount := getAmount()
 
 	validateAddress := func(input string) error {
@@ -36,16 +36,18 @@ func transferDusk(client node.NodeClient) (*node.TransferResponse, error) {
 	return client.Transfer(context.Background(), &node.TransferRequest{Amount: amount, Address: []byte(address)})
 }
 
-func bidDusk(client node.NodeClient) (*node.TransferResponse, error) {
+func bidDusk(client node.TransactorClient) (*node.TransactionResponse, error) {
 	amount := getAmount()
 	lockTime := getLockTime()
-	return client.SendBid(context.Background(), &node.ConsensusTxRequest{Amount: amount, LockTime: lockTime})
+	// TODO: parameterize fee
+	return client.Bid(context.Background(), &node.BidRequest{Amount: amount, Fee: 100, Locktime: lockTime})
 }
 
-func stakeDusk(client node.NodeClient) (*node.TransferResponse, error) {
+func stakeDusk(client node.TransactorClient) (*node.TransactionResponse, error) {
 	amount := getAmount()
 	lockTime := getLockTime()
-	return client.SendStake(context.Background(), &node.ConsensusTxRequest{Amount: amount, LockTime: lockTime})
+	// TODO: parameterize fee
+	return client.Stake(context.Background(), &node.StakeRequest{Amount: amount, Fee: 100, Locktime: lockTime})
 }
 
 func getAmount() uint64 {

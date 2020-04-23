@@ -93,7 +93,7 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 		_ = conn.Close()
 	}()
 
-	client := pb.NewNodeClient(conn)
+	client := pb.NewWalletClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
@@ -120,12 +120,12 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 		_ = conn.Close()
 	}()
 
-	client := pb.NewNodeClient(conn)
+	client := pb.NewTransactorClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	req := pb.ConsensusTxRequest{Amount: amount, LockTime: locktime}
-	resp, err := client.SendBid(ctx, &req)
+	req := pb.BidRequest{Amount: amount}
+	resp, err := client.Bid(ctx, &req)
 	if err != nil {
 		return nil, err
 	}

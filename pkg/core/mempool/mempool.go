@@ -2,6 +2,7 @@ package mempool
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	logger "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 var log = logger.WithFields(logger.Fields{"prefix": "mempool"})
@@ -47,7 +49,6 @@ var (
 type Mempool struct {
 	getMempoolTxsChan       <-chan rpcbus.Request
 	getMempoolTxsBySizeChan <-chan rpcbus.Request
-	getMempoolViewChan      <-chan rpcbus.Request
 	sendTxChan              <-chan rpcbus.Request
 
 	// transactions emitted by RPC and Peer subsystems
@@ -93,7 +94,7 @@ func (m *Mempool) checkTx(tx transactions.Transaction) error {
 }
 
 // NewMempool instantiates and initializes node mempool
-func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx func(tx transactions.Transaction) error) *Mempool {
+func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx func(tx transactions.Transaction) error, srv *grpc.Server) *Mempool {
 
 	log.Infof("Create instance")
 
@@ -105,11 +106,6 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 	getMempoolTxsBySizeChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetMempoolTxsBySize, getMempoolTxsBySizeChan); err != nil {
 		log.Errorf("rpcbus.getMempoolTxsBySize err=%v", err)
-	}
-
-	getMempoolViewChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(topics.GetMempoolView, getMempoolViewChan); err != nil {
-		log.WithError(err).Errorf("error registering getMempoolView")
 	}
 
 	sendTxChan := make(chan rpcbus.Request, 1)
@@ -128,7 +124,6 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 		acceptedBlockChan:       acceptedBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
-		getMempoolViewChan:      getMempoolViewChan,
 		sendTxChan:              sendTxChan,
 	}
 
@@ -144,6 +139,10 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 	m.pending = make(chan TxDesc, maxPendingLen)
 	l := eventbus.NewCallbackListener(m.CollectPending)
 	m.txSubscriberID = m.eventBus.Subscribe(topics.Tx, l)
+
+	if srv != nil {
+		node.RegisterMempoolServer(srv, m)
+	}
 	return m
 }
 
@@ -164,8 +163,6 @@ func (m *Mempool) Run() {
 				handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
 			case r := <-m.getMempoolTxsBySizeChan:
 				handleRequest(r, m.processGetMempoolTxsBySizeRequest, "GetMempoolTxsBySize")
-			case r := <-m.getMempoolViewChan:
-				handleRequest(r, m.processGetMempoolViewRequest, "GetMempoolView")
 			// Mempool input channels
 			case b := <-m.intermediateBlockChan:
 				m.onBlock(b)
@@ -404,21 +401,21 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 	return outputTxs, err
 }
 
-func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, error) {
+// SelectTx will return a view of the mempool, with optional filters applied.
+func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {
 	txs := make([]transactions.Transaction, 0)
-	req := r.Params.(*node.SelectRequest)
 	switch {
 	case len(req.Id) == 64:
 		// If we want a tx with a certain ID, we can simply look it up
 		// directly
 		hash, err := hex.DecodeString(req.Id)
 		if err != nil {
-			return bytes.Buffer{}, err
+			return nil, err
 		}
 
 		tx := m.verified.Get(hash)
 		if tx == nil {
-			return bytes.Buffer{}, errors.New("tx not found")
+			return nil, errors.New("tx not found")
 		}
 
 		txs = append(txs, tx)
@@ -440,6 +437,13 @@ func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, er
 	}
 
 	return resp, nil
+}
+
+// GetUnconfirmedBalance will return the amount of DUSK that is in the mempool
+// for a given key.
+// TODO: implement
+func (m Mempool) GetUnconfirmedBalance(ctx context.Context, req *node.EmptyRequest) (*node.BalanceResponse, error) {
+	return nil, nil
 }
 
 // processGetMempoolTxsBySizeRequest returns a subset of verified mempool txs which

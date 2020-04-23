@@ -2,6 +2,7 @@ package chain
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -100,8 +102,6 @@ type Chain struct {
 	verifyCandidateBlockChan <-chan rpcbus.Request
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
-	getSyncProgressChan      <-chan rpcbus.Request
-	rebuildChainChan         <-chan rpcbus.Request
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -111,7 +111,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier) (*Chain, error) {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -121,8 +121,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
 	getLastCertificateChan := make(chan rpcbus.Request, 1)
 	getRoundResultsChan := make(chan rpcbus.Request, 1)
-	getSyncProgressChan := make(chan rpcbus.Request, 1)
-	rebuildChainChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetLastBlock, getLastBlockChan); err != nil {
 		return nil, err
 	}
@@ -133,12 +131,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		return nil, err
 	}
 	if err := rpcBus.Register(topics.GetRoundResults, getRoundResultsChan); err != nil {
-		return nil, err
-	}
-	if err := rpcBus.Register(topics.GetSyncProgress, getSyncProgressChan); err != nil {
-		return nil, err
-	}
-	if err := rpcBus.Register(topics.RebuildChain, rebuildChainChan); err != nil {
 		return nil, err
 	}
 
@@ -154,8 +146,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
 		getLastCertificateChan:   getLastCertificateChan,
 		getRoundResultsChan:      getRoundResultsChan,
-		getSyncProgressChan:      getSyncProgressChan,
-		rebuildChainChan:         rebuildChainChan,
 		loader:                   loader,
 		verifier:                 verifier,
 	}
@@ -183,6 +173,10 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		log.WithError(err).Warnln("error in calling chain.restoreConsensusData from chain.New. The error is not propagated")
 	}
 
+	if srv != nil {
+		node.RegisterChainServer(srv, chain)
+	}
+
 	// Hook the chain up to the required topics
 	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
 	eventBus.Subscribe(topics.Block, cbListener)
@@ -207,10 +201,6 @@ func (c *Chain) Listen() {
 			c.provideLastCertificate(r)
 		case r := <-c.getRoundResultsChan:
 			c.provideRoundResults(r)
-		case r := <-c.getSyncProgressChan:
-			c.provideSyncProgress(r)
-		case r := <-c.rebuildChainChan:
-			c.rebuild(r)
 		}
 	}
 }
@@ -695,10 +685,11 @@ func (c *Chain) provideRoundResults(r rpcbus.Request) {
 	r.RespChan <- rpcbus.NewResponse(*buf, nil)
 }
 
-func (c *Chain) provideSyncProgress(r rpcbus.Request) {
+// GetSyncProgress returns how close the node is to being sycned to the tip,
+// as a percentage value.
+func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
 	if c.highestSeen == 0 {
-		r.RespChan <- rpcbus.NewResponse(&node.SyncProgressResponse{Progress: 0}, nil)
-		return
+		return &node.SyncProgressResponse{Progress: 0}, nil
 	}
 
 	c.mu.RLock()
@@ -714,10 +705,12 @@ func (c *Chain) provideSyncProgress(r rpcbus.Request) {
 		progressPercentage = 100
 	}
 
-	r.RespChan <- rpcbus.NewResponse(&node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil)
+	return &node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil
 }
 
-func (c *Chain) rebuild(r rpcbus.Request) {
+// RebuildChain will delete all blocks except for the genesis block,
+// to allow for a full re-sync.
+func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -728,8 +721,7 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 	// Remove EVERYTHING from the database. This includes the genesis
 	// block, so we need to add it afterwards.
 	if err := c.loader.Clear(); err != nil {
-		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, err)
-		return
+		return nil, err
 	}
 
 	// Note that, beyond this point, an error in reconstructing our
@@ -758,7 +750,7 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 		log.Panic(err)
 	}
 
-	r.RespChan <- rpcbus.NewResponse(&node.GenericResponse{Response: "Blockchain deleted. Syncing from scratch..."}, nil)
+	return &node.GenericResponse{Response: "Blockchain deleted. Syncing from scratch..."}, nil
 }
 
 func (c *Chain) resetState() error {

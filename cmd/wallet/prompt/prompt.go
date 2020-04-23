@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/cmd/wallet/conf"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	"github.com/manifoldco/promptui"
 )
 
 // LoadMenu opens the prompt for loading a wallet.
-func LoadMenu(client node.NodeClient) error {
+func LoadMenu(client node.WalletClient) error {
 
 	prompt := promptui.Select{
 		Label: "Select action",
@@ -49,10 +50,10 @@ func LoadMenu(client node.NodeClient) error {
 }
 
 // WalletMenu opens the prompt for doing wallet operations.
-func WalletMenu(client node.NodeClient) error {
+func WalletMenu(client *conf.NodeClient) error {
 	for {
 		// Get sync progress first and print it
-		resp, err := client.GetSyncProgress(context.Background(), &node.EmptyRequest{})
+		resp, err := client.ChainClient.GetSyncProgress(context.Background(), &node.EmptyRequest{})
 		if err != nil {
 			return err
 		}
@@ -72,42 +73,42 @@ func WalletMenu(client node.NodeClient) error {
 		var res string
 		switch result {
 		case "Transfer DUSK":
-			resp, err := transferDusk(client)
+			resp, err := transferDusk(client.TransactorClient)
 			if err != nil {
 				return err
 			}
 
 			res = "Tx hash: " + hex.EncodeToString(resp.Hash)
 		case "Stake DUSK":
-			resp, err := stakeDusk(client)
+			resp, err := stakeDusk(client.TransactorClient)
 			if err != nil {
 				return err
 			}
 
 			res = "Tx hash: " + hex.EncodeToString(resp.Hash)
 		case "Bid DUSK":
-			resp, err := bidDusk(client)
+			resp, err := bidDusk(client.TransactorClient)
 			if err != nil {
 				return err
 			}
 
 			res = "Tx hash: " + hex.EncodeToString(resp.Hash)
 		case "Show Balance":
-			resp, err := client.GetBalance(context.Background(), &node.EmptyRequest{})
+			resp, err := client.WalletClient.GetBalance(context.Background(), &node.EmptyRequest{})
 			if err != nil {
 				return err
 			}
 
 			res = fmt.Sprintf("Unlocked balance: %.8f\nLocked balance: %.8f\n", float64(resp.UnlockedBalance)/float64(wallet.DUSK), float64(resp.LockedBalance)/float64(wallet.DUSK))
 		case "Show Address":
-			resp, err := client.GetAddress(context.Background(), &node.EmptyRequest{})
+			resp, err := client.WalletClient.GetAddress(context.Background(), &node.EmptyRequest{})
 			if err != nil {
 				return err
 			}
 
 			res = "Address: " + string(resp.Key.PublicKey)
 		case "Show Transaction History":
-			resp, err := client.GetTxHistory(context.Background(), &node.EmptyRequest{})
+			resp, err := client.WalletClient.GetTxHistory(context.Background(), &node.EmptyRequest{})
 			if err != nil {
 				return err
 			}
@@ -115,7 +116,7 @@ func WalletMenu(client node.NodeClient) error {
 			s := formatRecords(resp)
 			res = s.String()
 		case "Automate Consensus Participation":
-			resp, err := client.AutomateConsensusTxs(context.Background(), &node.EmptyRequest{})
+			resp, err := client.MaintainerClient.AutomateConsensusTxs(context.Background(), &node.EmptyRequest{})
 			if err != nil {
 				return err
 			}

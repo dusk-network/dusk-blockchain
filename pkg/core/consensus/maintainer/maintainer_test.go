@@ -1,32 +1,6 @@
 package maintainer_test
 
-import (
-	"os"
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/bwesterb/go-ristretto"
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
-	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	zkproof "github.com/dusk-network/dusk-zkproof"
-	"github.com/stretchr/testify/assert"
-)
-
+/*
 const pass = "password"
 
 // Test that the maintainer will properly send new stake and bid transactions, when
@@ -121,10 +95,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 		return t.StoreBlock(genesisBlock)
 	}))
 
-	tr, err := transactor.New(bus, rpcBus, db, nil, wallet.GenerateDecoys, wallet.GenerateInputs, true)
-	if err != nil {
-		panic(err)
-	}
+	tr := transactor.New(bus, db, true, nil)
 	go tr.Listen()
 
 	_ = os.Remove(cfg.Get().Wallet.File)
@@ -170,3 +141,4 @@ func createWallet(rpcBus *rpcbus.RPCBus, password string) error {
 	_, err := rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(&node.CreateRequest{Password: password}), 0)
 	return err
 }
+*/

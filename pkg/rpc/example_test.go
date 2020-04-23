@@ -39,7 +39,7 @@ func TestExampleInsecureSend(t *testing.T) {
 		_ = conn.Close()
 	}()
 
-	client := pb.NewNodeClient(conn)
+	client := pb.NewWalletClient(conn)
 
 	// Request timeout param set
 	reqCtx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -98,7 +98,7 @@ func TestExampleSecureSend(t *testing.T) {
 		_ = conn.Close()
 	}()
 
-	client := pb.NewNodeClient(conn)
+	client := pb.NewWalletClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
