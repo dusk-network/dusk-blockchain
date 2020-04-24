@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -18,19 +19,21 @@ var log = logger.WithFields(logger.Fields{"prefix": "grpc"})
 // over the RPCBus.
 type Client struct {
 	rusk.RuskClient
+	node.WalletClient
+	node.TransactorClient
 	conn           *grpc.ClientConn
 	validateSTChan chan rpcbus.Request
 	executeSTChan  chan rpcbus.Request
 }
 
-// InitRuskClient opens the connection with the Rusk gRPC server, and
+// InitRPCClients opens the connection with the Rusk gRPC server, and
 // launches a goroutine which listens for RPCBus calls that concern
 // the Rusk server.
 //
 // As the Rusk server is a fundamental part of the node functionality,
 // this function will panic if the connection can not be established
 // successfully.
-func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) *Client {
+func InitRPCClients(address string, rpcBus *rpcbus.RPCBus) *Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -40,8 +43,10 @@ func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) *Client {
 	}
 
 	c := &Client{
-		RuskClient: rusk.NewRuskClient(conn),
-		conn:       conn,
+		RuskClient:       rusk.NewRuskClient(conn),
+		WalletClient:     node.NewWalletClient(conn),
+		TransactorClient: node.NewTransactorClient(conn),
+		conn:             conn,
 	}
 	if err := registerMethod(rpcBus, topics.ValidateStateTransition, &c.validateSTChan); err != nil {
 		log.Panic(err)

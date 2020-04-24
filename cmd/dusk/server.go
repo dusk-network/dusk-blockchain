@@ -85,7 +85,7 @@ func Setup() *Server {
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	client := rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
+	client := rpc.InitRPCClients("127.0.0.1:8080", rpcBus)
 
 	m := mempool.NewMempool(eventBus, rpcBus, nil, grpcServer)
 	m.Run()
