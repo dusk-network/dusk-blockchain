@@ -20,7 +20,9 @@ type Transactor struct { // TODO: rename
 	// c                 *chainsync.Counter
 	// acceptedBlockChan <-chan block.Block
 
-	grpcClient rusk.RuskClient
+	grpcClient       rusk.RuskClient
+	walletClient     node.WalletClient
+	transactorClient node.TransactorClient
 }
 
 // New Instantiate a new Transactor struct.
