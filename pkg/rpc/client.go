@@ -1,14 +1,6 @@
 package rpc
 
-import (
-	"context"
-	"time"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/phoenix"
-	"google.golang.org/grpc"
-)
+/*
 
 // Client is a wrapper for a gRPC client. It establishes connection with
 // the server on startup, and then handles requests from other components
@@ -74,3 +66,4 @@ func (c *Client) listen() {
 func (c *Client) Close() error {
 	return c.conn.Close()
 }
+*/
