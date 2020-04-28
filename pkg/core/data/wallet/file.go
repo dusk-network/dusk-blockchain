@@ -11,8 +11,8 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// Save saves the seed to a dat file
-func saveSeed(seed []byte, password string, file string) error {
+// saveEncrypted saves a []byte to a dat @file
+func saveEncrypted(text []byte, password string, file string) error {
 	// Overwriting a seed file may cause loss of funds
 	if _, err := os.Stat(file); err == nil {
 		return ErrSeedFileExists
@@ -35,11 +35,11 @@ func saveSeed(seed []byte, password string, file string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, seed, nil), 0777)
+	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, text, nil), 0777)
 }
 
-//Modified from https://tutorialedge.net/golang/go-encrypt-decrypt-aes-tutorial/
-func fetchSeed(password string, file string) ([]byte, error) {
+//fetchEncrypted load encrypted from file
+func fetchEncrypted(password string, file string) ([]byte, error) {
 
 	digest := sha3.Sum256([]byte(password))
 

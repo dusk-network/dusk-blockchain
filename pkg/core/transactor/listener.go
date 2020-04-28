@@ -3,9 +3,7 @@ package transactor
 import (
 	"context"
 	"errors"
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
+
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
@@ -55,32 +53,6 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	}}, nil
 }
 
-func (t *Transactor) createFromSeed(seedBytes []byte, password string) (*rusk.PublicKey, error) {
-	// First load the database
-	db, err := walletdb.New(cfg.Get().Wallet.Store)
-	if err != nil {
-		return nil, err
-	}
-
-	var testnet = byte(2)
-
-	// Then create the wallet with seed and password
-	_, err = wallet.LoadFromSeed(seedBytes, testnet, db, password, cfg.Get().Wallet.File, t.secretKey)
-	if err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-
-	//get the pub key and return
-	ctx := context.Background()
-	keysResponse, err := t.ruskClient.Keys(ctx, t.secretKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return keysResponse.Pk, nil
-}
-
 func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
 	ctx := context.Background()
 	records, err := t.walletClient.GetAddress(ctx, &node.EmptyRequest{})
@@ -107,8 +79,7 @@ func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse
 	// 	return nil, errWalletAlreadyLoaded
 	// }
 
-	ctx := context.Background()
-	records, err := t.walletClient.LoadWallet(ctx, &node.LoadRequest{Password: req.Password})
+	pubKey, err := t.loadWallet(req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +88,9 @@ func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse
 	// t.launchConsensus()
 	// return loadResponse([]byte(pubKey)), nil
 
-	return records, nil
+	return &node.LoadResponse{Key: &node.PubKey{
+		PublicKey: []byte(pubKey.String()),
+	}}, nil
 }
 
 func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadResponse, error) {

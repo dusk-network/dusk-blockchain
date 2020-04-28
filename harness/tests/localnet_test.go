@@ -51,7 +51,7 @@ func TestMain(m *testing.M) {
 	}
 
 	if mockEnabled != "" {
-		startMockServer()
+		StartMockServer("127.0.0.1:8080")
 	}
 
 	var code int

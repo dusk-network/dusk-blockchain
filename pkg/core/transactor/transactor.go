@@ -2,6 +2,7 @@ package transactor
 
 import (
 	"context"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -26,6 +27,8 @@ type Transactor struct { // TODO: rename
 	ruskClient       rusk.RuskClient
 	walletClient     node.WalletClient
 	transactorClient node.TransactorClient
+
+	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
