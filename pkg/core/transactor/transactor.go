@@ -21,6 +21,8 @@ type Transactor struct { // TODO: rename
 	// c                 *chainsync.Counter
 	// acceptedBlockChan <-chan block.Block
 
+	secretKey *rusk.SecretKey
+
 	ruskClient       rusk.RuskClient
 	walletClient     node.WalletClient
 	transactorClient node.TransactorClient

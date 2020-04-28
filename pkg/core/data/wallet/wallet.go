@@ -3,6 +3,7 @@ package wallet
 import (
 	"errors"
 	"fmt"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"io"
 
 	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -29,7 +30,6 @@ var ErrSeedFileExists = fmt.Errorf("wallet seed file already exists")
 type FetchInputs func(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error)
 
 // Wallet encapsulates the wallet
-// Deprecated: use the phoenix wallet
 type Wallet struct {
 	db        *database.DB
 	netPrefix byte
@@ -37,8 +37,7 @@ type Wallet struct {
 	keyPair       *key.Key
 	consensusKeys *consensuskey.Keys
 
-	fetchDecoys transactions.FetchDecoys
-	fetchInputs FetchInputs
+	secretKey *rusk.SecretKey
 }
 
 // SignableTx is a signable transaction
@@ -49,7 +48,7 @@ type SignableTx interface {
 }
 
 // New creates a wallet instance
-func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string, file string) (*Wallet, error) {
+func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.DB, password string, file string, secretKey *rusk.SecretKey) (*Wallet, error) {
 
 	var seed []byte
 	for {
@@ -72,11 +71,11 @@ func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.
 		// If not, we retry.
 	}
 
-	return LoadFromSeed(seed, netPrefix, db, fDecoys, fInputs, password, file)
+	return LoadFromSeed(seed, netPrefix, db, password, file, secretKey)
 }
 
 // LoadFromSeed loads a wallet from the seed
-func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string, file string) (*Wallet, error) {
+func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, password string, file string, secretKey *rusk.SecretKey) (*Wallet, error) {
 	if len(seed) < 64 {
 		return nil, errors.New("seed must be atleast 64 bytes in size")
 	}
@@ -95,8 +94,7 @@ func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, fDecoys transact
 		netPrefix:     netPrefix,
 		keyPair:       key.NewKeyPair(seed),
 		consensusKeys: &consensusKeys,
-		fetchDecoys:   fDecoys,
-		fetchInputs:   fInputs,
+		secretKey:     secretKey,
 	}
 
 	// Check if this is a new wallet
@@ -136,8 +134,6 @@ func LoadFromFile(netPrefix byte, db *database.DB, fDecoys transactions.FetchDec
 		netPrefix:     netPrefix,
 		keyPair:       key.NewKeyPair(seed),
 		consensusKeys: &consensusKeys,
-		fetchDecoys:   fDecoys,
-		fetchInputs:   fInputs,
 	}, nil
 }
 

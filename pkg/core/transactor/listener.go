@@ -3,6 +3,10 @@ package transactor
 import (
 	"context"
 	"errors"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	logger "github.com/sirupsen/logrus"
@@ -22,16 +26,59 @@ func loadResponse(pubKey []byte) *node.LoadResponse {
 }
 
 func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResponse, error) {
+	//return err if user sends no seed
+	if len(req.Seed) < 64 {
+		return nil, errors.New("seed must be at least 64 bytes in size")
+	}
+
+	//generate secret key with rusk
 	ctx := context.Background()
-	records, err := t.walletClient.CreateWallet(ctx, &node.CreateRequest{Password: req.Password})
+	record, err := t.ruskClient.GenerateSecretKey(ctx, &rusk.GenerateSecretKeyRequest{B: req.Seed})
+	if err != nil {
+		return nil, err
+	}
+
+	//set it for further use
+	t.secretKey = record
+
+	//create wallet with seed and pass
+	pubKey, err := t.createFromSeed(req.Seed, req.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: will this still make sense after the migration
 	// t.launchConsensus()
-	// return loadResponse([]byte(pubKey)), nil
-	return records, nil
+
+	return &node.LoadResponse{Key: &node.PubKey{
+		PublicKey: []byte(pubKey.String()),
+	}}, nil
+}
+
+func (t *Transactor) createFromSeed(seedBytes []byte, password string) (*rusk.PublicKey, error) {
+	// First load the database
+	db, err := walletdb.New(cfg.Get().Wallet.Store)
+	if err != nil {
+		return nil, err
+	}
+
+	var testnet = byte(2)
+
+	// Then create the wallet with seed and password
+	_, err = wallet.LoadFromSeed(seedBytes, testnet, db, password, cfg.Get().Wallet.File, t.secretKey)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	//get the pub key and return
+	ctx := context.Background()
+	keysResponse, err := t.ruskClient.Keys(ctx, t.secretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return keysResponse.Pk, nil
 }
 
 func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
