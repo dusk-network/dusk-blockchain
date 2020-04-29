@@ -54,13 +54,20 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 }
 
 func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
+	if t.w.SecretKey() == nil {
+		return nil, errors.New("SecretKey is not set")
+	}
+
+	//get the pub key and return
 	ctx := context.Background()
-	records, err := t.walletClient.GetAddress(ctx, &node.EmptyRequest{})
+	pubKey, err := t.ruskClient.Keys(ctx, t.w.SecretKey())
 	if err != nil {
 		return nil, err
 	}
 
-	return records, nil
+	return &node.LoadResponse{Key: &node.PubKey{
+		PublicKey: []byte(pubKey.String()),
+	}}, nil
 }
 
 func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
