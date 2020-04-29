@@ -3,6 +3,8 @@ package transactor
 import (
 	"context"
 	"errors"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"os"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 
@@ -213,23 +215,24 @@ func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
 }
 
 func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) {
-	// TODO: will this still make sense after migration?
-	// if t.w == nil {
-	// 	if err := os.RemoveAll(cfg.Get().Wallet.Store); err != nil {
-	// 		return nil, err
-	// 	}
-
-	ctx := context.Background()
-	records, err := t.walletClient.ClearWalletDatabase(ctx, &node.EmptyRequest{})
-	if err != nil {
-		return nil, err
+	if t.w == nil {
+		if err := os.RemoveAll(cfg.Get().Wallet.Store); err != nil {
+			return nil, err
+		}
 	}
 
-	return records, nil
+	if err := t.w.ClearDatabase(); err != nil {
+		return nil, err
+	}
+	return &node.GenericResponse{Response: "Wallet database deleted."}, nil
 }
 
 func (t *Transactor) handleIsWalletLoaded() (*node.WalletStatusResponse, error) {
-	return &node.WalletStatusResponse{Loaded: t.w.SecretKey() != nil}, nil
+	isLoaded := false
+	if t.w != nil && t.w.SecretKey() != nil {
+		isLoaded = true
+	}
+	return &node.WalletStatusResponse{Loaded: isLoaded}, nil
 }
 
 //nolint:unused
