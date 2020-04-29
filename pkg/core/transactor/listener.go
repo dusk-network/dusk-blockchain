@@ -198,20 +198,18 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 }
 
 func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
-	// TODO: will this still make sense after migration?
-	// if t.w == nil {
-	// 	return nil, errWalletNotLoaded
-	// }
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
 
-	ctx := context.Background()
-	records, err := t.walletClient.GetBalance(ctx, &node.EmptyRequest{})
+	unlockedBalance, lockedBalance, err := t.w.Balance()
 	if err != nil {
 		return nil, err
 	}
 
-	log.Tracef("wallet balance: %d, mempool balance: %d", records.UnlockedBalance, records.LockedBalance)
+	log.Tracef("wallet balance: %d, mempool balance: %d", unlockedBalance, lockedBalance)
 
-	return records, nil
+	return &node.BalanceResponse{UnlockedBalance: unlockedBalance, LockedBalance: lockedBalance}, nil
 }
 
 func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) {

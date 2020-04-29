@@ -146,6 +146,8 @@ func (db *DB) FetchInputs(decryptionKey []byte, amount int64) ([]*transactions.I
 
 // FetchBalance calculates the balance
 func (db *DB) FetchBalance(decryptionKey []byte) (uint64, uint64, error) {
+
+	//TODO: #446 , shall this be refactored ?
 	var unlockedBalance ristretto.Scalar
 	unlockedBalance.SetZero()
 	var lockedBalance ristretto.Scalar
