@@ -229,14 +229,7 @@ func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) 
 }
 
 func (t *Transactor) handleIsWalletLoaded() (*node.WalletStatusResponse, error) {
-	ctx := context.Background()
-
-	records, err := t.walletClient.GetWalletStatus(ctx, &node.EmptyRequest{})
-	if err != nil {
-		return nil, err
-	}
-
-	return records, nil
+	return &node.WalletStatusResponse{Loaded: t.w.SecretKey() != nil}, nil
 }
 
 //nolint:unused
