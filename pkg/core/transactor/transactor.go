@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-//nolint
+//Transactor is the implementation of both the Waller and the Transactor GRPC servers
 type Transactor struct { // TODO: rename
 	db database.DB
 	eb *eventbus.EventBus

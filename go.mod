@@ -4,7 +4,7 @@ require (
 	github.com/bwesterb/go-ristretto v1.1.1
 	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/dusk-network/dusk-crypto v0.1.1
-	github.com/dusk-network/dusk-protobuf v0.0.0-20200422085952-61bfb000a9e8
+	github.com/dusk-network/dusk-protobuf v0.1.1-0.20200430132832-c454bb21e269
 	github.com/dusk-network/dusk-wallet/v2 v2.0.2
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/go-chi/render v1.0.1
@@ -27,8 +27,8 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/urfave/cli v1.22.3
 	golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
-	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
 	google.golang.org/grpc v1.28.0
+	google.golang.org/protobuf v1.21.0
 	gotest.tools v2.2.0+incompatible
 )
 

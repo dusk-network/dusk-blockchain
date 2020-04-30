@@ -1,14 +1,55 @@
 package block
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"bytes"
+
+	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/merkletree"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"google.golang.org/protobuf/proto"
 )
 
 // Block defines a block on the Dusk blockchain.
 type Block struct {
 	Header *Header
-	Txs    []transactions.Transaction
+	Txs    []rusk.ContractCall
+}
+
+type SHA3Payload struct {
+	hash []byte
+}
+
+func newSHA3Payload(tx rusk.ContractCall) (SHA3Payload, error) {
+	out, err := proto.Marshal(tx)
+	if err != nil {
+		return SHA3Payload{}, err
+	}
+
+	h, herr := hash.Sha3256(out)
+	if herr != nil {
+		return SHA3Payload{}, err
+	}
+	return SHA3Payload{h}, nil
+}
+
+func (s SHA3Payload) CalculateHash() ([]byte, error) {
+	return s.hash, nil
+}
+
+func (s SHA3Payload) Equals(other interface{}) bool {
+	sother, ok := other.(SHA3Payload)
+	if !ok {
+		cc, right := other.(rusk.ContractCall)
+		if !right {
+			return false
+		}
+		var err error
+		sother, err = newSHA3Payload(&cc)
+		if err != nil {
+			return false
+		}
+	}
+	return bytes.Equal(s.hash, sother.hash)
 }
 
 // NewBlock will return an empty Block with an empty BlockHeader.
@@ -28,7 +69,11 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 	// convert Transaction interface to Payload interface
 	var txs []merkletree.Payload
 	for _, tx := range b.Txs {
-		txs = append(txs, tx)
+		stx, err := newSHA3Payload(&tx)
+		if err != nil {
+			return nil, err
+		}
+		txs = append(txs, stx)
 	}
 
 	tree, err := merkletree.NewTree(txs)
@@ -40,7 +85,7 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 }
 
 // AddTx will add a transaction to the block.
-func (b *Block) AddTx(tx transactions.Transaction) {
+func (b *Block) AddTx(tx rusk.ContractCall) {
 	b.Txs = append(b.Txs, tx)
 }
 
@@ -70,8 +115,8 @@ func (b *Block) Equals(other *Block) bool {
 	}
 
 	for i := range b.Txs {
-		tx := b.Txs[i]
-		otherTx := other.Txs[i]
+		tx, _ := newSHA3Payload(&b.Txs[i])
+		otherTx, _ := newSHA3Payload(&other.Txs[i])
 
 		if !tx.Equals(otherTx) {
 			return false

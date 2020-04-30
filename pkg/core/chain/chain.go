@@ -10,24 +10,25 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+
+	//"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	pb "github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
@@ -97,6 +98,12 @@ type Chain struct {
 	certificateChan <-chan certMsg
 	highestSeenChan <-chan uint64
 
+	// poseidon client
+	poseidon *pb.CryptoClient
+
+	// rusk client
+	rusk *pb.RuskClient
+
 	// rpcbus channels
 	getLastBlockChan         <-chan rpcbus.Request
 	verifyCandidateBlockChan <-chan rpcbus.Request
@@ -111,7 +118,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server) (*Chain, error) {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, poseidon *pb.CryptoClient, rusk *pb.RuskClient) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -148,6 +155,8 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		getRoundResultsChan:      getRoundResultsChan,
 		loader:                   loader,
 		verifier:                 verifier,
+		poseidon:                 poseidon,
+		rusk:                     rusk,
 	}
 
 	prevBlock, err := loader.LoadTip()
@@ -205,13 +214,19 @@ func (c *Chain) Listen() {
 	}
 }
 
-func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) {
+// TODO: use the protobuf fields to calculate X
+func (c *Chain) addBidder(tx *pb.BidTransaction, startHeight uint64) error {
 	var bid user.Bid
-	x := calculateXFromBytes(tx.Outputs[0].Commitment.Bytes(), tx.M)
-	copy(bid.X[:], x.Bytes())
+	x, err := c.calculateXFromBytes(tx.Commitment, tx.M)
+	if err != nil {
+		return err
+	}
+
+	copy(bid.X[:], x.Data)
 	copy(bid.M[:], tx.M)
-	bid.EndHeight = startHeight + tx.Lock
+	bid.EndHeight = startHeight + tx.ExpirationHeight
 	c.addBid(bid)
+	return nil
 }
 
 func (c *Chain) onAcceptBlock(m message.Message) error {
@@ -288,7 +303,12 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	// 3. Add provisioners and block generators
+	// 3. Call ExecuteStateTransitionFunction
+
+	// TODO: After this point, if an error happens we need to formulate a
+	// recovery strategy (or panic)
+
+	// 4. Add provisioners and block generators
 	l.Trace("adding consensus nodes")
 	// We set the stake start height as blk.Header.Height+2.
 	// This is because, once this block is accepted, the consensus will
@@ -297,15 +317,12 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// run into some inconsistencies when accepting the next block,
 	// as the certificate could've been made with a different committee.
 	c.addConsensusNodes(blk.Txs, blk.Header.Height+2)
-
-	// 4. Store block in database
+	// 4. Store the approved block
 	l.Trace("storing block in db")
 	if err := c.loader.Append(&blk); err != nil {
 		l.WithError(err).Errorln("block storing failed")
 		return err
 	}
-
-	c.prevBlock = blk
 
 	// 5. Gossip advertise block Hash
 	l.Trace("gossiping block")
@@ -313,6 +330,8 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		l.WithError(err).Errorln("block advertising failed")
 		return err
 	}
+
+	c.prevBlock = blk
 
 	// 6. Remove expired provisioners and bids
 	l.Trace("removing expired consensus transactions")
@@ -350,19 +369,21 @@ func (c *Chain) sendRoundUpdate() error {
 	return nil
 }
 
-func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight uint64) {
+func (c *Chain) addConsensusNodes(txs []pb.ContractCall, startHeight uint64) {
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
 	for _, tx := range txs {
-		switch tx.Type() {
-		case transactions.StakeType:
-			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
+		switch tx := tx.(type) {
+		case pb.StakeTransaction:
+			//stake := tx.(*pb.StakeTransaction)
+			// TODO: apparently the startHeight could also be found in the
+			// transaction. Check if we need to keep track of it here
+			if err := c.addProvisioner(stake.PubKeyBLS, tx.Tx.Outputs[0].Value, startHeight, tx.ExpirationHeight); err != nil {
 				l.Errorf("adding provisioner failed: %s", err.Error())
 			}
-		case transactions.BidType:
-			bid := tx.(*transactions.Bid)
+		case pb.BidTransaction:
+			//bid := tx.(*pb.BidTransaction)
 			c.addBidder(bid, startHeight)
 		}
 	}
@@ -423,21 +444,18 @@ func (c *Chain) restoreConsensusData() error {
 		}
 
 		for _, tx := range blk.Txs {
-			switch t := tx.(type) {
-			case *transactions.Stake:
+			switch tx := tx.(type) {
+			case *pb.StakeTransaction:
 				// Only add them if their stake is still valid
 				if searchingHeight+t.Lock > currentHeight {
-					amount := t.Outputs[0].EncryptedAmount.BigInt().Uint64()
-					if err := c.addProvisioner(t.PubKeyBLS, amount, searchingHeight+2, searchingHeight+t.Lock); err != nil {
+					amount := tx.Outputs[0].Value
+					if err := c.addProvisioner(tx.PubKeyBLS, amount, searchingHeight+2, tx.ExpirationHeight); err != nil {
 						return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
 					}
 				}
-			case *transactions.Bid:
-				// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
-				// to work with the `zkproof` package. Investigate if we should change this (reserve for testnet v2,
-				// as this is most likely a consensus-breaking change)
-				if searchingHeight+t.Lock > currentHeight {
-					c.addBidder(t, searchingHeight)
+			case *pb.BidTransaction:
+				if tx.ExpirationHeight > currentHeight {
+					c.addBidder(tx, searchingHeight)
 				}
 			}
 		}
@@ -500,17 +518,22 @@ func (c *Chain) removeProvisioner(pubKeyBLS []byte) bool {
 	return c.p.Set.Remove(pubKeyBLS)
 }
 
-func calculateXFromBytes(d, m []byte) ristretto.Scalar {
+func (c *Chain) calculateXFromBytes(d, m []byte) (*pb.Scalar, error) {
 	var dBytes [32]byte
 	copy(dBytes[:], d)
 	var mBytes [32]byte
 	copy(mBytes[:], m)
-	var dScalar ristretto.Scalar
-	dScalar.SetBytes(&dBytes)
-	var mScalar ristretto.Scalar
-	mScalar.SetBytes(&mBytes)
-	x := zkproof.CalculateX(dScalar, mScalar)
-	return x
+	inputs := [][]byte{dBytes, mBytes}
+	req := &pb.HashRequest{
+		Inputs: inputs,
+	}
+
+	response, err := c.poseidon.Hash(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Hash, err
 }
 
 // AddBid will add a bid to the BidList.
