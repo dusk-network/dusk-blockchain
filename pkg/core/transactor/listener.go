@@ -208,14 +208,14 @@ func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
 	// NOTE: maybe we will separate the locked and unlocked balances
 	// This call should be updated in that case
 	ctx := context.Background()
-	balance, err := t.walletClient.GetBalance(ctx, &node.EmptyRequest)
+	balanceResponse, err := t.walletClient.GetBalance(ctx, &node.EmptyRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	log.Tracef("wallet balance: %d", balance)
+	log.Tracef("wallet balance: %d, mempool balance: %d", balanceResponse.UnlockedBalance, balanceResponse.LockedBalance)
 
-	return &node.BalanceResponse{UnlockedBalance: balance, LockedBalance: balance}, nil
+	return &node.BalanceResponse{UnlockedBalance: balanceResponse.UnlockedBalance, LockedBalance: balanceResponse.LockedBalance}, nil
 }
 
 func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) {
