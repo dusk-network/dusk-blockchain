@@ -3,8 +3,9 @@ package transactor
 import (
 	"context"
 	"errors"
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"os"
+
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 
@@ -204,14 +205,17 @@ func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
 		return nil, errWalletNotLoaded
 	}
 
-	unlockedBalance, lockedBalance, err := t.w.Balance()
+	// NOTE: maybe we will separate the locked and unlocked balances
+	// This call should be updated in that case
+	ctx := context.Background()
+	balance, err := t.walletClient.GetBalance(ctx, &node.EmptyRequest)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Tracef("wallet balance: %d, mempool balance: %d", unlockedBalance, lockedBalance)
+	log.Tracef("wallet balance: %d", balance)
 
-	return &node.BalanceResponse{UnlockedBalance: unlockedBalance, LockedBalance: lockedBalance}, nil
+	return &node.BalanceResponse{UnlockedBalance: balance, LockedBalance: balance}, nil
 }
 
 func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) {
