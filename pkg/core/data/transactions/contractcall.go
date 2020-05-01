@@ -5,164 +5,118 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
+// TxType specifies the type of transaction, whether it is a contract call or a
+// genesis contract transaction
 type TxType uint8
 
 const (
+	// Tx indicates the phoenix transaction type
 	Tx TxType = iota
+	// Distribute indicates the coinbase and reward distribution contract call
 	Distribute
+	// WithdrawFees indicates the Provisioners' withdraw contract call
 	WithdrawFees
+	// Bid transaction propagated by the Block Generator
 	Bid
+	// Stake transaction propagated by the Provisioners
 	Stake
+	// Slash transaction propagated by the consensus to punish the Committee
+	// members when they turn byzantine
 	Slash
+	// WithdrawStake transaction propagated by the Provisioners to withdraw
+	// their stake
 	WithdrawStake
+	// WithdrawBid transaction propagated by the Block Generator to withdraw
+	// their bids
 	WithdrawBid
 )
 
+// NoteType is either Transparent or Obfuscated
 type NoteType int32
 
 const (
+	// NoteType_TRANSPARENT denotes a public note (transaction output)
 	NoteType_TRANSPARENT NoteType = 0
-	NoteType_OBFUSCATED  NoteType = 1
+	// NoteType_OBFUSCATED denotes a private note (transaction output)
+	NoteType_OBFUSCATED NoteType = 1
 )
 
+// ContractCall is the transaction that embodies the execution parameter for a
+// smart contract method invocation
 type ContractCall interface {
+	merkletree.Payload
+	// Type indicates the transaction
 	Type() TxType
+	// StandardTx is the underlying phoenix transaction carrying the
+	// transaction outputs and inputs
 	StandardTx() *Transaction
+
+	// setHash is used to set a precalculated hash
+	setHash([]byte)
 }
 
-type DistributeTransaction struct {
-	TotalReward           uint64       `protobuf:"fixed64,1,opt,name=total_reward,json=totalReward,proto3" json:"total_reward,omitempty"`
-	ProvisionersAddresses []byte       `protobuf:"bytes,2,opt,name=provisioners_addresses,json=provisionersAddresses,proto3" json:"provisioners_addresses,omitempty"`
-	BgPk                  *PublicKey   `protobuf:"bytes,3,opt,name=bg_pk,json=bgPk,proto3" json:"bg_pk,omitempty"`
-	Tx                    *Transaction `protobuf:"bytes,4,opt,name=tx,proto3" json:"tx,omitempty"`
+// ContractTx is the embedded struct utilized to group operations on the
+// phoenix underlying transaction common to all genesis contracts
+type ContractTx struct {
+	Tx *Transaction `protobuf:"bytes,9,opt,name=tx,proto3" json:"tx,omitempty"`
 }
 
-func (d *DistributeTransaction) Type() TxType {
-	return Distribute
+// StandardTx returns the underlying phoenix transaction
+func (t *ContractTx) StandardTx() *Transaction {
+	return t.Tx
 }
 
-func (d *DistributeTransaction) StandardTx() *Transaction {
-	return d.Tx
+// CalculateHash returns the hash precalculated during serialization
+func (t *ContractTx) CalculateHash() ([]byte, error) {
+	return t.Tx.CalculateHash()
 }
 
-type WithdrawFeesTransaction struct {
-	BlsKey []byte       `protobuf:"bytes,1,opt,name=bls_key,json=blsKey,proto3" json:"bls_key,omitempty"`
-	Sig    []byte       `protobuf:"bytes,2,opt,name=sig,proto3" json:"sig,omitempty"`
-	Msg    []byte       `protobuf:"bytes,3,opt,name=msg,proto3" json:"msg,omitempty"`
-	Tx     *Transaction `protobuf:"bytes,4,opt,name=tx,proto3" json:"tx,omitempty"`
+func (t *ContractTx) setHash(h []byte) {
+	t.Tx.setHash(h)
 }
 
-func (w *WithdrawFeesTransaction) Type() TxType {
-	return WithdrawFees
+// Equal tests two contract calls for equality
+func Equal(a, b ContractCall) bool {
+	ba, _ := a.CalculateHash()
+	bb, _ := b.CalculateHash()
+	return bytes.Equal(ba, bb)
 }
 
-func (w *WithdrawFeesTransaction) StandardTx() *Transaction {
-	return w.Tx
-}
-
-type SlashTransaction struct {
-	BlsKey    []byte       `protobuf:"bytes,1,opt,name=bls_key,json=blsKey,proto3" json:"bls_key,omitempty"`
-	Step      uint32       `protobuf:"varint,2,opt,name=step,proto3" json:"step,omitempty"`
-	Round     uint64       `protobuf:"fixed64,3,opt,name=round,proto3" json:"round,omitempty"`
-	FirstMsg  []byte       `protobuf:"bytes,4,opt,name=first_msg,json=firstMsg,proto3" json:"first_msg,omitempty"`
-	FirstSig  []byte       `protobuf:"bytes,5,opt,name=first_sig,json=firstSig,proto3" json:"first_sig,omitempty"`
-	SecondMsg []byte       `protobuf:"bytes,6,opt,name=second_msg,json=secondMsg,proto3" json:"second_msg,omitempty"`
-	SecondSig []byte       `protobuf:"bytes,7,opt,name=second_sig,json=secondSig,proto3" json:"second_sig,omitempty"`
-	Tx        *Transaction `protobuf:"bytes,8,opt,name=tx,proto3" json:"tx,omitempty"`
-}
-
-func (s *SlashTransaction) Type() TxType {
-	return Slash
-}
-
-func (s *SlashTransaction) StandardTx() *Transaction {
-	return s.Tx
-}
-
-type StakeTransaction struct {
-	BlsKey           []byte       `protobuf:"bytes,1,opt,name=bls_key,json=blsKey,proto3" json:"bls_key,omitempty"`
-	Value            uint64       `protobuf:"fixed64,2,opt,name=value,proto3" json:"value,omitempty"` // Should be the leftover value that was burned in `tx`
-	ExpirationHeight uint64       `protobuf:"fixed64,3,opt,name=expiration_height,json=expirationHeight,proto3" json:"expiration_height,omitempty"`
-	Tx               *Transaction `protobuf:"bytes,4,opt,name=tx,proto3" json:"tx,omitempty"`
-}
-
-func (s *StakeTransaction) Type() TxType {
-	return Stake
-}
-
-func (s *StakeTransaction) StandardTx() *Transaction {
-	return s.Tx
-}
-
-type BidTransaction struct {
-	M                []byte       `protobuf:"bytes,1,opt,name=m,proto3" json:"m,omitempty"`
-	Commitment       []byte       `protobuf:"bytes,2,opt,name=commitment,proto3" json:"commitment,omitempty"`
-	EncryptedValue   []byte       `protobuf:"bytes,3,opt,name=encrypted_value,json=encryptedValue,proto3" json:"encrypted_value,omitempty"`
-	EncryptedBlinder []byte       `protobuf:"bytes,4,opt,name=encrypted_blinder,json=encryptedBlinder,proto3" json:"encrypted_blinder,omitempty"`
-	ExpirationHeight uint64       `protobuf:"fixed64,5,opt,name=expiration_height,json=expirationHeight,proto3" json:"expiration_height,omitempty"`
-	Pk               []byte       `protobuf:"bytes,6,opt,name=pk,proto3" json:"pk,omitempty"`
-	R                []byte       `protobuf:"bytes,7,opt,name=r,proto3" json:"r,omitempty"`
-	Seed             []byte       `protobuf:"bytes,8,opt,name=seed,proto3" json:"seed,omitempty"`
-	Tx               *Transaction `protobuf:"bytes,9,opt,name=tx,proto3" json:"tx,omitempty"`
-}
-
-func (b *BidTransaction) Type() TxType {
-	return Bid
-}
-
-func (b *BidTransaction) StandardTx() *Transaction {
-	return b.Tx
-}
-
-type WithdrawBidTransaction struct {
-	Commitment       []byte       `protobuf:"bytes,1,opt,name=commitment,proto3" json:"commitment,omitempty"`
-	EncryptedValue   []byte       `protobuf:"bytes,2,opt,name=encrypted_value,json=encryptedValue,proto3" json:"encrypted_value,omitempty"`
-	EncryptedBlinder []byte       `protobuf:"bytes,3,opt,name=encrypted_blinder,json=encryptedBlinder,proto3" json:"encrypted_blinder,omitempty"`
-	Bid              []byte       `protobuf:"bytes,4,opt,name=bid,proto3" json:"bid,omitempty"`
-	Sig              []byte       `protobuf:"bytes,5,opt,name=sig,proto3" json:"sig,omitempty"`
-	Tx               *Transaction `protobuf:"bytes,6,opt,name=tx,proto3" json:"tx,omitempty"`
-}
-
-func (w *WithdrawBidTransaction) Type() TxType {
-	return WithdrawBid
-}
-
-func (w *WithdrawBidTransaction) StandardTx() *Transaction {
-	return w.Tx
-}
-
-type WithdrawStakeTransaction struct {
-	BlsKey []byte       `protobuf:"bytes,1,opt,name=bls_key,json=blsKey,proto3" json:"bls_key,omitempty"`
-	Sig    []byte       `protobuf:"bytes,2,opt,name=sig,proto3" json:"sig,omitempty"`
-	Tx     *Transaction `protobuf:"bytes,3,opt,name=tx,proto3" json:"tx,omitempty"`
-}
-
-func (w *WithdrawStakeTransaction) Type() TxType {
-	return WithdrawStake
-}
-
-func (w *WithdrawStakeTransaction) StandardTx() *Transaction {
-	return w.Tx
-}
-
+// Transaction according to the Phoenix model
 type Transaction struct {
 	Inputs  []*TransactionInput  `protobuf:"bytes,1,rep,name=inputs,proto3" json:"inputs,omitempty"`
 	Outputs []*TransactionOutput `protobuf:"bytes,2,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	Fee     *TransactionOutput   `protobuf:"bytes,3,opt,name=fee,proto3" json:"fee,omitempty"`
 	Proof   []byte               `protobuf:"bytes,4,opt,name=proof,proto3" json:"proof,omitempty"`
+	hash    []byte
 }
 
+func (t *Transaction) setHash(h []byte) {
+	t.hash = h
+}
+
+// CalculateHash complies with merkletree.Payload interface
+func (t *Transaction) CalculateHash() ([]byte, error) {
+	return t.hash, nil
+}
+
+// Type complies with the ContractCall interface
 func (t *Transaction) Type() TxType {
 	return Tx
 }
 
+// StandardTx complies with the ContractCall interface. It returns the underlying
+// phoenix transaction
 func (t *Transaction) StandardTx() *Transaction {
 	return t
 }
 
+// TransactionInput includes the notes, the nullifier and the transaction merkleroot
 type TransactionInput struct {
 	Note       *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
 	Pos        uint64     `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos,omitempty"`
@@ -171,6 +125,7 @@ type TransactionInput struct {
 	MerkleRoot *Scalar    `protobuf:"bytes,5,opt,name=merkle_root,json=merkleRoot,proto3" json:"merkle_root,omitempty"`
 }
 
+// TransactionOutput is the spendable output of the transaction
 type TransactionOutput struct {
 	Note           *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
 	Pk             *PublicKey `protobuf:"bytes,2,opt,name=pk,proto3" json:"pk,omitempty"`
@@ -178,10 +133,12 @@ type TransactionOutput struct {
 	BlindingFactor *Scalar    `protobuf:"bytes,4,opt,name=blinding_factor,json=blindingFactor,proto3" json:"blinding_factor,omitempty"`
 }
 
+// Nullifier of the transaction
 type Nullifier struct {
 	H *Scalar `protobuf:"bytes,1,opt,name=h,proto3" json:"h,omitempty"`
 }
 
+// Note is the spendable output
 type Note struct {
 	NoteType                  NoteType         `protobuf:"varint,1,opt,name=note_type,json=noteType,proto3,enum=rusk.NoteType" json:"note_type,omitempty"`
 	Pos                       uint64           `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos,omitempty"`
@@ -195,33 +152,42 @@ type Note struct {
 	EncryptedValue            []byte           `protobuf:"bytes,10,opt,name=encrypted_value,json=encryptedValue,proto3,oneof"`
 }
 
-type Scalar struct {
-	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-}
-
-type CompressedPoint struct {
-	Y []byte `protobuf:"bytes,1,opt,name=y,proto3" json:"y,omitempty"`
-}
-
-type Nonce struct {
-	Bs []byte `protobuf:"bytes,1,opt,name=bs,proto3" json:"bs,omitempty"`
-}
-
+// SecretKey to sign the ContractCall
 type SecretKey struct {
 	A *Scalar `protobuf:"bytes,1,opt,name=a,proto3" json:"a,omitempty"`
 	B *Scalar `protobuf:"bytes,2,opt,name=b,proto3" json:"b,omitempty"`
 }
 
+// ViewKey is to view the transactions belonging to the related SecretKey
 type ViewKey struct {
 	A  *Scalar          `protobuf:"bytes,1,opt,name=a,proto3" json:"a,omitempty"`
 	BG *CompressedPoint `protobuf:"bytes,2,opt,name=b_g,json=bG,proto3" json:"b_g,omitempty"`
 }
 
+// PublicKey is the public key
 type PublicKey struct {
 	AG *CompressedPoint `protobuf:"bytes,1,opt,name=a_g,json=aG,proto3" json:"a_g,omitempty"`
 	BG *CompressedPoint `protobuf:"bytes,2,opt,name=b_g,json=bG,proto3" json:"b_g,omitempty"`
 }
 
+// Scalar of the BLS12_381 curve
+type Scalar struct {
+	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+}
+
+// CompressedPoint of the BLS12_#81 curve
+type CompressedPoint struct {
+	Y []byte `protobuf:"bytes,1,opt,name=y,proto3" json:"y,omitempty"`
+}
+
+// Nonce is the distributed atomic increment used to prevent double spending
+type Nonce struct {
+	Bs []byte `protobuf:"bytes,1,opt,name=bs,proto3" json:"bs,omitempty"`
+}
+
+// Marshal a ContractCall into a binary buffer
+// TODO marshal the hash
+// TODO this should be the wire protocol
 func Marshal(c ContractCall) (*bytes.Buffer, error) {
 	var byteArr []byte
 	var err error
@@ -274,14 +240,18 @@ func Marshal(c ContractCall) (*bytes.Buffer, error) {
 	return bytes.NewBuffer(byteArr), err
 }
 
+// Unmarshal the binary buffer into a ContractCall interface
+// TODO unmarshal the hash
+// TODO this should be the wire protocol
 func Unmarshal(buf *bytes.Buffer, c ContractCall) error {
 	return json.Unmarshal(buf.Bytes(), &c)
 }
 
-func DecodeContractCall(contractCall *rusk.ContractCallTx) (interface{}, error) {
-	var call interface{}
+// DecodeContractCall turns the protobuf message into a ContractCall
+func DecodeContractCall(contractCall *rusk.ContractCallTx) (ContractCall, error) {
+	var call ContractCall
 
-	var byteArr []byte
+	var byteArr, h []byte
 	var err error
 
 	switch c := contractCall.ContractCall.(type) {
@@ -335,6 +305,13 @@ func DecodeContractCall(contractCall *rusk.ContractCallTx) (interface{}, error) 
 		call = new(WithdrawBidTransaction)
 	}
 
+	h, err = hash.Sha3256(byteArr)
+	if err != nil {
+		return nil, err
+	}
+
+	call.setHash(h)
+
 	if err := json.Unmarshal(byteArr, call); err != nil {
 		return nil, err
 	}
@@ -342,6 +319,7 @@ func DecodeContractCall(contractCall *rusk.ContractCallTx) (interface{}, error) 
 	return call, nil
 }
 
+// EncodeContractCall into a ContractCallTx
 func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 	var byteArr []byte
 	var err error
@@ -357,8 +335,8 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			Tx: new(rusk.Transaction),
 		}
 
-		if err := json.Unmarshal(byteArr, call.Tx); err != nil {
-			return nil, err
+		if jerr := json.Unmarshal(byteArr, call.Tx); jerr != nil {
+			return nil, jerr
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *WithdrawFeesTransaction:
@@ -371,8 +349,8 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			Withdraw: new(rusk.WithdrawFeesTransaction),
 		}
 
-		if err := json.Unmarshal(byteArr, call.Withdraw); err != nil {
-			return nil, err
+		if jerr := json.Unmarshal(byteArr, call.Withdraw); jerr != nil {
+			return nil, jerr
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *StakeTransaction:
@@ -385,8 +363,8 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			Stake: new(rusk.StakeTransaction),
 		}
 
-		if err := json.Unmarshal(byteArr, call.Stake); err != nil {
-			return nil, err
+		if jerr := json.Unmarshal(byteArr, call.Stake); jerr != nil {
+			return nil, jerr
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *BidTransaction:
@@ -399,8 +377,8 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			Bid: new(rusk.BidTransaction),
 		}
 
-		if err := json.Unmarshal(byteArr, call.Bid); err != nil {
-			return nil, err
+		if jerr := json.Unmarshal(byteArr, call.Bid); jerr != nil {
+			return nil, jerr
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *SlashTransaction:
@@ -413,8 +391,8 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			Slash: new(rusk.SlashTransaction),
 		}
 
-		if err := json.Unmarshal(byteArr, call.Slash); err != nil {
-			return nil, err
+		if jerr := json.Unmarshal(byteArr, call.Slash); jerr != nil {
+			return nil, jerr
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *DistributeTransaction:
@@ -427,8 +405,8 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			Distribute: new(rusk.DistributeTransaction),
 		}
 
-		if err := json.Unmarshal(byteArr, call.Distribute); err != nil {
-			return nil, err
+		if jerr := json.Unmarshal(byteArr, call.Distribute); jerr != nil {
+			return nil, jerr
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *WithdrawStakeTransaction:
@@ -441,8 +419,8 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			WithdrawStake: new(rusk.WithdrawStakeTransaction),
 		}
 
-		if err := json.Unmarshal(byteArr, call.WithdrawStake); err != nil {
-			return nil, err
+		if jerr := json.Unmarshal(byteArr, call.WithdrawStake); jerr != nil {
+			return nil, jerr
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *WithdrawBidTransaction:
@@ -455,90 +433,11 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			WithdrawBid: new(rusk.WithdrawBidTransaction),
 		}
 
-		if err := json.Unmarshal(byteArr, call.WithdrawBid); err != nil {
-			return nil, err
+		if jerr := json.Unmarshal(byteArr, call.WithdrawBid); jerr != nil {
+			return nil, jerr
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	default:
 		return nil, errors.New("structure to encode is not a contract call")
 	}
 }
-
-/*
-type ContractCall struct {
-	Inputs   []Input
-	Outputs  []Output
-	Fee      Output
-	Proof    []byte
-	CallData []byte
-}
-
-type Nullifier struct {
-	H []byte
-}
-
-type Note struct {
-	NoteType        uint8
-	Pos             uint64
-	Nonce           []byte
-	RG              []byte
-	PkR             []byte
-	ValueCommitment []byte
-	BlindingFactor  []byte
-	Value           []byte
-}
-
-type Input struct {
-	Nullifier
-	MerkleRoot []byte
-}
-
-type Output struct {
-	Note
-	Recipient      []byte
-	Value          uint64
-	BlindingFactor []byte
-}
-
-
-func DecodeTx(tx *rusk.ContractCallTx_Tx) ContractCall {
-	call := ContractCall{
-		Inputs:  make([]Input, 0),
-		Outputs: make([]Output, 0),
-	}
-
-	for _, input := range tx.Tx.Inputs {
-		call.Inputs = append(call.Inputs, DecodeInput(input))
-	}
-
-	for _, output := range tx.Tx.Outputs {
-		call.Outputs = append(call.Outputs, DecodeOutput(output)
-	}
-
-	call.Fee = DecodeOutput(tx.Tx.Fee)
-	call.Proof = tx.Tx.Proof
-
-	return call
-}
-
-func DecodeOutput(output *rusk.TransactionOutput) Output {
-	out := Output{}
-
-	out.Note = DecodeNote(output.Note)
-	out.Recipient = append(output.PublicKey.AG, output.PublicKey.BG...)
-	out.Value = output.Value
-	out.BlindingFactor = output.BlindingFactor.Data
-	return out
-}
-
-func DecodeInput(input *rusk.TransactionInput) Input {
-	in := Input{}
-
-	in.Nullifier.H = input.Nullifier.H
-}
-
-func DecodeNote(note *rusk.Note) Note {
-	n := Note{}
-
-}
-*/

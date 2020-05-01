@@ -27,12 +27,8 @@ func (b *Block) SetPrevBlock(prevHeader *Header) {
 func (b *Block) CalculateRoot() ([]byte, error) {
 	// convert Transaction interface to Payload interface
 	var txs []merkletree.Payload
-	for i := 0; i < len(b.Txs); i++ {
-		tx, err := NewSHA3Payload(b.Txs[i])
-		if err != nil {
-			return nil, err
-		}
-		txs = append(txs, tx)
+	for _, tx := range b.Txs {
+		txs = append(txs, tx.(merkletree.Payload))
 	}
 
 	tree, err := merkletree.NewTree(txs)
@@ -74,10 +70,7 @@ func (b *Block) Equals(other *Block) bool {
 	}
 
 	for i := 0; i < len(b.Txs); i++ {
-		tx, _ := NewSHA3Payload(b.Txs[i])
-		otherTx, _ := NewSHA3Payload(other.Txs[i])
-
-		if !tx.Equals(otherTx) {
+		if !transactions.Equal(b.Txs[i], other.Txs[i]) {
 			return false
 		}
 	}

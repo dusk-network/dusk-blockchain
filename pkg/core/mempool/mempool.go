@@ -206,12 +206,7 @@ func (m *Mempool) onPendingTx(t TxDesc) ([]byte, error) {
 // processTx ensures all transaction rules are satisfied before adding the tx
 // into the verified pool
 func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
-	payload, err := block.NewSHA3Payload(t.tx)
-	if err != nil {
-		return nil, err
-	}
-
-	txid, err := payload.CalculateHash()
+	txid, err := t.tx.CalculateHash()
 	if err != nil {
 		return txid, fmt.Errorf("hash err: %s", err.Error())
 	}
@@ -292,12 +287,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 		// Check if mempool verified tx is part of merkle tree of this block
 		// if not, then keep it in the mempool for the next block
 		err = m.verified.Range(func(k txHash, t TxDesc) error {
-			payload, err := block.NewSHA3Payload(t.tx)
-			if err != nil {
-				return err
-			}
-
-			if r, _ := tree.VerifyContent(payload); !r {
+			if r, _ := tree.VerifyContent(t.tx); !r {
 				if e := s.Put(t); e != nil {
 					return e
 				}
@@ -439,12 +429,7 @@ func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.S
 
 	resp := &node.SelectResponse{Result: make([]*node.Tx, len(txs))}
 	for i, tx := range txs {
-		payload, err := block.NewSHA3Payload(tx)
-		if err != nil {
-			return nil, err
-		}
-
-		txid, err := payload.CalculateHash()
+		txid, err := tx.CalculateHash()
 		if err != nil {
 			return nil, err
 		}

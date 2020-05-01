@@ -8,7 +8,6 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	core "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	log "github.com/sirupsen/logrus"
 )
@@ -52,12 +51,7 @@ type transactions struct {
 
 // newQueryTx constructs query tx data from core tx and block hash
 func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
-	payload, err := block.NewSHA3Payload(tx)
-	if err != nil {
-		return queryTx{}, err
-	}
-
-	txID, err := payload.CalculateHash()
+	txID, err := tx.CalculateHash()
 	if err != nil {
 		return queryTx{}, err
 	}

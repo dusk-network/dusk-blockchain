@@ -560,12 +560,7 @@ func TestFetchBlockTxByHash(test *testing.T) {
 			for txIndex, originTx := range blk.Txs {
 
 				// FetchBlockTxByHash
-				payload, err := block.NewSHA3Payload(originTx)
-				if err != nil {
-					return err
-				}
-
-				txID, _ := payload.CalculateHash()
+				txID, _ := originTx.CalculateHash()
 				fetchedTx, fetchedIndex, _, err := t.FetchBlockTxByHash(txID)
 
 				if err != nil {

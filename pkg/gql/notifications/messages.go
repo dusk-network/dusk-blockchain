@@ -38,12 +38,7 @@ func MarshalBlockMsg(blk block.Block) (string, error) {
 			break
 		}
 
-		payload, err := block.NewSHA3Payload(tx)
-		if err != nil {
-			return "", err
-		}
-
-		txid, e := payload.CalculateHash()
+		txid, e := tx.CalculateHash()
 		if e != nil {
 			return "", e
 		}

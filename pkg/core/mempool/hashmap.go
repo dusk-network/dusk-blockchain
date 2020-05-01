@@ -3,7 +3,6 @@ package mempool
 import (
 	"sort"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
@@ -51,12 +50,7 @@ func (m *HashMap) Put(t TxDesc) error {
 	}
 
 	// store tx
-	payload, err := block.NewSHA3Payload(t.tx)
-	if err != nil {
-		return err
-	}
-
-	txID, err := payload.CalculateHash()
+	txID, err := t.tx.CalculateHash()
 	if err != nil {
 		return err
 	}

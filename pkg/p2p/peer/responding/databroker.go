@@ -112,12 +112,7 @@ func (d *DataBroker) SendTxsItems() error {
 		msg := &peermsg.Inv{}
 
 		for _, tx := range txs {
-			payload, err := block.NewSHA3Payload(tx)
-			if err != nil {
-				return err
-			}
-
-			txID, err := payload.CalculateHash()
+			txID, err := tx.CalculateHash()
 			if err != nil {
 				return err
 			}

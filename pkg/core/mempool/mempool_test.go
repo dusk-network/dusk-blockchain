@@ -14,7 +14,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -381,8 +380,7 @@ func TestSendMempoolTx(t *testing.T) {
 		}
 		txidBytes := resp.([]byte)
 
-		payload, err := block.NewSHA3Payload(tx)
-		txid, _ := payload.CalculateHash()
+		txid, _ := tx.CalculateHash()
 		if !bytes.Equal(txidBytes, txid) {
 			t.Fatal("unexpected txid retrieved")
 		}
@@ -416,12 +414,7 @@ func TestMempoolView(t *testing.T) {
 	assert.Equal(t, numTxs*4, len(resp.Result))
 
 	// Now, we single out one hash from the bunch
-	payload, err := block.NewSHA3Payload(txs[7])
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	txid, _ := payload.CalculateHash()
+	txid, _ := txs[7].CalculateHash()
 	hash := hex.EncodeToString(txid)
 	resp, err = c.m.SelectTx(context.Background(), &node.SelectRequest{Id: hash})
 	if err != nil {

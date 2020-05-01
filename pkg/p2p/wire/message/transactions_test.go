@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -33,14 +32,10 @@ func TestEncodeDecodeStandard(t *testing.T) {
 	// assert.True(tx.Equals(decTX))
 
 	// Check that Hashes are equal
-	payload, err := block.NewSHA3Payload(tx)
-	assert.Nil(err)
-	txid, err := payload.CalculateHash()
+	txid, err := tx.CalculateHash()
 	assert.Nil(err)
 
-	payload, err = block.NewSHA3Payload(decTX)
-	assert.Nil(err)
-	decTxid, err := payload.CalculateHash()
+	decTxid, err := decTX.CalculateHash()
 	assert.Nil(err)
 
 	assert.True(bytes.Equal(txid, decTxid))
@@ -86,39 +81,24 @@ func TestEncodeDecodeBid(t *testing.T) {
 	// TODO: add equals method for RUSK/phoenix transactions
 	// assert.True(tx.Equals(decTX))
 
-	// Check that Hashes are equal
-	payload, err := block.NewSHA3Payload(tx)
-	assert.Nil(err)
-	txid, err := payload.CalculateHash()
-	assert.Nil(err)
-
-	payload, err = block.NewSHA3Payload(decTX)
-	assert.Nil(err)
-	decTxid, err := payload.CalculateHash()
-	assert.Nil(err)
-
-	assert.True(bytes.Equal(txid, decTxid))
+	assert.True(transactions.Equal(tx, decTX))
 
 	// Check that type is correct
 	// assert.Equal(transactions.BidType, decTX.(*transactions.Bid).TxType)
 }
 
 func TestEqualsMethodBid(t *testing.T) {
-	// TODO: add equals method for RUSK/phoenix transactions
+	assert := assert.New(t)
 
-	/*
-		assert := assert.New(t)
+	a, err := helper.RandomBidTx(t, false)
+	assert.Nil(err)
+	b, err := helper.RandomBidTx(t, false)
+	assert.Nil(err)
+	c := a
 
-		a, err := helper.RandomBidTx(t, false)
-		assert.Nil(err)
-		b, err := helper.RandomBidTx(t, false)
-		assert.Nil(err)
-		c := a
-
-		assert.False(a.Equals(b))
-		assert.False(b.Equals(c))
-		assert.True(a.Equals(c))
-	*/
+	assert.False(transactions.Equal(a, b))
+	assert.False(transactions.Equal(b, c))
+	assert.True(transactions.Equal(a, c))
 }
 
 func TestEncodeDecodeStake(t *testing.T) {
@@ -140,41 +120,23 @@ func TestEncodeDecodeStake(t *testing.T) {
 
 	// Check both structs are equal
 	// TODO: add equals method for RUSK/phoenix transactions
-	// assert.True(tx.Equals(decTX))
-
-	// Check that Hashes are equal
-	payload, err := block.NewSHA3Payload(tx)
-	assert.Nil(err)
-	txid, err := payload.CalculateHash()
-	assert.Nil(err)
-
-	payload, err = block.NewSHA3Payload(decTX)
-	assert.Nil(err)
-	decTxid, err := payload.CalculateHash()
-	assert.Nil(err)
-
-	assert.True(bytes.Equal(txid, decTxid))
-
+	assert.True(transactions.Equal(tx, decTX))
 	// Check that type is correct
 	// assert.Equal(transactions.StakeType, decTX.(*transactions.Stake).TxType)
 }
 
 func TestEqualsMethodStake(t *testing.T) {
-	// TODO: add equals method for RUSK/phoenix transactions
+	assert := assert.New(t)
 
-	/*
-		assert := assert.New(t)
+	a, err := helper.RandomStakeTx(t, false)
+	assert.Nil(err)
+	b, err := helper.RandomStakeTx(t, false)
+	assert.Nil(err)
+	c := a
 
-		a, err := helper.RandomStakeTx(t, false)
-		assert.Nil(err)
-		b, err := helper.RandomStakeTx(t, false)
-		assert.Nil(err)
-		c := a
-
-		assert.False(a.Equals(b))
-		assert.False(b.Equals(c))
-		assert.True(a.Equals(c))
-	*/
+	assert.False(transactions.Equal(a, b))
+	assert.False(transactions.Equal(b, c))
+	assert.True(transactions.Equal(a, c))
 }
 
 func TestEncodeDecodeCoinbase(t *testing.T) {
@@ -194,37 +156,19 @@ func TestEncodeDecodeCoinbase(t *testing.T) {
 	assert.Nil(err)
 
 	// Check both structs are equal
-	// TODO: add equals method for RUSK/phoenix transactions
-	// assert.True(tx.Equals(decTX))
-
-	// Check that Hashes are equal
-	payload, err := block.NewSHA3Payload(tx)
-	assert.Nil(err)
-	txid, err := payload.CalculateHash()
-	assert.Nil(err)
-
-	payload, err = block.NewSHA3Payload(decTX)
-	assert.Nil(err)
-	decTxid, err := payload.CalculateHash()
-	assert.Nil(err)
-
-	assert.True(bytes.Equal(txid, decTxid))
+	assert.True(transactions.Equal(tx, decTX))
 }
 
 func TestEqualsMethodCoinBase(t *testing.T) {
-	// TODO: add equals method for RUSK/phoenix transactions
+	assert := assert.New(t)
 
-	/*
-		assert := assert.New(t)
+	a := helper.RandomCoinBaseTx(t, false)
+	b := helper.RandomCoinBaseTx(t, false)
+	c := a
 
-		a := helper.RandomCoinBaseTx(t, false)
-		b := helper.RandomCoinBaseTx(t, false)
-		c := a
-
-		assert.False(a.Equals(b))
-		assert.False(b.Equals(c))
-		assert.True(a.Equals(c))
-	*/
+	assert.False(transactions.Equal(a, b))
+	assert.False(transactions.Equal(b, c))
+	assert.True(transactions.Equal(a, c))
 }
 
 func TestEncodeDecodeTLock(t *testing.T) {
@@ -244,21 +188,7 @@ func TestEncodeDecodeTLock(t *testing.T) {
 	assert.Nil(err)
 
 	// Check both structs are equal
-	// TODO: add equals method for RUSK/phoenix transactions
-	// assert.True(tx.Equals(decTX))
-
-	// Check that Hashes are equal
-	payload, err := block.NewSHA3Payload(tx)
-	assert.Nil(err)
-	txid, err := payload.CalculateHash()
-	assert.Nil(err)
-
-	payload, err = block.NewSHA3Payload(decTX)
-	assert.Nil(err)
-	decTxid, err := payload.CalculateHash()
-	assert.Nil(err)
-
-	assert.True(bytes.Equal(txid, decTxid))
+	assert.True(transactions.Equal(tx, decTX))
 
 	// Check that type is correct
 	// TODO: this type does not exist in the RUSK migration
@@ -267,38 +197,15 @@ func TestEncodeDecodeTLock(t *testing.T) {
 
 func TestEqualsMethodTimeLock(t *testing.T) {
 	// TODO: add equals method for RUSK/phoenix transactions
-	/*
-		assert := assert.New(t)
-
-		a := helper.RandomTLockTx(t, false)
-		b := helper.RandomTLockTx(t, false)
-		c := a
-
-		assert.False(a.Equals(b))
-		assert.False(b.Equals(c))
-		assert.True(a.Equals(c))
-	*/
-}
-
-// Test that the tx type has overridden the standard hash function
-func TestBidHashNotStandard(t *testing.T) {
-
 	assert := assert.New(t)
 
-	var txs []transactions.ContractCall
+	a := helper.RandomTLockTx(t, false)
+	b := helper.RandomTLockTx(t, false)
+	c := a
 
-	// Possible tye
-
-	bidTx, err := helper.RandomBidTx(t, false)
-	assert.Nil(err)
-	txs = append(txs, bidTx)
-
-	timeLockTx := helper.RandomTLockTx(t, false)
-	txs = append(txs, timeLockTx)
-
-	stakeTx, err := helper.RandomStakeTx(t, false)
-	assert.Nil(err)
-	txs = append(txs, stakeTx)
+	assert.False(transactions.Equal(a, b))
+	assert.False(transactions.Equal(b, c))
+	assert.True(transactions.Equal(a, c))
 }
 
 func TestDecodeTransactions(t *testing.T) {
@@ -314,12 +221,9 @@ func TestDecodeTransactions(t *testing.T) {
 
 	assert.Equal(t, len(txs), len(decTxs))
 
-	// TODO: add equals method for RUSK/phoenix transactions
-	/*
-		for i := range txs {
-			tx := txs[i]
-			decTx := decTxs[i]
-			assert.True(t, tx.Equals(decTx))
-		}
-	*/
+	for i := range txs {
+		tx := txs[i]
+		decTx := decTxs[i]
+		assert.True(t, transactions.Equal(tx, decTx))
+	}
 }

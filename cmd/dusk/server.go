@@ -50,7 +50,8 @@ func LaunchChain(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *ch
 	_, db := heavy.CreateDBConnection()
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(eventBus, rpcBus, counter, l, l, srv)
+	// TODO: inject the proper RUSK client
+	chainProcess, err := chain.New(eventBus, rpcBus, counter, l, l, srv, nil)
 	if err != nil {
 		return nil, err
 	}

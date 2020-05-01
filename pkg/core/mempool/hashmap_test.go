@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -105,12 +104,7 @@ func TestGet(t *testing.T) {
 		// constFee := big.NewInt(0).SetUint64(20)
 		// tx.Fee.SetBigInt(constFee)
 
-		payload, err := block.NewSHA3Payload(tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		hash, _ := payload.CalculateHash()
+		hash, _ := tx.CalculateHash()
 		hashes[i] = hash
 
 		td := TxDesc{tx: tx, received: time.Now()}
@@ -172,12 +166,7 @@ func BenchmarkContains(b *testing.B) {
 
 	for tN := 0; tN < b.N; tN++ {
 		for i := 0; i < len(txs); i++ {
-			payload, err := block.NewSHA3Payload(txs[i])
-			if err != nil {
-				b.Fatal(err)
-			}
-
-			txid, _ := payload.CalculateHash()
+			txid, _ := txs[i].CalculateHash()
 			if !pool.Contains(txid) {
 				b.Fatal("missing tx")
 			}

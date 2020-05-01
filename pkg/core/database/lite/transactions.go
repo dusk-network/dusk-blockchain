@@ -47,13 +47,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	// Map txId to transactions.ContractCall
 	for i, tx := range b.Txs {
-
-		payload, err := block.NewSHA3Payload(tx)
-		if err != nil {
-			return err
-		}
-
-		txID, err := payload.CalculateHash()
+		txID, err := tx.CalculateHash()
 		if err != nil {
 			return err
 		}
