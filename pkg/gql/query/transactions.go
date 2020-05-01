@@ -1,15 +1,14 @@
 package query
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	core "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	log "github.com/sirupsen/logrus"
 )
@@ -52,46 +51,53 @@ type transactions struct {
 }
 
 // newQueryTx constructs query tx data from core tx and block hash
-func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
+func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
+	payload, err := block.NewSHA3Payload(tx)
+	if err != nil {
+		return queryTx{}, err
+	}
 
-	txID, err := tx.CalculateHash()
+	txID, err := payload.CalculateHash()
 	if err != nil {
 		return queryTx{}, err
 	}
 
 	qd := queryTx{}
 	qd.TxID = txID
-	qd.TxType = tx.StandardTx().TxType
+	qd.TxType = tx.Type()
 
-	qd.Outputs = make([]queryOutput, 0)
-	for _, output := range tx.StandardTx().Outputs {
-		pubkey := output.PubKey.P.Bytes()
-		qd.Outputs = append(qd.Outputs, queryOutput{pubkey})
-	}
-
-	qd.Inputs = make([]queryInput, 0)
-	for _, input := range tx.StandardTx().Inputs {
-		keyimage := input.KeyImage.Bytes()
-		qd.Inputs = append(qd.Inputs, queryInput{keyimage})
-	}
-
-	qd.BlockHash = blockHash
-
-	// Populate Score value if available
-	if tx.Type() == core.CoinbaseType {
-		x, ok := tx.(*core.Coinbase)
-		if ok {
-			qd.Score = x.Score
+	// TODO: adjust this for Phoenix transactions
+	/*
+		qd.Outputs = make([]queryOutput, 0)
+		for _, output := range tx.StandardTx().Outputs {
+			pubkey := output.PubKey.P.Bytes()
+			qd.Outputs = append(qd.Outputs, queryOutput{pubkey})
 		}
-	}
 
-	// Populate marshaling size
-	buf := new(bytes.Buffer)
-	if err := message.MarshalTx(buf, tx); err != nil {
-		return queryTx{}, err
-	}
+		qd.Inputs = make([]queryInput, 0)
+		for _, input := range tx.StandardTx().Inputs {
+			keyimage := input.KeyImage.Bytes()
+			qd.Inputs = append(qd.Inputs, queryInput{keyimage})
+		}
 
-	qd.Size = buf.Len()
+		qd.BlockHash = blockHash
+
+		// Populate Score value if available
+		if tx.Type() == core.CoinbaseType {
+			x, ok := tx.(*core.Coinbase)
+			if ok {
+				qd.Score = x.Score
+			}
+		}
+
+		// Populate marshaling size
+		buf := new(bytes.Buffer)
+		if err := message.MarshalTx(buf, tx); err != nil {
+			return queryTx{}, err
+		}
+
+		qd.Size = buf.Len()
+	*/
 
 	return qd, nil
 }

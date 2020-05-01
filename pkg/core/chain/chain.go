@@ -7,11 +7,9 @@ import (
 	"time"
 
 	"encoding/binary"
-	"fmt"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -98,9 +96,6 @@ type Chain struct {
 	certificateChan <-chan certMsg
 	highestSeenChan <-chan uint64
 
-	// poseidon client
-	poseidon *pb.CryptoClient
-
 	// rusk client
 	rusk *pb.RuskClient
 
@@ -118,7 +113,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, poseidon *pb.CryptoClient, rusk *pb.RuskClient) (*Chain, error) {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, rusk *pb.RuskClient) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -155,7 +150,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		getRoundResultsChan:      getRoundResultsChan,
 		loader:                   loader,
 		verifier:                 verifier,
-		poseidon:                 poseidon,
 		rusk:                     rusk,
 	}
 
@@ -177,10 +171,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		chain.intermediateBlock = blk
 	}
 	chain.prevBlock = *prevBlock
-
-	if err := chain.restoreConsensusData(); err != nil {
-		log.WithError(err).Warnln("error in calling chain.restoreConsensusData from chain.New. The error is not propagated")
-	}
 
 	if srv != nil {
 		node.RegisterChainServer(srv, chain)
@@ -212,21 +202,6 @@ func (c *Chain) Listen() {
 			c.provideRoundResults(r)
 		}
 	}
-}
-
-// TODO: use the protobuf fields to calculate X
-func (c *Chain) addBidder(tx *pb.BidTransaction, startHeight uint64) error {
-	var bid user.Bid
-	x, err := c.calculateXFromBytes(tx.Commitment, tx.M)
-	if err != nil {
-		return err
-	}
-
-	copy(bid.X[:], x.Data)
-	copy(bid.M[:], tx.M)
-	bid.EndHeight = startHeight + tx.ExpirationHeight
-	c.addBid(bid)
-	return nil
 }
 
 func (c *Chain) onAcceptBlock(m message.Message) error {
@@ -308,15 +283,6 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// TODO: After this point, if an error happens we need to formulate a
 	// recovery strategy (or panic)
 
-	// 4. Add provisioners and block generators
-	l.Trace("adding consensus nodes")
-	// We set the stake start height as blk.Header.Height+2.
-	// This is because, once this block is accepted, the consensus will
-	// be 2 rounds ahead of this current block height. As a result,
-	// if we pick the start height to just be the block height, we
-	// run into some inconsistencies when accepting the next block,
-	// as the certificate could've been made with a different committee.
-	c.addConsensusNodes(blk.Txs, blk.Header.Height+2)
 	// 4. Store the approved block
 	l.Trace("storing block in db")
 	if err := c.loader.Append(&blk); err != nil {
@@ -333,12 +299,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.prevBlock = blk
 
-	// 6. Remove expired provisioners and bids
-	l.Trace("removing expired consensus transactions")
-	c.removeExpiredProvisioners(blk.Header.Height)
-	c.removeExpiredBids(blk.Header.Height + 2)
-
-	// 7. Notify other subsystems for the accepted block
+	// 6. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
 	// consensus.generation.broker
@@ -367,26 +328,6 @@ func (c *Chain) sendRoundUpdate() error {
 	msg := message.New(topics.RoundUpdate, ru)
 	c.eventBus.Publish(topics.RoundUpdate, msg)
 	return nil
-}
-
-func (c *Chain) addConsensusNodes(txs []pb.ContractCall, startHeight uint64) {
-	field := logger.Fields{"process": "accept block"}
-	l := log.WithFields(field)
-
-	for _, tx := range txs {
-		switch tx := tx.(type) {
-		case pb.StakeTransaction:
-			//stake := tx.(*pb.StakeTransaction)
-			// TODO: apparently the startHeight could also be found in the
-			// transaction. Check if we need to keep track of it here
-			if err := c.addProvisioner(stake.PubKeyBLS, tx.Tx.Outputs[0].Value, startHeight, tx.ExpirationHeight); err != nil {
-				l.Errorf("adding provisioner failed: %s", err.Error())
-			}
-		case pb.BidTransaction:
-			//bid := tx.(*pb.BidTransaction)
-			c.addBidder(bid, startHeight)
-		}
-	}
 }
 
 func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
@@ -420,152 +361,6 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	m := message.New(topics.Inv, *buf)
 	c.eventBus.Publish(topics.Gossip, m)
 	return nil
-}
-
-// TODO: consensus data should be persisted to disk, to decrease
-// startup times
-func (c *Chain) restoreConsensusData() error {
-	currentHeight, err := c.loader.Height()
-	if err != nil {
-		log.WithError(err).Warnln("could not fetch current height from disk")
-		currentHeight = 0
-	}
-
-	searchingHeight := uint64(0)
-	if currentHeight > transactions.MaxLockTime {
-		searchingHeight = currentHeight - transactions.MaxLockTime
-	}
-
-	for {
-		blk, loadErr := c.loader.BlockAt(searchingHeight)
-		if loadErr != nil {
-			log.WithError(err).Debugln("cannot fetch hash by heigth, quitting restoreConsensusData routine")
-			break
-		}
-
-		for _, tx := range blk.Txs {
-			switch tx := tx.(type) {
-			case *pb.StakeTransaction:
-				// Only add them if their stake is still valid
-				if searchingHeight+t.Lock > currentHeight {
-					amount := tx.Outputs[0].Value
-					if err := c.addProvisioner(tx.PubKeyBLS, amount, searchingHeight+2, tx.ExpirationHeight); err != nil {
-						return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
-					}
-				}
-			case *pb.BidTransaction:
-				if tx.ExpirationHeight > currentHeight {
-					c.addBidder(tx, searchingHeight)
-				}
-			}
-		}
-
-		searchingHeight++
-	}
-
-	return nil
-}
-
-// RemoveExpired removes Provisioners which stake expired
-func (c *Chain) removeExpiredProvisioners(round uint64) {
-	for pk, member := range c.p.Members {
-		for i := 0; i < len(member.Stakes); i++ {
-			if member.Stakes[i].EndHeight < round {
-				member.RemoveStake(i)
-				// If they have no stakes left, we should remove them entirely.
-				if len(member.Stakes) == 0 {
-					c.removeProvisioner([]byte(pk))
-				}
-
-				// Reset index
-				i = -1
-			}
-		}
-	}
-}
-
-// addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
-func (c *Chain) addProvisioner(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
-	if len(pubKeyBLS) != 129 {
-		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
-	}
-
-	i := string(pubKeyBLS)
-	stake := user.Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
-
-	// Check for duplicates
-	_, inserted := c.p.Set.IndexOf(pubKeyBLS)
-	if inserted {
-		// If they already exist, just add their new stake
-		c.p.Members[i].AddStake(stake)
-		return nil
-	}
-
-	// This is a new provisioner, so let's initialize the Member struct and add them to the list
-	c.p.Set.Insert(pubKeyBLS)
-	m := &user.Member{}
-
-	m.PublicKeyBLS = pubKeyBLS
-	m.AddStake(stake)
-
-	c.p.Members[i] = m
-	return nil
-}
-
-// Remove a Member, designated by their BLS public key.
-func (c *Chain) removeProvisioner(pubKeyBLS []byte) bool {
-	delete(c.p.Members, string(pubKeyBLS))
-	return c.p.Set.Remove(pubKeyBLS)
-}
-
-func (c *Chain) calculateXFromBytes(d, m []byte) (*pb.Scalar, error) {
-	var dBytes [32]byte
-	copy(dBytes[:], d)
-	var mBytes [32]byte
-	copy(mBytes[:], m)
-	inputs := [][]byte{dBytes, mBytes}
-	req := &pb.HashRequest{
-		Inputs: inputs,
-	}
-
-	response, err := c.poseidon.Hash(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return response.Hash, err
-}
-
-// AddBid will add a bid to the BidList.
-func (c *Chain) addBid(bid user.Bid) {
-	// Check for duplicates
-	for _, bidFromList := range *c.bidList {
-		if bidFromList.Equals(bid) {
-			return
-		}
-	}
-
-	*c.bidList = append(*c.bidList, bid)
-}
-
-// RemoveBid will iterate over a BidList to remove a specified bid.
-func (c *Chain) removeBid(bid user.Bid) {
-	for i, bidFromList := range *c.bidList {
-		if bidFromList.Equals(bid) {
-			c.bidList.Remove(i)
-		}
-	}
-}
-
-// RemoveExpired iterates over a BidList to remove expired bids.
-func (c *Chain) removeExpiredBids(round uint64) {
-	for _, bid := range *c.bidList {
-		if bid.EndHeight < round {
-			// We need to call RemoveBid here and loop twice, as the index
-			// could be off if more than one bid is removed.
-			c.removeBid(bid)
-		}
-	}
 }
 
 func (c *Chain) handleCertificateMessage(cMsg certMsg) {
@@ -786,8 +581,5 @@ func (c *Chain) resetState() error {
 	c.intermediateBlock = intermediateBlock
 
 	c.lastCertificate = block.EmptyCertificate()
-	if err := c.restoreConsensusData(); err != nil {
-		log.WithError(err).Warnln("error in calling chain.restoreConsensusData from resetState. The error is not propagated")
-	}
 	return nil
 }

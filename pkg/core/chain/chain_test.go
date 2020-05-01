@@ -2,7 +2,6 @@ package chain
 
 import (
 	"bytes"
-	"context"
 	"testing"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -24,7 +22,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -198,7 +195,7 @@ func TestFetchTip(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	loader := createLoader()
-	chain, err := New(eb, rpc, nil, loader, &MockVerifier{}, nil)
+	chain, err := New(eb, rpc, nil, loader, &MockVerifier{}, nil, nil)
 
 	assert.Nil(t, err)
 
@@ -220,7 +217,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	chain, err := New(eb, rpc, counter, createLoader(), &MockVerifier{}, nil)
+	chain, err := New(eb, rpc, counter, createLoader(), &MockVerifier{}, nil, nil)
 	assert.Nil(t, err)
 
 	// Add some provisioners to our chain, including one that is just about to expire
@@ -248,152 +245,67 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	// assert.False(t, chain.p.GetMember(k[0].BLSPubKeyBytes) == nil)
 }
 
-func TestAddAndRemoveBid(t *testing.T) {
-	eb := eventbus.New()
-	rpc := rpcbus.New()
-	c, err := New(eb, rpc, nil, createLoader(), &MockVerifier{}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bid := createBid(t)
-
-	c.addBid(bid)
-	assert.True(t, c.bidList.Contains(bid))
-
-	c.removeBid(bid)
-	assert.False(t, c.bidList.Contains(bid))
-}
-
-func TestRemoveExpired(t *testing.T) {
-	_, _, c := setupChainTest(t, false)
-
-	for i := 0; i < 10; i++ {
-		bid := createBid(t)
-		c.addBid(bid)
-	}
-
-	// Let's change the end heights alternatingly, to make sure the bidlist removes bids properly
-	bl := *c.bidList
-	for i, bid := range bl {
-		if i%2 == 0 {
-			bid.EndHeight = 2000
-			bl[i] = bid
-		}
-	}
-
-	c.bidList = &bl
-
-	// All other bids have their end height at 1000 - so let's remove them
-	c.removeExpiredBids(1001)
-
-	assert.Equal(t, 5, len(*c.bidList))
-
-	for _, bid := range *c.bidList {
-		assert.Equal(t, uint64(2000), bid.EndHeight)
-	}
-}
-
-// Add and then a remove a provisioner, to check if removal works properly.
-func TestRemove(t *testing.T) {
-	_, _, c := setupChainTest(t, false)
-
-	keys, _ := key.NewRandKeys()
-	if err := c.addProvisioner(keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
-		t.Fatal(err)
-	}
-
-	assert.NotNil(t, c.p.GetMember(keys.BLSPubKeyBytes))
-	assert.Equal(t, 1, len(c.p.Members))
-
-	if !c.removeProvisioner(keys.BLSPubKeyBytes) {
-		t.Fatal("could not remove a member we just added")
-	}
-
-	assert.Equal(t, 0, len(c.p.Members))
-}
-
-func TestRemoveExpiredProvisioners(t *testing.T) {
-	_, _, c := setupChainTest(t, false)
-
-	for i := 0; i < 10; i++ {
-		keys, _ := key.NewRandKeys()
-		if err := c.addProvisioner(keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	assert.Equal(t, 10, len(c.p.Members))
-
-	var i int
-	for _, p := range c.p.Members {
-		if i%2 == 0 {
-			p.Stakes[0].EndHeight = 2000
-		}
-		i++
-	}
-
-	c.removeExpiredProvisioners(1001)
-	assert.Equal(t, 5, len(c.p.Members))
-}
-
 func TestRebuildChain(t *testing.T) {
-	eb, rb, c := setupChainTest(t, true)
-	catchClearWalletDatabaseRequest(rb)
-	go c.Listen()
+	// TODO: rework this for RUSK integration
+	/*
+		eb, rb, c := setupChainTest(t, true)
+		catchClearWalletDatabaseRequest(rb)
+		go c.Listen()
 
-	// Listen for `StopConsensus` messages
-	stopConsensusChan := make(chan message.Message, 1)
-	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
+		// Listen for `StopConsensus` messages
+		stopConsensusChan := make(chan message.Message, 1)
+		eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
 
-	// Add a block so that we have a bit of chain state
-	// to check against.
-	blk := mockAcceptableBlock(t, c.prevBlock)
+		// Add a block so that we have a bit of chain state
+		// to check against.
+		blk := mockAcceptableBlock(t, c.prevBlock)
 
-	assert.NoError(t, c.AcceptBlock(*blk))
+		assert.NoError(t, c.AcceptBlock(*blk))
 
-	// Chain prevBlock should now no longer be genesis
-	genesis := c.loader.(*DBLoader).genesis
-	//genesis := cfg.DecodeGenesis()
-	assert.False(t, genesis.Equals(&c.prevBlock))
+		// Chain prevBlock should now no longer be genesis
+		genesis := c.loader.(*DBLoader).genesis
+		//genesis := cfg.DecodeGenesis()
+		assert.False(t, genesis.Equals(&c.prevBlock))
 
-	// Let's manually update some of the in-memory state, as it is
-	// difficult to do this through mocked blocks in a test.
-	p, ks := consensus.MockProvisioners(5)
-	for _, k := range ks {
-		assert.NoError(t, c.addProvisioner(k.BLSPubKeyBytes, 50000, 1, 2000))
-	}
+		// Let's manually update some of the in-memory state, as it is
+		// difficult to do this through mocked blocks in a test.
+		p, ks := consensus.MockProvisioners(5)
+		for _, k := range ks {
+			assert.NoError(t, c.addProvisioner(k.BLSPubKeyBytes, 50000, 1, 2000))
+		}
 
-	c.lastCertificate = createMockedCertificate(c.intermediateBlock.Header.Hash, 2, ks, p)
-	c.intermediateBlock = helper.RandomBlock(t, 2, 2)
-	bids := make(user.BidList, 0)
-	for i := 0; i < 3; i++ {
-		bid := createBid(t)
-		bids = append(bids, bid)
-		*c.bidList = append(*c.bidList, bid)
-	}
+		c.lastCertificate = createMockedCertificate(c.intermediateBlock.Header.Hash, 2, ks, p)
+		c.intermediateBlock = helper.RandomBlock(t, 2, 2)
+		bids := make(user.BidList, 0)
+		for i := 0; i < 3; i++ {
+			bid := createBid(t)
+			bids = append(bids, bid)
+			*c.bidList = append(*c.bidList, bid)
+		}
 
-	// Now, send a request to rebuild the chain
-	_, err := c.RebuildChain(context.Background(), &node.EmptyRequest{})
-	assert.NoError(t, err)
+		// Now, send a request to rebuild the chain
+		_, err := c.RebuildChain(context.Background(), &node.EmptyRequest{})
+		assert.NoError(t, err)
 
-	// We should be back at the genesis chain state
-	assert.True(t, genesis.Equals(&c.prevBlock))
-	for _, k := range ks {
-		assert.Nil(t, c.p.GetMember(k.BLSPubKeyBytes))
-	}
+		// We should be back at the genesis chain state
+		assert.True(t, genesis.Equals(&c.prevBlock))
+		for _, k := range ks {
+			assert.Nil(t, c.p.GetMember(k.BLSPubKeyBytes))
+		}
 
-	assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
-	intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
-	assert.NoError(t, err)
-	assert.True(t, c.intermediateBlock.Equals(intermediateBlock))
+		assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
+		intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
+		assert.NoError(t, err)
+		assert.True(t, c.intermediateBlock.Equals(intermediateBlock))
 
-	for _, bid := range bids {
-		assert.False(t, c.bidList.Contains(bid))
-	}
+		for _, bid := range bids {
+			assert.False(t, c.bidList.Contains(bid))
+		}
 
-	// Ensure we got a `StopConsensus` message
-	<-stopConsensusChan
+		// Ensure we got a `StopConsensus` message
+		<-stopConsensusChan
+	*/
+
 }
 
 //nolint:unused
@@ -444,14 +356,9 @@ func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpc
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
 	loader := createLoader()
-	c, err := New(eb, rpc, counter, loader, &MockVerifier{}, nil)
+	c, err := New(eb, rpc, counter, loader, &MockVerifier{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if !includeGenesis {
-		c.removeExpiredBids(transactions.GenesisExpirationHeight)
-		c.removeExpiredProvisioners(transactions.GenesisExpirationHeight)
 	}
 
 	return eb, rpc, c

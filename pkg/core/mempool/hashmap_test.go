@@ -3,11 +3,11 @@ package mempool
 import (
 	"errors"
 	"math"
-	"math/big"
 	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -22,8 +22,9 @@ func TestSortedKeys(t *testing.T) {
 
 		tx := helper.RandomStandardTx(t, false)
 
-		randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(10000)))
-		tx.Fee.SetBigInt(randFee)
+		// TODO: rework for RUSK integration
+		// randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(10000)))
+		// tx.Fee.SetBigInt(randFee)
 
 		td := TxDesc{tx: tx}
 		if err := pool.Put(td); err != nil {
@@ -38,7 +39,7 @@ func TestSortedKeys(t *testing.T) {
 
 	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
 
-		val := t.tx.StandardTx().Fee.BigInt().Uint64()
+		val := t.tx.StandardTx().Fee.Value
 		if prevVal < val {
 			return false, errors.New("keys not in a descending order")
 		}
@@ -61,8 +62,9 @@ func TestStableSortedKeys(t *testing.T) {
 
 		tx := helper.RandomStandardTx(t, false)
 
-		constFee := big.NewInt(0).SetUint64(20)
-		tx.Fee.SetBigInt(constFee)
+		// TODO: rework for RUSK integration
+		// constFee := big.NewInt(0).SetUint64(20)
+		// tx.Fee.SetBigInt(constFee)
 
 		td := TxDesc{tx: tx, received: time.Now()}
 		if err := pool.Put(td); err != nil {
@@ -99,12 +101,17 @@ func TestGet(t *testing.T) {
 
 		tx := helper.RandomStandardTx(t, false)
 
-		constFee := big.NewInt(0).SetUint64(20)
-		tx.Fee.SetBigInt(constFee)
+		// TODO: rework for RUSK integration
+		// constFee := big.NewInt(0).SetUint64(20)
+		// tx.Fee.SetBigInt(constFee)
 
-		hash, _ := tx.CalculateHash()
-		tx.TxID = hash
-		hashes[i] = tx.TxID
+		payload, err := block.NewSHA3Payload(tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		hash, _ := payload.CalculateHash()
+		hashes[i] = hash
 
 		td := TxDesc{tx: tx, received: time.Now()}
 		if err := pool.Put(td); err != nil {
@@ -165,7 +172,13 @@ func BenchmarkContains(b *testing.B) {
 
 	for tN := 0; tN < b.N; tN++ {
 		for i := 0; i < len(txs); i++ {
-			if !pool.Contains(txs[i].TxID) {
+			payload, err := block.NewSHA3Payload(txs[i])
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			txid, _ := payload.CalculateHash()
+			if !pool.Contains(txid) {
 				b.Fatal("missing tx")
 			}
 		}
@@ -203,22 +216,26 @@ func BenchmarkRangeSort(b *testing.B) {
 	b.Logf("Pool number of txs: %d", pool.Len())
 }
 
-func dummyTransactionsSet(size int) []*transactions.Standard {
+func dummyTransactionsSet(size int) []transactions.ContractCall {
+	// TODO: rework for RUSK integration
 
-	txs := make([]*transactions.Standard, size)
-	// Generate N random tx
-	dummyTx, _ := transactions.NewStandard(0, 2, 0)
-	for i := 0; i < len(txs); i++ {
+	/*
+		txs := make([]transactions.ContractCall, size)
+		// Generate N random tx
+		dummyTx, _ := transactions.NewStandard(0, 2, 0)
+		for i := 0; i < len(txs); i++ {
 
-		// change fee to enable sorting
-		randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(1000000)))
-		dummyTx.Fee.SetBigInt(randFee)
+			// change fee to enable sorting
+			randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(1000000)))
+			dummyTx.Fee.SetBigInt(randFee)
 
-		clone := *dummyTx
-		clone.TxID, _ = crypto.RandEntropy(32)
+			clone := *dummyTx
+			clone.TxID, _ = crypto.RandEntropy(32)
 
-		txs[i] = &clone
-	}
+			txs[i] = &clone
+		}
 
-	return txs
+		return txs
+	*/
+	return nil
 }

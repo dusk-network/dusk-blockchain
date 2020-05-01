@@ -80,17 +80,12 @@ func (db *DB) FetchTxRecords() ([]txrecords.TxRecord, error) {
 }
 
 // PutTxRecord saves the transaction record on the DB
-func (db *DB) PutTxRecord(tx transactions.Transaction, direction txrecords.Direction, privView *key.PrivateView) error {
+func (db *DB) PutTxRecord(tx transactions.ContractCall, height uint64, direction txrecords.Direction, privView *key.PrivateView) error {
 	// Schema
 	//
 	// key: txRecordPrefix + record
 	// value: 0
 	buf := new(bytes.Buffer)
-	height, err := db.GetWalletHeight()
-	if err != nil {
-		return err
-	}
-
 	txRecord := txrecords.New(tx, height, direction, privView)
 	if err := txrecords.Encode(buf, txRecord); err != nil {
 		return err

@@ -16,8 +16,8 @@ var (
 	byteOrder = binary.LittleEndian
 )
 
-// EncodeBlockTx tries to serialize type, index and encoded value of transactions.Transaction
-func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) {
+// EncodeBlockTx tries to serialize type, index and encoded value of transactions.ContractCall
+func EncodeBlockTx(tx transactions.ContractCall, txIndex uint32) ([]byte, error) {
 
 	buf := new(bytes.Buffer)
 
@@ -34,7 +34,7 @@ func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) 
 		return nil, err
 	}
 
-	// Write transactions.Transaction bytes
+	// Write transactions.ContractCall bytes
 	err := message.MarshalTx(buf, tx)
 	if err != nil {
 		return nil, err
@@ -44,11 +44,11 @@ func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) 
 }
 
 // DecodeBlockTx tries to deserialize the type, index and decoded value of a tx
-func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Transaction, uint32, error) {
+func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.ContractCall, uint32, error) {
 
 	txIndex := uint32(math.MaxUint32)
 
-	var tx transactions.Transaction
+	var tx transactions.ContractCall
 	reader := bytes.NewBuffer(data)
 
 	// Peak the type from the first byte

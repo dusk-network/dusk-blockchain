@@ -112,7 +112,12 @@ func (d *DataBroker) SendTxsItems() error {
 		msg := &peermsg.Inv{}
 
 		for _, tx := range txs {
-			txID, err := tx.CalculateHash()
+			payload, err := block.NewSHA3Payload(tx)
+			if err != nil {
+				return err
+			}
+
+			txID, err := payload.CalculateHash()
 			if err != nil {
 				return err
 			}
@@ -151,11 +156,11 @@ func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
 	return buf, nil
 }
 
-func marshalTx(tx transactions.Transaction) (*bytes.Buffer, error) {
+func marshalTx(tx transactions.ContractCall) (*bytes.Buffer, error) {
 	//TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
 	// buf := topics.Topics[topics.Block].Buffer
-	buf := new(bytes.Buffer)
-	if err := message.MarshalTx(buf, tx); err != nil {
+	buf, err := transactions.Marshal(tx)
+	if err != nil {
 		return nil, err
 	}
 

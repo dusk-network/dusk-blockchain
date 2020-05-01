@@ -213,8 +213,8 @@ func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) 
 	switch topic {
 
 	case topics.Tx:
-		tx := payload.(transactions.Transaction)
-		err = MarshalTx(buf, tx)
+		tx := payload.(transactions.ContractCall)
+		buf, err = transactions.Marshal(tx)
 	case topics.Candidate, topics.RoundResults:
 		candidate := payload.(Candidate)
 		err = MarshalCandidate(buf, candidate)

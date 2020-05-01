@@ -1,14 +1,14 @@
 package block
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-crypto/merkletree"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 // Block defines a block on the Dusk blockchain.
 type Block struct {
 	Header *Header
-	Txs    []*rusk.ContractCallTx
+	Txs    []transactions.ContractCall
 }
 
 // NewBlock will return an empty Block with an empty BlockHeader.
@@ -28,7 +28,7 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 	// convert Transaction interface to Payload interface
 	var txs []merkletree.Payload
 	for i := 0; i < len(b.Txs); i++ {
-		tx, err := newSHA3Payload(b.Txs[i])
+		tx, err := NewSHA3Payload(b.Txs[i])
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +44,7 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 }
 
 // AddTx will add a transaction to the block.
-func (b *Block) AddTx(tx *rusk.ContractCallTx) {
+func (b *Block) AddTx(tx transactions.ContractCall) {
 	b.Txs = append(b.Txs, tx)
 }
 
@@ -74,8 +74,8 @@ func (b *Block) Equals(other *Block) bool {
 	}
 
 	for i := 0; i < len(b.Txs); i++ {
-		tx, _ := newSHA3Payload(b.Txs[i])
-		otherTx, _ := newSHA3Payload(other.Txs[i])
+		tx, _ := NewSHA3Payload(b.Txs[i])
+		otherTx, _ := NewSHA3Payload(other.Txs[i])
 
 		if !tx.Equals(otherTx) {
 			return false

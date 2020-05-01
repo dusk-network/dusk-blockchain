@@ -45,10 +45,15 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	t.batch[blocksInd][toKey(b.Header.Hash)] = blockBytes
 
-	// Map txId to transactions.Transaction
+	// Map txId to transactions.ContractCall
 	for i, tx := range b.Txs {
 
-		txID, err := tx.CalculateHash()
+		payload, err := block.NewSHA3Payload(tx)
+		if err != nil {
+			return err
+		}
+
+		txID, err := payload.CalculateHash()
 		if err != nil {
 			return err
 		}
@@ -64,21 +69,6 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 		t.batch[txsInd][toKey(txID)] = data
 		t.batch[txHashInd][toKey(txID)] = b.Header.Hash
-
-		// Map KeyImage to Transaction
-		for _, input := range tx.StandardTx().Inputs {
-			t.batch[keyImagesInd][toKey(input.KeyImage.Bytes())] = txID
-		}
-
-		for i, output := range tx.StandardTx().Outputs {
-			value := make([]byte, 8)
-			// Only lock the first output, so that change outputs are
-			// not affected.
-			if i == 0 {
-				binary.LittleEndian.PutUint64(value, tx.LockTime()+b.Header.Height)
-			}
-			t.batch[outputKeyInd][toKey(output.PubKey.P.Bytes())] = value
-		}
 	}
 
 	// Map height to buffer bytes
@@ -145,7 +135,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	return b.Header, nil
 }
 
-func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.Transaction, error) {
+func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.ContractCall, error) {
 
 	var data []byte
 	var exists bool
@@ -184,7 +174,7 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 	return b.Header.Hash, nil
 }
 
-func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, uint32, []byte, error) {
+func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall, uint32, []byte, error) {
 
 	var data []byte
 	var exists bool

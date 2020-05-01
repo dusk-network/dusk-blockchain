@@ -1,10 +1,24 @@
 package transactions
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+)
+
+type TxType uint8
+
+const (
+	Tx TxType = iota
+	Distribute
+	WithdrawFees
+	Bid
+	Stake
+	Slash
+	WithdrawStake
+	WithdrawBid
 )
 
 type NoteType int32
@@ -14,6 +28,11 @@ const (
 	NoteType_OBFUSCATED  NoteType = 1
 )
 
+type ContractCall interface {
+	Type() TxType
+	StandardTx() *Transaction
+}
+
 type DistributeTransaction struct {
 	TotalReward           uint64       `protobuf:"fixed64,1,opt,name=total_reward,json=totalReward,proto3" json:"total_reward,omitempty"`
 	ProvisionersAddresses []byte       `protobuf:"bytes,2,opt,name=provisioners_addresses,json=provisionersAddresses,proto3" json:"provisioners_addresses,omitempty"`
@@ -21,11 +40,27 @@ type DistributeTransaction struct {
 	Tx                    *Transaction `protobuf:"bytes,4,opt,name=tx,proto3" json:"tx,omitempty"`
 }
 
+func (d *DistributeTransaction) Type() TxType {
+	return Distribute
+}
+
+func (d *DistributeTransaction) StandardTx() *Transaction {
+	return d.Tx
+}
+
 type WithdrawFeesTransaction struct {
 	BlsKey []byte       `protobuf:"bytes,1,opt,name=bls_key,json=blsKey,proto3" json:"bls_key,omitempty"`
 	Sig    []byte       `protobuf:"bytes,2,opt,name=sig,proto3" json:"sig,omitempty"`
 	Msg    []byte       `protobuf:"bytes,3,opt,name=msg,proto3" json:"msg,omitempty"`
 	Tx     *Transaction `protobuf:"bytes,4,opt,name=tx,proto3" json:"tx,omitempty"`
+}
+
+func (w *WithdrawFeesTransaction) Type() TxType {
+	return WithdrawFees
+}
+
+func (w *WithdrawFeesTransaction) StandardTx() *Transaction {
+	return w.Tx
 }
 
 type SlashTransaction struct {
@@ -39,11 +74,27 @@ type SlashTransaction struct {
 	Tx        *Transaction `protobuf:"bytes,8,opt,name=tx,proto3" json:"tx,omitempty"`
 }
 
+func (s *SlashTransaction) Type() TxType {
+	return Slash
+}
+
+func (s *SlashTransaction) StandardTx() *Transaction {
+	return s.Tx
+}
+
 type StakeTransaction struct {
 	BlsKey           []byte       `protobuf:"bytes,1,opt,name=bls_key,json=blsKey,proto3" json:"bls_key,omitempty"`
 	Value            uint64       `protobuf:"fixed64,2,opt,name=value,proto3" json:"value,omitempty"` // Should be the leftover value that was burned in `tx`
 	ExpirationHeight uint64       `protobuf:"fixed64,3,opt,name=expiration_height,json=expirationHeight,proto3" json:"expiration_height,omitempty"`
 	Tx               *Transaction `protobuf:"bytes,4,opt,name=tx,proto3" json:"tx,omitempty"`
+}
+
+func (s *StakeTransaction) Type() TxType {
+	return Stake
+}
+
+func (s *StakeTransaction) StandardTx() *Transaction {
+	return s.Tx
 }
 
 type BidTransaction struct {
@@ -58,6 +109,14 @@ type BidTransaction struct {
 	Tx               *Transaction `protobuf:"bytes,9,opt,name=tx,proto3" json:"tx,omitempty"`
 }
 
+func (b *BidTransaction) Type() TxType {
+	return Bid
+}
+
+func (b *BidTransaction) StandardTx() *Transaction {
+	return b.Tx
+}
+
 type WithdrawBidTransaction struct {
 	Commitment       []byte       `protobuf:"bytes,1,opt,name=commitment,proto3" json:"commitment,omitempty"`
 	EncryptedValue   []byte       `protobuf:"bytes,2,opt,name=encrypted_value,json=encryptedValue,proto3" json:"encrypted_value,omitempty"`
@@ -67,10 +126,26 @@ type WithdrawBidTransaction struct {
 	Tx               *Transaction `protobuf:"bytes,6,opt,name=tx,proto3" json:"tx,omitempty"`
 }
 
+func (w *WithdrawBidTransaction) Type() TxType {
+	return WithdrawBid
+}
+
+func (w *WithdrawBidTransaction) StandardTx() *Transaction {
+	return w.Tx
+}
+
 type WithdrawStakeTransaction struct {
 	BlsKey []byte       `protobuf:"bytes,1,opt,name=bls_key,json=blsKey,proto3" json:"bls_key,omitempty"`
 	Sig    []byte       `protobuf:"bytes,2,opt,name=sig,proto3" json:"sig,omitempty"`
 	Tx     *Transaction `protobuf:"bytes,3,opt,name=tx,proto3" json:"tx,omitempty"`
+}
+
+func (w *WithdrawStakeTransaction) Type() TxType {
+	return WithdrawStake
+}
+
+func (w *WithdrawStakeTransaction) StandardTx() *Transaction {
+	return w.Tx
 }
 
 type Transaction struct {
@@ -78,6 +153,14 @@ type Transaction struct {
 	Outputs []*TransactionOutput `protobuf:"bytes,2,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	Fee     *TransactionOutput   `protobuf:"bytes,3,opt,name=fee,proto3" json:"fee,omitempty"`
 	Proof   []byte               `protobuf:"bytes,4,opt,name=proof,proto3" json:"proof,omitempty"`
+}
+
+func (t *Transaction) Type() TxType {
+	return Tx
+}
+
+func (t *Transaction) StandardTx() *Transaction {
+	return t
 }
 
 type TransactionInput struct {
@@ -137,6 +220,62 @@ type ViewKey struct {
 type PublicKey struct {
 	AG *CompressedPoint `protobuf:"bytes,1,opt,name=a_g,json=aG,proto3" json:"a_g,omitempty"`
 	BG *CompressedPoint `protobuf:"bytes,2,opt,name=b_g,json=bG,proto3" json:"b_g,omitempty"`
+}
+
+func Marshal(c ContractCall) (*bytes.Buffer, error) {
+	var byteArr []byte
+	var err error
+
+	switch t := c.(type) {
+	case *Transaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+	case *WithdrawFeesTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+	case *StakeTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+	case *BidTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+	case *SlashTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+	case *DistributeTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+	case *WithdrawStakeTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+	case *WithdrawBidTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("structure to encode is not a contract call")
+	}
+
+	return bytes.NewBuffer(byteArr), err
+}
+
+func Unmarshal(buf *bytes.Buffer, c ContractCall) error {
+	return json.Unmarshal(buf.Bytes(), &c)
 }
 
 func DecodeContractCall(contractCall *rusk.ContractCallTx) (interface{}, error) {

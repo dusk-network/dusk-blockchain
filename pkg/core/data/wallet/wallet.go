@@ -14,8 +14,7 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/syndtr/goleveldb/leveldb"
+	"golang.org/x/crypto/sha3"
 )
 
 // DUSK is one whole unit of DUSK.
@@ -139,22 +138,6 @@ func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, password string,
 		secretKey:     secretKey,
 	}
 
-	// Check if this is a new wallet
-	_, err = w.db.GetWalletHeight()
-	if err == nil {
-		return w, nil
-	}
-
-	if err != leveldb.ErrNotFound {
-		return nil, err
-	}
-
-	// Add height of zero into database
-	err = w.UpdateWalletHeight(0)
-	if err != nil {
-		return nil, err
-	}
-
 	return w, nil
 }
 
@@ -216,4 +199,16 @@ func (w *Wallet) Keys() consensuskey.Keys {
 // ClearDatabase will remove all info from the database.
 func (w *Wallet) ClearDatabase() error {
 	return w.db.Clear()
+}
+
+func generateKeys(seed []byte) (consensuskey.Keys, error) {
+	// Consensus keys require >80 bytes of seed, so we will hash seed twice and concatenate
+	// both hashes to get 128 bytes
+
+	seedHash := sha3.Sum512(seed)
+	secondSeedHash := sha3.Sum512(seedHash[:])
+
+	consensusSeed := append(seedHash[:], secondSeedHash[:]...)
+
+	return consensuskey.NewKeysFromBytes(consensusSeed)
 }

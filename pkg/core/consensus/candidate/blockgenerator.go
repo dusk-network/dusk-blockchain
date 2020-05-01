@@ -2,11 +2,8 @@ package candidate
 
 import (
 	"bytes"
-	"math/big"
 	"time"
 
-	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -183,9 +180,9 @@ func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 
 // ConstructBlockTxs will fetch all valid transactions from the mempool, prepend a coinbase
 // transaction, and return them all.
-func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Transaction, error) {
+func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.ContractCall, error) {
 
-	txs := make([]transactions.Transaction, 0)
+	txs := make([]transactions.ContractCall, 0)
 
 	// Construct and append coinbase Tx to reward the generator
 	coinbaseTx := constructCoinbaseTx(bg.genPubKey, proof, score)
@@ -207,7 +204,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 		if err != nil {
 			return nil, err
 		}
-		txs = append(txs, resp.([]transactions.Transaction)...)
+		txs = append(txs, resp.([]transactions.ContractCall)...)
 	}
 
 	// TODO Append Provisioners rewards
@@ -216,31 +213,36 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 }
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
-func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) *transactions.Coinbase {
-	// The rewards for both the Generator and the Provisioners are disclosed.
-	// Provisioner reward addresses do not require obfuscation
-	// The Generator address rewards do.
+func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) *transactions.DistributeTransaction {
+	// TODO: adjust this for rusk/phoenix
+	/*
+		// The rewards for both the Generator and the Provisioners are disclosed.
+		// Provisioner reward addresses do not require obfuscation
+		// The Generator address rewards do.
 
-	// Construct one-time address derived from block generator public key
-	// the big random number to be used in calculating P and R
-	var r ristretto.Scalar
-	r.Rand()
+		// Construct one-time address derived from block generator public key
+		// the big random number to be used in calculating P and R
+		var r ristretto.Scalar
+		r.Rand()
 
-	// Create transaction
-	tx := transactions.NewCoinbase(proof, score, 2)
+		// Create transaction
+		tx := transactions.NewCoinbase(proof, score, 2)
 
-	// Set r to our generated value
-	tx.SetTxPubKey(r)
+		// Set r to our generated value
+		tx.SetTxPubKey(r)
 
-	// Disclose  reward
-	var reward ristretto.Scalar
-	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
+		// Disclose  reward
+		var reward ristretto.Scalar
+		reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
 
-	// Store the reward in the coinbase tx
-	// TODO: what happens if the maximum amount of outputs has been reached?
-	_ = tx.AddReward(*rewardReceiver, reward)
+		// Store the reward in the coinbase tx
+		// TODO: what happens if the maximum amount of outputs has been reached?
+		_ = tx.AddReward(*rewardReceiver, reward)
 
-	// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
-	// This could be achieved with a request to dusk-blockchain/pkg/core/data
-	return tx
+		// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
+		// This could be achieved with a request to dusk-blockchain/pkg/core/data
+		return tx
+	*/
+
+	return nil
 }

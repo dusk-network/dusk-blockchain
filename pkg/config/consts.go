@@ -1,14 +1,10 @@
 package config
 
 import (
-	"bytes"
-	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	log "github.com/sirupsen/logrus"
 )
 
 // A signle point of constants definition
@@ -29,24 +25,27 @@ const (
 
 // DecodeGenesis marshals a genesis block into a buffer
 func DecodeGenesis() *block.Block {
-	b := block.NewBlock()
-	switch Get().General.Network {
-	case "testnet": //nolint
-		blob, err := hex.DecodeString(TestNetGenesisBlob)
-		if err != nil {
-			log.Panic(err)
-		}
+	/*
+		b := block.NewBlock()
+		switch Get().General.Network {
+		case "testnet": //nolint
+			blob, err := hex.DecodeString(TestNetGenesisBlob)
+			if err != nil {
+				log.Panic(err)
+			}
 
-		var buf bytes.Buffer
-		_, _ = buf.Write(blob)
-		if err := message.UnmarshalLegacyBlock(&buf, b); err != nil {
-			log.Panic(err)
-		}
+			var buf bytes.Buffer
+			_, _ = buf.Write(blob)
+			if err := message.UnmarshalLegacyBlock(&buf, b); err != nil {
+				log.Panic(err)
+			}
 
-		// For some reason, the testnet genesis block root hash
-		// is not correctly set.
-		root, _ := b.CalculateRoot()
-		b.Header.TxRoot = root
-	}
-	return b
+			// For some reason, the testnet genesis block root hash
+			// is not correctly set.
+			root, _ := b.CalculateRoot()
+			b.Header.TxRoot = root
+		}
+		return b
+	*/
+	return nil
 }

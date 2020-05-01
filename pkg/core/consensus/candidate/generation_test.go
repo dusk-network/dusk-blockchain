@@ -43,9 +43,9 @@ func TestGeneration(t *testing.T) {
 	// Block height should equal the round
 	assert.Equal(t, round, c.Header.Height)
 
-	// First transaction should be coinbase
-	if _, ok := c.Txs[0].(*transactions.Coinbase); !ok {
-		t.Fatal("first transaction in candidate should be a coinbase")
+	// Last transaction should be coinbase
+	if _, ok := c.Txs[len(c.Txs)-1].(*transactions.DistributeTransaction); !ok {
+		t.Fatal("last transaction in candidate should be a coinbase")
 	}
 
 	// Should contain correct amount of txs

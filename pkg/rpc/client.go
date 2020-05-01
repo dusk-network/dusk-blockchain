@@ -2,8 +2,9 @@ package rpc
 
 import (
 	"context"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"time"
+
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -69,7 +70,7 @@ func (c *Client) listen() {
 	for {
 		select {
 		case r := <-c.validateSTChan:
-			resp, err := c.ValidateStateTransition(context.Background(), &rusk.ValidateStateTransitionRequest{Calls: r.Params.([]*rusk.ContractCall)})
+			resp, err := c.ValidateStateTransition(context.Background(), &rusk.ValidateStateTransitionRequest{Calls: r.Params.([]*rusk.ContractCallTx)})
 			r.RespChan <- rpcbus.NewResponse(resp, err)
 		case r := <-c.executeSTChan:
 			// TODO: add implementation for execute state transition

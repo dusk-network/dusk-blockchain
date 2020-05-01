@@ -3,9 +3,8 @@ package block
 import (
 	"bytes"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	"google.golang.org/protobuf/proto"
 )
 
 // SHA3Payload is a wrapper to the ContractCallTx which is used to facilitate
@@ -14,13 +13,13 @@ type SHA3Payload struct {
 	hash []byte
 }
 
-func newSHA3Payload(tx *rusk.ContractCallTx) (SHA3Payload, error) {
-	out, err := proto.Marshal(tx)
+func NewSHA3Payload(tx transactions.ContractCall) (SHA3Payload, error) {
+	out, err := transactions.Marshal(tx)
 	if err != nil {
 		return SHA3Payload{}, err
 	}
 
-	h, herr := hash.Sha3256(out)
+	h, herr := hash.Sha3256(out.Bytes())
 	if herr != nil {
 		return SHA3Payload{}, err
 	}

@@ -1,12 +1,7 @@
 package chain
 
 import (
-	"math/big"
-
-	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
@@ -98,18 +93,23 @@ func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, er
 	return blk, nil
 }
 
-func mockDeterministicCoinbase() transactions.Transaction {
-	seed := make([]byte, 32)
+func mockDeterministicCoinbase() transactions.ContractCall {
+	// TODO: update for phoenix
+	/*
+		seed := make([]byte, 32)
 
-	keyPair := key.NewKeyPair(seed)
-	tx := transactions.NewCoinbase(make([]byte, 32), make([]byte, 32), 2)
-	var r ristretto.Scalar
-	r.SetZero()
-	tx.SetTxPubKey(r)
+		keyPair := key.NewKeyPair(seed)
+		tx := transactions.NewCoinbase(make([]byte, 32), make([]byte, 32), 2)
+		var r ristretto.Scalar
+		r.SetZero()
+		tx.SetTxPubKey(r)
 
-	var reward ristretto.Scalar
-	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
+		var reward ristretto.Scalar
+		reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
 
-	_ = tx.AddReward(*keyPair.PublicKey(), reward)
-	return tx
+		_ = tx.AddReward(*keyPair.PublicKey(), reward)
+		return tx
+	*/
+
+	return nil
 }

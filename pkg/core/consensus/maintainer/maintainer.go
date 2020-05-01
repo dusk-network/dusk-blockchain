@@ -9,7 +9,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -184,10 +183,11 @@ func (m *StakeAutomaton) getTxSettings() (uint64, uint64) {
 	settings := config.Get().Consensus
 	amount := settings.DefaultAmount
 	lockTime := settings.DefaultLockTime
-	if lockTime > transactions.MaxLockTime {
-		l.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v", lockTime, transactions.MaxLockTime)
-		lockTime = transactions.MaxLockTime
-	}
+	// TODO: this no longer exists. investigate if we should reinstate it
+	// if lockTime > transactions.MaxLockTime {
+	// 	l.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v", lockTime, transactions.MaxLockTime)
+	// 	lockTime = transactions.MaxLockTime
+	// }
 
 	// Convert amount from atomic units to whole units of DUSK
 	amount = amount * wallet.DUSK

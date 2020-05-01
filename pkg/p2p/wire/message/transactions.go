@@ -2,90 +2,93 @@ package message
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
-	"math"
-	"math/big"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-crypto/mlsag"
 )
 
 // UnmarshalTxMessage unmarshals a Message carrying a tx from a buffer
 func UnmarshalTxMessage(r *bytes.Buffer, m SerializableMessage) error {
-	tx, err := UnmarshalTx(r)
-	if err != nil {
-		return err
-	}
-	m.SetPayload(tx)
+	/*
+		tx, err := UnmarshalTx(r)
+		if err != nil {
+			return err
+		}
+		m.SetPayload(tx)
+	*/
 	return nil
 }
 
 //UnmarshalTx unmarshals a tx from a buffer
-func UnmarshalTx(r *bytes.Buffer) (transactions.Transaction, error) {
-	var txType uint8
-	if err := encoding.ReadUint8(r, &txType); err != nil {
-		return nil, err
-	}
-
-	// Unmarshal
-	switch transactions.TxType(txType) {
-	case transactions.StandardType:
-		tx := &transactions.Standard{TxType: transactions.TxType(txType)}
-		err := UnmarshalStandard(r, tx)
-		return tx, err
-	case transactions.TimelockType:
-		tx, err := transactions.NewTimelock(0, 0, 0, 0)
-		if err != nil {
+func UnmarshalTx(r *bytes.Buffer) (transactions.ContractCall, error) {
+	/*
+		var txType uint8
+		if err := encoding.ReadUint8(r, &txType); err != nil {
 			return nil, err
 		}
 
-		err = UnmarshalTimelock(r, tx)
-		return tx, err
-	case transactions.BidType:
-		tx, err := transactions.NewBid(0, 0, 0, 0, nil)
-		if err != nil {
-			return nil, err
-		}
+		// Unmarshal
+		switch transactions.TxType(txType) {
+		case transactions.StandardType:
+			tx := &transactions.Standard{TxType: transactions.TxType(txType)}
+			err := UnmarshalStandard(r, tx)
+			return tx, err
+		case transactions.TimelockType:
+			tx, err := transactions.NewTimelock(0, 0, 0, 0)
+			if err != nil {
+				return nil, err
+			}
 
-		err = UnmarshalBid(r, tx)
-		return tx, err
-	case transactions.StakeType:
-		tx, err := transactions.NewStake(0, 0, 0, 0, nil)
-		if err != nil {
-			return nil, err
-		}
+			err = UnmarshalTimelock(r, tx)
+			return tx, err
+		case transactions.BidType:
+			tx, err := transactions.NewBid(0, 0, 0, 0, nil)
+			if err != nil {
+				return nil, err
+			}
 
-		err = UnmarshalStake(r, tx)
-		return tx, err
-	case transactions.CoinbaseType:
-		tx := &transactions.Coinbase{TxType: transactions.TxType(txType)}
-		err := UnmarshalCoinbase(r, tx)
-		return tx, err
-	default:
-		return nil, fmt.Errorf("unknown transaction type: %d", txType)
-	}
+			err = UnmarshalBid(r, tx)
+			return tx, err
+		case transactions.StakeType:
+			tx, err := transactions.NewStake(0, 0, 0, 0, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			err = UnmarshalStake(r, tx)
+			return tx, err
+		case transactions.CoinbaseType:
+			tx := &transactions.Coinbase{TxType: transactions.TxType(txType)}
+			err := UnmarshalCoinbase(r, tx)
+			return tx, err
+		default:
+			return nil, fmt.Errorf("unknown transaction type: %d", txType)
+		}
+	*/
+	return nil, nil
 }
 
 // MarshalTx marshals a tx into a buffer
-func MarshalTx(r *bytes.Buffer, tx transactions.Transaction) error {
-	switch tx.Type() {
-	case transactions.StandardType:
-		return MarshalStandard(r, tx.(*transactions.Standard))
-	case transactions.TimelockType:
-		return MarshalTimelock(r, tx.(*transactions.Timelock))
-	case transactions.BidType:
-		return MarshalBid(r, tx.(*transactions.Bid))
-	case transactions.StakeType:
-		return MarshalStake(r, tx.(*transactions.Stake))
-	case transactions.CoinbaseType:
-		return MarshalCoinbase(r, tx.(*transactions.Coinbase))
-	default:
-		return fmt.Errorf("unknown transaction type: %d", tx.Type())
-	}
+func MarshalTx(r *bytes.Buffer, tx transactions.ContractCall) error {
+	/*
+		switch tx.Type() {
+		case transactions.StandardType:
+			return MarshalStandard(r, tx.(*transactions.Standard))
+		case transactions.TimelockType:
+			return MarshalTimelock(r, tx.(*transactions.Timelock))
+		case transactions.BidType:
+			return MarshalBid(r, tx.(*transactions.Bid))
+		case transactions.StakeType:
+			return MarshalStake(r, tx.(*transactions.Stake))
+		case transactions.CoinbaseType:
+			return MarshalCoinbase(r, tx.(*transactions.Coinbase))
+		default:
+			return fmt.Errorf("unknown transaction type: %d", tx.Type())
+		}
+	*/
+	return nil
 }
 
+/*
 // MarshalStandard marshals a standard transaction into a buffer
 func MarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 	return marshalStandard(w, s, true)
@@ -488,3 +491,4 @@ func UnmarshalInput(r *bytes.Buffer, i *transactions.Input) error {
 
 	return i.Signature.Decode(bytes.NewBuffer(sigBytes), true)
 }
+*/

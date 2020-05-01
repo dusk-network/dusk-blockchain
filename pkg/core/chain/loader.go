@@ -52,14 +52,15 @@ func (l *DBLoader) CheckBlock(prevBlock block.Block, blk block.Block) error {
 		return err
 	}
 
-	for i, merklePayload := range blk.Txs {
-		tx, ok := merklePayload.(transactions.Transaction)
+	for _, merklePayload := range blk.Txs {
+		_, ok := merklePayload.(transactions.ContractCall)
 		if !ok {
 			return errors.New("tx does not implement the transaction interface")
 		}
-		if err := verifiers.CheckTx(l.db, uint64(i), uint64(blk.Header.Timestamp), tx); err != nil {
-			return err
-		}
+		// TODO: should be a call to rusk method `VerifyTransaction`
+		// if err := verifiers.CheckTx(l.db, uint64(i), uint64(blk.Header.Timestamp), tx); err != nil {
+		// 	return err
+		// }
 	}
 	return nil
 }

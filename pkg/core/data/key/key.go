@@ -1,5 +1,7 @@
 package key
 
+// TODO: for the RUSK migration, this should hold Phoenix keys
+
 import (
 	"errors"
 

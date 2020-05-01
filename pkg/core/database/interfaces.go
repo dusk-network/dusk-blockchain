@@ -56,10 +56,10 @@ type Transaction interface {
 
 	FetchBlockHeader(hash []byte) (*block.Header, error)
 	// Fetch all of the Txs that belong to a block with this header.hash
-	FetchBlockTxs(hash []byte) ([]transactions.Transaction, error)
+	FetchBlockTxs(hash []byte) ([]transactions.ContractCall, error)
 	// Fetch tx by txID. If succeeds, it returns tx data, tx index and
 	// hash of the block it belongs to.
-	FetchBlockTxByHash(txID []byte) (tx transactions.Transaction, txIndex uint32, blockHeaderHash []byte, err error)
+	FetchBlockTxByHash(txID []byte) (tx transactions.ContractCall, txIndex uint32, blockHeaderHash []byte, err error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
 	// Fetch chain state information (chain tip hash)
