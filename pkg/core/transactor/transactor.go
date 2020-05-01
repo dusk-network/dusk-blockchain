@@ -2,6 +2,8 @@ package transactor
 
 import (
 	"context"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -20,20 +22,27 @@ type Transactor struct { // TODO: rename
 	// c                 *chainsync.Counter
 	// acceptedBlockChan <-chan block.Block
 
-	grpcClient rusk.RuskClient
+	secretKey *rusk.SecretKey
+
+	ruskClient       rusk.RuskClient
+	walletClient     node.WalletClient
+	transactorClient node.TransactorClient
+
+	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client rusk.RuskClient) *Transactor {
+func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client *rpc.Client) *Transactor {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
 
 	t := &Transactor{
-		db: db,
-		eb: eb,
-		// c:           counter,
-		grpcClient: client,
+		db:               db,
+		eb:               eb,
+		ruskClient:       client.RuskClient,
+		walletClient:     client.WalletClient,
+		transactorClient: client.TransactorClient,
 	}
 
 	if srv != nil {

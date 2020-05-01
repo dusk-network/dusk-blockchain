@@ -1,22 +1,22 @@
 package wallet
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 
 	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/txrecords"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"github.com/golang/protobuf/proto"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
-
-// Number of mixins per ring. ringsize = mixin + 1
-const numMixins = 7
 
 // DUSK is one whole unit of DUSK.
 const DUSK = uint64(100000000)
@@ -24,12 +24,7 @@ const DUSK = uint64(100000000)
 // ErrSeedFileExists is returned if the seed file already exists
 var ErrSeedFileExists = fmt.Errorf("wallet seed file already exists")
 
-// FetchInputs returns a slice of inputs such that Sum(Inputs)- Sum(Outputs) >= 0
-// If > 0, then a change address is created for the remaining amount
-type FetchInputs func(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error)
-
 // Wallet encapsulates the wallet
-// Deprecated: use the phoenix wallet
 type Wallet struct {
 	db        *database.DB
 	netPrefix byte
@@ -37,21 +32,31 @@ type Wallet struct {
 	keyPair       *key.Key
 	consensusKeys *consensuskey.Keys
 
-	fetchDecoys transactions.FetchDecoys
-	fetchInputs FetchInputs
-}
-
-// SignableTx is a signable transaction
-type SignableTx interface {
-	AddDecoys(numMixins int, f transactions.FetchDecoys) error
-	Prove() error
-	StandardTx() *transactions.Standard
+	secretKey *rusk.SecretKey
 }
 
 // New creates a wallet instance
-func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string, file string) (*Wallet, error) {
+func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, db *database.DB, password string, seedFile, secretFile string, secretKey *rusk.SecretKey) (*Wallet, error) {
 
+	//create new seed if seed comes empty
+	if len(seed) == 0 {
+		var err error
+		seed, err = GenerateNewSeed(Read)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return LoadFromSeed(seed, netPrefix, db, password, seedFile, secretFile, secretKey)
+}
+
+// GenerateNewSeed a new seed
+func GenerateNewSeed(Read func(buf []byte) (n int, err error)) ([]byte, error) {
 	var seed []byte
+	if Read == nil {
+		Read = rand.Read
+	}
+
 	for {
 		// random seed
 		seed = make([]byte, 64)
@@ -71,16 +76,52 @@ func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.
 		}
 		// If not, we retry.
 	}
-
-	return LoadFromSeed(seed, netPrefix, db, fDecoys, fInputs, password, file)
+	return seed, nil
 }
 
 // LoadFromSeed loads a wallet from the seed
-func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string, file string) (*Wallet, error) {
+func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, password string, seedFile, secretFile string, secretKey *rusk.SecretKey) (*Wallet, error) {
 	if len(seed) < 64 {
 		return nil, errors.New("seed must be atleast 64 bytes in size")
 	}
-	err := saveSeed(seed, password, file)
+
+	if secretKey.A == nil || secretKey.B == nil {
+		return nil, errors.New("secretKey must be valid")
+	}
+
+	//TODO: are we sure we want to save the seed when loading ?
+	err := saveEncrypted(seed, password, seedFile)
+	if err != nil {
+		return nil, err
+	}
+
+	//TODO: are we sure we want to save the secretKey when loading ?
+	//secretKey manipulation
+	secretKeyArr, err := proto.Marshal(secretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	secretKeyNew := new(rusk.SecretKey)
+	err = proto.Unmarshal(secretKeyArr, secretKeyNew)
+	if err != nil {
+		return nil, err
+	}
+
+	//TODO: remove this once we are confident this is really working
+	if !reflect.DeepEqual(secretKey.A.Data, secretKeyNew.A.Data) || !reflect.DeepEqual(secretKey.B.Data, secretKeyNew.B.Data) {
+		log.WithField("secretKey.A.Data", secretKey.A.Data).
+			WithField("secretKeyNew.A.Data", secretKeyNew.A.Data).
+			WithField("secretKey.B.Data", secretKey.B.Data).
+			WithField("secretKeyNew.B.Data", secretKeyNew.B.Data).
+			//WithField("secretKey",secretKey.String()).
+			//WithField("secretKeyNew",secretKeyNew.String()).
+			//WithField("string eq", secretKey.String() == secretKeyNew.String()).
+			Error("karaidiasa")
+		panic("karaidiasa")
+	}
+
+	err = saveEncrypted(secretKeyArr, password, secretFile)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +136,7 @@ func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, fDecoys transact
 		netPrefix:     netPrefix,
 		keyPair:       key.NewKeyPair(seed),
 		consensusKeys: &consensusKeys,
-		fetchDecoys:   fDecoys,
-		fetchInputs:   fInputs,
+		secretKey:     secretKey,
 	}
 
 	// Check if this is a new wallet
@@ -119,9 +159,14 @@ func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, fDecoys transact
 }
 
 // LoadFromFile loads a wallet from a .dat file
-func LoadFromFile(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string, file string) (*Wallet, error) {
+func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile, secretKeyFile string) (*Wallet, error) {
 
-	seed, err := fetchSeed(password, file)
+	seed, err := fetchEncrypted(password, seedFile)
+	if err != nil {
+		return nil, err
+	}
+
+	secretKeyByteArr, err := fetchEncrypted(password, secretKeyFile)
 	if err != nil {
 		return nil, err
 	}
@@ -131,96 +176,20 @@ func LoadFromFile(netPrefix byte, db *database.DB, fDecoys transactions.FetchDec
 		return nil, err
 	}
 
+	// secretKey manipulation
+	secretKey := new(rusk.SecretKey)
+	err = proto.Unmarshal(secretKeyByteArr, secretKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Wallet{
 		db:            db,
 		netPrefix:     netPrefix,
 		keyPair:       key.NewKeyPair(seed),
 		consensusKeys: &consensusKeys,
-		fetchDecoys:   fDecoys,
-		fetchInputs:   fInputs,
+		secretKey:     secretKey,
 	}, nil
-}
-
-// CheckWireBlock check a block
-func (w *Wallet) CheckWireBlock(blk block.Block) (uint64, uint64, error) {
-	// Ensure this block is at the height we expect it to be
-	walletHeight, err := w.GetSavedHeight()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	if blk.Header.Height != walletHeight {
-		return 0, 0, errors.New("last seen block does not precede provided block")
-	}
-
-	spentCount, err := w.CheckWireBlockSpent(blk)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	receivedCount, err := w.CheckWireBlockReceived(blk)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	err = w.UpdateWalletHeight(blk.Header.Height + 1)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	privSpend, err := w.keyPair.PrivateSpend()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	if err := w.db.UpdateLockedInputs(privSpend.Bytes(), blk.Header.Height); err != nil {
-		return 0, 0, err
-	}
-
-	return spentCount, receivedCount, nil
-}
-
-// CheckUnconfirmedBalance calculates balance including the unconfirmed
-// transactions from a slice of transactions
-func (w *Wallet) CheckUnconfirmedBalance(txs []transactions.Transaction) (uint64, error) {
-	privView, err := w.keyPair.PrivateView()
-	if err != nil {
-		return 0, err
-	}
-
-	var balance uint64
-	for _, tx := range txs {
-		for i, output := range tx.StandardTx().Outputs {
-			if _, ok := w.keyPair.DidReceiveTx(tx.StandardTx().R, output.PubKey, uint32(i)); !ok {
-				continue
-			}
-
-			var amount uint64
-			if transactions.ShouldEncryptValues(tx) {
-				amountScalar := transactions.DecryptAmount(output.EncryptedAmount, tx.StandardTx().R, uint32(i), *privView)
-				amount = amountScalar.BigInt().Uint64()
-			} else {
-				amount = output.EncryptedAmount.BigInt().Uint64()
-			}
-
-			balance += amount
-		}
-	}
-
-	return balance, nil
-}
-
-// Balance calculates and returns the wallet balance for confirmed transactions
-func (w *Wallet) Balance() (uint64, uint64, error) {
-	privSpend, err := w.keyPair.PrivateSpend()
-	if err != nil {
-		return 0, 0, err
-	}
-	unlockedBalance, lockedBalance, err := w.db.FetchBalance(privSpend.Bytes())
-	if err != nil {
-		return 0, 0, err
-	}
-	return unlockedBalance, lockedBalance, nil
 }
 
 // FetchTxHistory will return a slice containing information about all
@@ -229,43 +198,19 @@ func (w *Wallet) FetchTxHistory() ([]txrecords.TxRecord, error) {
 	return w.db.FetchTxRecords()
 }
 
-// GetSavedHeight returns the saved height
-func (w *Wallet) GetSavedHeight() (uint64, error) {
-	return w.db.GetWalletHeight()
-}
+//// PublicKey returns the wallet public key
+//func (w *Wallet) PublicKey() key.PublicKey {
+//	return *w.keyPair.PublicKey()
+//}
 
-// UpdateWalletHeight update the wallet to the new height
-func (w *Wallet) UpdateWalletHeight(newHeight uint64) error {
-	return w.db.UpdateWalletHeight(newHeight)
-}
-
-// PublicKey returns the wallet public key
-func (w *Wallet) PublicKey() key.PublicKey {
-	return *w.keyPair.PublicKey()
-}
-
-// PublicAddress returns the wallet public address
-func (w *Wallet) PublicAddress() (string, error) {
-	pubAddr, err := w.keyPair.PublicKey().PublicAddress(w.netPrefix)
-	if err != nil {
-		return "", err
-	}
-	return pubAddr.String(), nil
+// SecretKey returns the wallet secret key
+func (w *Wallet) SecretKey() *rusk.SecretKey {
+	return w.secretKey
 }
 
 // Keys returns the BLS keys
 func (w *Wallet) Keys() consensuskey.Keys {
 	return *w.consensusKeys
-}
-
-// PrivateSpend calls the PrivateSpend method on the keypair
-func (w *Wallet) PrivateSpend() ([]byte, error) {
-	privateSpend, err := w.keyPair.PrivateSpend()
-	if err != nil {
-		return nil, err
-	}
-
-	return privateSpend.Bytes(), nil
 }
 
 // ClearDatabase will remove all info from the database.

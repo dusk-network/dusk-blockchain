@@ -17,6 +17,7 @@ import (
 
 const path = "mainnet"
 
+//TODO: #446 , shall this be refactored ?
 func TestPutGet(t *testing.T) {
 
 	// New
@@ -51,45 +52,6 @@ func TestPutGet(t *testing.T) {
 	val, err = db.Get(key)
 	assert.Equal(t, leveldb.ErrNotFound, err)
 	assert.True(t, bytes.Equal(val, []byte{}))
-}
-
-func TestUnlockInputs(t *testing.T) {
-	// New
-	db, err := New(path)
-	assert.Nil(t, err)
-
-	// Make sure to delete this dir after test
-	defer os.RemoveAll(path)
-
-	input := randInput()
-	// This input unlocks at height 1000
-	input.unlockHeight = 1000
-
-	// Put it in the DB
-	var pubKey ristretto.Point
-	pubKey.Rand()
-	assert.NoError(t, db.PutInput([]byte{0}, pubKey, input.amount, input.mask, input.privKey, input.unlockHeight))
-
-	// Fetch it and ensure the unlock height is set
-	key := append(inputPrefix, pubKey.Bytes()...)
-	value, err := db.Get(key)
-	assert.NoError(t, err)
-
-	decoded := &inputDB{}
-	decoded.Decode(bytes.NewBuffer(value))
-
-	assert.Equal(t, uint64(1000), decoded.unlockHeight)
-
-	// Now run UpdateLockedInputs
-	assert.NoError(t, db.UpdateLockedInputs([]byte{0}, 1000))
-
-	value, err = db.Get(key)
-	assert.NoError(t, err)
-
-	decoded = &inputDB{}
-	decoded.Decode(bytes.NewBuffer(value))
-
-	assert.Equal(t, uint64(0), decoded.unlockHeight)
 }
 
 func TestPutFetchTxRecord(t *testing.T) {
@@ -170,20 +132,6 @@ func TestClear(t *testing.T) {
 
 	_, err = db.Get([]byte("hello"))
 	assert.Error(t, err)
-}
-
-func randInput() *inputDB {
-	var amount, mask, privKey ristretto.Scalar
-	amount.Rand()
-	mask.Rand()
-	privKey.Rand()
-	idb := &inputDB{
-		amount:  amount,
-		mask:    mask,
-		privKey: privKey,
-	}
-
-	return idb
 }
 
 func randTxForRecord(t transactions.TxType) (transactions.Transaction, *key.PrivateView) {
