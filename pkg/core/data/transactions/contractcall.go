@@ -208,7 +208,7 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 	var err error
 
 	switch t := c.(type) {
-	case Transaction:
+	case *Transaction:
 		byteArr, err = json.Marshal(t)
 		if err != nil {
 			return nil, err
@@ -222,7 +222,7 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
-	case WithdrawFeesTransaction:
+	case *WithdrawFeesTransaction:
 		byteArr, err = json.Marshal(t)
 		if err != nil {
 			return nil, err
@@ -236,7 +236,7 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
-	case StakeTransaction:
+	case *StakeTransaction:
 		byteArr, err = json.Marshal(t)
 		if err != nil {
 			return nil, err
@@ -250,7 +250,7 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
-	case BidTransaction:
+	case *BidTransaction:
 		byteArr, err = json.Marshal(t)
 		if err != nil {
 			return nil, err
@@ -264,7 +264,7 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
-	case SlashTransaction:
+	case *SlashTransaction:
 		byteArr, err = json.Marshal(t)
 		if err != nil {
 			return nil, err
@@ -278,7 +278,7 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
-	case DistributeTransaction:
+	case *DistributeTransaction:
 		byteArr, err = json.Marshal(t)
 		if err != nil {
 			return nil, err
@@ -292,7 +292,7 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
-	case WithdrawStakeTransaction:
+	case *WithdrawStakeTransaction:
 		byteArr, err = json.Marshal(t)
 		if err != nil {
 			return nil, err
@@ -306,7 +306,7 @@ func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
 			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
-	case WithdrawBidTransaction:
+	case *WithdrawBidTransaction:
 		byteArr, err = json.Marshal(t)
 		if err != nil {
 			return nil, err
