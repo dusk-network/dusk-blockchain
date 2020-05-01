@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -200,6 +201,128 @@ func DecodeContractCall(contractCall *rusk.ContractCallTx) (interface{}, error) 
 	}
 
 	return call, nil
+}
+
+func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
+	var byteArr []byte
+	var err error
+
+	switch t := c.(type) {
+	case Transaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+
+		call := &rusk.ContractCallTx_Tx{
+			Tx: new(rusk.Transaction),
+		}
+
+		if err := json.Unmarshal(byteArr, call.Tx); err != nil {
+			return nil, err
+		}
+		return &rusk.ContractCallTx{ContractCall: call}, nil
+	case WithdrawFeesTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+
+		call := &rusk.ContractCallTx_Withdraw{
+			Withdraw: new(rusk.WithdrawFeesTransaction),
+		}
+
+		if err := json.Unmarshal(byteArr, call.Withdraw); err != nil {
+			return nil, err
+		}
+		return &rusk.ContractCallTx{ContractCall: call}, nil
+	case StakeTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+
+		call := &rusk.ContractCallTx_Stake{
+			Stake: new(rusk.StakeTransaction),
+		}
+
+		if err := json.Unmarshal(byteArr, call.Stake); err != nil {
+			return nil, err
+		}
+		return &rusk.ContractCallTx{ContractCall: call}, nil
+	case BidTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+
+		call := &rusk.ContractCallTx_Bid{
+			Bid: new(rusk.BidTransaction),
+		}
+
+		if err := json.Unmarshal(byteArr, call.Bid); err != nil {
+			return nil, err
+		}
+		return &rusk.ContractCallTx{ContractCall: call}, nil
+	case SlashTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+
+		call := &rusk.ContractCallTx_Slash{
+			Slash: new(rusk.SlashTransaction),
+		}
+
+		if err := json.Unmarshal(byteArr, call.Slash); err != nil {
+			return nil, err
+		}
+		return &rusk.ContractCallTx{ContractCall: call}, nil
+	case DistributeTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+
+		call := &rusk.ContractCallTx_Distribute{
+			Distribute: new(rusk.DistributeTransaction),
+		}
+
+		if err := json.Unmarshal(byteArr, call.Distribute); err != nil {
+			return nil, err
+		}
+		return &rusk.ContractCallTx{ContractCall: call}, nil
+	case WithdrawStakeTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+
+		call := &rusk.ContractCallTx_WithdrawStake{
+			WithdrawStake: new(rusk.WithdrawStakeTransaction),
+		}
+
+		if err := json.Unmarshal(byteArr, call.WithdrawStake); err != nil {
+			return nil, err
+		}
+		return &rusk.ContractCallTx{ContractCall: call}, nil
+	case WithdrawBidTransaction:
+		byteArr, err = json.Marshal(t)
+		if err != nil {
+			return nil, err
+		}
+
+		call := &rusk.ContractCallTx_WithdrawBid{
+			WithdrawBid: new(rusk.WithdrawBidTransaction),
+		}
+
+		if err := json.Unmarshal(byteArr, call.WithdrawBid); err != nil {
+			return nil, err
+		}
+		return &rusk.ContractCallTx{ContractCall: call}, nil
+	default:
+		return nil, errors.New("structure to encode is not a contract call")
+	}
 }
 
 /*
