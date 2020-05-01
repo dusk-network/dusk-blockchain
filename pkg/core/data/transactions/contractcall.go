@@ -141,31 +141,61 @@ type PublicKey struct {
 func DecodeContractCall(contractCall *rusk.ContractCallTx) (interface{}, error) {
 	var call interface{}
 
-	txBytes, err := json.Marshal(contractCall)
-	if err != nil {
-		return nil, err
-	}
+	var byteArr []byte
+	var err error
 
-	switch contractCall.ContractCall.(type) {
+	switch c := contractCall.ContractCall.(type) {
 	case *rusk.ContractCallTx_Tx:
+		byteArr, err = json.Marshal(c.Tx)
+		if err != nil {
+			return nil, err
+		}
 		call = new(Transaction)
 	case *rusk.ContractCallTx_Withdraw:
+		byteArr, err = json.Marshal(c.Withdraw)
+		if err != nil {
+			return nil, err
+		}
 		call = new(WithdrawFeesTransaction)
 	case *rusk.ContractCallTx_Stake:
+		byteArr, err = json.Marshal(c.Stake)
+		if err != nil {
+			return nil, err
+		}
 		call = new(StakeTransaction)
 	case *rusk.ContractCallTx_Bid:
+		byteArr, err = json.Marshal(c.Bid)
+		if err != nil {
+			return nil, err
+		}
 		call = new(BidTransaction)
 	case *rusk.ContractCallTx_Slash:
+		byteArr, err = json.Marshal(c.Slash)
+		if err != nil {
+			return nil, err
+		}
 		call = new(SlashTransaction)
 	case *rusk.ContractCallTx_Distribute:
+		byteArr, err = json.Marshal(c.Distribute)
+		if err != nil {
+			return nil, err
+		}
 		call = new(DistributeTransaction)
 	case *rusk.ContractCallTx_WithdrawStake:
+		byteArr, err = json.Marshal(c.WithdrawStake)
+		if err != nil {
+			return nil, err
+		}
 		call = new(WithdrawStakeTransaction)
 	case *rusk.ContractCallTx_WithdrawBid:
+		byteArr, err = json.Marshal(c.WithdrawBid)
+		if err != nil {
+			return nil, err
+		}
 		call = new(WithdrawBidTransaction)
 	}
 
-	if err := json.Unmarshal(txBytes, call); err != nil {
+	if err := json.Unmarshal(byteArr, call); err != nil {
 		return nil, err
 	}
 
