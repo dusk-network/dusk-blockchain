@@ -75,6 +75,8 @@ github.com/dusk-network/dusk-protobuf v0.1.1-0.20200430122228-0dd7d7157568 h1:xe
 github.com/dusk-network/dusk-protobuf v0.1.1-0.20200430122228-0dd7d7157568/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/dusk-network/dusk-protobuf v0.1.1-0.20200430132832-c454bb21e269 h1:z3qAIhuv2sCij8H+bMJ40b/L4bedSakhH5SOAT/mHgk=
 github.com/dusk-network/dusk-protobuf v0.1.1-0.20200430132832-c454bb21e269/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
+github.com/dusk-network/dusk-protobuf v0.1.1-0.20200501063908-4ae47674ed6f h1:21VuJSKqaRoRLpiswOmHF0r9Ck271JDEJz7X6sH5Vtg=
+github.com/dusk-network/dusk-protobuf v0.1.1-0.20200501063908-4ae47674ed6f/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/dusk-network/dusk-wallet/v2 v2.0.2 h1:t/nH//N6eUjfwh05im44ncx1Z+auLyTeieNtL3EvNzg=
 github.com/dusk-network/dusk-wallet/v2 v2.0.2/go.mod h1:iweGXUe9XLFWh04TgfBfUu4hkhp4WNsrPWPYt2AHNwY=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
@@ -190,6 +192,7 @@ github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5a
 github.com/google/go-cmp v0.3.0/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
 github.com/google/go-cmp v0.3.1 h1:Xye71clBPdm5HgqGwUkwhbynsUJZhDbS20FvLhQ2izg=
 github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
+github.com/google/go-cmp v0.4.0 h1:xsAVV57WRhGj6kEIi8ReJzQlHHqcBYCElAvkovg3B/4=
 github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
 github.com/google/uuid v1.0.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
