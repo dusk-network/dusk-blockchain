@@ -1,18 +1,54 @@
 package transactions
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestContractCallDecodeEncode(t *testing.T) {
-	call := &rusk.ContractCallTx{
+	callTx := mockCall()
+	assert.NoError(t, encodeDecode(callTx))
+}
+
+func BenchmarkEncode(b *testing.B) {
+	callTx := mockCall()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = DecodeContractCall(callTx)
+	}
+}
+
+func BenchmarkDecode(b *testing.B) {
+	callTx := mockCall()
+	c, _ := DecodeContractCall(callTx)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = EncodeContractCall(c)
+	}
+}
+
+func encodeDecode(tx *rusk.ContractCallTx) error {
+	c, err := DecodeContractCall(tx)
+	if err != nil {
+		return err
+	}
+
+	_, err = EncodeContractCall(c)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func mockCall() *rusk.ContractCallTx {
+	return &rusk.ContractCallTx{
 		ContractCall: &rusk.ContractCallTx_Tx{
 			Tx: &rusk.Transaction{
 				Inputs: []*rusk.TransactionInput{
-					&rusk.TransactionInput{
+					{
 						Note: &rusk.Note{
 							NoteType:        0,
 							Nonce:           &rusk.Nonce{Bs: []byte{0x11, 0x22}},
@@ -35,7 +71,7 @@ func TestContractCallDecodeEncode(t *testing.T) {
 					},
 				},
 				Outputs: []*rusk.TransactionOutput{
-					&rusk.TransactionOutput{
+					{
 						Note: &rusk.Note{
 							NoteType:        1,
 							Nonce:           &rusk.Nonce{},
@@ -74,18 +110,4 @@ func TestContractCallDecodeEncode(t *testing.T) {
 			},
 		},
 	}
-
-	c, err := DecodeContractCall(call)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fmt.Println(c.(*Transaction))
-
-	encodedCall, err := EncodeContractCall(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fmt.Println(encodedCall)
 }

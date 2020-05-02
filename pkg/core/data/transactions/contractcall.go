@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -36,16 +37,6 @@ const (
 	WithdrawBid
 )
 
-// NoteType is either Transparent or Obfuscated
-type NoteType int32
-
-const (
-	// NoteType_TRANSPARENT denotes a public note (transaction output)
-	NoteType_TRANSPARENT NoteType = 0
-	// NoteType_OBFUSCATED denotes a private note (transaction output)
-	NoteType_OBFUSCATED NoteType = 1
-)
-
 // ContractCall is the transaction that embodies the execution parameter for a
 // smart contract method invocation
 type ContractCall interface {
@@ -63,7 +54,18 @@ type ContractCall interface {
 // ContractTx is the embedded struct utilized to group operations on the
 // phoenix underlying transaction common to all genesis contracts
 type ContractTx struct {
-	Tx *Transaction `protobuf:"bytes,9,opt,name=tx,proto3" json:"tx,omitempty"`
+	Tx *Transaction `protobuf:"bytes,1,opt,name=tx,proto3" json:"tx,omitempty"`
+}
+
+// MarshalContractTx into a buffer
+func MarshalContractTx(r *bytes.Buffer, c ContractTx) error {
+	return MarshalTransaction(r, *c.Tx)
+}
+
+// UnmarshalContractTx from a buffer
+func UnmarshalContractTx(r *bytes.Buffer, c *ContractTx) error {
+	c.Tx = &Transaction{}
+	return UnmarshalTransaction(r, c.Tx)
 }
 
 // StandardTx returns the underlying phoenix transaction
@@ -87,164 +89,68 @@ func Equal(a, b ContractCall) bool {
 	return bytes.Equal(ba, bb)
 }
 
-// Transaction according to the Phoenix model
-type Transaction struct {
-	Inputs  []*TransactionInput  `protobuf:"bytes,1,rep,name=inputs,proto3" json:"inputs,omitempty"`
-	Outputs []*TransactionOutput `protobuf:"bytes,2,rep,name=outputs,proto3" json:"outputs,omitempty"`
-	Fee     *TransactionOutput   `protobuf:"bytes,3,opt,name=fee,proto3" json:"fee,omitempty"`
-	Proof   []byte               `protobuf:"bytes,4,opt,name=proof,proto3" json:"proof,omitempty"`
-	hash    []byte
-}
-
-func (t *Transaction) setHash(h []byte) {
-	t.hash = h
-}
-
-// CalculateHash complies with merkletree.Payload interface
-func (t *Transaction) CalculateHash() ([]byte, error) {
-	return t.hash, nil
-}
-
-// Type complies with the ContractCall interface
-func (t *Transaction) Type() TxType {
-	return Tx
-}
-
-// StandardTx complies with the ContractCall interface. It returns the underlying
-// phoenix transaction
-func (t *Transaction) StandardTx() *Transaction {
-	return t
-}
-
-// TransactionInput includes the notes, the nullifier and the transaction merkleroot
-type TransactionInput struct {
-	Note       *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
-	Pos        uint64     `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos,omitempty"`
-	Sk         *SecretKey `protobuf:"bytes,3,opt,name=sk,proto3" json:"sk,omitempty"`
-	Nullifier  *Nullifier `protobuf:"bytes,4,opt,name=nullifier,proto3" json:"nullifier,omitempty"`
-	MerkleRoot *Scalar    `protobuf:"bytes,5,opt,name=merkle_root,json=merkleRoot,proto3" json:"merkle_root,omitempty"`
-}
-
-// TransactionOutput is the spendable output of the transaction
-type TransactionOutput struct {
-	Note           *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
-	Pk             *PublicKey `protobuf:"bytes,2,opt,name=pk,proto3" json:"pk,omitempty"`
-	Value          uint64     `protobuf:"fixed64,3,opt,name=value,proto3" json:"value,omitempty"`
-	BlindingFactor *Scalar    `protobuf:"bytes,4,opt,name=blinding_factor,json=blindingFactor,proto3" json:"blinding_factor,omitempty"`
-}
-
-// Nullifier of the transaction
-type Nullifier struct {
-	H *Scalar `protobuf:"bytes,1,opt,name=h,proto3" json:"h,omitempty"`
-}
-
-// Note is the spendable output
-type Note struct {
-	NoteType                  NoteType         `protobuf:"varint,1,opt,name=note_type,json=noteType,proto3,enum=rusk.NoteType" json:"note_type,omitempty"`
-	Pos                       uint64           `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos,omitempty"`
-	Nonce                     *Nonce           `protobuf:"bytes,3,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	RG                        *CompressedPoint `protobuf:"bytes,4,opt,name=r_g,json=rG,proto3" json:"r_g,omitempty"`
-	PkR                       *CompressedPoint `protobuf:"bytes,5,opt,name=pk_r,json=pkR,proto3" json:"pk_r,omitempty"`
-	ValueCommitment           *Scalar          `protobuf:"bytes,6,opt,name=value_commitment,json=valueCommitment,proto3" json:"value_commitment,omitempty"`
-	TransparentBlindingFactor *Scalar          `protobuf:"bytes,7,opt,name=transparent_blinding_factor,json=transparentBlindingFactor,proto3,oneof"`
-	EncryptedBlindingFactor   []byte           `protobuf:"bytes,8,opt,name=encrypted_blinding_factor,json=encryptedBlindingFactor,proto3,oneof"`
-	TransparentValue          uint64           `protobuf:"fixed64,9,opt,name=transparent_value,json=transparentValue,proto3,oneof"`
-	EncryptedValue            []byte           `protobuf:"bytes,10,opt,name=encrypted_value,json=encryptedValue,proto3,oneof"`
-}
-
-// SecretKey to sign the ContractCall
-type SecretKey struct {
-	A *Scalar `protobuf:"bytes,1,opt,name=a,proto3" json:"a,omitempty"`
-	B *Scalar `protobuf:"bytes,2,opt,name=b,proto3" json:"b,omitempty"`
-}
-
-// ViewKey is to view the transactions belonging to the related SecretKey
-type ViewKey struct {
-	A  *Scalar          `protobuf:"bytes,1,opt,name=a,proto3" json:"a,omitempty"`
-	BG *CompressedPoint `protobuf:"bytes,2,opt,name=b_g,json=bG,proto3" json:"b_g,omitempty"`
-}
-
-// PublicKey is the public key
-type PublicKey struct {
-	AG *CompressedPoint `protobuf:"bytes,1,opt,name=a_g,json=aG,proto3" json:"a_g,omitempty"`
-	BG *CompressedPoint `protobuf:"bytes,2,opt,name=b_g,json=bG,proto3" json:"b_g,omitempty"`
-}
-
-// Scalar of the BLS12_381 curve
-type Scalar struct {
-	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-}
-
-// CompressedPoint of the BLS12_#81 curve
-type CompressedPoint struct {
-	Y []byte `protobuf:"bytes,1,opt,name=y,proto3" json:"y,omitempty"`
-}
-
-// Nonce is the distributed atomic increment used to prevent double spending
-type Nonce struct {
-	Bs []byte `protobuf:"bytes,1,opt,name=bs,proto3" json:"bs,omitempty"`
-}
-
 // Marshal a ContractCall into a binary buffer
-// TODO marshal the hash
-// TODO this should be the wire protocol
 func Marshal(c ContractCall) (*bytes.Buffer, error) {
-	var byteArr []byte
-	var err error
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint8(buf, uint8(c.Type())); err != nil {
+		return nil, err
+	}
 
+	var err error
 	switch t := c.(type) {
 	case *Transaction:
-		byteArr, err = json.Marshal(t)
-		if err != nil {
-			return nil, err
-		}
+		err = MarshalTransaction(buf, *t)
 	case *WithdrawFeesTransaction:
-		byteArr, err = json.Marshal(t)
-		if err != nil {
-			return nil, err
-		}
+		err = MarshalFees(buf, *t)
 	case *StakeTransaction:
-		byteArr, err = json.Marshal(t)
-		if err != nil {
-			return nil, err
-		}
+		err = MarshalStake(buf, *t)
 	case *BidTransaction:
-		byteArr, err = json.Marshal(t)
-		if err != nil {
-			return nil, err
-		}
+		err = MarshalBid(buf, *t)
 	case *SlashTransaction:
-		byteArr, err = json.Marshal(t)
-		if err != nil {
-			return nil, err
-		}
+		err = MarshalSlash(buf, *t)
 	case *DistributeTransaction:
-		byteArr, err = json.Marshal(t)
-		if err != nil {
-			return nil, err
-		}
+		err = MarshalDistribute(buf, *t)
 	case *WithdrawStakeTransaction:
-		byteArr, err = json.Marshal(t)
-		if err != nil {
-			return nil, err
-		}
+		err = MarshalWithdrawStake(buf, *t)
 	case *WithdrawBidTransaction:
-		byteArr, err = json.Marshal(t)
-		if err != nil {
-			return nil, err
-		}
+		err = MarshalWithdrawBid(buf, *t)
 	default:
 		return nil, errors.New("structure to encode is not a contract call")
 	}
 
-	return bytes.NewBuffer(byteArr), err
+	return buf, err
 }
 
 // Unmarshal the binary buffer into a ContractCall interface
-// TODO unmarshal the hash
-// TODO this should be the wire protocol
 func Unmarshal(buf *bytes.Buffer, c ContractCall) error {
-	return json.Unmarshal(buf.Bytes(), &c)
+	var txPrefix uint8
+	if err := encoding.ReadUint8(buf, &txPrefix); err != nil {
+		return err
+	}
+
+	var err error
+	switch TxType(txPrefix) {
+	case Tx:
+		err = UnmarshalTransaction(buf, c.(*Transaction))
+	case WithdrawFees:
+		err = UnmarshalFees(buf, c.(*WithdrawFeesTransaction))
+	case Stake:
+		err = UnmarshalStake(buf, c.(*StakeTransaction))
+	case Bid:
+		err = UnmarshalBid(buf, c.(*BidTransaction))
+	case Slash:
+		err = UnmarshalSlash(buf, c.(*SlashTransaction))
+	case Distribute:
+		err = UnmarshalDistribute(buf, c.(*DistributeTransaction))
+	case WithdrawStake:
+		err = UnmarshalWithdrawStake(buf, c.(*WithdrawStakeTransaction))
+	case WithdrawBid:
+		err = UnmarshalWithdrawBid(buf, c.(*WithdrawBidTransaction))
+	default:
+		return errors.New("Unknown transaction type")
+	}
+
+	return err
 }
 
 // DecodeContractCall turns the protobuf message into a ContractCall
