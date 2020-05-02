@@ -59,7 +59,7 @@ func MarshalSlash(r *bytes.Buffer, s SlashTransaction) error {
 
 //UnmarshalSlash into a buffer
 func UnmarshalSlash(r *bytes.Buffer, s *SlashTransaction) error {
-	s.ContractTx = &ContractTx{}
+	s.ContractTx = new(ContractTx)
 
 	if err := UnmarshalContractTx(r, s.ContractTx); err != nil {
 		return err

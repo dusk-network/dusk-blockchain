@@ -43,7 +43,7 @@ func MarshalStake(r *bytes.Buffer, s StakeTransaction) error {
 
 //UnmarshalStake into a buffer
 func UnmarshalStake(r *bytes.Buffer, s *StakeTransaction) error {
-	s.ContractTx = &ContractTx{}
+	s.ContractTx = new(ContractTx)
 
 	if err := UnmarshalContractTx(r, s.ContractTx); err != nil {
 		return err
@@ -94,7 +94,7 @@ func MarshalWithdrawStake(r *bytes.Buffer, s WithdrawStakeTransaction) error {
 
 //UnmarshalWithdrawStake into a buffer
 func UnmarshalWithdrawStake(r *bytes.Buffer, s *WithdrawStakeTransaction) error {
-	s.ContractTx = &ContractTx{}
+	s.ContractTx = new(ContractTx)
 
 	if err := UnmarshalContractTx(r, s.ContractTx); err != nil {
 		return err
@@ -104,11 +104,6 @@ func UnmarshalWithdrawStake(r *bytes.Buffer, s *WithdrawStakeTransaction) error 
 	}
 
 	if err := encoding.ReadVarBytes(r, &s.Sig); err != nil {
-		return err
-	}
-
-	s.Tx = &Transaction{}
-	if err := UnmarshalTransaction(r, s.Tx); err != nil {
 		return err
 	}
 

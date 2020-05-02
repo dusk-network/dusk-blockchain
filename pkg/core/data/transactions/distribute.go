@@ -38,7 +38,7 @@ func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
 
 //UnmarshalDistribute into a buffer
 func UnmarshalDistribute(r *bytes.Buffer, s *DistributeTransaction) error {
-	s.ContractTx = &ContractTx{}
+	s.ContractTx = new(ContractTx)
 
 	if err := UnmarshalContractTx(r, s.ContractTx); err != nil {
 		return err
@@ -52,7 +52,7 @@ func UnmarshalDistribute(r *bytes.Buffer, s *DistributeTransaction) error {
 		return err
 	}
 
-	s.BgPk = &PublicKey{}
+	s.BgPk = new(PublicKey)
 	if err := UnmarshalPublicKey(r, s.BgPk); err != nil {
 		return err
 	}

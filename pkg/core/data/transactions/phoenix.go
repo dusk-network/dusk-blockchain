@@ -24,23 +24,30 @@ func (t *Transaction) CalculateHash() ([]byte, error) {
 	return t.hash, nil
 }
 
-// Type complies with the ContractCall interface
+// Type complies with ContractCall interface. Returns "Tx"
 func (t *Transaction) Type() TxType {
 	return Tx
 }
 
-// StandardTx complies with the ContractCall interface. It returns the underlying
-// phoenix transaction
+// StandardTx returns the transaction itself. It complies with the ContractCall
+// interface
 func (t *Transaction) StandardTx() *Transaction {
 	return t
 }
 
 //MarshalTransaction into a buffer
 func MarshalTransaction(r *bytes.Buffer, t Transaction) error {
+	if err := encoding.WriteVarInt(r, uint64(len(t.Inputs))); err != nil {
+		return err
+	}
 	for _, input := range t.Inputs {
 		if err := MarshalTransactionInput(r, *input); err != nil {
 			return err
 		}
+	}
+
+	if err := encoding.WriteVarInt(r, uint64(len(t.Outputs))); err != nil {
+		return err
 	}
 	for _, output := range t.Outputs {
 		if err := MarshalTransactionOutput(r, *output); err != nil {
@@ -72,9 +79,11 @@ func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
 
 	t.Inputs = make([]*TransactionInput, nIn)
 	for i := range t.Inputs {
-		if err := UnmarshalTransactionInput(r, t.Inputs[i]); err != nil {
+		tIn := new(TransactionInput)
+		if err := UnmarshalTransactionInput(r, tIn); err != nil {
 			return err
 		}
+		t.Inputs[i] = tIn
 	}
 
 	nOut, err := encoding.ReadVarInt(r)
@@ -84,12 +93,14 @@ func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
 
 	t.Outputs = make([]*TransactionOutput, nOut)
 	for i := range t.Outputs {
-		if err := UnmarshalTransactionOutput(r, t.Outputs[i]); err != nil {
+		tOut := new(TransactionOutput)
+		if err := UnmarshalTransactionOutput(r, tOut); err != nil {
 			return err
 		}
+		t.Outputs[i] = tOut
 	}
 
-	t.Fee = &TransactionOutput{}
+	t.Fee = new(TransactionOutput)
 	if err := UnmarshalTransactionOutput(r, t.Fee); err != nil {
 		return err
 	}
@@ -106,19 +117,19 @@ func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
 
 // TransactionInput includes the notes, the nullifier and the transaction merkleroot
 type TransactionInput struct {
-	Note       *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
-	Pos        uint64     `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos,omitempty"`
-	Sk         *SecretKey `protobuf:"bytes,3,opt,name=sk,proto3" json:"sk,omitempty"`
-	Nullifier  *Nullifier `protobuf:"bytes,4,opt,name=nullifier,proto3" json:"nullifier,omitempty"`
-	MerkleRoot *Scalar    `protobuf:"bytes,5,opt,name=merkle_root,json=merkleRoot,proto3" json:"merkle_root,omitempty"`
+	Note       *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note"`
+	Pos        uint64     `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos"`
+	Sk         *SecretKey `protobuf:"bytes,3,opt,name=sk,proto3" json:"sk"`
+	Nullifier  *Nullifier `protobuf:"bytes,4,opt,name=nullifier,proto3" json:"nullifier"`
+	MerkleRoot *Scalar    `protobuf:"bytes,5,opt,name=merkle_root,json=merkleRoot,proto3" json:"merkle_root"`
 }
 
 // TransactionOutput is the spendable output of the transaction
 type TransactionOutput struct {
-	Note           *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
-	Pk             *PublicKey `protobuf:"bytes,2,opt,name=pk,proto3" json:"pk,omitempty"`
-	Value          uint64     `protobuf:"fixed64,3,opt,name=value,proto3" json:"value,omitempty"`
-	BlindingFactor *Scalar    `protobuf:"bytes,4,opt,name=blinding_factor,json=blindingFactor,proto3" json:"blinding_factor,omitempty"`
+	Note           *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note"`
+	Pk             *PublicKey `protobuf:"bytes,2,opt,name=pk,proto3" json:"pk"`
+	Value          uint64     `protobuf:"fixed64,3,opt,name=value,proto3" json:"value"`
+	BlindingFactor *Scalar    `protobuf:"bytes,4,opt,name=blinding_factor,json=blindingFactor,proto3" json:"blinding_factor"`
 }
 
 // MarshalTransactionInput to a buffer
@@ -143,22 +154,22 @@ func MarshalTransactionInput(r *bytes.Buffer, t TransactionInput) error {
 
 // UnmarshalTransactionInput from a buffer
 func UnmarshalTransactionInput(r *bytes.Buffer, t *TransactionInput) error {
-	t.Note = &Note{}
+	t.Note = new(Note)
 	if err := UnmarshalNote(r, t.Note); err != nil {
 		return err
 	}
 	if err := encoding.ReadUint64LE(r, &t.Pos); err != nil {
 		return err
 	}
-	t.Sk = &SecretKey{}
+	t.Sk = new(SecretKey)
 	if err := UnmarshalSecretKey(r, t.Sk); err != nil {
 		return err
 	}
-	t.Nullifier = &Nullifier{}
+	t.Nullifier = new(Nullifier)
 	if err := UnmarshalNullifier(r, t.Nullifier); err != nil {
 		return err
 	}
-	t.MerkleRoot = &Scalar{}
+	t.MerkleRoot = new(Scalar)
 	if err := UnmarshalScalar(r, t.MerkleRoot); err != nil {
 		return err
 	}

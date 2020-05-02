@@ -63,8 +63,7 @@ func MarshalBid(r *bytes.Buffer, s BidTransaction) error {
 
 //UnmarshalBid into a buffer
 func UnmarshalBid(r *bytes.Buffer, s *BidTransaction) error {
-	s.ContractTx = &ContractTx{}
-
+	s.ContractTx = new(ContractTx)
 	if err := UnmarshalContractTx(r, s.ContractTx); err != nil {
 		return err
 	}

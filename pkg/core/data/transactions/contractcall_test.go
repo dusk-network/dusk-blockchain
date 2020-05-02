@@ -12,6 +12,20 @@ func TestContractCallDecodeEncode(t *testing.T) {
 	assert.NoError(t, encodeDecode(callTx))
 }
 
+func TestUnMarshal(t *testing.T) {
+	callTx := mockCall()
+	cc, _ := DecodeContractCall(callTx)
+	assert.Equal(t, Tx, cc.Type())
+
+	b, err := Marshal(cc)
+	assert.NoError(t, err)
+
+	ccOther := new(Transaction)
+	assert.NoError(t, Unmarshal(b, ccOther))
+
+	assert.True(t, Equal(cc, ccOther))
+}
+
 func BenchmarkEncode(b *testing.B) {
 	callTx := mockCall()
 
@@ -49,17 +63,7 @@ func mockCall() *rusk.ContractCallTx {
 			Tx: &rusk.Transaction{
 				Inputs: []*rusk.TransactionInput{
 					{
-						Note: &rusk.Note{
-							NoteType:        0,
-							Nonce:           &rusk.Nonce{Bs: []byte{0x11, 0x22}},
-							RG:              &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-							PkR:             &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-							ValueCommitment: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-							BlindingFactor: &rusk.Note_TransparentBlindingFactor{
-								TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-							},
-							Value: &rusk.Note_EncryptedValue{},
-						},
+						Note: mockNote1(),
 						Sk: &rusk.SecretKey{
 							A: &rusk.Scalar{Data: []byte{0x55, 0x66}},
 							B: &rusk.Scalar{Data: []byte{0x55, 0x66}},
@@ -72,17 +76,7 @@ func mockCall() *rusk.ContractCallTx {
 				},
 				Outputs: []*rusk.TransactionOutput{
 					{
-						Note: &rusk.Note{
-							NoteType:        1,
-							Nonce:           &rusk.Nonce{},
-							RG:              &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-							PkR:             &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-							ValueCommitment: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-							BlindingFactor: &rusk.Note_TransparentBlindingFactor{
-								TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-							},
-							Value: &rusk.Note_TransparentValue{},
-						},
+						Note: mockNote2(),
 						Pk: &rusk.PublicKey{
 							AG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
 							BG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
@@ -97,8 +91,12 @@ func mockCall() *rusk.ContractCallTx {
 						RG:              &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
 						PkR:             &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
 						ValueCommitment: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-						BlindingFactor:  &rusk.Note_EncryptedBlindingFactor{},
-						Value:           &rusk.Note_TransparentValue{},
+						BlindingFactor: &rusk.Note_TransparentBlindingFactor{
+							TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x56, 0x67}},
+						},
+						Value: &rusk.Note_TransparentValue{
+							TransparentValue: uint64(200),
+						},
 					},
 					Pk: &rusk.PublicKey{
 						AG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},

@@ -19,16 +19,30 @@ const (
 
 // Note is the spendable output
 type Note struct {
-	NoteType                  NoteType         `protobuf:"varint,1,opt,name=note_type,json=noteType,proto3,enum=rusk.NoteType" json:"note_type,omitempty"`
-	Pos                       uint64           `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos,omitempty"`
-	Nonce                     *Nonce           `protobuf:"bytes,3,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	RG                        *CompressedPoint `protobuf:"bytes,4,opt,name=r_g,json=rG,proto3" json:"r_g,omitempty"`
-	PkR                       *CompressedPoint `protobuf:"bytes,5,opt,name=pk_r,json=pkR,proto3" json:"pk_r,omitempty"`
-	ValueCommitment           *Scalar          `protobuf:"bytes,6,opt,name=value_commitment,json=valueCommitment,proto3" json:"value_commitment,omitempty"`
-	TransparentBlindingFactor *Scalar          `protobuf:"bytes,7,opt,name=transparent_blinding_factor,json=transparentBlindingFactor,proto3,oneof"`
-	EncryptedBlindingFactor   []byte           `protobuf:"bytes,8,opt,name=encrypted_blinding_factor,json=encryptedBlindingFactor,proto3,oneof"`
-	TransparentValue          uint64           `protobuf:"fixed64,9,opt,name=transparent_value,json=transparentValue,proto3,oneof"`
-	EncryptedValue            []byte           `protobuf:"bytes,10,opt,name=encrypted_value,json=encryptedValue,proto3,oneof"`
+	NoteType        NoteType         `protobuf:"varint,1,opt,name=note_type,json=noteType,proto3,enum=rusk.NoteType" json:"note_type"`
+	Pos             uint64           `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos"`
+	Nonce           *Nonce           `protobuf:"bytes,3,opt,name=nonce,proto3" json:"nonce"`
+	RG              *CompressedPoint `protobuf:"bytes,4,opt,name=r_g,json=rG,proto3" json:"r_g"`
+	PkR             *CompressedPoint `protobuf:"bytes,5,opt,name=pk_r,json=pkR,proto3" json:"pk_r"`
+	ValueCommitment *Scalar          `protobuf:"bytes,6,opt,name=value_commitment,json=valueCommitment,proto3" json:"value_commitment"`
+
+	// Blinding factor is a union of oneof
+	BlindingFactor *BlindingFactor `protobuf_oneof:"blinding_factor"`
+
+	// Value can be one of the following:
+	Value *NoteValue `protobuf_oneof:"value"`
+}
+
+// BlindingFactor is the blinding factor of the note
+type BlindingFactor struct {
+	TransparentBlindingFactor *Scalar `protobuf:"bytes,7,opt,name=transparent_blinding_factor,json=transparentBlindingFactor,proto3,oneof"`
+	EncryptedBlindingFactor   []byte  `protobuf:"bytes,8,opt,name=encrypted_blinding_factor,json=encryptedBlindingFactor,proto3,oneof"`
+}
+
+// NoteValue is the transparent/encrypted value
+type NoteValue struct {
+	TransparentValue uint64 `protobuf:"fixed64,9,opt,name=transparent_value,json=transparentValue,proto3,oneof"`
+	EncryptedValue   []byte `protobuf:"bytes,10,opt,name=encrypted_value,json=encryptedValue,proto3,oneof"`
 }
 
 //MarshalNote to a buffer
@@ -43,6 +57,7 @@ func MarshalNote(r *bytes.Buffer, n Note) error {
 	default:
 		return errors.New("Unexpected Note type")
 	}
+
 	if err != nil {
 		return err
 	}
@@ -61,16 +76,24 @@ func MarshalNote(r *bytes.Buffer, n Note) error {
 	if err := MarshalScalar(r, *n.ValueCommitment); err != nil {
 		return err
 	}
-	if err := MarshalScalar(r, *n.TransparentBlindingFactor); err != nil {
+
+	// If note is TRANSPARENT
+	if n.NoteType == NoteType_TRANSPARENT {
+		if err := MarshalScalar(r, *n.BlindingFactor.TransparentBlindingFactor); err != nil {
+			return err
+		}
+		if err := encoding.WriteUint64LE(r, n.Value.TransparentValue); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// Otherwise if note is OBFUSCATED
+	if err := encoding.WriteVarBytes(r, n.BlindingFactor.EncryptedBlindingFactor); err != nil {
 		return err
 	}
-	if err := encoding.WriteVarBytes(r, n.EncryptedBlindingFactor); err != nil {
-		return err
-	}
-	if err := encoding.WriteUint64LE(r, n.TransparentValue); err != nil {
-		return err
-	}
-	if err := encoding.WriteVarBytes(r, n.EncryptedValue); err != nil {
+	if err := encoding.WriteVarBytes(r, n.Value.EncryptedValue); err != nil {
 		return err
 	}
 	return nil
@@ -95,36 +118,48 @@ func UnmarshalNote(r *bytes.Buffer, n *Note) error {
 		return err
 	}
 
-	n.Nonce = &Nonce{}
+	n.Nonce = new(Nonce)
 	if err := UnmarshalNonce(r, n.Nonce); err != nil {
 		return err
 	}
 
-	n.RG = &CompressedPoint{}
+	n.RG = new(CompressedPoint)
 	if err := UnmarshalCompressedPoint(r, n.RG); err != nil {
 		return err
 	}
 
-	n.PkR = &CompressedPoint{}
+	n.PkR = new(CompressedPoint)
 	if err := UnmarshalCompressedPoint(r, n.PkR); err != nil {
 		return err
 	}
 
-	n.ValueCommitment = &Scalar{}
+	n.ValueCommitment = new(Scalar)
 	if err := UnmarshalScalar(r, n.ValueCommitment); err != nil {
 		return err
 	}
-	n.TransparentBlindingFactor = &Scalar{}
-	if err := UnmarshalScalar(r, n.TransparentBlindingFactor); err != nil {
+
+	n.BlindingFactor = new(BlindingFactor)
+	n.Value = new(NoteValue)
+
+	// If note is TRANSPARENT
+	if n.NoteType == NoteType_TRANSPARENT {
+
+		n.BlindingFactor.TransparentBlindingFactor = new(Scalar)
+		if err := UnmarshalScalar(r, n.BlindingFactor.TransparentBlindingFactor); err != nil {
+			return err
+		}
+		if err := encoding.ReadUint64LE(r, &n.Value.TransparentValue); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// Otherwise if it is OBFUSCATED
+	if err := encoding.ReadVarBytes(r, &n.BlindingFactor.EncryptedBlindingFactor); err != nil {
 		return err
 	}
-	if err := encoding.ReadVarBytes(r, &n.EncryptedBlindingFactor); err != nil {
-		return err
-	}
-	if err := encoding.ReadUint64LE(r, &n.TransparentValue); err != nil {
-		return err
-	}
-	if err := encoding.ReadVarBytes(r, &n.EncryptedValue); err != nil {
+	if err := encoding.ReadVarBytes(r, &n.Value.EncryptedValue); err != nil {
 		return err
 	}
 	return nil
@@ -142,6 +177,7 @@ func MarshalNullifier(r *bytes.Buffer, n Nullifier) error {
 
 // UnmarshalNullifier from a buffer
 func UnmarshalNullifier(r *bytes.Buffer, n *Nullifier) error {
+	n.H = new(Scalar)
 	return UnmarshalScalar(r, n.H)
 }
 
@@ -161,9 +197,11 @@ func MarshalSecretKey(r *bytes.Buffer, n SecretKey) error {
 
 // UnmarshalSecretKey from the wire encoding
 func UnmarshalSecretKey(r *bytes.Buffer, n *SecretKey) error {
+	n.A = new(Scalar)
 	if err := UnmarshalScalar(r, n.A); err != nil {
 		return err
 	}
+	n.B = new(Scalar)
 	return UnmarshalScalar(r, n.B)
 }
 
@@ -183,9 +221,11 @@ func MarshalViewKey(r *bytes.Buffer, n ViewKey) error {
 
 // UnmarshalViewKey from the wire encoding
 func UnmarshalViewKey(r *bytes.Buffer, n *ViewKey) error {
+	n.A = new(Scalar)
 	if err := UnmarshalScalar(r, n.A); err != nil {
 		return err
 	}
+	n.BG = new(CompressedPoint)
 	return UnmarshalCompressedPoint(r, n.BG)
 }
 
@@ -205,9 +245,11 @@ func MarshalPublicKey(r *bytes.Buffer, n PublicKey) error {
 
 // UnmarshalPublicKey from the wire encoding
 func UnmarshalPublicKey(r *bytes.Buffer, n *PublicKey) error {
+	n.AG = new(CompressedPoint)
 	if err := UnmarshalCompressedPoint(r, n.AG); err != nil {
 		return err
 	}
+	n.BG = new(CompressedPoint)
 	return UnmarshalCompressedPoint(r, n.BG)
 }
 
@@ -218,12 +260,12 @@ type Scalar struct {
 
 // MarshalScalar to the wire encoding
 func MarshalScalar(r *bytes.Buffer, n Scalar) error {
-	return encoding.ReadVarBytes(r, &n.Data)
+	return encoding.WriteVarBytes(r, n.Data)
 }
 
 // UnmarshalScalar from the wire encoding
 func UnmarshalScalar(r *bytes.Buffer, n *Scalar) error {
-	return encoding.WriteVarBytes(r, n.Data)
+	return encoding.ReadVarBytes(r, &n.Data)
 }
 
 // CompressedPoint of the BLS12_#81 curve
@@ -233,12 +275,12 @@ type CompressedPoint struct {
 
 // MarshalCompressedPoint to the wire encoding
 func MarshalCompressedPoint(r *bytes.Buffer, n CompressedPoint) error {
-	return encoding.ReadVarBytes(r, &n.Y)
+	return encoding.WriteVarBytes(r, n.Y)
 }
 
 // UnmarshalCompressedPoint from the wire encoding
 func UnmarshalCompressedPoint(r *bytes.Buffer, n *CompressedPoint) error {
-	return encoding.WriteVarBytes(r, n.Y)
+	return encoding.ReadVarBytes(r, &n.Y)
 }
 
 // Nonce is the distributed atomic increment used to prevent double spending
@@ -248,10 +290,10 @@ type Nonce struct {
 
 // MarshalNonce to the wire encoding
 func MarshalNonce(r *bytes.Buffer, n Nonce) error {
-	return encoding.ReadVarBytes(r, &n.Bs)
+	return encoding.WriteVarBytes(r, n.Bs)
 }
 
 // UnmarshalNonce from the wire encoding
 func UnmarshalNonce(r *bytes.Buffer, n *Nonce) error {
-	return encoding.WriteVarBytes(r, n.Bs)
+	return encoding.ReadVarBytes(r, &n.Bs)
 }

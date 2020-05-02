@@ -39,7 +39,7 @@ func MarshalFees(r *bytes.Buffer, s WithdrawFeesTransaction) error {
 
 //UnmarshalFees into a buffer
 func UnmarshalFees(r *bytes.Buffer, s *WithdrawFeesTransaction) error {
-	s.ContractTx = &ContractTx{}
+	s.ContractTx = new(ContractTx)
 
 	if err := UnmarshalContractTx(r, s.ContractTx); err != nil {
 		return err
