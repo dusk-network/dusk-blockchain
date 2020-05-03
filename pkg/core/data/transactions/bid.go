@@ -4,20 +4,83 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 // BidTransaction is the transaction created by BlockGenerators to be able to
 // calculate the scores to accompany block candidates
 type BidTransaction struct {
 	*ContractTx
-	M                []byte `protobuf:"bytes,2,opt,name=m,proto3" json:"m,omitempty"`
-	Commitment       []byte `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`
-	EncryptedValue   []byte `protobuf:"bytes,4,opt,name=encrypted_value,json=encryptedValue,proto3" json:"encrypted_value,omitempty"`
-	EncryptedBlinder []byte `protobuf:"bytes,5,opt,name=encrypted_blinder,json=encryptedBlinder,proto3" json:"encrypted_blinder,omitempty"`
-	ExpirationHeight uint64 `protobuf:"fixed64,6,opt,name=expiration_height,json=expirationHeight,proto3" json:"expiration_height,omitempty"`
-	Pk               []byte `protobuf:"bytes,7,opt,name=pk,proto3" json:"pk,omitempty"`
-	R                []byte `protobuf:"bytes,8,opt,name=r,proto3" json:"r,omitempty"`
-	Seed             []byte `protobuf:"bytes,9,opt,name=seed,proto3" json:"seed,omitempty"`
+	M                []byte `json:"m"`
+	Commitment       []byte `json:"commitment"`
+	EncryptedValue   []byte `json:"encrypted_value"`
+	EncryptedBlinder []byte `json:"encrypted_blinder"`
+	Pk               []byte `json:"pk"`
+	R                []byte `json:"r"`
+	Seed             []byte `json:"seed"`
+	ExpirationHeight uint64 `json:"expiration_height"`
+}
+
+// MBid copies the Bid rusk struct into the transaction datastruct
+func MBid(r *rusk.BidTransaction, t *BidTransaction) error {
+	r.Tx = new(rusk.Transaction)
+	if err := MTx(r.Tx, t.Tx); err != nil {
+		return err
+	}
+
+	r.M = make([]byte, len(r.M))
+	copy(r.M, t.M)
+	r.Commitment = make([]byte, len(t.Commitment))
+	copy(r.Commitment, t.Commitment)
+	r.EncryptedValue = make([]byte, len(t.EncryptedValue))
+	copy(r.EncryptedValue, t.EncryptedValue)
+	r.EncryptedBlinder = make([]byte, len(t.EncryptedBlinder))
+	copy(r.EncryptedBlinder, t.EncryptedBlinder)
+	r.Pk = make([]byte, len(t.Pk))
+	copy(r.Pk, r.Pk)
+	r.R = make([]byte, len(t.R))
+	copy(r.R, r.R)
+	r.Seed = make([]byte, len(t.Seed))
+	copy(r.Seed, t.Seed)
+	r.ExpirationHeight = t.ExpirationHeight
+	return nil
+}
+
+// UBid copies the Bid rusk struct into the transaction datastruct
+func UBid(r *rusk.BidTransaction, t *BidTransaction) error {
+	var err error
+	t.ContractTx, err = UContractTx(r.Tx)
+	if err != nil {
+		return err
+	}
+
+	t.M = make([]byte, len(r.M))
+	copy(t.M, r.M)
+	t.Commitment = make([]byte, len(r.Commitment))
+	copy(t.Commitment, r.Commitment)
+	t.EncryptedValue = make([]byte, len(r.EncryptedValue))
+	copy(t.EncryptedValue, r.EncryptedValue)
+	t.EncryptedBlinder = make([]byte, len(r.EncryptedBlinder))
+	copy(t.EncryptedBlinder, r.EncryptedBlinder)
+	t.Pk = make([]byte, len(r.Pk))
+	copy(t.Pk, r.Pk)
+	t.R = make([]byte, len(r.R))
+	copy(t.R, r.R)
+	t.Seed = make([]byte, len(r.Seed))
+	copy(t.Seed, r.Seed)
+	t.ExpirationHeight = r.ExpirationHeight
+	return nil
+}
+
+// CalculateHash complies with merkletree.Payload interface
+func (t *BidTransaction) CalculateHash() ([]byte, error) {
+	b := new(bytes.Buffer)
+	if err := MarshalBid(b, *t); err != nil {
+		return nil, err
+	}
+
+	return hash.Sha3256(b.Bytes())
 }
 
 //MarshalBid into a buffer
@@ -104,7 +167,7 @@ func UnmarshalBid(r *bytes.Buffer, s *BidTransaction) error {
 }
 
 // Type complies with the ContractCall interface
-func (b *BidTransaction) Type() TxType {
+func (t *BidTransaction) Type() TxType {
 	return Bid
 }
 
@@ -112,11 +175,61 @@ func (b *BidTransaction) Type() TxType {
 // withdraw their stake (bid)
 type WithdrawBidTransaction struct {
 	*ContractTx
-	Commitment       []byte `protobuf:"bytes,2,opt,name=commitment,proto3" json:"commitment,omitempty"`
-	EncryptedValue   []byte `protobuf:"bytes,3,opt,name=encrypted_value,json=encryptedValue,proto3" json:"encrypted_value,omitempty"`
-	EncryptedBlinder []byte `protobuf:"bytes,4,opt,name=encrypted_blinder,json=encryptedBlinder,proto3" json:"encrypted_blinder,omitempty"`
-	Bid              []byte `protobuf:"bytes,5,opt,name=bid,proto3" json:"bid,omitempty"`
-	Sig              []byte `protobuf:"bytes,6,opt,name=sig,proto3" json:"sig,omitempty"`
+	Commitment       []byte `json:"commitment"`
+	EncryptedValue   []byte `json:"encrypted_value"`
+	EncryptedBlinder []byte `json:"encrypted_blinder"`
+	Bid              []byte `json:"bid"`
+	Sig              []byte `json:"sig"`
+}
+
+// CalculateHash complies with merkletree.Payload interface
+func (t *WithdrawBidTransaction) CalculateHash() ([]byte, error) {
+	b := new(bytes.Buffer)
+	if err := MarshalWithdrawBid(b, *t); err != nil {
+		return nil, err
+	}
+
+	return hash.Sha3256(b.Bytes())
+}
+
+// MWithdrawBid copies the WithdrawBid struct into the rusk datastruct
+func MWithdrawBid(r *rusk.WithdrawBidTransaction, t *WithdrawBidTransaction) error {
+	r.Tx = new(rusk.Transaction)
+	if err := MTx(r.Tx, t.Tx); err != nil {
+		return err
+	}
+
+	r.Commitment = make([]byte, len(t.Commitment))
+	copy(r.Commitment, t.Commitment)
+	r.EncryptedValue = make([]byte, len(t.EncryptedValue))
+	copy(r.EncryptedValue, t.EncryptedValue)
+	r.EncryptedBlinder = make([]byte, len(t.EncryptedBlinder))
+	copy(r.EncryptedBlinder, t.EncryptedBlinder)
+	r.Bid = make([]byte, len(t.Bid))
+	copy(r.Bid, t.Bid)
+	r.Sig = make([]byte, len(t.Sig))
+	copy(r.Sig, t.Sig)
+	return nil
+}
+
+// UWithdrawBid copies the WithdrawBid rusk struct into the transaction datastruct
+func UWithdrawBid(r *rusk.WithdrawBidTransaction, t *WithdrawBidTransaction) error {
+	var err error
+	t.ContractTx, err = UContractTx(r.Tx)
+	if err != nil {
+		return err
+	}
+	t.Commitment = make([]byte, len(r.Commitment))
+	copy(t.Commitment, r.Commitment)
+	t.EncryptedValue = make([]byte, len(r.EncryptedValue))
+	copy(t.EncryptedValue, r.EncryptedValue)
+	t.EncryptedBlinder = make([]byte, len(r.EncryptedBlinder))
+	copy(t.EncryptedBlinder, r.EncryptedBlinder)
+	t.Bid = make([]byte, len(r.Bid))
+	copy(t.Bid, r.Bid)
+	t.Sig = make([]byte, len(r.Sig))
+	copy(t.Sig, r.Sig)
+	return nil
 }
 
 //MarshalWithdrawBid into a buffer
@@ -180,6 +293,6 @@ func UnmarshalWithdrawBid(r *bytes.Buffer, s *WithdrawBidTransaction) error {
 }
 
 // Type complies with the ContractCall interface
-func (w *WithdrawBidTransaction) Type() TxType {
+func (t *WithdrawBidTransaction) Type() TxType {
 	return WithdrawBid
 }

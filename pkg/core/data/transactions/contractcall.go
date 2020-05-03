@@ -2,11 +2,9 @@ package transactions
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -46,9 +44,6 @@ type ContractCall interface {
 	// StandardTx is the underlying phoenix transaction carrying the
 	// transaction outputs and inputs
 	StandardTx() *Transaction
-
-	// setHash is used to set a precalculated hash
-	setHash([]byte)
 }
 
 // ContractTx is the embedded struct utilized to group operations on the
@@ -56,6 +51,17 @@ type ContractCall interface {
 // It is NOT a ContractCall implementation as Transaction is a type apart
 type ContractTx struct {
 	Tx *Transaction `protobuf:"bytes,1,opt,name=tx,proto3" json:"tx,omitempty"`
+}
+
+// UContractTx is embedded by the ContractCall structs to facilitate copying
+// the transaction fields from rusk.Transaction into Transaction data
+func UContractTx(r *rusk.Transaction) (*ContractTx, error) {
+	ctx := new(ContractTx)
+	ctx.Tx = new(Transaction)
+	if err := UTx(r, ctx.Tx); err != nil {
+		return nil, err
+	}
+	return ctx, nil
 }
 
 // MarshalContractTx into a buffer
@@ -72,15 +78,6 @@ func UnmarshalContractTx(r *bytes.Buffer, c *ContractTx) error {
 // StandardTx returns the underlying phoenix transaction
 func (t *ContractTx) StandardTx() *Transaction {
 	return t.Tx
-}
-
-// CalculateHash returns the hash precalculated during serialization
-func (t *ContractTx) CalculateHash() ([]byte, error) {
-	return t.Tx.CalculateHash()
-}
-
-func (t *ContractTx) setHash(h []byte) {
-	t.Tx.setHash(h)
 }
 
 // Equal tests two contract calls for equality
@@ -156,208 +153,125 @@ func Unmarshal(buf *bytes.Buffer, c ContractCall) error {
 
 // DecodeContractCall turns the protobuf message into a ContractCall
 func DecodeContractCall(contractCall *rusk.ContractCallTx) (ContractCall, error) {
-	return decodeContractCall(contractCall, json.Marshal, json.Unmarshal)
-}
-
-func decodeContractCall(
-	contractCall *rusk.ContractCallTx,
-	marshal func(interface{}) ([]byte, error),
-	unmarshal func([]byte, interface{}) error,
-) (ContractCall, error) {
-	var call ContractCall
-
-	var byteArr, h []byte
-	var err error
-
 	switch c := contractCall.ContractCall.(type) {
 	case *rusk.ContractCallTx_Tx:
-		byteArr, err = marshal(c.Tx)
-		if err != nil {
+		call := new(Transaction)
+		if err := UTx(c.Tx, call); err != nil {
 			return nil, err
 		}
-		call = new(Transaction)
+		return call, nil
 	case *rusk.ContractCallTx_Withdraw:
-		byteArr, err = marshal(c.Withdraw)
-		if err != nil {
+		call := new(WithdrawFeesTransaction)
+		if err := UWithdrawFees(c.Withdraw, call); err != nil {
 			return nil, err
 		}
-		call = new(WithdrawFeesTransaction)
+		return call, nil
 	case *rusk.ContractCallTx_Stake:
-		byteArr, err = marshal(c.Stake)
-		if err != nil {
+		call := new(StakeTransaction)
+		if err := UStake(c.Stake, call); err != nil {
 			return nil, err
 		}
-		call = new(StakeTransaction)
+		return call, nil
 	case *rusk.ContractCallTx_Bid:
-		byteArr, err = marshal(c.Bid)
-		if err != nil {
+		call := new(BidTransaction)
+		if err := UBid(c.Bid, call); err != nil {
 			return nil, err
 		}
-		call = new(BidTransaction)
+		return call, nil
 	case *rusk.ContractCallTx_Slash:
-		byteArr, err = marshal(c.Slash)
-		if err != nil {
+		call := new(SlashTransaction)
+		if err := USlash(c.Slash, call); err != nil {
 			return nil, err
 		}
-		call = new(SlashTransaction)
+		return call, nil
 	case *rusk.ContractCallTx_Distribute:
-		byteArr, err = marshal(c.Distribute)
-		if err != nil {
+		call := new(DistributeTransaction)
+		if err := UDistribute(c.Distribute, call); err != nil {
 			return nil, err
 		}
-		call = new(DistributeTransaction)
+		return call, nil
 	case *rusk.ContractCallTx_WithdrawStake:
-		byteArr, err = marshal(c.WithdrawStake)
-		if err != nil {
+		call := new(WithdrawStakeTransaction)
+		if err := UWithdrawStake(c.WithdrawStake, call); err != nil {
 			return nil, err
 		}
-		call = new(WithdrawStakeTransaction)
+		return call, nil
 	case *rusk.ContractCallTx_WithdrawBid:
-		byteArr, err = marshal(c.WithdrawBid)
-		if err != nil {
+		call := new(WithdrawBidTransaction)
+		if err := UWithdrawBid(c.WithdrawBid, call); err != nil {
 			return nil, err
 		}
-		call = new(WithdrawBidTransaction)
+		return call, nil
 	}
 
-	if jerr := unmarshal(byteArr, call); err != nil {
-		return nil, jerr
-	}
-
-	h, err = hash.Sha3256(byteArr)
-	if err != nil {
-		return nil, err
-	}
-
-	call.setHash(h)
-
-	return call, nil
+	return nil, errors.New("Unrecognized contract call")
 }
 
 // EncodeContractCall into a ContractCallTx
 func EncodeContractCall(c interface{}) (*rusk.ContractCallTx, error) {
-	return encodeContractCall(c, json.Marshal, json.Unmarshal)
-}
-
-func encodeContractCall(
-	c interface{},
-	marshal func(interface{}) ([]byte, error),
-	unmarshal func([]byte, interface{}) error,
-) (*rusk.ContractCallTx, error) {
-	var byteArr []byte
-	var err error
-
 	switch t := c.(type) {
 	case *Transaction:
-		byteArr, err = marshal(t)
-		if err != nil {
-			return nil, err
-		}
-
 		call := &rusk.ContractCallTx_Tx{
 			Tx: new(rusk.Transaction),
 		}
-
-		if jerr := unmarshal(byteArr, call.Tx); jerr != nil {
-			return nil, jerr
+		if err := MTx(call.Tx, t); err != nil {
+			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *WithdrawFeesTransaction:
-		byteArr, err = marshal(t)
-		if err != nil {
-			return nil, err
-		}
-
 		call := &rusk.ContractCallTx_Withdraw{
 			Withdraw: new(rusk.WithdrawFeesTransaction),
 		}
-
-		if jerr := unmarshal(byteArr, call.Withdraw); jerr != nil {
-			return nil, jerr
+		if err := MWithdrawFees(call.Withdraw, t); err != nil {
+			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *StakeTransaction:
-		byteArr, err = marshal(t)
-		if err != nil {
-			return nil, err
-		}
-
 		call := &rusk.ContractCallTx_Stake{
 			Stake: new(rusk.StakeTransaction),
 		}
-
-		if jerr := unmarshal(byteArr, call.Stake); jerr != nil {
-			return nil, jerr
+		if err := MStake(call.Stake, t); err != nil {
+			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *BidTransaction:
-		byteArr, err = marshal(t)
-		if err != nil {
-			return nil, err
-		}
-
 		call := &rusk.ContractCallTx_Bid{
 			Bid: new(rusk.BidTransaction),
 		}
-
-		if jerr := unmarshal(byteArr, call.Bid); jerr != nil {
-			return nil, jerr
+		if err := MBid(call.Bid, t); err != nil {
+			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *SlashTransaction:
-		byteArr, err = marshal(t)
-		if err != nil {
-			return nil, err
-		}
-
 		call := &rusk.ContractCallTx_Slash{
 			Slash: new(rusk.SlashTransaction),
 		}
-
-		if jerr := unmarshal(byteArr, call.Slash); jerr != nil {
-			return nil, jerr
+		if err := MSlash(call.Slash, t); err != nil {
+			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *DistributeTransaction:
-		byteArr, err = marshal(t)
-		if err != nil {
-			return nil, err
-		}
-
 		call := &rusk.ContractCallTx_Distribute{
 			Distribute: new(rusk.DistributeTransaction),
 		}
-
-		if jerr := unmarshal(byteArr, call.Distribute); jerr != nil {
-			return nil, jerr
+		if err := MDistribute(call.Distribute, t); err != nil {
+			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *WithdrawStakeTransaction:
-		byteArr, err = marshal(t)
-		if err != nil {
-			return nil, err
-		}
-
 		call := &rusk.ContractCallTx_WithdrawStake{
 			WithdrawStake: new(rusk.WithdrawStakeTransaction),
 		}
-
-		if jerr := unmarshal(byteArr, call.WithdrawStake); jerr != nil {
-			return nil, jerr
+		if err := MWithdrawStake(call.WithdrawStake, t); err != nil {
+			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	case *WithdrawBidTransaction:
-		byteArr, err = marshal(t)
-		if err != nil {
-			return nil, err
-		}
-
 		call := &rusk.ContractCallTx_WithdrawBid{
 			WithdrawBid: new(rusk.WithdrawBidTransaction),
 		}
-
-		if jerr := unmarshal(byteArr, call.WithdrawBid); jerr != nil {
-			return nil, jerr
+		if err := MWithdrawBid(call.WithdrawBid, t); err != nil {
+			return nil, err
 		}
 		return &rusk.ContractCallTx{ContractCall: call}, nil
 	default:

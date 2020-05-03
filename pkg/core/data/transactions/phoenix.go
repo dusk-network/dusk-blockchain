@@ -4,24 +4,27 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 // Transaction according to the Phoenix model
 type Transaction struct {
-	Inputs  []*TransactionInput  `protobuf:"bytes,1,rep,name=inputs,proto3" json:"inputs,omitempty"`
-	Outputs []*TransactionOutput `protobuf:"bytes,2,rep,name=outputs,proto3" json:"outputs,omitempty"`
-	Fee     *TransactionOutput   `protobuf:"bytes,3,opt,name=fee,proto3" json:"fee,omitempty"`
-	Proof   []byte               `protobuf:"bytes,4,opt,name=proof,proto3" json:"proof,omitempty"`
+	Inputs  []*TransactionInput  `json:"inputs"`
+	Outputs []*TransactionOutput `json:"outputs"`
+	Fee     *TransactionOutput   `json:"fee"`
+	Proof   []byte               `json:"proof"`
 	hash    []byte
-}
-
-func (t *Transaction) setHash(h []byte) {
-	t.hash = h
 }
 
 // CalculateHash complies with merkletree.Payload interface
 func (t *Transaction) CalculateHash() ([]byte, error) {
-	return t.hash, nil
+	b := new(bytes.Buffer)
+	if err := MarshalTransaction(b, *t); err != nil {
+		return nil, err
+	}
+
+	return hash.Sha3256(b.Bytes())
 }
 
 // Type complies with ContractCall interface. Returns "Tx"
@@ -33,6 +36,58 @@ func (t *Transaction) Type() TxType {
 // interface
 func (t *Transaction) StandardTx() *Transaction {
 	return t
+}
+
+// MTx copies from rusk.Transaction to transactions.Transaction
+func MTx(r *rusk.Transaction, t *Transaction) error {
+	r.Inputs = make([]*rusk.TransactionInput, len(t.Inputs))
+	r.Outputs = make([]*rusk.TransactionOutput, len(t.Outputs))
+	for i := range t.Inputs {
+		r.Inputs[i] = new(rusk.TransactionInput)
+		if err := MTxIn(r.Inputs[i], t.Inputs[i]); err != nil {
+			return err
+		}
+	}
+	for i := range t.Outputs {
+		r.Outputs[i] = new(rusk.TransactionOutput)
+		if err := MTxOut(r.Outputs[i], t.Outputs[i]); err != nil {
+			return err
+		}
+	}
+	r.Fee = new(rusk.TransactionOutput)
+	if err := MTxOut(r.Fee, t.Fee); err != nil {
+		return err
+	}
+
+	r.Proof = make([]byte, len(t.Proof))
+	copy(r.Proof, t.Proof)
+	return nil
+}
+
+// UTx copies from rusk.Transaction to transactions.Transaction
+func UTx(r *rusk.Transaction, t *Transaction) error {
+	t.Inputs = make([]*TransactionInput, len(r.Inputs))
+	t.Outputs = make([]*TransactionOutput, len(r.Outputs))
+	for i := range r.Inputs {
+		t.Inputs[i] = new(TransactionInput)
+		if err := UTxIn(r.Inputs[i], t.Inputs[i]); err != nil {
+			return err
+		}
+	}
+	for i := range r.Outputs {
+		t.Outputs[i] = new(TransactionOutput)
+		if err := UTxOut(r.Outputs[i], t.Outputs[i]); err != nil {
+			return err
+		}
+	}
+	t.Fee = new(TransactionOutput)
+	if err := UTxOut(r.Fee, t.Fee); err != nil {
+		return err
+	}
+
+	t.Proof = make([]byte, len(r.Proof))
+	copy(t.Proof, r.Proof)
+	return nil
 }
 
 //MarshalTransaction into a buffer
@@ -117,19 +172,47 @@ func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
 
 // TransactionInput includes the notes, the nullifier and the transaction merkleroot
 type TransactionInput struct {
-	Note       *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note"`
-	Pos        uint64     `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos"`
-	Sk         *SecretKey `protobuf:"bytes,3,opt,name=sk,proto3" json:"sk"`
-	Nullifier  *Nullifier `protobuf:"bytes,4,opt,name=nullifier,proto3" json:"nullifier"`
-	MerkleRoot *Scalar    `protobuf:"bytes,5,opt,name=merkle_root,json=merkleRoot,proto3" json:"merkle_root"`
+	Note       *Note      `json:"note"`
+	Pos        uint64     `json:"pos"`
+	Sk         *SecretKey `json:"sk"`
+	Nullifier  *Nullifier `json:"nullifier"`
+	MerkleRoot *Scalar    `json:"merkle_root"`
 }
 
-// TransactionOutput is the spendable output of the transaction
-type TransactionOutput struct {
-	Note           *Note      `protobuf:"bytes,1,opt,name=note,proto3" json:"note"`
-	Pk             *PublicKey `protobuf:"bytes,2,opt,name=pk,proto3" json:"pk"`
-	Value          uint64     `protobuf:"fixed64,3,opt,name=value,proto3" json:"value"`
-	BlindingFactor *Scalar    `protobuf:"bytes,4,opt,name=blinding_factor,json=blindingFactor,proto3" json:"blinding_factor"`
+// MTxIn copies from rusk.TransactionInput to transactions.TransactionInput
+func MTxIn(r *rusk.TransactionInput, t *TransactionInput) error {
+	r.Note = new(rusk.Note)
+	r.Sk = new(rusk.SecretKey)
+	r.Nullifier = new(rusk.Nullifier)
+	r.MerkleRoot = new(rusk.Scalar)
+
+	if err := MNote(r.Note, t.Note); err != nil {
+		return err
+	}
+
+	r.Pos = t.Pos
+	MSecretKey(r.Sk, t.Sk)
+	MNullifier(r.Nullifier, t.Nullifier)
+	MScalar(r.MerkleRoot, t.MerkleRoot)
+	return nil
+}
+
+// UTxIn copies from rusk.TransactionOutput to transactions.TransactionOutput
+func UTxIn(r *rusk.TransactionInput, t *TransactionInput) error {
+	t.Note = new(Note)
+	t.Sk = new(SecretKey)
+	t.Nullifier = new(Nullifier)
+	t.MerkleRoot = new(Scalar)
+
+	if err := UNote(r.Note, t.Note); err != nil {
+		return err
+	}
+
+	t.Pos = r.Pos
+	USecretKey(r.Sk, t.Sk)
+	UNullifier(r.Nullifier, t.Nullifier)
+	UScalar(r.MerkleRoot, t.MerkleRoot)
+	return nil
 }
 
 // MarshalTransactionInput to a buffer
@@ -173,6 +256,46 @@ func UnmarshalTransactionInput(r *bytes.Buffer, t *TransactionInput) error {
 	if err := UnmarshalScalar(r, t.MerkleRoot); err != nil {
 		return err
 	}
+	return nil
+}
+
+// TransactionOutput is the spendable output of the transaction
+type TransactionOutput struct {
+	Note           *Note      `json:"note"`
+	Pk             *PublicKey `json:"pk"`
+	Value          uint64     `json:"value"`
+	BlindingFactor *Scalar    `json:"blinding_factor"`
+}
+
+// MTxOut copies from transactions.TransactionOutput to rusk.TransactionOutput
+func MTxOut(r *rusk.TransactionOutput, t *TransactionOutput) error {
+	r.Note = new(rusk.Note)
+	r.Pk = new(rusk.PublicKey)
+	r.BlindingFactor = new(rusk.Scalar)
+
+	if err := MNote(r.Note, t.Note); err != nil {
+		return err
+	}
+
+	r.Value = t.Value
+	MPublicKey(r.Pk, t.Pk)
+	MScalar(r.BlindingFactor, t.BlindingFactor)
+	return nil
+}
+
+// UTxOut copies from rusk.TransactionOutput to transactions.TransactionOutput
+func UTxOut(r *rusk.TransactionOutput, t *TransactionOutput) error {
+	t.Note = new(Note)
+	t.Pk = new(PublicKey)
+	t.BlindingFactor = new(Scalar)
+
+	if err := UNote(r.Note, t.Note); err != nil {
+		return err
+	}
+
+	t.Value = r.Value
+	UPublicKey(r.Pk, t.Pk)
+	UScalar(r.BlindingFactor, t.BlindingFactor)
 	return nil
 }
 

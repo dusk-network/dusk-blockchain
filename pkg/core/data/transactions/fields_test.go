@@ -2,78 +2,83 @@ package transactions
 
 import (
 	"bytes"
-	"encoding/json"
 	"testing"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
-var table = []struct {
+type noteTable struct {
 	name string
 	mock func() *rusk.Note
-	test func(*testing.T, *Note)
-}{
-	{
-		"one",
-		mockNote1,
-		func(t *testing.T, tNote *Note) {
-			if !assert.Equal(t, []byte{0x55, 0x66}, tNote.ValueCommitment.Data) {
-				t.Fatal()
-			}
-
-			if !assert.Equal(t, []byte{0x55, 0x66}, tNote.BlindingFactor.TransparentBlindingFactor.Data) {
-				t.Fatal()
-			}
-
-			if !assert.Equal(t, uint64(122), tNote.Value.TransparentValue) {
-				t.Fatal()
-			}
-		},
-	},
-	{
-		"two",
-		mockNote2,
-		func(t *testing.T, tNote *Note) {
-			if !assert.Equal(t, []byte{0x56, 0x67}, tNote.BlindingFactor.EncryptedBlindingFactor) {
-				t.Fatal()
-			}
-
-			if !assert.Equal(t, []byte{0x12, 0x02}, tNote.Value.EncryptedValue) {
-				t.Fatal()
-			}
-		},
-	},
-	{
-		"three",
-		mockNote3,
-		func(t *testing.T, tNote *Note) {
-			if !assert.Nil(t, tNote.BlindingFactor.TransparentBlindingFactor) {
-				t.Fatal()
-			}
-
-			if !assert.Equal(t, uint64(0), tNote.Value.TransparentValue) {
-				t.Fatal()
-			}
-		},
-	},
+	test func(*Note)
 }
 
-func TestNote(t *testing.T) {
+func table(t *testing.T) (*assert.Assertions, []noteTable) {
+	assert := assert.New(t)
 
-	for _, tt := range table {
-		note := tt.mock()
-		b, _ := json.Marshal(note)
-		n := new(Note)
-		assert.NoError(t, json.Unmarshal(b, n))
+	return assert, []noteTable{
+		{
+			"one",
+			mockNote1,
+			func(tNote *Note) {
+				assert.Equal([]byte{0x55, 0x66}, tNote.ValueCommitment.Data)
+				assert.Equal([]byte{0x55, 0x66}, tNote.TransparentBlindingFactor.Data)
+				assert.Equal(uint64(122), tNote.TransparentValue)
+			},
+		},
+		{
+			"two",
+			mockNote2,
+			func(tNote *Note) {
+				assert.Equal([]byte{0x56, 0x67}, tNote.EncryptedBlindingFactor)
+				assert.Equal([]byte{0x12, 0x02}, tNote.EncryptedValue)
+			},
+		},
+	}
+}
+
+func TestWireUnMarshalNote(t *testing.T) {
+	assert, ttest := table(t)
+	for _, tt := range ttest {
+		_, n, err := notes(tt.mock)
+		assert.NoError(err)
 
 		marshaled := new(bytes.Buffer)
-		assert.NoError(t, MarshalNote(marshaled, *n))
+		assert.NoError(MarshalNote(marshaled, *n))
 
-		tNote := &Note{}
-		assert.NoError(t, UnmarshalNote(marshaled, tNote))
-		tt.test(t, tNote)
+		tNote := new(Note)
+		assert.NoError(UnmarshalNote(marshaled, tNote))
+		tt.test(tNote)
 	}
+}
+
+func TestRuskUnMarshalNote(t *testing.T) {
+	assert := assert.New(t)
+	note, n, err := notes(mockNote1)
+	assert.NoError(err)
+
+	outNote := new(rusk.Note)
+	assert.NoError(MNote(outNote, n))
+	assert.Equal(outNote.Nonce.Bs, note.Nonce.Bs)
+	assert.Equal(outNote.RG.Y, note.RG.Y)
+	assert.Equal(outNote.PkR.Y, note.PkR.Y)
+	assert.Equal(outNote.ValueCommitment.Data, note.ValueCommitment.Data)
+	assert.Equal(outNote.BlindingFactor, note.BlindingFactor)
+	assert.Equal(outNote.Value, note.Value)
+}
+
+func TestInconsistentNote(t *testing.T) {
+	assert := assert.New(t)
+	_, _, err := notes(mockNote3)
+	assert.Error(err)
+}
+
+func notes(mockNote func() *rusk.Note) (*rusk.Note, *Note, error) {
+	note := mockNote()
+	n := new(Note)
+	err := UNote(note, n)
+	return note, n, err
 }
 
 func mockNote1() *rusk.Note {

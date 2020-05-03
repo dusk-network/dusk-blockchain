@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
 func TestContractCallDecodeEncode(t *testing.T) {
@@ -13,17 +13,18 @@ func TestContractCallDecodeEncode(t *testing.T) {
 }
 
 func TestUnMarshal(t *testing.T) {
+	assert := assert.New(t)
 	callTx := mockCall()
 	cc, _ := DecodeContractCall(callTx)
-	assert.Equal(t, Tx, cc.Type())
+	assert.Equal(Tx, cc.Type())
 
 	b, err := Marshal(cc)
-	assert.NoError(t, err)
+	assert.NoError(err)
 
 	ccOther := new(Transaction)
-	assert.NoError(t, Unmarshal(b, ccOther))
+	assert.NoError(Unmarshal(b, ccOther))
 
-	assert.True(t, Equal(cc, ccOther))
+	assert.True(Equal(cc, ccOther))
 }
 
 func BenchmarkEncode(b *testing.B) {

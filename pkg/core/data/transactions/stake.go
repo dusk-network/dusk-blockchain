@@ -4,19 +4,58 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 // StakeTransaction is used by the nodes to create a stake and become
 // Provisioners
 type StakeTransaction struct {
 	*ContractTx
-	BlsKey           []byte `protobuf:"bytes,2,opt,name=bls_key,json=blsKey,proto3" json:"bls_key,omitempty"`
-	Value            uint64 `protobuf:"fixed64,3,opt,name=value,proto3" json:"value,omitempty"` // Should be the leftover value that was burned in `tx`
-	ExpirationHeight uint64 `protobuf:"fixed64,4,opt,name=expiration_height,json=expirationHeight,proto3" json:"expiration_height,omitempty"`
+	BlsKey           []byte `json:"bls_key"`
+	Value            uint64 `json:"value"`
+	ExpirationHeight uint64 `json:"expiration_height"`
+}
+
+// MStake copies the Stake struct into the rusk datastruct
+func MStake(r *rusk.StakeTransaction, t *StakeTransaction) error {
+	r.Tx = new(rusk.Transaction)
+	if err := MTx(r.Tx, t.Tx); err != nil {
+		return err
+	}
+	r.BlsKey = make([]byte, len(t.BlsKey))
+	copy(r.BlsKey, t.BlsKey)
+	r.Value = t.Value
+	r.ExpirationHeight = t.ExpirationHeight
+	return nil
+}
+
+// UStake copies the Stake rusk struct into the transaction datastruct
+func UStake(r *rusk.StakeTransaction, t *StakeTransaction) error {
+	var err error
+	t.ContractTx, err = UContractTx(r.Tx)
+	if err != nil {
+		return err
+	}
+	t.BlsKey = make([]byte, len(r.BlsKey))
+	copy(t.BlsKey, r.BlsKey)
+	t.Value = r.Value
+	t.ExpirationHeight = r.ExpirationHeight
+	return nil
+}
+
+// CalculateHash complies with merkletree.Payload interface
+func (t *StakeTransaction) CalculateHash() ([]byte, error) {
+	b := new(bytes.Buffer)
+	if err := MarshalStake(b, *t); err != nil {
+		return nil, err
+	}
+
+	return hash.Sha3256(b.Bytes())
 }
 
 // Type complies with the ContractCall interface
-func (s *StakeTransaction) Type() TxType {
+func (t *StakeTransaction) Type() TxType {
 	return Stake
 }
 
@@ -68,8 +107,45 @@ func UnmarshalStake(r *bytes.Buffer, s *StakeTransaction) error {
 // the stakes
 type WithdrawStakeTransaction struct {
 	*ContractTx
-	BlsKey []byte `protobuf:"bytes,2,opt,name=bls_key,json=blsKey,proto3" json:"bls_key,omitempty"`
-	Sig    []byte `protobuf:"bytes,3,opt,name=sig,proto3" json:"sig,omitempty"`
+	BlsKey []byte `json:"bls_key"`
+	Sig    []byte `json:"sig"`
+}
+
+// MWithdrawStake copies the WithdrawStake rusk struct into the transaction datastruct
+func MWithdrawStake(r *rusk.WithdrawStakeTransaction, t *WithdrawStakeTransaction) error {
+	r.Tx = new(rusk.Transaction)
+	if err := MTx(r.Tx, t.Tx); err != nil {
+		return err
+	}
+	r.BlsKey = make([]byte, len(t.BlsKey))
+	copy(r.BlsKey, t.BlsKey)
+	r.Sig = make([]byte, len(t.Sig))
+	copy(r.Sig, t.Sig)
+	return nil
+}
+
+// UWithdrawStake copies the WithdrawStake rusk struct into the transaction datastruct
+func UWithdrawStake(r *rusk.WithdrawStakeTransaction, t *WithdrawStakeTransaction) error {
+	var err error
+	t.ContractTx, err = UContractTx(r.Tx)
+	if err != nil {
+		return err
+	}
+	t.BlsKey = make([]byte, len(r.BlsKey))
+	copy(t.BlsKey, r.BlsKey)
+	t.Sig = make([]byte, len(r.Sig))
+	copy(t.Sig, r.Sig)
+	return nil
+}
+
+// CalculateHash complies with merkletree.Payload interface
+func (t *WithdrawStakeTransaction) CalculateHash() ([]byte, error) {
+	b := new(bytes.Buffer)
+	if err := MarshalWithdrawStake(b, *t); err != nil {
+		return nil, err
+	}
+
+	return hash.Sha3256(b.Bytes())
 }
 
 //MarshalWithdrawStake into a buffer
@@ -111,6 +187,6 @@ func UnmarshalWithdrawStake(r *bytes.Buffer, s *WithdrawStakeTransaction) error 
 }
 
 // Type complies with the ContractCall interface
-func (w *WithdrawStakeTransaction) Type() TxType {
+func (t *WithdrawStakeTransaction) Type() TxType {
 	return WithdrawStake
 }

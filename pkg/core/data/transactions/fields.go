@@ -5,44 +5,135 @@ import (
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 // NoteType is either Transparent or Obfuscated
 type NoteType int32
 
 const (
-	// NoteType_TRANSPARENT denotes a public note (transaction output)
-	NoteType_TRANSPARENT NoteType = 0
-	// NoteType_OBFUSCATED denotes a private note (transaction output)
-	NoteType_OBFUSCATED NoteType = 1
+	// TRANSPARENT denotes a public note (transaction output)
+	TRANSPARENT NoteType = 0
+	// OBFUSCATED denotes a private note (transaction output)
+	OBFUSCATED NoteType = 1
 )
 
 // Note is the spendable output
 type Note struct {
-	NoteType        NoteType         `protobuf:"varint,1,opt,name=note_type,json=noteType,proto3,enum=rusk.NoteType" json:"note_type"`
-	Pos             uint64           `protobuf:"fixed64,2,opt,name=pos,proto3" json:"pos"`
-	Nonce           *Nonce           `protobuf:"bytes,3,opt,name=nonce,proto3" json:"nonce"`
-	RG              *CompressedPoint `protobuf:"bytes,4,opt,name=r_g,json=rG,proto3" json:"r_g"`
-	PkR             *CompressedPoint `protobuf:"bytes,5,opt,name=pk_r,json=pkR,proto3" json:"pk_r"`
-	ValueCommitment *Scalar          `protobuf:"bytes,6,opt,name=value_commitment,json=valueCommitment,proto3" json:"value_commitment"`
-
-	// Blinding factor is a union of oneof
-	BlindingFactor *BlindingFactor `protobuf_oneof:"blinding_factor"`
-
-	// Value can be one of the following:
-	Value *NoteValue `protobuf_oneof:"value"`
+	NoteType                  NoteType         `json:"note_type"`
+	Pos                       uint64           `json:"pos"`
+	Nonce                     *Nonce           `json:"nonce"`
+	RG                        *CompressedPoint `json:"r_g"`
+	PkR                       *CompressedPoint `json:"pk_r"`
+	ValueCommitment           *Scalar          `json:"value_commitment"`
+	TransparentBlindingFactor *Scalar          `json:"transparent_blinding_factor"`
+	EncryptedBlindingFactor   []byte           `json:"encrypted_blinding_factor"`
+	TransparentValue          uint64           `json:"transparent_value"`
+	EncryptedValue            []byte           `json:"encrypted_value"`
 }
 
-// BlindingFactor is the blinding factor of the note
-type BlindingFactor struct {
-	TransparentBlindingFactor *Scalar `protobuf:"bytes,7,opt,name=transparent_blinding_factor,json=transparentBlindingFactor,proto3,oneof"`
-	EncryptedBlindingFactor   []byte  `protobuf:"bytes,8,opt,name=encrypted_blinding_factor,json=encryptedBlindingFactor,proto3,oneof"`
+//MNote to rusk
+func MNote(r *rusk.Note, n *Note) error {
+	switch n.NoteType {
+	case TRANSPARENT:
+		r.NoteType = rusk.NoteType_TRANSPARENT
+	case OBFUSCATED:
+		r.NoteType = rusk.NoteType_OBFUSCATED
+	default:
+		return errors.New("Unexpected Note type")
+	}
+	r.Pos = n.Pos
+	r.Nonce = new(rusk.Nonce)
+	MNonce(r.Nonce, n.Nonce)
+	r.RG = new(rusk.CompressedPoint)
+	MCompressedPoint(r.RG, n.RG)
+	r.PkR = new(rusk.CompressedPoint)
+	MCompressedPoint(r.PkR, n.PkR)
+	r.ValueCommitment = new(rusk.Scalar)
+	MScalar(r.ValueCommitment, n.ValueCommitment)
+
+	// If note is TRANSPARENT
+	if n.NoteType == TRANSPARENT {
+		tbf := new(rusk.Scalar)
+		MScalar(tbf, n.TransparentBlindingFactor)
+		r.BlindingFactor = &rusk.Note_TransparentBlindingFactor{
+			TransparentBlindingFactor: tbf,
+		}
+
+		r.Value = &rusk.Note_TransparentValue{
+			TransparentValue: n.TransparentValue,
+		}
+		return nil
+	}
+
+	// Otherwise if note is OBFUSCATED
+	ebf := make([]byte, len(n.EncryptedBlindingFactor))
+	copy(ebf, n.EncryptedBlindingFactor)
+	r.BlindingFactor = &rusk.Note_EncryptedBlindingFactor{
+		EncryptedBlindingFactor: ebf,
+	}
+
+	ev := make([]byte, len(n.EncryptedValue))
+	copy(ev, n.EncryptedValue)
+	r.Value = &rusk.Note_EncryptedValue{
+		EncryptedValue: ev,
+	}
+	return nil
 }
 
-// NoteValue is the transparent/encrypted value
-type NoteValue struct {
-	TransparentValue uint64 `protobuf:"fixed64,9,opt,name=transparent_value,json=transparentValue,proto3,oneof"`
-	EncryptedValue   []byte `protobuf:"bytes,10,opt,name=encrypted_value,json=encryptedValue,proto3,oneof"`
+//UNote to a buffer
+func UNote(r *rusk.Note, n *Note) error {
+	switch r.NoteType {
+	case rusk.NoteType_TRANSPARENT:
+		n.NoteType = TRANSPARENT
+	case rusk.NoteType_OBFUSCATED:
+		n.NoteType = OBFUSCATED
+	default:
+		return errors.New("Unexpected Note type")
+	}
+	n.Pos = r.Pos
+	n.Nonce = new(Nonce)
+	UNonce(r.Nonce, n.Nonce)
+	n.RG = new(CompressedPoint)
+	UCompressedPoint(r.RG, n.RG)
+	n.PkR = new(CompressedPoint)
+	UCompressedPoint(r.PkR, n.PkR)
+	n.ValueCommitment = new(Scalar)
+	UScalar(r.ValueCommitment, n.ValueCommitment)
+
+	// If note is TRANSPARENT
+	if n.NoteType == TRANSPARENT {
+		bf, ok := r.BlindingFactor.(*rusk.Note_TransparentBlindingFactor)
+		if !ok {
+			return errors.New("transparent blinding factor cannot be nil for transparent notes")
+		}
+		n.TransparentBlindingFactor = new(Scalar)
+		UScalar(bf.TransparentBlindingFactor, n.TransparentBlindingFactor)
+		v, right := r.Value.(*rusk.Note_TransparentValue)
+		if !right {
+			return errors.New("transparent value cannot be nil for transparent notes")
+		}
+		n.TransparentValue = v.TransparentValue
+		return nil
+	}
+
+	// Otherwise if note is OBFUSCATED
+	bf, ok := r.BlindingFactor.(*rusk.Note_EncryptedBlindingFactor)
+	if !ok {
+		return errors.New("encrypted blinding factor cannot be nil for obfuscated notes")
+	}
+
+	n.EncryptedBlindingFactor = make([]byte, len(bf.EncryptedBlindingFactor))
+	copy(n.EncryptedBlindingFactor, bf.EncryptedBlindingFactor)
+
+	v, right := r.Value.(*rusk.Note_EncryptedValue)
+	if !right {
+		return errors.New("encrypted value cannot be nil for obfuscated notes")
+	}
+
+	n.EncryptedValue = make([]byte, len(v.EncryptedValue))
+	copy(n.EncryptedValue, v.EncryptedValue)
+	return nil
 }
 
 //MarshalNote to a buffer
@@ -50,9 +141,9 @@ func MarshalNote(r *bytes.Buffer, n Note) error {
 	var err error
 
 	switch n.NoteType {
-	case NoteType_TRANSPARENT:
+	case TRANSPARENT:
 		err = encoding.WriteUint8(r, uint8(0))
-	case NoteType_OBFUSCATED:
+	case OBFUSCATED:
 		err = encoding.WriteUint8(r, uint8(1))
 	default:
 		return errors.New("Unexpected Note type")
@@ -78,11 +169,11 @@ func MarshalNote(r *bytes.Buffer, n Note) error {
 	}
 
 	// If note is TRANSPARENT
-	if n.NoteType == NoteType_TRANSPARENT {
-		if err := MarshalScalar(r, *n.BlindingFactor.TransparentBlindingFactor); err != nil {
+	if n.NoteType == TRANSPARENT {
+		if err := MarshalScalar(r, *n.TransparentBlindingFactor); err != nil {
 			return err
 		}
-		if err := encoding.WriteUint64LE(r, n.Value.TransparentValue); err != nil {
+		if err := encoding.WriteUint64LE(r, n.TransparentValue); err != nil {
 			return err
 		}
 
@@ -90,10 +181,10 @@ func MarshalNote(r *bytes.Buffer, n Note) error {
 	}
 
 	// Otherwise if note is OBFUSCATED
-	if err := encoding.WriteVarBytes(r, n.BlindingFactor.EncryptedBlindingFactor); err != nil {
+	if err := encoding.WriteVarBytes(r, n.EncryptedBlindingFactor); err != nil {
 		return err
 	}
-	if err := encoding.WriteVarBytes(r, n.Value.EncryptedValue); err != nil {
+	if err := encoding.WriteVarBytes(r, n.EncryptedValue); err != nil {
 		return err
 	}
 	return nil
@@ -107,9 +198,9 @@ func UnmarshalNote(r *bytes.Buffer, n *Note) error {
 	}
 
 	if raw == uint8(0) {
-		n.NoteType = NoteType_TRANSPARENT
+		n.NoteType = TRANSPARENT
 	} else if raw == uint8(1) {
-		n.NoteType = NoteType_OBFUSCATED
+		n.NoteType = OBFUSCATED
 	} else {
 		return errors.New("Buffer cannot unmarshal a valid note type")
 	}
@@ -138,17 +229,14 @@ func UnmarshalNote(r *bytes.Buffer, n *Note) error {
 		return err
 	}
 
-	n.BlindingFactor = new(BlindingFactor)
-	n.Value = new(NoteValue)
-
 	// If note is TRANSPARENT
-	if n.NoteType == NoteType_TRANSPARENT {
+	if n.NoteType == TRANSPARENT {
 
-		n.BlindingFactor.TransparentBlindingFactor = new(Scalar)
-		if err := UnmarshalScalar(r, n.BlindingFactor.TransparentBlindingFactor); err != nil {
+		n.TransparentBlindingFactor = new(Scalar)
+		if err := UnmarshalScalar(r, n.TransparentBlindingFactor); err != nil {
 			return err
 		}
-		if err := encoding.ReadUint64LE(r, &n.Value.TransparentValue); err != nil {
+		if err := encoding.ReadUint64LE(r, &n.TransparentValue); err != nil {
 			return err
 		}
 
@@ -156,10 +244,10 @@ func UnmarshalNote(r *bytes.Buffer, n *Note) error {
 	}
 
 	// Otherwise if it is OBFUSCATED
-	if err := encoding.ReadVarBytes(r, &n.BlindingFactor.EncryptedBlindingFactor); err != nil {
+	if err := encoding.ReadVarBytes(r, &n.EncryptedBlindingFactor); err != nil {
 		return err
 	}
-	if err := encoding.ReadVarBytes(r, &n.Value.EncryptedValue); err != nil {
+	if err := encoding.ReadVarBytes(r, &n.EncryptedValue); err != nil {
 		return err
 	}
 	return nil
@@ -167,7 +255,19 @@ func UnmarshalNote(r *bytes.Buffer, n *Note) error {
 
 // Nullifier of the transaction
 type Nullifier struct {
-	H *Scalar `protobuf:"bytes,1,opt,name=h,proto3" json:"h,omitempty"`
+	H *Scalar `json:"h"`
+}
+
+// MNullifier copy the Nullifier from rusk to transactions datastruct
+func MNullifier(r *rusk.Nullifier, n *Nullifier) {
+	r.H = new(rusk.Scalar)
+	MScalar(r.H, n.H)
+}
+
+// UNullifier copy the Nullifier from rusk to transactions datastruct
+func UNullifier(r *rusk.Nullifier, n *Nullifier) {
+	n.H = new(Scalar)
+	UScalar(r.H, n.H)
 }
 
 // MarshalNullifier to a buffer
@@ -183,8 +283,24 @@ func UnmarshalNullifier(r *bytes.Buffer, n *Nullifier) error {
 
 // SecretKey to sign the ContractCall
 type SecretKey struct {
-	A *Scalar `protobuf:"bytes,1,opt,name=a,proto3" json:"a,omitempty"`
-	B *Scalar `protobuf:"bytes,2,opt,name=b,proto3" json:"b,omitempty"`
+	A *Scalar `json:"a"`
+	B *Scalar `json:"b"`
+}
+
+// MSecretKey copy the USecretKey from rusk to transactions datastruct
+func MSecretKey(r *rusk.SecretKey, n *SecretKey) {
+	r.A = new(rusk.Scalar)
+	MScalar(r.A, n.A)
+	r.B = new(rusk.Scalar)
+	MScalar(r.B, n.B)
+}
+
+// USecretKey copy the USecretKey from rusk to transactions datastruct
+func USecretKey(r *rusk.SecretKey, n *SecretKey) {
+	n.A = new(Scalar)
+	UScalar(r.A, n.A)
+	n.B = new(Scalar)
+	UScalar(r.B, n.B)
 }
 
 // MarshalSecretKey to the wire encoding
@@ -207,8 +323,24 @@ func UnmarshalSecretKey(r *bytes.Buffer, n *SecretKey) error {
 
 // ViewKey is to view the transactions belonging to the related SecretKey
 type ViewKey struct {
-	A  *Scalar          `protobuf:"bytes,1,opt,name=a,proto3" json:"a,omitempty"`
-	BG *CompressedPoint `protobuf:"bytes,2,opt,name=b_g,json=bG,proto3" json:"b_g,omitempty"`
+	A  *Scalar          `json:"a"`
+	BG *CompressedPoint `json:"b_g"`
+}
+
+// MViewKey copies the ViewKey from rusk to transactions datastructs
+func MViewKey(r *rusk.ViewKey, n *ViewKey) {
+	r.A = new(rusk.Scalar)
+	MScalar(r.A, n.A)
+	r.BG = new(rusk.CompressedPoint)
+	MCompressedPoint(r.BG, n.BG)
+}
+
+// UViewKey copies the ViewKey from rusk to transactions datastructs
+func UViewKey(r *rusk.ViewKey, n *ViewKey) {
+	n.A = new(Scalar)
+	UScalar(r.A, n.A)
+	n.BG = new(CompressedPoint)
+	UCompressedPoint(r.BG, n.BG)
 }
 
 // MarshalViewKey to the wire encoding
@@ -231,8 +363,24 @@ func UnmarshalViewKey(r *bytes.Buffer, n *ViewKey) error {
 
 // PublicKey is the public key
 type PublicKey struct {
-	AG *CompressedPoint `protobuf:"bytes,1,opt,name=a_g,json=aG,proto3" json:"a_g,omitempty"`
-	BG *CompressedPoint `protobuf:"bytes,2,opt,name=b_g,json=bG,proto3" json:"b_g,omitempty"`
+	AG *CompressedPoint `json:"a_g"`
+	BG *CompressedPoint `json:"b_g"`
+}
+
+// MPublicKey copies the PublicKey from rusk to transactions datastructs
+func MPublicKey(r *rusk.PublicKey, n *PublicKey) {
+	r.AG = new(rusk.CompressedPoint)
+	MCompressedPoint(r.AG, n.AG)
+	r.BG = new(rusk.CompressedPoint)
+	MCompressedPoint(r.BG, n.BG)
+}
+
+// UPublicKey copies the PublicKey from rusk to transactions datastructs
+func UPublicKey(r *rusk.PublicKey, n *PublicKey) {
+	n.AG = new(CompressedPoint)
+	UCompressedPoint(r.AG, n.AG)
+	n.BG = new(CompressedPoint)
+	UCompressedPoint(r.BG, n.BG)
 }
 
 // MarshalPublicKey to the wire encoding
@@ -255,7 +403,19 @@ func UnmarshalPublicKey(r *bytes.Buffer, n *PublicKey) error {
 
 // Scalar of the BLS12_381 curve
 type Scalar struct {
-	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Data []byte `json:"data"`
+}
+
+// MScalar serializes Nonce from transaction to rusk
+func MScalar(r *rusk.Scalar, n *Scalar) {
+	r.Data = make([]byte, len(n.Data))
+	copy(r.Data, n.Data)
+}
+
+// UScalar serializes Nonce from rusk to transaction
+func UScalar(r *rusk.Scalar, n *Scalar) {
+	n.Data = make([]byte, len(r.Data))
+	copy(n.Data, r.Data)
 }
 
 // MarshalScalar to the wire encoding
@@ -270,7 +430,7 @@ func UnmarshalScalar(r *bytes.Buffer, n *Scalar) error {
 
 // CompressedPoint of the BLS12_#81 curve
 type CompressedPoint struct {
-	Y []byte `protobuf:"bytes,1,opt,name=y,proto3" json:"y,omitempty"`
+	Y []byte `json:"y"`
 }
 
 // MarshalCompressedPoint to the wire encoding
@@ -283,9 +443,21 @@ func UnmarshalCompressedPoint(r *bytes.Buffer, n *CompressedPoint) error {
 	return encoding.ReadVarBytes(r, &n.Y)
 }
 
+// UCompressedPoint serializes Nonce from rusk to transaction
+func UCompressedPoint(r *rusk.CompressedPoint, n *CompressedPoint) {
+	n.Y = make([]byte, len(r.Y))
+	copy(n.Y, r.Y)
+}
+
+// MCompressedPoint serializes Nonce from transaction to rusk
+func MCompressedPoint(r *rusk.CompressedPoint, n *CompressedPoint) {
+	r.Y = make([]byte, len(n.Y))
+	copy(r.Y, n.Y)
+}
+
 // Nonce is the distributed atomic increment used to prevent double spending
 type Nonce struct {
-	Bs []byte `protobuf:"bytes,1,opt,name=bs,proto3" json:"bs,omitempty"`
+	Bs []byte `json:"bs"`
 }
 
 // MarshalNonce to the wire encoding
@@ -296,4 +468,16 @@ func MarshalNonce(r *bytes.Buffer, n Nonce) error {
 // UnmarshalNonce from the wire encoding
 func UnmarshalNonce(r *bytes.Buffer, n *Nonce) error {
 	return encoding.ReadVarBytes(r, &n.Bs)
+}
+
+// MNonce serializes Nonce from rusk to transaction
+func MNonce(r *rusk.Nonce, n *Nonce) {
+	r.Bs = make([]byte, len(n.Bs))
+	copy(r.Bs, n.Bs)
+}
+
+// UNonce serializes Nonce from rusk to transaction
+func UNonce(r *rusk.Nonce, n *Nonce) {
+	n.Bs = make([]byte, len(r.Bs))
+	copy(n.Bs, r.Bs)
 }
