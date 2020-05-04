@@ -5,10 +5,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"log"
+	"time"
+
 	"math/bits"
 	"math/rand"
 	"net"
+	"strconv"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 
@@ -20,7 +22,7 @@ import (
 
 const (
 	// MaxFrameSize is set based on max block size expected
-	MaxFrameSize = 5000000
+	MaxFrameSize = 500000
 )
 
 var (
@@ -96,9 +98,8 @@ func computePeerID(ip [4]byte, port uint16) [16]byte {
 	return halfLenID
 }
 
-/*
 // computePeerDummyID is helpful on simplifying ID on local net
-func computePeerDummyID(ip [4]byte, port uint16) [16]byte {
+/* func computePeerDummyID(ip [4]byte, port uint16) [16]byte {
 	var id [16]byte
 	port -= 10000
 	seed := make([]byte, 16)
@@ -132,9 +133,8 @@ func computeChunkID(chunk []byte) [16]byte {
 
 // ------------------ NET UTILS ------------------ //
 
-// Get outbound IP returns local address
-// TODO To be replaced with config param
-func getOutboundIP() net.IP {
+// GetOutboundIP returns local address
+func GetOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
@@ -151,14 +151,7 @@ func getOutboundIP() net.IP {
 
 // Format the UDP address, the UDP listener binds on
 func getLocalUDPAddress(port int) net.UDPAddr {
-	laddr := net.UDPAddr{IP: getOutboundIP()}
-	laddr.Port = port
-	return laddr
-}
-
-// Gets the TCP address, the TCP listener binds on
-func getLocalTCPAddress(port int) net.TCPAddr {
-	laddr := net.TCPAddr{IP: getOutboundIP()}
+	laddr := net.UDPAddr{IP: GetOutboundIP()}
 	laddr.Port = port
 	return laddr
 }
@@ -187,101 +180,32 @@ func getBytesFromUint16(num uint16) [2]byte {
 	return res
 }
 
-// Encodes received UDP packets to send it through the
-// Ring to the packetProcess rutine.
-func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
-	encodedLen := len(payload) + 8
-	enc := make([]byte, encodedLen)
-	// Get numBytes as slice of bytes.
-	numBytes := getBytesFromUint16(byteNum)
-	// Append it to the resulting slice.
-	copy(enc[0:2], numBytes[0:2])
-	// Append Peer IP.
-
-	l := len(peerAddr.IP)
-	ip := peerAddr.IP[l-4 : l]
-
-	copy(enc[2:6], ip)
-	// Append Port
-	port := getBytesFromUint16(uint16(peerAddr.Port))
-	copy(enc[6:8], port[0:2])
-	// Append Payload
-	copy(enc[8:encodedLen], payload[0:])
-	return enc
-}
-
-// Encodes received TCP packets to send it through the
-// Ring to the packetProcess rutine.
-func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []byte {
-
-	encodedLen := len(payload) + 8
-	enc := make([]byte, encodedLen)
-	// Get numBytes as slice of bytes.
-	numBytes := getBytesFromUint16(byteNum)
-	// Append it to the resulting slice.
-	copy(enc[0:2], numBytes[0:2])
-	// Append Peer IP.
-
-	tcpAddr, _ := net.ResolveTCPAddr(peerAddr.Network(), peerAddr.String())
-	l := len(tcpAddr.IP)
-	ip := tcpAddr.IP[l-4 : l]
-
-	copy(enc[2:6], ip)
-	// Append Port
-	port := getBytesFromUint16(uint16(tcpAddr.Port))
-	copy(enc[6:8], port[0:2])
-	// Append Payload
-	copy(enc[8:encodedLen], payload[0:])
-	return enc
-}
-
-// Decodes a CircularQueue packet and returns the
-// elements of the original received packet.
-func decodeRedPacket(packet []byte) (int, *net.UDPAddr, []byte, error) {
-	redPackLen := len(packet)
-	byteNum := int(binary.LittleEndian.Uint16(packet[0:2]))
-	if (redPackLen) != (byteNum + 8) {
-		return 0, nil, nil, errors.New("Packet's length taken from the ring differs from expected")
-	}
-	ip := packet[2:6]
-	port := int(binary.LittleEndian.Uint16(packet[6:8]))
-	payload := packet[8:]
-
-	peerAddr := net.UDPAddr{
-		IP:   ip,
-		Port: port,
-		Zone: "",
-	}
-	return byteNum, &peerAddr, payload, nil
-}
-
-func readTCPFrame(r io.Reader) ([]byte, int, error) {
+func readTCPFrame(r io.Reader) ([]byte, error) {
 
 	// Read frame length.
 	ln := make([]byte, 4)
 	_, err := io.ReadFull(r, ln)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	length := binary.LittleEndian.Uint32(ln[:])
 	if length > MaxFrameSize {
-		return nil, 0, ErrExceedMaxLen
+		return nil, ErrExceedMaxLen
 	}
 
 	// Read packet payload
-	var n int
 	payload := make([]byte, length)
-	if n, err = io.ReadFull(r, payload); err != nil {
-		return nil, 0, err
+	if _, err = io.ReadFull(r, payload); err != nil {
+		return nil, err
 	}
 
-	return payload, n, nil
+	return payload, nil
 }
 
-func writeTCPFrame(w io.Writer, payload []byte) error {
+func writeTCPFrame(w io.Writer, data []byte) error {
 
-	frameLength := uint32(len(payload))
+	frameLength := uint32(len(data))
 	if frameLength > MaxFrameSize {
 		return ErrExceedMaxLen
 	}
@@ -293,7 +217,7 @@ func writeTCPFrame(w io.Writer, payload []byte) error {
 	}
 
 	// Append packet payload
-	if _, err := frame.Write(payload); err != nil {
+	if _, err := frame.Write(data); err != nil {
 		return err
 	}
 
@@ -307,7 +231,7 @@ func writeTCPFrame(w io.Writer, payload []byte) error {
 
 // generateRandomDelegates selects n random and distinct items from `in` and
 // copy them into `out` slice (no duplicates)
-func generateRandomDelegates(beta uint8, in []Peer, out *[]Peer) error {
+func generateRandomDelegates(beta uint8, in []PeerInfo, out *[]PeerInfo) error {
 
 	if in == nil || out == nil {
 		return errors.New("invalid in/out params")
@@ -327,4 +251,73 @@ func generateRandomDelegates(beta uint8, in []Peer, out *[]Peer) error {
 	in = in[:len(in)-1]
 
 	return generateRandomDelegates(beta, in, out)
+}
+
+func udpTipusToString(tipus byte) string {
+
+	switch tipus {
+	case pingMsg:
+		return "PING"
+	case pongMsg:
+		return "PONG"
+	case findNodesMsg:
+		return "FIND_NODES"
+	case nodesMsg:
+		return "NODES"
+	}
+	return "UNKNOWN"
+}
+
+// Opens a TCP connection with the peer sent on the params and transmits
+// a stream of bytes. Once transmitted, closes the connection.
+func sendTCPStream(raddr net.UDPAddr, data []byte) {
+
+	address := raddr.IP.String() + ":" + strconv.Itoa(raddr.Port)
+	conn, err := net.Dial("tcp4", address)
+	if err != nil {
+		log.WithError(err).Warnf("Could not establish a peer connection %s.", raddr.String())
+		return
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	log.WithField("src", conn.LocalAddr().String()).
+		WithField("dest", raddr.String()).Traceln("Sending tcp")
+
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+
+	// Write our message to the connection.
+	if err = writeTCPFrame(conn, data); err != nil {
+		log.WithError(err).Warnf("Could not write to addr %s", raddr.String())
+		return
+	}
+}
+
+// Gets the local address of the sender `Peer` and the UDPAddress of the
+// receiver `Peer` and sends to it a UDP Packet with the payload inside.
+func sendUDPPacket(laddr, raddr net.UDPAddr, payload []byte) {
+
+	log.WithField("dest", raddr.String()).Tracef("Dialing udp")
+
+	// Send from same IP that the UDP listener is bound on but choose random port
+	laddr.Port = 0
+	conn, err := net.DialUDP("udp", &laddr, &raddr)
+	if err != nil {
+		log.WithError(err).Warn("Could not establish a connection with the dest Peer.")
+		return
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	log.WithField("src", conn.LocalAddr().String()).
+		WithField("dest", raddr.String()).Traceln("Sending udp")
+
+	// Simple write
+	_, err = conn.Write(payload)
+	if err != nil {
+		log.WithError(err).Warn("Error while writing to the filedescriptor.")
+		return
+	}
 }

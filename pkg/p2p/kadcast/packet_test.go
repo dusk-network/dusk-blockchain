@@ -14,7 +14,7 @@ func TestPacketMarshalling(t *testing.T) {
 	}
 
 	var p Packet
-	unmarshalPacket(buf, &p)
+	unmarshalPacket(buf, &p, MaxUDPacketSize)
 
 	data := marshalPacket(p)
 

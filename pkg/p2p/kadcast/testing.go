@@ -3,16 +3,21 @@ package kadcast
 import (
 	"bytes"
 	"encoding/hex"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
-	log "github.com/sirupsen/logrus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 // TraceRoutingState logs the routing table of a peer
-func TraceRoutingState(r *Router) {
-	peer := r.MyPeerInfo
+func TraceRoutingState(r *RoutingTable) {
+	peer := r.LpeerInfo
 	log.Tracef("this_peer: %s, bucket peers num %d", peer.String(), r.tree.getTotalPeers())
 	for _, b := range r.tree.buckets {
 		for _, p := range b.entries {
@@ -22,8 +27,8 @@ func TraceRoutingState(r *Router) {
 	}
 }
 
-// testPeer creates a peer with local IP
-func testPeer(port uint16) Peer {
+// testPeerInfo creates a peer with local IP
+func testPeerInfo(port uint16) PeerInfo {
 
 	lAddr := getLocalUDPAddress(int(port))
 	var ip [4]byte
@@ -33,85 +38,155 @@ func testPeer(port uint16) Peer {
 	return peer
 }
 
+// TestRouter creates a peer router with a fixed id
+func TestRouter(port uint16, id [16]byte) *RoutingTable {
+
+	lAddr := getLocalUDPAddress(int(port))
+	var ip [4]byte
+	copy(ip[:], lAddr.IP)
+
+	peer := PeerInfo{ip, port, id}
+
+	r := makeRoutingTableFromPeer(peer)
+	return &r
+}
+
+// Node a very limited instance of a node running kadcast peer only
+type Node struct {
+	Router   *RoutingTable
+	EventBus *eventbus.EventBus
+
+	Lock       sync.RWMutex
+	Blocks     []*block.Block
+	Duplicated bool
+}
+
+func (n *Node) onAcceptBlock(m message.Message) error {
+
+	n.Lock.Lock()
+	defer n.Lock.Unlock()
+
+	blk := m.Payload().(block.Block)
+	n.Blocks = append(n.Blocks, &blk)
+
+	height := m.Header()[0]
+	if height > 128 {
+		panic("invalid kadcast height")
+	}
+
+	/// repropagate
+	buf := new(bytes.Buffer)
+	if err := message.MarshalBlock(buf, &blk); err != nil {
+		return err
+	}
+
+	if err := topics.Prepend(buf, topics.Block); err != nil {
+		return err
+	}
+
+	repropagateMsg := message.NewWithHeader(topics.Block, *buf, m.Header())
+	n.EventBus.Publish(topics.Kadcast, repropagateMsg)
+
+	return nil
+}
+
+func newKadcastNode(r *RoutingTable, eb *eventbus.EventBus) *Node {
+
+	n := &Node{
+		Router:   r,
+		EventBus: eb,
+		Blocks:   make([]*block.Block, 0),
+	}
+
+	// Subscribe for topics.Block so we can ensure the kadcast-ed block has been
+	// successfully published to the bus
+	cbListener := eventbus.NewCallbackListener(n.onAcceptBlock)
+	eb.Subscribe(topics.Block, cbListener)
+
+	return n
+}
+
 // TestNode starts a node for testing purposes. A node is represented by a
 // routing state, TCP listener and UDP listener
-func TestNode(port int) *Router {
+func TestNode(port int) *Node {
 
-	peer := testPeer(uint16(port))
-	router := makeRouterFromPeer(peer)
+	eb := eventbus.New()
+	g := protocol.NewGossip(protocol.TestNet)
+	d := dupemap.NewDupeMap(1)
 
-	log.Infof("Starting Kadcast Node on: %s", peer.String())
-
-	// Force each node to store all chunk messages Needed only for testing
-	// purposes
-	router.StoreChunks = true
+	// Instantiate Kadcast Router
+	peer := testPeerInfo(uint16(port))
+	router := makeRoutingTableFromPeer(peer)
 
 	// Set beta delegates to 1 so we can expect only one message per node
 	// optimal broadcast (no duplicates)
 	router.beta = 1
 
-	// Initialize the UDP server
-	udpQueue := ring.NewBuffer(500)
-	// Launch PacketProcessor routine.
-	go ProcessUDPPacket(udpQueue, &router)
-	// Launch a listener routine.
-	go StartUDPListener("udp4", udpQueue, router.MyPeerInfo)
+	log.Infof("Starting Kadcast Node on: %s", peer.String())
 
-	// Initialize the TCP server
-	tcpQueue := ring.NewBuffer(500)
-	// Launch PacketProcessor routine.
-	go ProcessTCPPacket(tcpQueue, &router)
-	// Launch a listener routine.
-	go StartTCPListener("tcp4", tcpQueue, router.MyPeerInfo)
+	// Routing table maintainer
+	m := NewMaintainer(&router)
+	go m.Serve()
 
-	return &router
+	// A reader for Kadcast broadcast messsage.
+	//
+	// It listens for a valid kadcast wire messages
+	//
+	// On a new kadcast message ...
+	//
+	// Reader forwards the message to the eventbus
+	// Reader repropagates any valid kadcast wire messages
+	r := NewReader(router.LpeerInfo, eb, g, d)
+	go r.Serve()
+
+	w := NewWriter(&router, eb, g)
+	go w.Serve()
+
+	return newKadcastNode(&router, eb)
 }
 
 // TestNetwork initiates kadcast network bootstraping of N nodes. This will run
 // a set of nodes bound on local addresses (port per node), execute
 // bootstrapping and network discovery
-func TestNetwork(num int, basePort int) ([]*Router, error) {
+func TestNetwork(num int, basePort int) ([]*Node, error) {
 
 	// List of all peer routers
-	routers := make([]*Router, 0)
-	bootstrapNodes := make([]Peer, 0)
+	nodes := make([]*Node, 0)
+	bootstrapNodes := make([]PeerInfo, 0)
 
 	for i := 0; i < num; i++ {
-		r := TestNode(basePort + i)
-
+		n := TestNode(basePort + i)
 		if i != 0 {
-			bootstrapNodes = append(bootstrapNodes, r.MyPeerInfo)
+			bootstrapNodes = append(bootstrapNodes, n.Router.LpeerInfo)
 		}
-
-		routers = append(routers, r)
+		nodes = append(nodes, n)
 	}
 
 	// Give all peers a second to start their udp/tcp listeners
 	time.Sleep(1 * time.Second)
 
 	// Start Bootstrapping process.
-	err := InitBootstrap(routers[0], bootstrapNodes)
+	err := InitBootstrap(nodes[0].Router, bootstrapNodes)
 	if err != nil {
 		return nil, err
 	}
 
 	// Once the bootstrap succeeded, start the network discovery.
-	for _, r := range routers {
-		StartNetworkDiscovery(r, 1*time.Second)
+	for _, n := range nodes {
+		go StartNetworkDiscovery(n.Router, 1*time.Second)
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Second)
 
-	return routers, nil
+	return nodes, nil
 }
 
-// TestReceivedChunckOnce ensures the all network nodes have received the
+// DidNetworkReceivedMsg checks if all network nodes have received the
 // msgPayload only once
-func TestReceivedChunckOnce(t *testing.T, nodes []*Router, senderIndex int, msgPayload []byte) {
+func DidNetworkReceivedMsg(nodes []*Node, senderIndex int, sentBlock *block.Block) bool {
 
-	// Verify if all nodes have received the payload
 	failed := false
-	for i, r := range nodes {
+	for i, n := range nodes {
 
 		// Sender of CHUNK message not needed to be tested
 		if senderIndex == i {
@@ -120,28 +195,49 @@ func TestReceivedChunckOnce(t *testing.T, nodes []*Router, senderIndex int, msgP
 
 		received := false
 		duplicated := false
-		r.MapMutex.RLock()
-		for _, chunk := range r.ChunkIDmap {
-			if bytes.Equal(chunk, msgPayload) {
+		n.Lock.RLock()
+		for _, b := range n.Blocks {
+			if b.Equals(sentBlock) {
+				if received {
+					duplicated = true
+				}
 				received = true
-				break
 			}
 		}
-		duplicated = r.Duplicated
-		r.MapMutex.RUnlock()
+		n.Lock.RUnlock()
 
 		if !received {
 			failed = true
-			t.Logf("Peer %s did not receive CHUNK message", r.MyPeerInfo.String())
+			break
+			//t.Logf("Peer %s did not receive CHUNK message", n.Router.LpeerInfo.String())
 		}
 
 		if duplicated {
 			failed = true
-			t.Logf("Peer %s receive same CHUNK message more than once", r.MyPeerInfo.String())
+			break
+			// t.Logf("Peer %s receive same CHUNK message more than once", n.Router.LpeerInfo.String())
 		}
 	}
 
-	if failed {
-		t.Fatal("Broadcast procedure has failed")
+	return !failed
+}
+
+// TestReceivedMsgOnce check periodically (up to 7 sec) if network has received the message
+func TestReceivedMsgOnce(t *testing.T, nodes []*Node, i int, blk *block.Block) {
+
+	passed := false
+	for y := 0; y < 70; y++ {
+		// Wait a bit so all nodes receives the broadcast message
+		time.Sleep(100 * time.Millisecond)
+		if DidNetworkReceivedMsg(nodes, i, blk) {
+			passed = true
+			break
+		}
+	}
+
+	if passed {
+		log.Infof("Each network node received the message once")
+	} else {
+		log.Fatal("Broadcast procedure has failed")
 	}
 }

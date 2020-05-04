@@ -11,7 +11,7 @@ import (
 )
 
 func TestPOW(t *testing.T) {
-	a := Peer{
+	a := PeerInfo{
 		ip:   [4]byte{192, 169, 1, 1},
 		port: 25519,
 		id:   [16]byte{22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22},
@@ -28,7 +28,7 @@ func TestWriteTCPFrame(t *testing.T) {
 		t.Error(err)
 	}
 
-	readPayload, _, err := readTCPFrame(conn)
+	readPayload, err := readTCPFrame(conn)
 	if err != nil {
 		t.Error(err)
 	}
@@ -52,7 +52,7 @@ func TestReadTCPFrameErr(t *testing.T) {
 	frame := new(bytes.Buffer)
 	_ = encoding.WriteUint32LE(frame, MaxFrameSize+1)
 
-	readPayload, _, err := readTCPFrame(frame)
+	readPayload, err := readTCPFrame(frame)
 	if readPayload != nil {
 		t.Error("expect an nil payload ")
 	}
@@ -98,14 +98,14 @@ func TestGenerateRandomDelegates(t *testing.T) {
 	ip := [4]byte{127, 0, 0, 1}
 	id := [16]byte{1, 2, 3, 4}
 
-	in := make([]Peer, 10)
+	in := make([]PeerInfo, 10)
 	for i := 0; i < len(in); i++ {
-		in[i] = Peer{ip, uint16(i), id}
+		in[i] = PeerInfo{ip, uint16(i), id}
 	}
 
 	for i := 0; i < len(in); i++ {
 		var beta uint8 = uint8(i)
-		out := make([]Peer, 0)
+		out := make([]PeerInfo, 0)
 		generateRandomDelegates(beta, in, &out)
 
 		if len(out) != int(beta) {
@@ -114,7 +114,7 @@ func TestGenerateRandomDelegates(t *testing.T) {
 	}
 
 	beta := uint8(len(in) * 2)
-	out := make([]Peer, 0)
+	out := make([]PeerInfo, 0)
 	generateRandomDelegates(beta, in, &out)
 
 	if len(out) != len(in) {

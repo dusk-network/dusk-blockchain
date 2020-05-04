@@ -17,3 +17,15 @@ var DefaultAlphaClosestNodes int = 1
 
 // DefaultKNumber is the K number of peers that a node will send on a `FIND_NODES` message
 var DefaultKNumber int = 20
+
+const (
+	// Message types over UDP
+
+	pingMsg      = 0
+	pongMsg      = 1
+	findNodesMsg = 2
+	nodesMsg     = 3
+
+	// Message types over TCP
+	broadcastMsg = 10
+)

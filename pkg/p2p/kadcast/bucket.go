@@ -6,13 +6,13 @@ type bucket struct {
 	idLength         uint8
 	totalPeersPassed uint64
 	// Should always be less than `MaxBucketPeers`
-	entries []Peer
+	entries []PeerInfo
 	// This map keeps the order of arrivals for LRU
-	lru map[Peer]uint64
+	lru map[PeerInfo]uint64
 	// This map allows us to quickly see if a Peer is
 	// included on a entries set without iterating over
 	// it.
-	lruPresent map[Peer]bool
+	lruPresent map[PeerInfo]bool
 }
 
 // Allocates space for a `bucket` and returns a instance
@@ -21,9 +21,9 @@ func makeBucket(idlen uint8) bucket {
 	return bucket{
 		idLength:         idlen,
 		totalPeersPassed: 0,
-		entries:          make([]Peer, 0, DefaultMaxBucketPeers),
-		lru:              make(map[Peer]uint64),
-		lruPresent:       make(map[Peer]bool),
+		entries:          make([]PeerInfo, 0, DefaultMaxBucketPeers),
+		lru:              make(map[PeerInfo]uint64),
+		lruPresent:       make(map[PeerInfo]bool),
 	}
 }
 
@@ -46,7 +46,7 @@ func (b bucket) findLRUPeerIndex() (int, uint64) {
 // caring about the order.
 // It also maps the `Peer` to false on the LRU map.
 // The resulting slice of entries is then returned.
-func (b *bucket) removePeerAtIndex(index int) []Peer {
+func (b *bucket) removePeerAtIndex(index int) []PeerInfo {
 	// Remove peer from the lruPresent map.
 	b.lruPresent[b.entries[index]] = false
 
@@ -57,7 +57,7 @@ func (b *bucket) removePeerAtIndex(index int) []Peer {
 
 // Adds a `Peer` to the `bucket` entries list.
 // the LRU policy.
-func (b *bucket) addPeer(peer Peer) {
+func (b *bucket) addPeer(peer PeerInfo) {
 
 	// Check if the entries set can hold more peers.
 	if len(b.entries) < int(DefaultMaxBucketPeers) {

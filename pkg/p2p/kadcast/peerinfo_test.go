@@ -15,10 +15,10 @@ func TestPeerMarshaling(t *testing.T) {
 	seed, _ := crypto.RandEntropy(16)
 	copy(id[:], seed[:])
 
-	p := Peer{ip, 1234, id}
+	p := PeerInfo{ip, 1234, id}
 
-	buf := marshalPeer(&p)
-	p2 := unmarshalPeer(buf)
+	buf := marshalPeerInfo(&p)
+	p2 := unmarshalPeerInfo(buf)
 
 	if !bytes.Equal(p2.id[:], p.id[:]) {
 		t.Error("ids not equal")
@@ -39,8 +39,8 @@ func TestPeerIsEqual(t *testing.T) {
 	id := [16]byte{1, 2, 3, 4}
 	var port uint16 = 9876
 
-	p1 := Peer{ip, port, id}
-	p2 := Peer{ip, port, id}
+	p1 := PeerInfo{ip, port, id}
+	p2 := PeerInfo{ip, port, id}
 
 	if !p1.IsEqual(p2) {
 		t.Error("expect they are equal")
