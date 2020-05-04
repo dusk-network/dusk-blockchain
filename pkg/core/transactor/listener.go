@@ -3,6 +3,9 @@ package transactor
 import (
 	"context"
 	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"os"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -177,27 +180,34 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 }
 
 func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.TransactionResponse, error) {
-	// if t.w == nil {
-	// 	return nil, errWalletNotLoaded
-	// }
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
 
 	// create and sign transaction
 	log.Tracef("Create a standard tx (%d,%s)", req.Amount, string(req.Address))
 
 	ctx := context.Background()
-	tx, err := t.transactorClient.Transfer(ctx, &node.TransferRequest{Amount: req.Amount, Address: req.Address, Fee: req.Fee})
+
+	pb, err := DecodeAddressToPublicKey(req.Address)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: will this still make sense after migration?
-	// Publish transaction to the mempool processing
-	// txid, err := t.publishTx(tx)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	tx, err := t.ruskClient.NewTransaction(ctx, &rusk.NewTransactionRequest{
+		Value: req.Amount, Recipient: pb,
+		Fee: req.Fee, Sk: t.w.SecretKey()})
+	if err != nil {
+		return nil, err
+	}
 
-	return tx, nil
+	// Publish transaction to the mempool processing
+	hash, err := t.publishTx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &node.TransactionResponse{Hash: hash}, nil
 }
 
 func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
@@ -239,22 +249,23 @@ func (t *Transactor) handleIsWalletLoaded() (*node.WalletStatusResponse, error) 
 	return &node.WalletStatusResponse{Loaded: isLoaded}, nil
 }
 
-//nolint:unused
-func (t *Transactor) publishTx(tx *node.TransactionResponse) ([]byte, error) {
-	// hash, err := tx.CalculateHash()
-	// if err != nil {
-	// 	// If we found a valid bid tx, we should under no circumstance have issues marshaling it
-	// 	return nil, fmt.Errorf("error encoding transaction: %v", err)
-	// }
+func (t *Transactor) publishTx(tx *rusk.Transaction) ([]byte, error) {
+	phoenixTX := new(transactions.Transaction)
 
-	// TODO: this can go over the event bus
-	// _, err = t.rb.Call(topics.SendMempoolTx, rpcbus.Request{Params: tx, RespChan: make(chan rpcbus.Response, 1)}, 0)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	err := transactions.UTx(tx, phoenixTX)
+	if err != nil {
+		return nil, err
+	}
 
-	// return hash, nil
-	return nil, nil
+	hash, err := phoenixTX.CalculateHash()
+	if err != nil {
+		return nil, err
+	}
+
+	msg := message.New(topics.Tx, phoenixTX)
+	t.eb.Publish(topics.Tx, msg)
+
+	return hash, nil
 }
 
 //nolint:unused

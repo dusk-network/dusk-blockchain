@@ -1,6 +1,7 @@
 package transactor
 
 import (
+	"bytes"
 	"context"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
@@ -62,4 +63,24 @@ func (t *Transactor) loadWallet(password string) (*rusk.PublicKey, error) {
 	t.w = w
 
 	return keysResponse.Pk, nil
+}
+
+func DecodeAddressToPublicKey(in []byte) (*rusk.PublicKey, error) {
+	var buf = &bytes.Buffer{}
+	buf.Write(in)
+
+	AG := make([]byte, 32)
+	BG := make([]byte, 32)
+
+	_, err := buf.Read(AG)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Read(BG)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rusk.PublicKey{AG: &rusk.CompressedPoint{Y: AG}, BG: &rusk.CompressedPoint{Y: BG}}, nil
 }
