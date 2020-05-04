@@ -27,19 +27,19 @@ type ConsensusFactory struct {
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 
-	walletPubKey *pkey.PublicKey
+	privKey *pkey.PrivateKey
 	key.Keys
 	timerLength time.Duration
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, walletPubKey *pkey.PublicKey, keys key.Keys) *ConsensusFactory {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, privKey *pkey.PrivateKey, keys key.Keys) *ConsensusFactory {
 	return &ConsensusFactory{
-		eventBus:     eventBus,
-		rpcBus:       rpcBus,
-		walletPubKey: walletPubKey,
-		Keys:         keys,
-		timerLength:  timerLength,
+		eventBus:    eventBus,
+		rpcBus:      rpcBus,
+		privKey:     privKey,
+		Keys:        keys,
+		timerLength: timerLength,
 	}
 }
 
@@ -48,7 +48,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Du
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	gen := generation.NewFactory()
-	cgen := candidate.NewFactory(c.eventBus, c.rpcBus, c.walletPubKey)
+	cgen := candidate.NewFactory(c.eventBus, c.rpcBus, c.privKey)
 	sgen := score.NewFactory(c.eventBus, c.Keys, nil)
 	sel := selection.NewFactory(c.eventBus, c.timerLength)
 	redFirstStep := firststep.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
