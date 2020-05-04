@@ -21,9 +21,24 @@ type logMonitorConfiguration struct {
 }
 
 type networkConfiguration struct {
-	Seeder  seedersConfiguration
-	Monitor monitorConfiguration
-	Port    string
+	Seeder           seedersConfiguration
+	Monitor          monitorConfiguration
+	Port             string
+	DisableBroadcast bool
+}
+
+type kadcastConfiguration struct {
+	Enabled bool
+	Network string
+
+	// IP nature
+	Address string
+
+	// a set of network addresses of bootstrapping nodes
+	Bootstrappers []string
+
+	// Kadcast protocol configs
+	MaxDelegatesNum byte
 }
 
 type monitorConfiguration struct {
