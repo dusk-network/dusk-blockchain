@@ -6,9 +6,23 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
-/*********/
+/************/
+/**** TX ****/
+/************/
+
+// MockTx mocks a transfer transaction
+func MockTx() (*Transaction, error) {
+	ccTx := new(Transaction)
+	if err := UTx(RuskTx.ContractCall.(*rusk.ContractCallTx_Tx).Tx, ccTx); err != nil {
+		return nil, err
+	}
+
+	return ccTx, nil
+}
+
+/************/
 /** STAKE **/
-/*********/
+/************/
 
 // MockStake mocks a stake transaction
 func MockStake(amount, expires uint64) (*StakeTransaction, error) {
