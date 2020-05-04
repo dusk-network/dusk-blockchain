@@ -82,8 +82,10 @@ func TestSendBidTransaction(t *testing.T) {
 
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 
-	t.Log("Send request to all nodes to loadWallet")
-	for i := 0; i < localNetSize; i++ {
+	// Half of the network is supposed to run the consensus, the rest should be light nodes
+	t.Log("Send request to half of the network nodes to loadWallet")
+	halfNetwork := localNetSize / 2
+	for i := 0; i < halfNetwork; i++ {
 		_, err := localNet.LoadWalletCmd(uint(i), walletsPass)
 		if err != nil {
 			t.Fatal(err.Error())
