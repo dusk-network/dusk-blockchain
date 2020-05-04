@@ -17,9 +17,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 
@@ -35,10 +35,11 @@ type Server struct {
 	loader     chain.Loader
 	dupeMap    *dupemap.DupeMap
 	counter    *chainsync.Counter
-	gossip     *processing.Gossip
+	gossip     *protocol.Gossip
 	rpcWrapper *rpc.SrvWrapper
 	// rpcClient     *rpc.Client
 	cancelMonitor StopFunc
+	kadPeer       *kadcast.Peer
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
@@ -62,6 +63,22 @@ func LaunchChain(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *ch
 
 	go chainProcess.Listen()
 	return l, nil
+}
+
+func (s *Server) launchKadcastPeer() {
+
+	kcfg := cfg.Get().Kadcast
+
+	if !kcfg.Enabled {
+		log.Warn("Kadcast service is disabled")
+		return
+	}
+
+	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, s.dupeMap)
+
+	// Launch kadcast peer services and join network defined by bootstrappers
+	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
+	s.kadPeer = kadPeer
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
@@ -121,7 +138,7 @@ func Setup() *Server {
 		loader:     chainDBLoader,
 		dupeMap:    dupeBlacklist,
 		counter:    counter,
-		gossip:     processing.NewGossip(protocol.TestNet),
+		gossip:     protocol.NewGossip(protocol.TestNet),
 		rpcWrapper: rpcWrapper,
 		// rpcClient:  client,
 	}
@@ -132,6 +149,9 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 	go transactorComponent.Listen()
+
+	// Setting up and launch kadcast peer
+	srv.launchKadcastPeer()
 
 	// Connecting to the log based monitoring system
 	stopFunc, err := LaunchMonitor(eventBus)
@@ -207,4 +227,8 @@ func (s *Server) Close() {
 	s.rpcWrapper.Shutdown()
 	// _ = s.rpcClient.Close()
 	s.cancelMonitor()
+
+	if s.kadPeer != nil {
+		s.kadPeer.Close()
+	}
 }

@@ -100,6 +100,9 @@ const (
 
 	// Monitoring topics
 	SyncProgress
+
+	// Kadcast wire messaging
+	Kadcast
 )
 
 type topicBuf struct {

@@ -10,7 +10,9 @@ import (
 	"sync"
 
 	"github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -239,8 +241,13 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	// Accept the block
 	blk := m.Payload().(block.Block)
 
+	var kadHeight byte = 255
+	if len(m.Header()) > 0 {
+		kadHeight = m.Header()[0]
+	}
+
 	// This will decrement the sync counter
-	if err := c.AcceptBlock(blk); err != nil {
+	if err := c.AcceptBlock(blk, kadHeight); err != nil {
 		return err
 	}
 
@@ -273,7 +280,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 // 1. We have not seen it before
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
-func (c *Chain) AcceptBlock(blk block.Block) error {
+func (c *Chain) AcceptBlock(blk block.Block, kadHeight byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -318,11 +325,8 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	c.prevBlock = blk
 
 	// 5. Gossip advertise block Hash
-	l.Trace("gossiping block")
-	if err := c.advertiseBlock(blk); err != nil {
-		l.WithError(err).Errorln("block advertising failed")
-		return err
-	}
+	l.Trace("gossiping and kadcast-sending block")
+	go triggerBlockBroadcast(c.eventBus, blk, kadHeight)
 
 	// 6. Remove expired provisioners and bids
 	l.Trace("removing expired consensus transactions")
@@ -392,8 +396,53 @@ func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
 	r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
 }
 
+func triggerBlockBroadcast(publisher eventbus.Publisher, b block.Block, kadHeight byte) {
+
+	// (Re)Propagate complete block data into kadcast network together with kad height
+	if config.Get().Kadcast.Enabled && kadHeight <= kadcast.InitHeight {
+
+		buf := new(bytes.Buffer)
+		if err := message.MarshalBlock(buf, &b); err != nil {
+			log.Panic(err)
+		}
+
+		if err := topics.Prepend(buf, topics.Block); err != nil {
+			log.Panic(err)
+		}
+
+		m := message.NewWithHeader(topics.Block, *buf, []byte{kadHeight})
+		publisher.Publish(topics.Kadcast, m)
+
+		// time.Sleep(1 * time.Second)
+	}
+
+	// Send Inventory message to all peers advertising the newly accepted block
+	if !config.Get().Network.DisableBroadcast {
+		msg := &peermsg.Inv{}
+		msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
+
+		buf := new(bytes.Buffer)
+		if err := msg.Encode(buf); err != nil {
+			log.Panic(err)
+		}
+
+		if err := topics.Prepend(buf, topics.Inv); err != nil {
+			log.Panic(err)
+		}
+
+		m := message.New(topics.Inv, *buf)
+		publisher.Publish(topics.Gossip, m)
+	}
+
+}
+
 // Send Inventory message to all peers
 func (c *Chain) advertiseBlock(b block.Block) error {
+
+	if config.Get().Network.DisableBroadcast {
+		return nil
+	}
+
 	msg := &peermsg.Inv{}
 	msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
 
@@ -408,6 +457,31 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 
 	m := message.New(topics.Inv, *buf)
 	c.eventBus.Publish(topics.Gossip, m)
+	return nil
+}
+
+func (c *Chain) kadcastBlock(b block.Block, kadHeight byte) error {
+
+	if !config.Get().Kadcast.Enabled {
+		return nil
+	}
+
+	if kadHeight > kadcast.InitHeight {
+		return nil
+	}
+
+	buf := new(bytes.Buffer)
+	if err := message.MarshalBlock(buf, &b); err != nil {
+		return err
+	}
+
+	if err := topics.Prepend(buf, topics.Block); err != nil {
+		return err
+	}
+
+	m := message.NewWithHeader(topics.Block, *buf, []byte{kadHeight})
+	c.eventBus.Publish(topics.Kadcast, m)
+
 	return nil
 }
 
@@ -595,7 +669,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 
 func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {
 	c.intermediateBlock.Header.Certificate = cert
-	return c.AcceptBlock(*c.intermediateBlock)
+	return c.AcceptBlock(*c.intermediateBlock, kadcast.InitHeight)
 }
 
 // Send out a query for agreement messages and an intermediate block.

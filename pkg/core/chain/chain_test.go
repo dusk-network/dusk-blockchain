@@ -15,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -241,7 +242,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	blk.Header.Certificate = message.MockCertificate(blk.Header.Hash, 1, k, p)
 	blk.Header.PrevBlockHash = chain.prevBlock.Header.Hash
 	// Accept it
-	assert.NoError(t, chain.AcceptBlock(*blk))
+	assert.NoError(t, chain.AcceptBlock(*blk, kadcast.InitHeight))
 	// Provisioner with k3 should no longer be in the committee now
 	// assert.False(t, chain.p.GetMember(k[0].BLSPubKeyBytes) == nil)
 }
@@ -348,7 +349,7 @@ func TestRebuildChain(t *testing.T) {
 	// to check against.
 	blk := mockAcceptableBlock(t, c.prevBlock)
 
-	assert.NoError(t, c.AcceptBlock(*blk))
+	assert.NoError(t, c.AcceptBlock(*blk, kadcast.InitHeight))
 
 	// Chain prevBlock should now no longer be genesis
 	genesis := c.loader.(*DBLoader).genesis
