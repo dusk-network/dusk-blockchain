@@ -133,16 +133,15 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 		t.Fatalf("expecting %d verified txs but mempool stores %d txs", len(c.verifiedTx), len(txs))
 	}
 
-	for i := range c.verifiedTx {
+	for i, tx := range c.verifiedTx {
 
 		var exists bool
-		// TODO: update for RUSK
-		// for _, memTx := range txs {
-		// 	if memTx.Equals(tx) {
-		// 		exists = true
-		// 		break
-		// 	}
-		// }
+		for _, memTx := range txs {
+			if transactions.Equal(memTx, tx) {
+				exists = true
+				break
+			}
+		}
 
 		if !exists {
 			// ctx is expected to have the same list of verified txs as mempool stores

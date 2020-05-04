@@ -8,6 +8,27 @@
 
 - Test methods should Ideally be made for every file, even if they are compositions of others. For example, in bulletproof, the vector file has it’s own test files, it is used in many different files in BP which also contain their own respective test files.
 
+- Use `require` instead of plain `assert`. With `require` the test will fail if the assertion fails and there won't be any need for ugly `if` when testing if something fails or otherwise
+
+- Use `assert.New` to inject the testing context when testing. This shortens the signature and makes the test more readable
+
+- Adopt [table testing](https://github.com/golang/go/wiki/TableDrivenTests) whenever possible
+
+#### Example
+
+```
+import (
+    assert "github.com/stretchr/testify/require"
+)
+
+func TestXXX(t *testing.T) {
+    assert := assert.New(t)
+
+    // you can now test without explicitly setting the context and making the test fail fast
+    assert.Equal(2, 3) // this will fail and halt execution
+}
+```
+
 ### General
 
 - Reflection should be a last ditch effort, usually when a package uses reflection in a strongly typed language, it is a sign of bad architecture. Sometimes you will need a big switch statement.

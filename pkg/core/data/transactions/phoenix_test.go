@@ -9,7 +9,7 @@ import (
 
 func TestRuskTxInputUnMarshal(t *testing.T) {
 	assert := assert.New(t)
-	ruskIn := mockTransactionInput()
+	ruskIn := RuskTransparentTxIn
 	in := new(TransactionInput)
 	assert.NoError(UTxIn(ruskIn, in))
 
@@ -25,7 +25,7 @@ func TestRuskTxInputUnMarshal(t *testing.T) {
 
 func TestRuskTxOutUnMarshal(t *testing.T) {
 	assert := assert.New(t)
-	ruskIn := mockTransactionOutput()
+	ruskIn := RuskObfuscatedTxOut
 	in := new(TransactionOutput)
 	assert.NoError(UTxOut(ruskIn, in))
 
@@ -37,30 +37,4 @@ func TestRuskTxOutUnMarshal(t *testing.T) {
 
 	assert.Equal(in.Pk.AG.Y, ruskOut.Pk.AG.Y)
 	assert.Equal(in.BlindingFactor.Data, ruskOut.BlindingFactor.Data)
-}
-
-func mockTransactionInput() *rusk.TransactionInput {
-	return &rusk.TransactionInput{
-
-		Note: mockNote1(),
-		Sk: &rusk.SecretKey{
-			A: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-			B: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-		},
-		Nullifier: &rusk.Nullifier{
-			H: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-		},
-		MerkleRoot: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	}
-}
-
-func mockTransactionOutput() *rusk.TransactionOutput {
-	return &rusk.TransactionOutput{
-		Note: mockNote2(),
-		Pk: &rusk.PublicKey{
-			AG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-			BG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-		},
-		BlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	}
 }

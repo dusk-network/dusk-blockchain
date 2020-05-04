@@ -17,7 +17,7 @@ var numInputs, numOutputs = 23, 16
 // Each tx batch represents all 4 non-coinbase tx types
 func RandomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.ContractCall {
 	/*
-		var txs []transactions.Transaction
+		var txs []transactions.ContractCall
 
 		txs = append(txs, RandomCoinBaseTx(t, false))
 
