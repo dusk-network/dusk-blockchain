@@ -326,7 +326,7 @@ func (c *Chain) AcceptBlock(blk block.Block, kadHeight byte) error {
 
 	// 5. Gossip advertise block Hash
 	l.Trace("gossiping and kadcast-sending block")
-	go triggerBlockBroadcast(c.eventBus, blk, kadHeight)
+	startBlockBroadcast(c.eventBus, blk, kadHeight)
 
 	// 6. Remove expired provisioners and bids
 	l.Trace("removing expired consensus transactions")
@@ -396,7 +396,8 @@ func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
 	r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
 }
 
-func triggerBlockBroadcast(publisher eventbus.Publisher, b block.Block, kadHeight byte) {
+// startBlockBroadcast propagates block hash to gossip network and complete block to kadcast network
+func startBlockBroadcast(publisher eventbus.Publisher, b block.Block, kadHeight byte) {
 
 	// (Re)Propagate complete block data into kadcast network together with kad height
 	if config.Get().Kadcast.Enabled && kadHeight <= kadcast.InitHeight {
@@ -416,7 +417,7 @@ func triggerBlockBroadcast(publisher eventbus.Publisher, b block.Block, kadHeigh
 		// time.Sleep(1 * time.Second)
 	}
 
-	// Send Inventory message to all peers advertising the newly accepted block
+	// Send Inventory message to all peers advertising the newly accepted block hash
 	if !config.Get().Network.DisableBroadcast {
 		msg := &peermsg.Inv{}
 		msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
@@ -432,57 +433,9 @@ func triggerBlockBroadcast(publisher eventbus.Publisher, b block.Block, kadHeigh
 
 		m := message.New(topics.Inv, *buf)
 		publisher.Publish(topics.Gossip, m)
+
 	}
 
-}
-
-// Send Inventory message to all peers
-func (c *Chain) advertiseBlock(b block.Block) error {
-
-	if config.Get().Network.DisableBroadcast {
-		return nil
-	}
-
-	msg := &peermsg.Inv{}
-	msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
-
-	buf := new(bytes.Buffer)
-	if err := msg.Encode(buf); err != nil {
-		log.Panic(err)
-	}
-
-	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		log.Panic(err)
-	}
-
-	m := message.New(topics.Inv, *buf)
-	c.eventBus.Publish(topics.Gossip, m)
-	return nil
-}
-
-func (c *Chain) kadcastBlock(b block.Block, kadHeight byte) error {
-
-	if !config.Get().Kadcast.Enabled {
-		return nil
-	}
-
-	if kadHeight > kadcast.InitHeight {
-		return nil
-	}
-
-	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, &b); err != nil {
-		return err
-	}
-
-	if err := topics.Prepend(buf, topics.Block); err != nil {
-		return err
-	}
-
-	m := message.NewWithHeader(topics.Block, *buf, []byte{kadHeight})
-	c.eventBus.Publish(topics.Kadcast, m)
-
-	return nil
 }
 
 // TODO: consensus data should be persisted to disk, to decrease
