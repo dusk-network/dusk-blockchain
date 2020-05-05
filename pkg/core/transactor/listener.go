@@ -131,33 +131,52 @@ func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadRe
 }
 
 func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionResponse, error) {
-	// TODO: will this still make sense after migration?
-	// if t.w == nil {
-	// 	return nil, errWalletNotLoaded
-	// }
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
+
+	// TODO: Make an internal call to the block generator, to retrieve the blind bid M value. (Scalar)
 
 	// // create and sign transaction
 	log.Tracef("Create a bid tx (%d,%d)", req.Amount, req.Locktime)
 
+	resp, err := t.handleAddress()
+	if err != nil {
+		return nil, err
+	}
+
 	ctx := context.Background()
-	tx, err := t.transactorClient.Bid(ctx, &node.BidRequest{Amount: req.Amount, Locktime: req.Locktime, Fee: req.Fee})
+
+	pb, err := DecodeAddressToPublicKey(resp.GetKey().PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	ruskSK := new(rusk.SecretKey)
+	transactions.MSecretKey(ruskSK, t.w.SecretKey())
+	tx, err := t.ruskClient.NewTransaction(ctx, &rusk.NewTransactionRequest{
+		//TODO: currently does not yet support adding any peripheral data to transactions
+		//Value:     c.Value,
+		Recipient: pb,
+		Fee:       req.Fee,
+		Sk:        ruskSK,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := t.publishTx(tx)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: will this still make sense after migration?
-	////  Publish transaction to the mempool processing
-	//txid, err := t.publishTx(tx)
-	//if err != nil {
+	// Save relevant values in the database for the generation component to use
+	//if err := t.writeBidValues(tx); err != nil {
 	//	return nil, err
 	//}
 
-	// Save relevant values in the database for the generation component to use
-	if err := t.writeBidValues(tx); err != nil {
-		return nil, err
-	}
-
-	return tx, nil
+	return &node.TransactionResponse{Hash: hash}, nil
 }
 
 func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.TransactionResponse, error) {
