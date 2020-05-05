@@ -45,7 +45,7 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 
 	//set it for further use
 	t.secretKey = new(transactions.SecretKey)
-	transactions.USecretKey(record, t.secretKey)
+	transactions.USecretKey(record.Sk, t.secretKey)
 
 	//create wallet with seed and pass
 	pubKey, err := t.createFromSeed(req.Seed, req.Password)
