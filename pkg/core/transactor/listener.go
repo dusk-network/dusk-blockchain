@@ -6,6 +6,7 @@ import (
 	"os"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 
@@ -40,7 +41,8 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	}
 
 	//set it for further use
-	t.secretKey = record
+	t.secretKey = new(transactions.SecretKey)
+	transactions.USecretKey(record, t.secretKey)
 
 	//create wallet with seed and pass
 	pubKey, err := t.createFromSeed(req.Seed, req.Password)
@@ -51,8 +53,9 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	// TODO: will this still make sense after the migration
 	// t.launchConsensus()
 
+	// TODO: KEYS is hex encoding the PK correct?
 	return &node.LoadResponse{Key: &node.PubKey{
-		PublicKey: []byte(pubKey.String()),
+		PublicKey: pubKey.ToAddr(),
 	}}, nil
 }
 
@@ -61,9 +64,12 @@ func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
 		return nil, errors.New("SecretKey is not set")
 	}
 
+	ruskSK := new(rusk.SecretKey)
+	transactions.MSecretKey(ruskSK, t.w.SecretKey())
+
 	//get the pub key and return
 	ctx := context.Background()
-	pubKey, err := t.ruskClient.Keys(ctx, t.w.SecretKey())
+	pubKey, err := t.ruskClient.Keys(ctx, ruskSK)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +105,7 @@ func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse
 	// return loadResponse([]byte(pubKey)), nil
 
 	return &node.LoadResponse{Key: &node.PubKey{
-		PublicKey: []byte(pubKey.String()),
+		PublicKey: pubKey.ToAddr(),
 	}}, nil
 }
 

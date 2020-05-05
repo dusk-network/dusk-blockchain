@@ -7,7 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -55,8 +55,8 @@ type Helper struct {
 
 // NewHelper creates a Helper
 func NewHelper(t *testing.T, eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, txBatchCount uint16) *Helper {
-	walletKeys := key.NewKeyPair([]byte("pippo"))
-	factory := NewFactory(eb, rpcBus, walletKeys.PublicKey())
+	_, pk := transactions.MockKeys()
+	factory := NewFactory(eb, rpcBus, pk)
 	g := factory.Instantiate()
 	gen := g.(*Generator)
 	pubkey, _ := crypto.RandEntropy(32)

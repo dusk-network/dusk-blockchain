@@ -2,15 +2,17 @@ package transactor
 
 import (
 	"context"
+
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 var testnet = byte(2)
 
-func (t *Transactor) createFromSeed(seedBytes []byte, password string) (*rusk.PublicKey, error) {
+func (t *Transactor) createFromSeed(seedBytes []byte, password string) (*transactions.PublicKey, error) {
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
@@ -26,17 +28,10 @@ func (t *Transactor) createFromSeed(seedBytes []byte, password string) (*rusk.Pu
 		return nil, err
 	}
 
-	//get the pub key and return
-	ctx := context.Background()
-	keysResponse, err := t.ruskClient.Keys(ctx, t.secretKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return keysResponse.Pk, nil
+	return t.loadPK(t.secretKey)
 }
 
-func (t *Transactor) loadWallet(password string) (*rusk.PublicKey, error) {
+func (t *Transactor) loadWallet(password string) (*transactions.PublicKey, error) {
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
@@ -50,16 +45,24 @@ func (t *Transactor) loadWallet(password string) (*rusk.PublicKey, error) {
 		return nil, err
 	}
 
+	// //TODO: asign wallet here still make sense ?
+	// t.w = w
+	return t.loadPK(w.SecretKey())
+}
+
+func (t *Transactor) loadPK(sk *transactions.SecretKey) (*transactions.PublicKey, error) {
+
+	ruskSK := new(rusk.SecretKey)
+	transactions.MSecretKey(ruskSK, sk)
+
 	//get the pub key and return
 	ctx := context.Background()
-	keysResponse, err := t.ruskClient.Keys(ctx, w.SecretKey())
+	keysResponse, err := t.ruskClient.Keys(ctx, ruskSK)
 	if err != nil {
 		return nil, err
 	}
 
-	//TODO: asign wallet here still make sense ?
-
-	t.w = w
-
-	return keysResponse.Pk, nil
+	pk := new(transactions.PublicKey)
+	transactions.UPublicKey(keysResponse.Pk, pk)
+	return pk, nil
 }

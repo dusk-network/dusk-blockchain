@@ -6,6 +6,15 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
+// MockKeys mocks the keys
+func MockKeys() (*SecretKey, *PublicKey) {
+	sk := new(SecretKey)
+	pk := new(PublicKey)
+	USecretKey(RuskSecretKey, sk)
+	UPublicKey(RuskPublicKey, pk)
+	return sk, pk
+}
+
 /************/
 /**** TX ****/
 /************/
@@ -90,10 +99,7 @@ var RuskTx = &rusk.ContractCallTx{
 // RuskTransparentTxIn is a transparent Tx Input mock
 var RuskTransparentTxIn = &rusk.TransactionInput{
 	Note: RuskTransparentNote,
-	Sk: &rusk.SecretKey{
-		A: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-		B: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	},
+	Sk:   RuskSecretKey,
 	Nullifier: &rusk.Nullifier{
 		H: &rusk.Scalar{Data: []byte{0x55, 0x66}},
 	},
@@ -115,11 +121,8 @@ var RuskObfuscatedTxIn = &rusk.TransactionInput{
 
 // RuskTransparentTxOut is a transparent Tx Out Mock
 var RuskTransparentTxOut = &rusk.TransactionOutput{
-	Note: RuskTransparentNote,
-	Pk: &rusk.PublicKey{
-		AG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-		BG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-	},
+	Note:           RuskTransparentNote,
+	Pk:             RuskPublicKey,
 	BlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
 }
 
@@ -180,4 +183,20 @@ var RuskInvalidNote = &rusk.Note{
 	Value: &rusk.Note_TransparentValue{
 		TransparentValue: uint64(122),
 	},
+}
+
+/**********/
+/** KEYS **/
+/**********/
+
+// RuskPublicKey mocks rusk pk
+var RuskPublicKey = &rusk.PublicKey{
+	AG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+	BG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+}
+
+// RuskSecretKey mocks rusk sk
+var RuskSecretKey = &rusk.SecretKey{
+	A: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+	B: &rusk.Scalar{Data: []byte{0x55, 0x66}},
 }

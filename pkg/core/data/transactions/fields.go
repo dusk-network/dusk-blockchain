@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -365,6 +366,13 @@ func UnmarshalViewKey(r *bytes.Buffer, n *ViewKey) error {
 type PublicKey struct {
 	AG *CompressedPoint `json:"a_g"`
 	BG *CompressedPoint `json:"b_g"`
+}
+
+// ToAddr returns the HEX encoded string representation of the concatenation of
+// the two compressed points identifying the PublicKey
+func (pk *PublicKey) ToAddr() []byte {
+	repr := make([]byte, len(pk.AG.Y)+len(pk.BG.Y))
+	return []byte(hex.EncodeToString(repr))
 }
 
 // MPublicKey copies the PublicKey from rusk to transactions datastructs

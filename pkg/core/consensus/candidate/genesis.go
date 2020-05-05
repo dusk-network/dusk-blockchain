@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
@@ -12,7 +12,7 @@ import (
 // GenerateGenesisBlock is a developer utility for regenerating the genesis block
 // as they would be different per network type. Once a genesis block is
 // approved, its hex blob should be copied into config.TestNetGenesisBlob
-func GenerateGenesisBlock(generatorPubKey *key.PublicKey) (string, error) {
+func GenerateGenesisBlock(generatorPubKey *transactions.PublicKey) (string, error) {
 	g := &Generator{
 		rpcBus:    nil,
 		genPubKey: generatorPubKey,

@@ -9,7 +9,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -30,7 +29,7 @@ const MaxTxSetSize = 150000
 type Generator struct {
 	publisher eventbus.Publisher
 	// generator Public Keys to sign the rewards tx
-	genPubKey *key.PublicKey
+	genPubKey *transactions.PublicKey
 	rpcBus    *rpcbus.RPCBus
 	signer    consensus.Signer
 
@@ -39,7 +38,7 @@ type Generator struct {
 }
 
 // NewComponent returns an uninitialized candidate generator.
-func NewComponent(publisher eventbus.Publisher, genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
+func NewComponent(publisher eventbus.Publisher, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
 	return &Generator{
 		publisher: publisher,
 		rpcBus:    rpcBus,
@@ -213,7 +212,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Cont
 }
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
-func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) *transactions.DistributeTransaction {
+func constructCoinbaseTx(rewardReceiver *transactions.PublicKey, proof []byte, score []byte) *transactions.DistributeTransaction {
 	// TODO: adjust this for rusk/phoenix
 	/*
 		// The rewards for both the Generator and the Provisioners are disclosed.
