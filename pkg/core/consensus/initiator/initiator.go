@@ -1,10 +1,16 @@
 package initiator
 
 import (
+	"bytes"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
@@ -19,25 +25,21 @@ func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *w
 }
 
 func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) error {
-	// TODO: rework for RUSK integration
-	/*
-		// Setting up the consensus factory
-		pubKey := w.PublicKey()
-		f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, &pubKey, w.Keys())
-		f.StartConsensus()
+	// Setting up the consensus factory
+	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, w.SecretKey(), w.Keys())
+	f.StartConsensus()
 
-		// If we are on genesis, we should kickstart the consensus
-		resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.NewRequest(bytes.Buffer{}), 0)
-		if err != nil {
-			return err
-		}
-		blk := resp.(block.Block)
+	// If we are on genesis, we should kickstart the consensus
+	resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	if err != nil {
+		return err
+	}
+	blk := resp.(block.Block)
 
-		if blk.Header.Height == 0 {
-			msg := message.New(topics.Initialization, bytes.Buffer{})
-			eventBroker.Publish(topics.Initialization, msg)
-		}
-	*/
+	if blk.Header.Height == 0 {
+		msg := message.New(topics.Initialization, bytes.Buffer{})
+		eventBroker.Publish(topics.Initialization, msg)
+	}
 	return nil
 }
 

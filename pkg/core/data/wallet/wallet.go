@@ -181,10 +181,10 @@ func (w *Wallet) FetchTxHistory() ([]txrecords.TxRecord, error) {
 	return w.db.FetchTxRecords()
 }
 
-//// PublicKey returns the wallet public key
-//func (w *Wallet) PublicKey() key.PublicKey {
-//	return *w.keyPair.PublicKey()
-//}
+// PublicKey returns the wallet public key
+func (w *Wallet) PublicKey() key.PublicKey {
+	return *w.keyPair.PublicKey()
+}
 
 // SecretKey returns the wallet secret key
 func (w *Wallet) SecretKey() *rusk.SecretKey {
