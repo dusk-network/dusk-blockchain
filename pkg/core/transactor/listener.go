@@ -203,8 +203,11 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 	ruskSK := new(rusk.SecretKey)
 	transactions.MSecretKey(ruskSK, t.w.SecretKey())
 	tx, err := t.ruskClient.NewTransaction(ctx, &rusk.NewTransactionRequest{
-		Value: req.Amount, Recipient: pb,
-		Fee: req.Fee, Sk: ruskSK})
+		Value:     req.Amount,
+		Recipient: pb,
+		Fee:       req.Fee,
+		Sk:        ruskSK,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -274,6 +277,36 @@ func (t *Transactor) publishTx(tx *rusk.Transaction) ([]byte, error) {
 	t.eb.Publish(topics.Tx, msg)
 
 	return hash, nil
+}
+
+func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.TransactionResponse, error) {
+	ctx := context.Background()
+
+	pb, err := DecodeAddressToPublicKey(c.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	ruskSK := new(rusk.SecretKey)
+	transactions.MSecretKey(ruskSK, t.w.SecretKey())
+	tx, err := t.ruskClient.NewTransaction(ctx, &rusk.NewTransactionRequest{
+		//TODO: currently does not yet support adding calldata to transactions
+		//Value:     c.Value,
+		Recipient: pb,
+		Fee:       c.Fee,
+		Sk:        ruskSK,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Publish transaction to the mempool processing
+	hash, err := t.publishTx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &node.TransactionResponse{Hash: hash}, nil
 }
 
 //nolint:unused

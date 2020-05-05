@@ -81,8 +81,7 @@ func (t *Transactor) ClearWalletDatabase(ctx context.Context, e *node.EmptyReque
 
 // CallContract will create a transaction that calls a smart contract.
 func (t *Transactor) CallContract(ctx context.Context, c *node.CallContractRequest) (*node.TransactionResponse, error) {
-	// TODO: implement
-	return nil, nil
+	return t.handleSendContract(c)
 }
 
 // Transfer will create a normal transaction, transferring DUSK.
