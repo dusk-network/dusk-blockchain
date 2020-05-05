@@ -13,13 +13,11 @@ func TestRuskTxInputUnMarshal(t *testing.T) {
 	in := new(TransactionInput)
 	assert.NoError(UTxIn(ruskIn, in))
 
-	assert.Equal(ruskIn.Sk.A.Data, in.Sk.A.Data)
 	assert.Equal(ruskIn.Nullifier.H.Data, in.Nullifier.H.Data)
 
 	ruskOut := new(rusk.TransactionInput)
 	assert.NoError(MTxIn(ruskOut, in))
 
-	assert.Equal(in.Sk.A.Data, ruskOut.Sk.A.Data)
 	assert.Equal(in.Nullifier.H.Data, ruskOut.Nullifier.H.Data)
 }
 

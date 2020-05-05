@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/txrecords"
 
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -21,7 +19,7 @@ type DB struct {
 var (
 	txRecordPrefix = []byte{0x00}
 
-	writeOptions = &opt.WriteOptions{NoWriteMerge: false, Sync: true}
+	//writeOptions = &opt.WriteOptions{NoWriteMerge: false, Sync: true}
 )
 
 // New creates an instance of DB
@@ -80,13 +78,13 @@ func (db *DB) FetchTxRecords() ([]txrecords.TxRecord, error) {
 }
 
 // PutTxRecord saves the transaction record on the DB
-func (db *DB) PutTxRecord(tx transactions.ContractCall, height uint64, direction txrecords.Direction, privView *key.PrivateView) error {
+func (db *DB) PutTxRecord(tx transactions.ContractCall, height uint64, direction txrecords.Direction) error {
 	// Schema
 	//
 	// key: txRecordPrefix + record
 	// value: 0
 	buf := new(bytes.Buffer)
-	txRecord := txrecords.New(tx, height, direction, privView)
+	txRecord := txrecords.New(tx, height, direction)
 	if err := txrecords.Encode(buf, txRecord); err != nil {
 		return err
 	}

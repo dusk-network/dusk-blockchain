@@ -13,9 +13,9 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
 const dbPath = "testDb"
@@ -37,25 +37,22 @@ func TestMain(m *testing.M) {
 }
 
 func createRPCConn(t *testing.T) (client rusk.RuskClient, conn *grpc.ClientConn) {
+	assert := assert.New(t)
 	dialCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	var err error
 	conn, err = grpc.DialContext(dialCtx, address, grpc.WithInsecure())
-	if err != nil {
-		t.Fatalf("Failed to dial bufnet: %v", err)
-	}
-
-	client = rusk.NewRuskClient(conn)
-
-	return client, conn
+	assert.NoError(err)
+	return rusk.NewRuskClient(conn), conn
 }
 
 func TestNewWallet(t *testing.T) {
+	assert := assert.New(t)
 	netPrefix := byte(1)
 
 	db, err := database.New(dbPath)
-	assert.Nil(t, err)
+	assert.NoError(err)
 	defer os.RemoveAll(dbPath)
 	defer os.Remove(seedFile)
 	defer os.Remove(secretFile)
@@ -64,32 +61,35 @@ func TestNewWallet(t *testing.T) {
 	defer conn.Close()
 
 	seed, err := GenerateNewSeed(nil)
-	require.Nil(t, err)
+	assert.NoError(err)
 
 	ctx := context.Background()
 	secretKey, err := client.GenerateSecretKey(ctx, &rusk.GenerateSecretKeyRequest{B: seed})
-	require.Nil(t, err)
-	require.NotNil(t, secretKey)
-	require.NotNil(t, secretKey.A.Data)
-	require.NotNil(t, secretKey.B.Data)
+	assert.NoError(err)
 
-	w, err := New(nil, seed, netPrefix, db, "pass", seedFile, secretFile, secretKey)
-	assert.Nil(t, err)
+	sk := new(transactions.SecretKey)
+	transactions.USecretKey(secretKey, sk)
+	assert.NotNil(sk)
+	assert.NotNil(sk.A.Data)
+	assert.NotNil(sk.B.Data)
+
+	w, err := New(nil, seed, netPrefix, db, "pass", seedFile, secretFile, sk)
+	assert.NoError(err)
 
 	// wrong wallet password
 	loadedWallet, err := LoadFromFile(netPrefix, db, "wrongPass", seedFile, secretFile)
-	assert.NotNil(t, err)
-	assert.Nil(t, loadedWallet)
+	assert.NotNil(err)
+	assert.Nil(loadedWallet)
 
 	// correct wallet password
 	loadedWallet, err = LoadFromFile(netPrefix, db, "pass", seedFile, secretFile)
-	assert.Nil(t, err)
+	assert.Nil(err)
 
-	assert.Equal(t, w.SecretKey().A.Data, loadedWallet.SecretKey().A.Data)
-	assert.Equal(t, w.SecretKey().B.Data, loadedWallet.SecretKey().B.Data)
+	assert.Equal(w.SecretKey().A.Data, loadedWallet.SecretKey().A.Data)
+	assert.Equal(w.SecretKey().B.Data, loadedWallet.SecretKey().B.Data)
 
-	assert.Equal(t, w.consensusKeys.BLSSecretKey, loadedWallet.consensusKeys.BLSSecretKey)
-	assert.True(t, bytes.Equal(w.consensusKeys.BLSPubKeyBytes, loadedWallet.consensusKeys.BLSPubKeyBytes))
+	assert.Equal(w.consensusKeys.BLSSecretKey, loadedWallet.consensusKeys.BLSSecretKey)
+	assert.True(bytes.Equal(w.consensusKeys.BLSPubKeyBytes, loadedWallet.consensusKeys.BLSPubKeyBytes))
 }
 
 func TestCatchEOF(t *testing.T) {
@@ -112,37 +112,13 @@ func TestCatchEOF(t *testing.T) {
 
 		ctx := context.Background()
 		secretKey, err := client.GenerateSecretKey(ctx, &rusk.GenerateSecretKeyRequest{B: seed})
+		sk := new(transactions.SecretKey)
+		transactions.USecretKey(secretKey, sk)
 		require.Nil(t, err)
 
-		_, err = New(nil, seed, netPrefix, db, "pass", seedFile, secretFile, secretKey)
+		_, err = New(nil, seed, netPrefix, db, "pass", seedFile, secretFile, sk)
 		assert.Nil(t, err)
 		os.Remove(seedFile)
 		os.Remove(secretFile)
 	}
-}
-
-func generateWallet(t *testing.T, netPrefix byte, walletPath, seedFile, secretFile string) *Wallet { //nolint:unparam
-	db, err := database.New(walletPath)
-	assert.Nil(t, err)
-	//defer os.RemoveAll(walletPath)
-
-	client, conn := createRPCConn(t)
-	defer conn.Close()
-
-	seed, err := GenerateNewSeed(nil)
-	require.Nil(t, err)
-
-	ctx := context.Background()
-	secretKey, err := client.GenerateSecretKey(ctx, &rusk.GenerateSecretKeyRequest{B: seed})
-	require.Nil(t, err)
-
-	w, err := New(nil, seed, netPrefix, db, "pass", seedFile, secretFile, secretKey)
-	assert.Nil(t, err)
-	return w
-}
-
-func generateSendAddr(t *testing.T, netPrefix byte, randKeyPair *key.Key) key.PublicAddress {
-	pubAddr, err := randKeyPair.PublicKey().PublicAddress(netPrefix)
-	assert.Nil(t, err)
-	return *pubAddr
 }
