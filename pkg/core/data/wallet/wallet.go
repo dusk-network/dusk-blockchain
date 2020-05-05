@@ -166,8 +166,8 @@ func (w *Wallet) FetchTxHistory() ([]txrecords.TxRecord, error) {
 }
 
 // PublicKey returns the wallet public key
-func (w *Wallet) PublicKey() key.PublicKey {
-	return *w.keyPair.PublicKey()
+func (w *Wallet) PublicKey() *transactions.PublicKey {
+	return w.publicKey
 }
 
 // SecretKey returns the wallet secret key

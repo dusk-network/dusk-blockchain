@@ -3,6 +3,7 @@ package initiator
 import (
 	"bytes"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -13,20 +14,21 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	log "github.com/sirupsen/logrus"
 )
 
 // LaunchConsensus start the whole consensus algorithm
-func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, _ *chainsync.Counter) {
+func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, _ *chainsync.Counter, rusk rusk.RuskClient) {
 	storeBidValues(eventBroker, rpcBus, w)
-	if err := startProvisioner(eventBroker, rpcBus, w); err != nil {
+	if err := startProvisioner(eventBroker, rpcBus, w, rusk); err != nil {
 		log.Panic(err)
 	}
 }
 
-func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) error {
+func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, rusk rusk.RuskClient) error {
 	// Setting up the consensus factory
-	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, w.SecretKey(), w.Keys())
+	f := factory.New(eventBroker, rpcBus, config.ConsensusTimeOut, w.SecretKey(), w.PublicKey(), w.Keys(), rusk)
 	f.StartConsensus()
 
 	// If we are on genesis, we should kickstart the consensus
