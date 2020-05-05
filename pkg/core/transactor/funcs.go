@@ -1,6 +1,7 @@
 package transactor
 
 import (
+	"bytes"
 	"context"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -65,4 +66,24 @@ func (t *Transactor) loadPK(sk *transactions.SecretKey) (*transactions.PublicKey
 	pk := new(transactions.PublicKey)
 	transactions.UPublicKey(keysResponse.Pk, pk)
 	return pk, nil
+}
+
+func DecodeAddressToPublicKey(in []byte) (*rusk.PublicKey, error) {
+	var buf = &bytes.Buffer{}
+	buf.Write(in)
+
+	AG := make([]byte, 32)
+	BG := make([]byte, 32)
+
+	_, err := buf.Read(AG)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Read(BG)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rusk.PublicKey{AG: &rusk.CompressedPoint{Y: AG}, BG: &rusk.CompressedPoint{Y: BG}}, nil
 }
