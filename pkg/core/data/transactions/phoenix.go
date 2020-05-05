@@ -172,26 +172,14 @@ func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
 
 // TransactionInput includes the notes, the nullifier and the transaction merkleroot
 type TransactionInput struct {
-	Note       *Note      `json:"note"`
-	Pos        uint64     `json:"pos"`
-	Sk         *SecretKey `json:"sk"`
 	Nullifier  *Nullifier `json:"nullifier"`
 	MerkleRoot *Scalar    `json:"merkle_root"`
 }
 
 // MTxIn copies from rusk.TransactionInput to transactions.TransactionInput
 func MTxIn(r *rusk.TransactionInput, t *TransactionInput) error {
-	r.Note = new(rusk.Note)
-	r.Sk = new(rusk.SecretKey)
 	r.Nullifier = new(rusk.Nullifier)
 	r.MerkleRoot = new(rusk.Scalar)
-
-	if err := MNote(r.Note, t.Note); err != nil {
-		return err
-	}
-
-	r.Pos = t.Pos
-	MSecretKey(r.Sk, t.Sk)
 	MNullifier(r.Nullifier, t.Nullifier)
 	MScalar(r.MerkleRoot, t.MerkleRoot)
 	return nil
@@ -199,17 +187,8 @@ func MTxIn(r *rusk.TransactionInput, t *TransactionInput) error {
 
 // UTxIn copies from rusk.TransactionOutput to transactions.TransactionOutput
 func UTxIn(r *rusk.TransactionInput, t *TransactionInput) error {
-	t.Note = new(Note)
-	t.Sk = new(SecretKey)
 	t.Nullifier = new(Nullifier)
 	t.MerkleRoot = new(Scalar)
-
-	if err := UNote(r.Note, t.Note); err != nil {
-		return err
-	}
-
-	t.Pos = r.Pos
-	USecretKey(r.Sk, t.Sk)
 	UNullifier(r.Nullifier, t.Nullifier)
 	UScalar(r.MerkleRoot, t.MerkleRoot)
 	return nil
@@ -217,15 +196,6 @@ func UTxIn(r *rusk.TransactionInput, t *TransactionInput) error {
 
 // MarshalTransactionInput to a buffer
 func MarshalTransactionInput(r *bytes.Buffer, t TransactionInput) error {
-	if err := MarshalNote(r, *t.Note); err != nil {
-		return err
-	}
-	if err := encoding.WriteUint64LE(r, t.Pos); err != nil {
-		return err
-	}
-	if err := MarshalSecretKey(r, *t.Sk); err != nil {
-		return err
-	}
 	if err := MarshalNullifier(r, *t.Nullifier); err != nil {
 		return err
 	}
@@ -237,17 +207,6 @@ func MarshalTransactionInput(r *bytes.Buffer, t TransactionInput) error {
 
 // UnmarshalTransactionInput from a buffer
 func UnmarshalTransactionInput(r *bytes.Buffer, t *TransactionInput) error {
-	t.Note = new(Note)
-	if err := UnmarshalNote(r, t.Note); err != nil {
-		return err
-	}
-	if err := encoding.ReadUint64LE(r, &t.Pos); err != nil {
-		return err
-	}
-	t.Sk = new(SecretKey)
-	if err := UnmarshalSecretKey(r, t.Sk); err != nil {
-		return err
-	}
 	t.Nullifier = new(Nullifier)
 	if err := UnmarshalNullifier(r, t.Nullifier); err != nil {
 		return err

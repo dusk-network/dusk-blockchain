@@ -2,6 +2,8 @@ package transactor
 
 import (
 	"context"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 
@@ -22,7 +24,7 @@ type Transactor struct { // TODO: rename
 	// c                 *chainsync.Counter
 	// acceptedBlockChan <-chan block.Block
 
-	secretKey *rusk.SecretKey
+	secretKey *transactions.SecretKey
 
 	ruskClient       rusk.RuskClient
 	walletClient     node.WalletClient
@@ -79,8 +81,7 @@ func (t *Transactor) ClearWalletDatabase(ctx context.Context, e *node.EmptyReque
 
 // CallContract will create a transaction that calls a smart contract.
 func (t *Transactor) CallContract(ctx context.Context, c *node.CallContractRequest) (*node.TransactionResponse, error) {
-	// TODO: implement
-	return nil, nil
+	return t.handleSendContract(c)
 }
 
 // Transfer will create a normal transaction, transferring DUSK.

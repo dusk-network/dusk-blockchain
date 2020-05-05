@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
@@ -31,7 +30,7 @@ type TxRecord struct {
 }
 
 // New creates a TxRecord
-func New(tx transactions.ContractCall, height uint64, direction Direction, privView *key.PrivateView) *TxRecord {
+func New(tx transactions.ContractCall, height uint64, direction Direction) *TxRecord {
 	return &TxRecord{
 		Direction:    direction,
 		Timestamp:    time.Now().Unix(),

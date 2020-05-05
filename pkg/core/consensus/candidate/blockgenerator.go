@@ -12,7 +12,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -31,9 +30,9 @@ const MaxTxSetSize = 150000
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator struct {
-	publisher eventbus.Publisher
-
-	genPrivKey *key.PrivateKey
+	publisher  eventbus.Publisher
+	genPrivKey *transactions.SecretKey
+	genPubKey  *transactions.PublicKey
 	rpcBus     *rpcbus.RPCBus
 	signer     consensus.Signer
 
@@ -44,11 +43,12 @@ type Generator struct {
 }
 
 // NewComponent returns an uninitialized candidate generator.
-func NewComponent(publisher eventbus.Publisher, genPrivKey *key.PrivateKey, rpcBus *rpcbus.RPCBus, rusk rusk.RuskClient) *Generator {
+func NewComponent(publisher eventbus.Publisher, genPrivKey *transactions.SecretKey, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus, rusk rusk.RuskClient) *Generator {
 	return &Generator{
 		publisher:  publisher,
 		rpcBus:     rpcBus,
 		genPrivKey: genPrivKey,
+		genPubKey:  genPubKey,
 		rusk:       rusk,
 	}
 }
@@ -220,10 +220,15 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Cont
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
 func (bg *Generator) constructCoinbaseTx() (*transactions.DistributeTransaction, error) {
+	ruskSecretKey := &rusk.SecretKey{}
+	ruskPublicKey := &rusk.PublicKey{}
+	transactions.MSecretKey(ruskSecretKey, bg.genPrivKey)
+	transactions.MPublicKey(ruskPublicKey, bg.genPubKey)
+
 	req := &rusk.DistributeTransactionRequest{
 		Tx: &rusk.NewTransactionRequest{
-			Sk:         &rusk.SecretKey{}, // TODO: get from genPrivKey
-			Recipient:  &rusk.PublicKey{}, // TODO: bg.privKey.PublicKey()
+			Sk:         ruskSecretKey,
+			Recipient:  ruskPublicKey,
 			Value:      config.GeneratorReward,
 			Fee:        100, // TODO: what do we set as fee here?
 			Obfuscated: false,

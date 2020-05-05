@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/stretchr/testify/assert"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	assert "github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -15,10 +15,11 @@ const path = "mainnet"
 
 //TODO: #446 , shall this be refactored ?
 func TestPutGet(t *testing.T) {
+	assert := assert.New(t)
 
 	// New
 	db, err := New(path)
-	assert.Nil(t, err)
+	assert.NoError(err)
 
 	// Make sure to delete this dir after test
 	defer os.RemoveAll(path)
@@ -27,27 +28,27 @@ func TestPutGet(t *testing.T) {
 	key := []byte("hello")
 	value := []byte("world")
 	err = db.Put(key, value)
-	assert.Nil(t, err)
+	assert.NoError(err)
 
 	// Close and re-open database
 	err = db.Close()
-	assert.Nil(t, err)
+	assert.NoError(err)
 	db, err = New(path)
-	assert.Nil(t, err)
+	assert.NoError(err)
 
 	// Get
 	val, err := db.Get(key)
-	assert.Nil(t, err)
-	assert.True(t, bytes.Equal(val, value))
+	assert.NoError(err)
+	assert.True(bytes.Equal(val, value))
 
 	// Delete
 	err = db.Delete(key)
-	assert.Nil(t, err)
+	assert.NoError(err)
 
 	// Get after delete
 	val, err = db.Get(key)
-	assert.Equal(t, leveldb.ErrNotFound, err)
-	assert.True(t, bytes.Equal(val, []byte{}))
+	assert.Equal(leveldb.ErrNotFound, err)
+	assert.True(bytes.Equal(val, []byte{}))
 }
 
 func TestPutFetchTxRecord(t *testing.T) {
@@ -126,7 +127,7 @@ func TestClear(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func randTxForRecord(t transactions.TxType) (transactions.ContractCall, *key.PrivateView) {
+func randTxForRecord(t transactions.TxType) (transactions.ContractCall, *key.PrivateView) { //nolint
 	// TODO: rework for RUSK integration
 	/*
 		var tx transactions.Transaction
