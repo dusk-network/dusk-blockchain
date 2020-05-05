@@ -98,8 +98,6 @@ var RuskTx = &rusk.ContractCallTx{
 
 // RuskTransparentTxIn is a transparent Tx Input mock
 var RuskTransparentTxIn = &rusk.TransactionInput{
-	Note: RuskTransparentNote,
-	Sk:   RuskSecretKey,
 	Nullifier: &rusk.Nullifier{
 		H: &rusk.Scalar{Data: []byte{0x55, 0x66}},
 	},
@@ -108,11 +106,6 @@ var RuskTransparentTxIn = &rusk.TransactionInput{
 
 // RuskObfuscatedTxIn is an encrypted Tx Input Mock
 var RuskObfuscatedTxIn = &rusk.TransactionInput{
-	Note: RuskObfuscatedNote,
-	Sk: &rusk.SecretKey{
-		A: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-		B: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	},
 	Nullifier: &rusk.Nullifier{
 		H: &rusk.Scalar{Data: []byte{0x55, 0x66}},
 	},
