@@ -3,13 +3,13 @@ package transactor
 import (
 	"context"
 	"errors"
+	"os"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"os"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 
@@ -200,9 +200,11 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 		return nil, err
 	}
 
+	ruskSK := new(rusk.SecretKey)
+	transactions.MSecretKey(ruskSK, t.w.SecretKey())
 	tx, err := t.ruskClient.NewTransaction(ctx, &rusk.NewTransactionRequest{
 		Value: req.Amount, Recipient: pb,
-		Fee: req.Fee, Sk: t.w.SecretKey()})
+		Fee: req.Fee, Sk: ruskSK})
 	if err != nil {
 		return nil, err
 	}
