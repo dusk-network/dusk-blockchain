@@ -180,28 +180,52 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 }
 
 func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.TransactionResponse, error) {
-	// TODO: will this still make sense after migration?
-	// if t.w == nil {
-	// 	return nil, errWalletNotLoaded
-	// }
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
 
 	// create and sign transaction
 	log.Tracef("Create a stake tx (%d,%d)", req.Amount, req.Locktime)
 
+	blsKey := t.w.Keys().BLSPubKey
+	if blsKey == nil {
+		return nil, errWalletNotLoaded
+	}
+
 	ctx := context.Background()
-	tx, err := t.transactorClient.Stake(ctx, &node.StakeRequest{Amount: req.Amount, Locktime: req.Locktime, Fee: req.Fee})
+
+	resp, err := t.handleAddress()
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: will this still make sense after migration?
-	// //  Publish transaction to the mempool processing
-	// txid, err := t.publishTx(tx)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	pb, err := DecodeAddressToPublicKey(resp.GetKey().PublicKey)
+	if err != nil {
+		return nil, err
+	}
 
-	return tx, nil
+	ruskSK := new(rusk.SecretKey)
+	transactions.MSecretKey(ruskSK, t.w.SecretKey())
+	tx, err := t.ruskClient.NewStake(ctx, &rusk.StakeTransactionRequest{
+		BlsKey: blsKey.Marshal(),
+		Tx: &rusk.NewTransactionRequest{
+			//TODO: currently does not yet support adding any peripheral data to transactions
+			Value:     req.Amount,
+			Recipient: pb,
+			Fee:       req.Fee,
+			Sk:        ruskSK,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := t.publishStakeTx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &node.TransactionResponse{Hash: hash}, nil
 }
 
 func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.TransactionResponse, error) {
@@ -277,6 +301,24 @@ func (t *Transactor) handleIsWalletLoaded() (*node.WalletStatusResponse, error) 
 		isLoaded = true
 	}
 	return &node.WalletStatusResponse{Loaded: isLoaded}, nil
+}
+func (t *Transactor) publishStakeTx(tx *rusk.StakeTransaction) ([]byte, error) {
+	phoenixTX := new(transactions.StakeTransaction)
+
+	err := transactions.MStake(tx, phoenixTX)
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := phoenixTX.CalculateHash()
+	if err != nil {
+		return nil, err
+	}
+
+	msg := message.New(topics.Tx, phoenixTX)
+	t.eb.Publish(topics.Tx, msg)
+
+	return hash, nil
 }
 
 func (t *Transactor) publishTx(tx *rusk.Transaction) ([]byte, error) {
