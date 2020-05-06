@@ -9,7 +9,7 @@ import (
 )
 
 type noteTable struct {
-	name string
+	name string //nolint
 	mock *rusk.Note
 	test func(*Note)
 }

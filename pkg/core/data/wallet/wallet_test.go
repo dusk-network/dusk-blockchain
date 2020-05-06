@@ -68,7 +68,7 @@ func TestNewWallet(t *testing.T) {
 	assert.NoError(err)
 
 	sk := new(transactions.SecretKey)
-	transactions.USecretKey(secretKey, sk)
+	transactions.USecretKey(secretKey.Sk, sk)
 	assert.NotNil(sk)
 	assert.NotNil(sk.A.Data)
 	assert.NotNil(sk.B.Data)
@@ -113,7 +113,7 @@ func TestCatchEOF(t *testing.T) {
 		ctx := context.Background()
 		secretKey, err := client.GenerateSecretKey(ctx, &rusk.GenerateSecretKeyRequest{B: seed})
 		sk := new(transactions.SecretKey)
-		transactions.USecretKey(secretKey, sk)
+		transactions.USecretKey(secretKey.Sk, sk)
 		require.Nil(t, err)
 
 		_, err = New(nil, seed, netPrefix, db, "pass", seedFile, secretFile, sk)

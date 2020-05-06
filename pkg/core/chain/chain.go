@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -26,7 +27,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	pb "github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
@@ -97,13 +97,15 @@ type Chain struct {
 	highestSeenChan <-chan uint64
 
 	// rusk client
-	rusk *pb.RuskClient
+	executor transactions.Executor
 
 	// rpcbus channels
 	getLastBlockChan         <-chan rpcbus.Request
 	verifyCandidateBlockChan <-chan rpcbus.Request
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
+
+	ctx context.Context
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -113,7 +115,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, rusk *pb.RuskClient) (*Chain, error) {
+func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, executor transactions.Executor) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -150,7 +152,8 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		getRoundResultsChan:      getRoundResultsChan,
 		loader:                   loader,
 		verifier:                 verifier,
-		rusk:                     rusk,
+		executor:                 executor,
+		ctx:                      ctx,
 	}
 
 	prevBlock, err := loader.LoadTip()
@@ -200,6 +203,8 @@ func (c *Chain) Listen() {
 			c.provideLastCertificate(r)
 		case r := <-c.getRoundResultsChan:
 			c.provideRoundResults(r)
+		case <-c.ctx.Done():
+			// TODO: dispose the Chain
 		}
 	}
 }
@@ -220,7 +225,9 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	blk := m.Payload().(block.Block)
 
 	// This will decrement the sync counter
-	if err := c.AcceptBlock(blk); err != nil {
+	// TODO: a new context should be created with timeout, cancelation, etc
+	// instead of reusing the Chain global one
+	if err := c.AcceptBlock(c.ctx, blk); err != nil {
 		return err
 	}
 
@@ -253,7 +260,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 // 1. We have not seen it before
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
-func (c *Chain) AcceptBlock(blk block.Block) error {
+func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -279,9 +286,15 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	// 3. Call ExecuteStateTransitionFunction
+	l.Debug("calling ExecuteStateTransitionFunction")
+	_, provisioners, bidList, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
+	if err != nil {
+		l.WithError(err).Errorln("Error in executing the state transition")
+	}
 
-	// TODO: After this point, if an error happens we need to formulate a
-	// recovery strategy (or panic)
+	// Caching the provisioners and bidList
+	c.p = &provisioners
+	c.bidList = &bidList
 
 	// 4. Store the approved block
 	l.Trace("storing block in db")
@@ -318,6 +331,7 @@ func (c *Chain) onInitialization(message.Message) error {
 
 func (c *Chain) sendRoundUpdate() error {
 	hdr := c.intermediateBlock.Header
+
 	ru := consensus.RoundUpdate{
 		Round:   hdr.Height + 1,
 		P:       *c.p,
@@ -364,6 +378,9 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 }
 
 func (c *Chain) handleCertificateMessage(cMsg certMsg) {
+
+	ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(1*time.Second))
+	defer cancel()
 	// Set latest certificate
 	c.lastCertificate = cMsg.cert
 
@@ -384,7 +401,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 		return
 	}
 
-	if err := c.finalizeIntermediateBlock(cm.Certificate); err != nil {
+	if err := c.finalizeIntermediateBlock(ctx, cm.Certificate); err != nil {
 		log.WithError(err).Warnln("could not accept intermediate block")
 		return
 	}
@@ -396,14 +413,15 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	msg := message.New(topics.IntermediateBlock, *cm.Block)
 	c.eventBus.Publish(topics.IntermediateBlock, msg)
 
+	// propagate round update
 	go func() {
 		_ = c.sendRoundUpdate()
 	}()
 }
 
-func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {
+func (c *Chain) finalizeIntermediateBlock(ctx context.Context, cert *block.Certificate) error {
 	c.intermediateBlock.Header.Certificate = cert
-	return c.AcceptBlock(*c.intermediateBlock)
+	return c.AcceptBlock(ctx, *c.intermediateBlock)
 }
 
 // Send out a query for agreement messages and an intermediate block.

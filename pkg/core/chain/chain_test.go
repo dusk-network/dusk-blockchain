@@ -2,6 +2,7 @@ package chain
 
 import (
 	"bytes"
+	"context"
 	"testing"
 	"time"
 
@@ -195,7 +196,7 @@ func TestFetchTip(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	loader := createLoader()
-	chain, err := New(eb, rpc, nil, loader, &MockVerifier{}, nil, nil)
+	chain, err := New(context.Background(), eb, rpc, nil, loader, &MockVerifier{}, nil, nil)
 
 	assert.Nil(t, err)
 
@@ -217,7 +218,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	chain, err := New(eb, rpc, counter, createLoader(), &MockVerifier{}, nil, nil)
+	chain, err := New(context.Background(), eb, rpc, counter, createLoader(), &MockVerifier{}, nil, nil)
 	assert.Nil(t, err)
 
 	// Add some provisioners to our chain, including one that is just about to expire
@@ -240,7 +241,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	blk.Header.Certificate = message.MockCertificate(blk.Header.Hash, 1, k, p)
 	blk.Header.PrevBlockHash = chain.prevBlock.Header.Hash
 	// Accept it
-	assert.NoError(t, chain.AcceptBlock(*blk))
+	assert.NoError(t, chain.AcceptBlock(context.Background(), *blk))
 	// Provisioner with k3 should no longer be in the committee now
 	// assert.False(t, chain.p.GetMember(k[0].BLSPubKeyBytes) == nil)
 }
@@ -350,13 +351,13 @@ func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
 	return blk
 }
 
-//nolint:unused
+//nolint:unparam
 func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
 	loader := createLoader()
-	c, err := New(eb, rpc, counter, loader, &MockVerifier{}, nil, nil)
+	c, err := New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
