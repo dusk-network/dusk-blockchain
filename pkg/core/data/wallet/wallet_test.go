@@ -85,8 +85,8 @@ func TestNewWallet(t *testing.T) {
 	loadedWallet, err = LoadFromFile(netPrefix, db, "pass", seedFile, secretFile)
 	assert.Nil(err)
 
-	assert.Equal(w.SecretKey().A.Data, loadedWallet.SecretKey().A.Data)
-	assert.Equal(w.SecretKey().B.Data, loadedWallet.SecretKey().B.Data)
+	assert.Equal(w.SecretKey.A.Data, loadedWallet.SecretKey.A.Data)
+	assert.Equal(w.SecretKey.B.Data, loadedWallet.SecretKey.B.Data)
 
 	assert.Equal(w.consensusKeys.BLSSecretKey, loadedWallet.consensusKeys.BLSSecretKey)
 	assert.True(bytes.Equal(w.consensusKeys.BLSPubKeyBytes, loadedWallet.consensusKeys.BLSPubKeyBytes))
