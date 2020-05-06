@@ -89,7 +89,7 @@ type Executor interface {
 
 	// ExecuteStateTransition performs a global state mutation and steps the
 	// block-height up
-	ExecuteStateTransition(context.Context, []ContractCall) (uint64, error)
+	ExecuteStateTransition(context.Context, []ContractCall) (uint64, user.Provisioners, user.BidList, error)
 }
 
 // Provisioner encapsulates the operations common to a Provisioner during the
@@ -110,23 +110,14 @@ type BlockGenerator interface {
 	GenerateScore(context.Context, ScoreRequest) (Score, error)
 }
 
-// Consensus is used to keep the consensus in synch with the BidList and the
-// Blockgenerator
-type Consensus interface {
-	// GetConsensusInfo asks rusk for the storage of the Bid and the Stake
-	// contracts
-	GetConsensusInfo(context.Context, uint64) (user.BidList, user.Provisioners, error)
-}
-
 // Proxy toward the rusk client
 type Proxy struct {
 	client rusk.RuskClient
 }
 
 // NewProxy creates a new Proxy
-func NewProxy() *Proxy {
-	// TODO: MEMPOOL initialize rusk client
-	return &Proxy{client: nil}
+func NewProxy(client rusk.RuskClient) *Proxy {
+	return &Proxy{client: client}
 }
 
 // Verifier returned by the Proxy
@@ -157,11 +148,6 @@ func (p *Proxy) Provider() Provider {
 // BlockGenerator returned by the Proxy
 func (p *Proxy) BlockGenerator() BlockGenerator {
 	return &blockgenerator{p}
-}
-
-// Consensus returned by the Proxy
-func (p *Proxy) Consensus() Consensus {
-	return &consensus{p}
 }
 
 type verifier struct {
@@ -366,27 +352,44 @@ func (e *executor) ValidateStateTransition(ctx context.Context, calls []Contract
 
 // ExecuteStateTransition performs a global state mutation and steps the
 // block-height up
-func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall) (uint64, error) {
+func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall) (uint64, user.Provisioners, user.BidList, error) {
 	vstr := new(rusk.ExecuteStateTransitionRequest)
 	vstr.Calls = make([]*rusk.ContractCallTx, len(calls))
 	var err error
 	for i, call := range calls {
 		vstr.Calls[i], err = EncodeContractCall(call)
 		if err != nil {
-			return 0, err
+			return 0, user.Provisioners{}, user.BidList{}, err
 		}
 	}
 
 	res, err := e.client.ExecuteStateTransition(ctx, vstr)
 	if err != nil {
-		return 0, err
+		return 0, user.Provisioners{}, user.BidList{}, err
 	}
 
 	if !res.Success {
-		return 0, errors.New("unsuccessful state transition function execution")
+		return 0, user.Provisioners{}, user.BidList{}, errors.New("unsuccessful state transition function execution")
 	}
 
-	return res.CurrentHeight, nil
+	provisioners := user.NewProvisioners()
+	memberMap := make(map[string]*user.Member)
+	for i := range res.Committee {
+		member := new(user.Member)
+		UMember(res.Committee[i], member)
+		memberMap[string(member.PublicKeyBLS)] = member
+		provisioners.Set.Insert(member.PublicKeyBLS)
+	}
+	provisioners.Members = memberMap
+
+	bids := make([]user.Bid, len(res.BidList.BidList))
+	for i, x := range res.BidList.BidList {
+		bid := user.Bid{}
+		copy(bid.X[:], x)
+		bids[i] = bid
+	}
+
+	return res.CurrentHeight, *provisioners, user.BidList(bids), nil
 }
 
 type provisioner struct {
@@ -483,31 +486,18 @@ func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Sco
 	}, nil
 }
 
-type consensus struct {
-	*Proxy
-}
-
-func (c *consensus) GetConsensusInfo(ctx context.Context, height uint64) (user.BidList, user.Provisioners, error) {
-	gcir := &rusk.GetConsensusInfoRequest{BlockHeight: height}
-	res, err := c.client.GetConsensusInfo(ctx, gcir)
-	if err != nil {
-		return nil, nil, err
+// UMember deep copies from the rusk.Provisioner
+func UMember(r *rusk.Provisioner, t *user.Member) {
+	t.PublicKeyBLS = make([]byte, len(r.BlsKey))
+	copy(t.PublicKeyBLS, r.BlsKey)
+	t.Stakes = make([]user.Stake, len(r.Stakes))
+	for i := range r.Stakes {
+		t.Stakes[i] = user.Stake{
+			Amount:      r.Stakes[i].Amount,
+			StartHeight: r.Stakes[i].StartHeight,
+			EndHeight:   r.Stakes[i].EndHeight,
+		}
 	}
-
-	provisioners := user.NewProvisioners()
-	memberMap := make(map[string]*user.Member)
-	for i := range res.Committee {
-		member := new(user.Member)
-		UMember(res.Committee[i], member)
-		memberMap[string(member.PublicKeyBLS)] = member
-		provisioners.Set.Insert(member.PublicKeyBLS)
-	}
-	provisioners.Members = memberMap
-
-	bidList := make([]user.Bid, len(res.BidList))
-	UBidList(res.BidList, bidList)
-	return bidList, provisioners, nil
-
 }
 
 // MTxRequest serializes a TxRequest into its rusk equivalent
