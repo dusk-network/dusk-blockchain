@@ -97,7 +97,7 @@ type Chain struct {
 	highestSeenChan <-chan uint64
 
 	// rusk client
-	consensusProvider transactions.Consensus
+	executor transactions.Executor
 
 	// rpcbus channels
 	getLastBlockChan         <-chan rpcbus.Request
@@ -105,7 +105,7 @@ type Chain struct {
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
 
-	propagateRoundChan chan struct{}
+	acceptBlockChan chan message.Message
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -115,7 +115,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server) (*Chain, error) {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, executor transactions.Executor) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -152,8 +152,8 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		getRoundResultsChan:      getRoundResultsChan,
 		loader:                   loader,
 		verifier:                 verifier,
-		consensusProvider:        consProvider,
-		propagateRoundChan:       make(chan struct{}, 1),
+		executor:                 executor,
+		acceptBlockChan:          make(chan message.Message, 1),
 	}
 
 	prevBlock, err := loader.LoadTip()
@@ -180,7 +180,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 	}
 
 	// Hook the chain up to the required topics
-	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
+	cbListener := eventbus.NewChanListener(chain.acceptBlockChan)
 	eventBus.Subscribe(topics.Block, cbListener)
 	initListener := eventbus.NewCallbackListener(chain.onInitialization)
 	eventBus.Subscribe(topics.Initialization, initListener)
@@ -189,10 +189,13 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 
 // Listen to the collectors
 func (c *Chain) Listen(ctx context.Context) {
+	field := logger.Fields{"process": "listen"}
+	l := log.WithFields(field)
+
 	for {
 		select {
 		case certificateMsg := <-c.certificateChan:
-			c.handleCertificateMessage(certificateMsg)
+			c.handleCertificateMessage(ctx, certificateMsg)
 		case height := <-c.highestSeenChan:
 			c.highestSeen = height
 		case r := <-c.getLastBlockChan:
@@ -203,15 +206,17 @@ func (c *Chain) Listen(ctx context.Context) {
 			c.provideLastCertificate(r)
 		case r := <-c.getRoundResultsChan:
 			c.provideRoundResults(r)
-		case r := <-c.propagateRoundChan:
-			_ = c.sendRoundUpdate(ctx)
+		case msg := <-c.acceptBlockChan:
+			if err := c.onAcceptBlock(ctx, msg); err != nil {
+				l.WithError(err).Errorln("problem in accepting the block")
+			}
 		case <-ctx.Done():
-			// dispose the Chain
+			// TODO: dispose the Chain
 		}
 	}
 }
 
-func (c *Chain) onAcceptBlock(m message.Message) error {
+func (c *Chain) onAcceptBlock(ctx context.Context, m message.Message) error {
 	// Ignore blocks from peers if we are only one behind - we are most
 	// likely just about to finalize consensus.
 	// TODO: we should probably just accept it if consensus was not
@@ -227,7 +232,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	blk := m.Payload().(block.Block)
 
 	// This will decrement the sync counter
-	if err := c.AcceptBlock(blk); err != nil {
+	if err := c.AcceptBlock(ctx, blk); err != nil {
 		return err
 	}
 
@@ -248,7 +253,9 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 		// round update, to reinstantiating the consensus, to setting off
 		// the first consensus loop. So, we do this in a goroutine to
 		// avoid blocking other requests to the chain.
-		c.propagateRoundChan <- struct{}{}
+		go func() {
+			_ = c.sendRoundUpdate()
+		}()
 	}
 
 	return nil
@@ -258,7 +265,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 // 1. We have not seen it before
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
-func (c *Chain) AcceptBlock(blk block.Block) error {
+func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -284,9 +291,15 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	// 3. Call ExecuteStateTransitionFunction
+	l.Debug("calling ExecuteStateTransitionFunction")
+	_, provisioners, bidList, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
+	if err != nil {
+		l.WithError(err).Errorln("Error in executing the state transition")
+	}
 
-	// TODO: After this point, if an error happens we need to formulate a
-	// recovery strategy (or panic)
+	// Caching the provisioners and bidList
+	c.p = &provisioners
+	c.bidList = &bidList
 
 	// 4. Store the approved block
 	l.Trace("storing block in db")
@@ -318,27 +331,16 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 }
 
 func (c *Chain) onInitialization(message.Message) error {
-	// TODO: RUSK check that asynchrony does not create problems here (we just
-	// swapped the synchronous sendRoundUpdate with asynchronous
-	// propagateRoundChan)
-	//return c.sendRoundUpdate()
-	c.propagateRoundChan <- struct{}{}
-	return nil
+	return c.sendRoundUpdate()
 }
 
-func (c *Chain) sendRoundUpdate(ctx context.Context) error {
+func (c *Chain) sendRoundUpdate() error {
 	hdr := c.intermediateBlock.Header
-
-	// fetching the BidList and the Provisioners valid for the next round
-	bidList, provisioners, err := c.consensusProvider.GetConsensusInfo(ctx, hdr.Height+1)
-	if err != nil {
-		return err
-	}
 
 	ru := consensus.RoundUpdate{
 		Round:   hdr.Height + 1,
-		P:       provisioners,
-		BidList: bidList,
+		P:       *c.p,
+		BidList: *c.bidList,
 		Seed:    hdr.Seed,
 		Hash:    hdr.Hash,
 	}
@@ -380,7 +382,7 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	return nil
 }
 
-func (c *Chain) handleCertificateMessage(cMsg certMsg) {
+func (c *Chain) handleCertificateMessage(ctx context.Context, cMsg certMsg) {
 	// Set latest certificate
 	c.lastCertificate = cMsg.cert
 
@@ -401,7 +403,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 		return
 	}
 
-	if err := c.finalizeIntermediateBlock(cm.Certificate); err != nil {
+	if err := c.finalizeIntermediateBlock(ctx, cm.Certificate); err != nil {
 		log.WithError(err).Warnln("could not accept intermediate block")
 		return
 	}
@@ -414,12 +416,14 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	c.eventBus.Publish(topics.IntermediateBlock, msg)
 
 	// propagate round update
-	c.propagateRoundChan <- struct{}{}
+	go func() {
+		_ = c.sendRoundUpdate()
+	}()
 }
 
-func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {
+func (c *Chain) finalizeIntermediateBlock(ctx context.Context, cert *block.Certificate) error {
 	c.intermediateBlock.Header.Certificate = cert
-	return c.AcceptBlock(*c.intermediateBlock)
+	return c.AcceptBlock(ctx, *c.intermediateBlock)
 }
 
 // Send out a query for agreement messages and an intermediate block.

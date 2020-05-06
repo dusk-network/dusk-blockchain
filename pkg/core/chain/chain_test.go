@@ -2,6 +2,7 @@ package chain
 
 import (
 	"bytes"
+	"context"
 	"testing"
 	"time"
 
@@ -39,7 +40,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	blk := helper.RandomBlock(t, 1, 1)
 	msg := message.New(topics.AcceptedBlock, *blk)
 
-	assert.NoError(t, c.onAcceptBlock(msg))
+	assert.NoError(t, c.onAcceptBlock(context.Background(), msg))
 
 	// Function should return before sending the `StopConsensus` message
 	select {
@@ -56,7 +57,7 @@ func TestAcceptFromPeer(t *testing.T) {
 
 	errChan := make(chan error, 1)
 	go func(chan error) {
-		if err := c.onAcceptBlock(msg); err.Error() != "request timeout" {
+		if err := c.onAcceptBlock(context.Background(), msg); err.Error() != "request timeout" {
 			errChan <- err
 		}
 	}(errChan)
@@ -95,7 +96,7 @@ func TestAcceptFromPeer(t *testing.T) {
 // directly from the consensus.
 func TestAcceptIntermediate(t *testing.T) {
 	eb, rpc, c := setupChainTest(t, false)
-	go c.Listen()
+	go c.Listen(context.Background())
 	intermediateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
 	roundUpdateChan := make(chan message.Message, 1)
@@ -112,7 +113,7 @@ func TestAcceptIntermediate(t *testing.T) {
 	cert = block.EmptyCertificate()
 	cert.Step = 5
 
-	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
+	c.handleCertificateMessage(context.Background(), certMsg{blk.Header.Hash, cert})
 
 	// Should have `blk` as intermediate block now
 	assert.True(t, blk.Equals(c.intermediateBlock))
@@ -155,7 +156,7 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	c.intermediateBlock = nil
 
 	// Now pretend we finalized on it
-	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
+	c.handleCertificateMessage(context.Background(), certMsg{blk.Header.Hash, cert})
 
 	// Ensure everything is still the same
 	assert.True(t, currPrevBlock.Equals(&c.prevBlock))
@@ -240,7 +241,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	blk.Header.Certificate = message.MockCertificate(blk.Header.Hash, 1, k, p)
 	blk.Header.PrevBlockHash = chain.prevBlock.Header.Hash
 	// Accept it
-	assert.NoError(t, chain.AcceptBlock(*blk))
+	assert.NoError(t, chain.AcceptBlock(context.Background(), *blk))
 	// Provisioner with k3 should no longer be in the committee now
 	// assert.False(t, chain.p.GetMember(k[0].BLSPubKeyBytes) == nil)
 }
@@ -350,7 +351,7 @@ func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
 	return blk
 }
 
-//nolint:unused
+//nolint:unparam
 func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
