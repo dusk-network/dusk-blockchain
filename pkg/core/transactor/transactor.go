@@ -23,11 +23,11 @@ type Transactor struct { // TODO: rename
 	// c                 *chainsync.Counter
 	// acceptedBlockChan <-chan block.Block
 
-	secretKey *transactions.SecretKey
+	secretKey transactions.SecretKey
 
 	//ruskClient       rusk.RuskClient
 	provider         transactions.Provider
-	keyMaster transactions.KeyMaster
+	keyMaster        transactions.KeyMaster
 	walletClient     node.WalletClient
 	transactorClient node.TransactorClient
 
@@ -46,8 +46,8 @@ func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client *rpc.Cl
 		//ruskClient:       client.RuskClient,
 		walletClient:     client.WalletClient,
 		transactorClient: client.TransactorClient,
-		keyMaster: keyMaster,
-		provider: provider,
+		keyMaster:        keyMaster,
+		provider:         provider,
 	}
 
 	if srv != nil {

@@ -12,18 +12,20 @@ import (
 
 var testnet = byte(2)
 
-func (t *Transactor) createFromSeed(seedBytes []byte, password string) (*transactions.PublicKey, error) {
+func (t *Transactor) createFromSeed(seedBytes []byte, password string) (transactions.PublicKey, transactions.ViewKey, error) {
+	var pk transactions.PublicKey
+	var vk transactions.ViewKey
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
-		return nil, err
+		return pk, vk, err
 	}
 
 	// Then create the wallet with seed and password
-	_, err = wallet.LoadFromSeed(seedBytes, testnet, db, password, cfg.Get().Wallet.File, cfg.Get().Wallet.SecretKeyFile, t.secretKey)
+	_, err = wallet.LoadFromSeed(seedBytes, testnet, db, password, cfg.Get().Wallet.File, cfg.Get().Wallet.SecretKeyFile, &t.secretKey)
 	if err != nil {
 		_ = db.Close()
-		return nil, err
+		return pk, vk, err
 	}
 
 	return t.loadPK(t.secretKey)
@@ -47,7 +49,7 @@ func (t *Transactor) loadWallet(password string) (transactions.PublicKey, transa
 
 	// //TODO: assign wallet here still make sense ?
 	// t.w = w
-	return t.loadPK(*w.SecretKey())
+	return t.loadPK(w.SecretKey)
 }
 
 func (t *Transactor) loadPK(sk transactions.SecretKey) (transactions.PublicKey, transactions.ViewKey, error) {
