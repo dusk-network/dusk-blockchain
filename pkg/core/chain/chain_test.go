@@ -40,7 +40,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	blk := helper.RandomBlock(t, 1, 1)
 	msg := message.New(topics.AcceptedBlock, *blk)
 
-	assert.NoError(t, c.onAcceptBlock(context.Background(), msg))
+	assert.NoError(t, c.onAcceptBlock(msg))
 
 	// Function should return before sending the `StopConsensus` message
 	select {
@@ -57,7 +57,7 @@ func TestAcceptFromPeer(t *testing.T) {
 
 	errChan := make(chan error, 1)
 	go func(chan error) {
-		if err := c.onAcceptBlock(context.Background(), msg); err.Error() != "request timeout" {
+		if err := c.onAcceptBlock(msg); err.Error() != "request timeout" {
 			errChan <- err
 		}
 	}(errChan)
@@ -96,7 +96,7 @@ func TestAcceptFromPeer(t *testing.T) {
 // directly from the consensus.
 func TestAcceptIntermediate(t *testing.T) {
 	eb, rpc, c := setupChainTest(t, false)
-	go c.Listen(context.Background())
+	go c.Listen()
 	intermediateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
 	roundUpdateChan := make(chan message.Message, 1)
@@ -113,7 +113,7 @@ func TestAcceptIntermediate(t *testing.T) {
 	cert = block.EmptyCertificate()
 	cert.Step = 5
 
-	c.handleCertificateMessage(context.Background(), certMsg{blk.Header.Hash, cert})
+	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
 
 	// Should have `blk` as intermediate block now
 	assert.True(t, blk.Equals(c.intermediateBlock))
@@ -156,7 +156,7 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	c.intermediateBlock = nil
 
 	// Now pretend we finalized on it
-	c.handleCertificateMessage(context.Background(), certMsg{blk.Header.Hash, cert})
+	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
 
 	// Ensure everything is still the same
 	assert.True(t, currPrevBlock.Equals(&c.prevBlock))
@@ -196,7 +196,7 @@ func TestFetchTip(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	loader := createLoader()
-	chain, err := New(eb, rpc, nil, loader, &MockVerifier{}, nil, nil)
+	chain, err := New(context.Background(), eb, rpc, nil, loader, &MockVerifier{}, nil, nil)
 
 	assert.Nil(t, err)
 
@@ -218,7 +218,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
-	chain, err := New(eb, rpc, counter, createLoader(), &MockVerifier{}, nil, nil)
+	chain, err := New(context.Background(), eb, rpc, counter, createLoader(), &MockVerifier{}, nil, nil)
 	assert.Nil(t, err)
 
 	// Add some provisioners to our chain, including one that is just about to expire
@@ -357,7 +357,7 @@ func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpc
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
 	loader := createLoader()
-	c, err := New(eb, rpc, counter, loader, &MockVerifier{}, nil, nil)
+	c, err := New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

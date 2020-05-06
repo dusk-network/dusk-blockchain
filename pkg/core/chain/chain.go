@@ -105,7 +105,7 @@ type Chain struct {
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
 
-	acceptBlockChan chan message.Message
+	ctx context.Context
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -115,7 +115,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, executor transactions.Executor) (*Chain, error) {
+func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, executor transactions.Executor) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -153,7 +153,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		loader:                   loader,
 		verifier:                 verifier,
 		executor:                 executor,
-		acceptBlockChan:          make(chan message.Message, 1),
+		ctx:                      ctx,
 	}
 
 	prevBlock, err := loader.LoadTip()
@@ -180,7 +180,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 	}
 
 	// Hook the chain up to the required topics
-	cbListener := eventbus.NewChanListener(chain.acceptBlockChan)
+	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
 	eventBus.Subscribe(topics.Block, cbListener)
 	initListener := eventbus.NewCallbackListener(chain.onInitialization)
 	eventBus.Subscribe(topics.Initialization, initListener)
@@ -188,14 +188,11 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 }
 
 // Listen to the collectors
-func (c *Chain) Listen(ctx context.Context) {
-	field := logger.Fields{"process": "listen"}
-	l := log.WithFields(field)
-
+func (c *Chain) Listen() {
 	for {
 		select {
 		case certificateMsg := <-c.certificateChan:
-			c.handleCertificateMessage(ctx, certificateMsg)
+			c.handleCertificateMessage(certificateMsg)
 		case height := <-c.highestSeenChan:
 			c.highestSeen = height
 		case r := <-c.getLastBlockChan:
@@ -206,17 +203,13 @@ func (c *Chain) Listen(ctx context.Context) {
 			c.provideLastCertificate(r)
 		case r := <-c.getRoundResultsChan:
 			c.provideRoundResults(r)
-		case msg := <-c.acceptBlockChan:
-			if err := c.onAcceptBlock(ctx, msg); err != nil {
-				l.WithError(err).Errorln("problem in accepting the block")
-			}
-		case <-ctx.Done():
+		case <-c.ctx.Done():
 			// TODO: dispose the Chain
 		}
 	}
 }
 
-func (c *Chain) onAcceptBlock(ctx context.Context, m message.Message) error {
+func (c *Chain) onAcceptBlock(m message.Message) error {
 	// Ignore blocks from peers if we are only one behind - we are most
 	// likely just about to finalize consensus.
 	// TODO: we should probably just accept it if consensus was not
@@ -232,7 +225,9 @@ func (c *Chain) onAcceptBlock(ctx context.Context, m message.Message) error {
 	blk := m.Payload().(block.Block)
 
 	// This will decrement the sync counter
-	if err := c.AcceptBlock(ctx, blk); err != nil {
+	// TODO: a new context should be created with timeout, cancelation, etc
+	// instead of reusing the Chain global one
+	if err := c.AcceptBlock(c.ctx, blk); err != nil {
 		return err
 	}
 
@@ -382,7 +377,10 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	return nil
 }
 
-func (c *Chain) handleCertificateMessage(ctx context.Context, cMsg certMsg) {
+func (c *Chain) handleCertificateMessage(cMsg certMsg) {
+
+	ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(1*time.Second))
+	defer cancel()
 	// Set latest certificate
 	c.lastCertificate = cMsg.cert
 
