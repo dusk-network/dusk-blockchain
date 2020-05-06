@@ -11,9 +11,8 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -348,14 +347,13 @@ func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.Tran
 		return nil, err
 	}
 
-	ruskSK := new(rusk.SecretKey)
-	transactions.MSecretKey(ruskSK, t.w.SecretKey())
-	tx, err := t.ruskClient.NewTransaction(ctx, &rusk.NewTransactionRequest{
+	tx, err := t.provider.NewTransactionTx(ctx, transaction.TxRequest{
 		//TODO: currently does not yet support adding calldata to transactions
-		//Value:     c.Value,
+		//Amount: c.Value,
 		Recipient: pb,
 		Fee:       c.Fee,
-		Sk:        ruskSK,
+		Sk:        t.w.SecretKey(),
+		Obfuscated: true, 
 	})
 	if err != nil {
 		return nil, err
