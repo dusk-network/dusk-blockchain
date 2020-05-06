@@ -18,6 +18,24 @@ type TxRequest struct {
 	Obfuscated bool
 }
 
+// MakeTxRequest populates a TxRequest with all needed data
+// ContractCall. As such, it does not need the Public Key
+func MakeTxRequest(sk SecretKey, pk PublicKey, amount uint64, fee uint64, isObfuscated bool) TxRequest {
+	return TxRequest{
+		SK:         sk,
+		PK:         pk,
+		Amount:     amount,
+		Fee:        fee,
+		Obfuscated: isObfuscated,
+	}
+}
+
+// MakeGenesisTxRequest creates a transaction to be embedded in a genesis
+// ContractCall. As such, it does not need the Public Key
+func MakeGenesisTxRequest(sk SecretKey, amount uint64, fee uint64, isObfuscated bool) TxRequest {
+	return MakeTxRequest(sk, PublicKey{}, amount, fee, isObfuscated)
+}
+
 // ScoreRequest is utilized to produce a score
 type ScoreRequest struct {
 	D      []byte
@@ -50,6 +68,8 @@ type Provider interface {
 	// GetBalance returns the balance of the client expressed in (unit?) of
 	// DUSK. It accepts the ViewKey as parameter
 	GetBalance(context.Context, ViewKey) (uint64, error)
+
+	NewContractCall(context.Context, []byte, TxRequest) (ContractCall, error)
 
 	// NewTransaction creates a new transaction using the user's PrivateKey
 	// It accepts the PublicKey of the recipient, a value, a fee and whether
@@ -186,6 +206,18 @@ func (p *provider) GetBalance(ctx context.Context, vk ViewKey) (uint64, error) {
 	}
 
 	return res.Balance, nil
+}
+
+// NewContractCall creates a new transaction using the user's PrivateKey
+// It accepts the PublicKey of the recipient, a value, a fee and whether
+// the transaction should be obfuscated or otherwise
+func (p *provider) NewContractCall(ctx context.Context, b []byte, tx TxRequest) (ContractCall, error) {
+	//trans := new(Transaction)
+	//tr := new(rusk.NewTransactionRequest)
+	//MTxRequest(tr, tx)
+	//res, err := p.client.NewContractCall(ctx, tr)
+
+	return nil, errors.New("not implemented yet")
 }
 
 // NewTransaction creates a new transaction using the user's PrivateKey
