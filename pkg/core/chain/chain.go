@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -26,7 +27,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	pb "github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
@@ -97,13 +97,15 @@ type Chain struct {
 	highestSeenChan <-chan uint64
 
 	// rusk client
-	rusk *pb.RuskClient
+	consensusProvider transactions.Consensus
 
 	// rpcbus channels
 	getLastBlockChan         <-chan rpcbus.Request
 	verifyCandidateBlockChan <-chan rpcbus.Request
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
+
+	propagateRoundChan chan struct{}
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -113,7 +115,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, rusk *pb.RuskClient) (*Chain, error) {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -150,7 +152,8 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		getRoundResultsChan:      getRoundResultsChan,
 		loader:                   loader,
 		verifier:                 verifier,
-		rusk:                     rusk,
+		consensusProvider:        consProvider,
+		propagateRoundChan:       make(chan struct{}, 1),
 	}
 
 	prevBlock, err := loader.LoadTip()
@@ -185,7 +188,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 }
 
 // Listen to the collectors
-func (c *Chain) Listen() {
+func (c *Chain) Listen(ctx context.Context) {
 	for {
 		select {
 		case certificateMsg := <-c.certificateChan:
@@ -200,6 +203,10 @@ func (c *Chain) Listen() {
 			c.provideLastCertificate(r)
 		case r := <-c.getRoundResultsChan:
 			c.provideRoundResults(r)
+		case r := <-c.propagateRoundChan:
+			_ = c.sendRoundUpdate(ctx)
+		case <-ctx.Done():
+			// dispose the Chain
 		}
 	}
 }
@@ -241,9 +248,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 		// round update, to reinstantiating the consensus, to setting off
 		// the first consensus loop. So, we do this in a goroutine to
 		// avoid blocking other requests to the chain.
-		go func() {
-			_ = c.sendRoundUpdate()
-		}()
+		c.propagateRoundChan <- struct{}{}
 	}
 
 	return nil
@@ -313,15 +318,27 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 }
 
 func (c *Chain) onInitialization(message.Message) error {
-	return c.sendRoundUpdate()
+	// TODO: RUSK check that asynchrony does not create problems here (we just
+	// swapped the synchronous sendRoundUpdate with asynchronous
+	// propagateRoundChan)
+	//return c.sendRoundUpdate()
+	c.propagateRoundChan <- struct{}{}
+	return nil
 }
 
-func (c *Chain) sendRoundUpdate() error {
+func (c *Chain) sendRoundUpdate(ctx context.Context) error {
 	hdr := c.intermediateBlock.Header
+
+	// fetching the BidList and the Provisioners valid for the next round
+	bidList, provisioners, err := c.consensusProvider.GetConsensusInfo(ctx, hdr.Height+1)
+	if err != nil {
+		return err
+	}
+
 	ru := consensus.RoundUpdate{
 		Round:   hdr.Height + 1,
-		P:       *c.p,
-		BidList: *c.bidList,
+		P:       provisioners,
+		BidList: bidList,
 		Seed:    hdr.Seed,
 		Hash:    hdr.Hash,
 	}
@@ -396,9 +413,8 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	msg := message.New(topics.IntermediateBlock, *cm.Block)
 	c.eventBus.Publish(topics.IntermediateBlock, msg)
 
-	go func() {
-		_ = c.sendRoundUpdate()
-	}()
+	// propagate round update
+	c.propagateRoundChan <- struct{}{}
 }
 
 func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {

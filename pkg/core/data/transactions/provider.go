@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
@@ -114,7 +115,7 @@ type BlockGenerator interface {
 type Consensus interface {
 	// GetConsensusInfo asks rusk for the storage of the Bid and the Stake
 	// contracts
-	GetConsensusInfo(context.Context, uint64) (BidList, []ProvisionerData, error)
+	GetConsensusInfo(context.Context, uint64) (user.BidList, user.Provisioners, error)
 }
 
 // Proxy toward the rusk client
@@ -486,20 +487,25 @@ type consensus struct {
 	*Proxy
 }
 
-func (c *consensus) GetConsensusInfo(ctx context.Context, height uint64) (BidList, []ProvisionerData, error) {
+func (c *consensus) GetConsensusInfo(ctx context.Context, height uint64) (user.BidList, user.Provisioners, error) {
 	gcir := &rusk.GetConsensusInfoRequest{BlockHeight: height}
 	res, err := c.client.GetConsensusInfo(ctx, gcir)
 	if err != nil {
-		return BidList{}, nil, err
+		return nil, nil, err
 	}
 
-	provisioners := make([]ProvisionerData, len(res.Committee))
+	provisioners := user.NewProvisioners()
+	memberMap := make(map[string]*user.Member)
 	for i := range res.Committee {
-		UProvisioner(res.Committee[i], &provisioners[i])
+		member := new(user.Member)
+		UMember(res.Committee[i], member)
+		memberMap[string(member.PublicKeyBLS)] = member
+		provisioners.Set.Insert(member.PublicKeyBLS)
 	}
+	provisioners.Members = memberMap
 
-	bidList := BidList{}
-	UBidList(res.BidList, &bidList)
+	bidList := make([]user.Bid, len(res.BidList))
+	UBidList(res.BidList, bidList)
 	return bidList, provisioners, nil
 
 }
