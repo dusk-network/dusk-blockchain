@@ -46,14 +46,14 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(proxy *transactions.Proxy, ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server) (chain.Loader, error) {
+func LaunchChain(ctx context.Context, proxy *transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server) (chain.Loader, error) {
 	// creating and firing up the chain process
 	genesis := cfg.DecodeGenesis()
 	_, db := heavy.CreateDBConnection()
 	l := chain.NewDBLoader(db, genesis)
 
 	// TODO: inject the proper interface
-	chainProcess, err := chain.New(eventBus, rpcBus, counter, l, l, srv, proxy.Executor())
+	chainProcess, err := chain.New(ctx, eventBus, rpcBus, counter, l, l, srv, proxy.Executor())
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func LaunchChain(proxy *transactions.Proxy, ctx context.Context, eventBus *event
 		return nil, err
 	}
 
-	go chainProcess.Listen(ctx)
+	go chainProcess.Listen()
 	return l, nil
 }
 
@@ -96,7 +96,7 @@ func Setup() *Server {
 	m := mempool.NewMempool(eventBus, rpcBus, nil, grpcServer)
 	m.Run()
 
-	chainDBLoader, err := LaunchChain(proxy, ctx, eventBus, rpcBus, counter, grpcServer)
+	chainDBLoader, err := LaunchChain(ctx, proxy, eventBus, rpcBus, counter, grpcServer)
 	if err != nil {
 		log.Panic(err)
 	}

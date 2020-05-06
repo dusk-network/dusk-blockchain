@@ -2,12 +2,15 @@ package node
 
 import (
 	"context"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"fmt"
 	"time"
 
-	"google.golang.org/grpc"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+
 	"net"
 	"testing"
+
+	"google.golang.org/grpc"
 )
 
 func TestSayHello(t *testing.T) {
@@ -17,7 +20,7 @@ func TestSayHello(t *testing.T) {
 	lis, _ := net.Listen("tcp", "127.0.0.1:5051")
 	go func() {
 		if err := s.Serve(lis); err != nil {
-			t.Fatalf("Server exited with error: %v", err)
+			panic(fmt.Sprintf("Server exited with error: %v", err))
 		}
 	}()
 

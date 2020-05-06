@@ -6,7 +6,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
-const respAmount uint32 = 7
+//const respAmount uint32 = 7
 
 // RandomInput returns a random input for testing
 func RandomInput(t *testing.T) *transactions.TransactionInput {

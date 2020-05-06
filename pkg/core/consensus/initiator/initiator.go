@@ -1,9 +1,7 @@
 package initiator
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -90,22 +88,22 @@ func storeBidValues(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *walle
 	*/
 }
 
-func getBlockHashForHeight(db database.DB, height uint64) ([]byte, error) {
-	var hash []byte
-	err := db.View(func(t database.Transaction) error {
-		var err error
-		hash, err = t.FetchBlockHashByHeight(height)
-		return err
-	})
-	return hash, err
-}
+//func getBlockHashForHeight(db database.DB, height uint64) ([]byte, error) {
+//	var hash []byte
+//	err := db.View(func(t database.Transaction) error {
+//		var err error
+//		hash, err = t.FetchBlockHashByHeight(height)
+//		return err
+//	})
+//	return hash, err
+//}
 
-func getTxsForBlock(db database.DB, hash []byte) ([]transactions.ContractCall, error) {
-	var txs []transactions.ContractCall
-	err := db.View(func(t database.Transaction) error {
-		var err error
-		txs, err = t.FetchBlockTxs(hash)
-		return err
-	})
-	return txs, err
-}
+//func getTxsForBlock(db database.DB, hash []byte) ([]transactions.ContractCall, error) {
+//	var txs []transactions.ContractCall
+//	err := db.View(func(t database.Transaction) error {
+//		var err error
+//		txs, err = t.FetchBlockTxs(hash)
+//		return err
+//	})
+//	return txs, err
+//}

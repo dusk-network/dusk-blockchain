@@ -20,8 +20,6 @@ func (t *Transactor) createFromSeed(seedBytes []byte, password string) (*transac
 		return nil, err
 	}
 
-	var testnet = byte(2)
-
 	// Then create the wallet with seed and password
 	_, err = wallet.LoadFromSeed(seedBytes, testnet, db, password, cfg.Get().Wallet.File, cfg.Get().Wallet.SecretKeyFile, t.secretKey)
 	if err != nil {
@@ -46,7 +44,7 @@ func (t *Transactor) loadWallet(password string) (*transactions.PublicKey, error
 		return nil, err
 	}
 
-	// //TODO: asign wallet here still make sense ?
+	// //TODO: assign wallet here still make sense ?
 	// t.w = w
 	return t.loadPK(w.SecretKey())
 }
@@ -68,14 +66,18 @@ func (t *Transactor) loadPK(sk *transactions.SecretKey) (*transactions.PublicKey
 	return pk, nil
 }
 
+// DecodeAddressToPublicKey will decode a []byte to rusk.PublicKey
 func DecodeAddressToPublicKey(in []byte) (*rusk.PublicKey, error) {
 	var buf = &bytes.Buffer{}
-	buf.Write(in)
+	_, err := buf.Write(in)
+	if err != nil {
+		return nil, err
+	}
 
 	AG := make([]byte, 32)
 	BG := make([]byte, 32)
 
-	_, err := buf.Read(AG)
+	_, err = buf.Read(AG)
 	if err != nil {
 		return nil, err
 	}

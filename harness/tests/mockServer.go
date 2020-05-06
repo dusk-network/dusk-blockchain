@@ -2,12 +2,14 @@ package tests
 
 import (
 	"fmt"
+	"net"
+
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"google.golang.org/grpc"
-	"net"
 )
 
+// StartMockServer will start a mock server
 func StartMockServer(address string) {
 	s := grpc.NewServer()
 	rusk.RegisterRuskServer(s, &rusk.RuskMock{})

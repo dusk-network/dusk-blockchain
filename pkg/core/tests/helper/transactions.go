@@ -6,12 +6,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
-const (
-	lockTime = uint64(2000000000)
-	fee      = int64(200)
-)
-
-var numInputs, numOutputs = 23, 16
+//const (
+//	lockTime = uint64(2000000000)
+//	fee      = int64(200)
+//)
+//
+//var numInputs, numOutputs = 23, 16
 
 // RandomSliceOfTxs returns a random slice of transactions for testing
 // Each tx batch represents all 4 non-coinbase tx types

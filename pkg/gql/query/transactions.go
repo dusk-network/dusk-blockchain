@@ -50,6 +50,7 @@ type transactions struct {
 }
 
 // newQueryTx constructs query tx data from core tx and block hash
+//nolint
 func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	txID, err := tx.CalculateHash()
 	if err != nil {

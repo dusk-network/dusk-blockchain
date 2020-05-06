@@ -8,8 +8,6 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -22,7 +20,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -174,17 +171,16 @@ func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 	}()
 }
 
-//nolint:unused
-func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user.Provisioners) *block.Certificate {
-	votes := message.GenVotes(hash, round, 3, keys, p)
-	return &block.Certificate{
-		StepOneBatchedSig: votes[0].Signature.Compress(),
-		StepTwoBatchedSig: votes[1].Signature.Compress(),
-		Step:              1,
-		StepOneCommittee:  votes[0].BitSet,
-		StepTwoCommittee:  votes[1].BitSet,
-	}
-}
+//func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user.Provisioners) *block.Certificate {
+//	votes := message.GenVotes(hash, round, 3, keys, p)
+//	return &block.Certificate{
+//		StepOneBatchedSig: votes[0].Signature.Compress(),
+//		StepTwoBatchedSig: votes[1].Signature.Compress(),
+//		Step:              1,
+//		StepOneCommittee:  votes[0].BitSet,
+//		StepTwoCommittee:  votes[1].BitSet,
+//	}
+//}
 
 func createLoader() *DBLoader {
 	_, db := heavy.CreateDBConnection()
@@ -309,27 +305,25 @@ func TestRebuildChain(t *testing.T) {
 
 }
 
-//nolint:unused
-func createBid(t *testing.T) user.Bid {
-	b, err := crypto.RandEntropy(32)
-	if err != nil {
-		t.Fatal(err)
-	}
+//func createBid(t *testing.T) user.Bid {
+//	b, err := crypto.RandEntropy(32)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	var arr [32]byte
+//	copy(arr[:], b)
+//	return user.Bid{X: arr, M: arr, EndHeight: 1000}
+//}
 
-	var arr [32]byte
-	copy(arr[:], b)
-	return user.Bid{X: arr, M: arr, EndHeight: 1000}
-}
-
-//nolint:unused
-func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
-	c := make(chan rpcbus.Request, 1)
-	rb.Register(topics.ClearWalletDatabase, c)
-	go func() {
-		r := <-c
-		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, nil)
-	}()
-}
+//func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
+//	c := make(chan rpcbus.Request, 1)
+//	rb.Register(topics.ClearWalletDatabase, c)
+//	go func() {
+//		r := <-c
+//		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, nil)
+//	}()
+//}
 
 // mock a block which can be accepted by the chain.
 // note that this is only valid for height 1, as the certificate

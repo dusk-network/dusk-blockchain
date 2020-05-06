@@ -30,8 +30,8 @@ import (
 var log = logger.WithFields(logger.Fields{"prefix": "mempool"})
 
 const (
-	consensusSeconds = 20
-	maxPendingLen    = 1000
+	//consensusSeconds = 20
+	maxPendingLen = 1000
 )
 
 var (

@@ -59,7 +59,6 @@ func (m *Member) SubtractFromStake(amount uint64) uint64 {
 	return 0
 }
 
-
 // NewProvisioners instantiates the Provisioners sortedset of members
 func NewProvisioners() *Provisioners {
 	return &Provisioners{
