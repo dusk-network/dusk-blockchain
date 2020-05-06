@@ -34,8 +34,8 @@ type Client struct {
 // As the Rusk server is a fundamental part of the node functionality,
 // this function will panic if the connection can not be established
 // successfully.
-func InitRPCClients(address string, rpcBus *rpcbus.RPCBus) *Client {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+func InitRPCClients(ctx context.Context, address string, rpcBus *rpcbus.RPCBus) *Client {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())

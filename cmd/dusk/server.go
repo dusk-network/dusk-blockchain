@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"net"
 
 	"github.com/sirupsen/logrus"
@@ -15,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
@@ -44,14 +46,14 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server) (chain.Loader, error) {
+func LaunchChain(proxy *transactions.Proxy, ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server) (chain.Loader, error) {
 	// creating and firing up the chain process
 	genesis := cfg.DecodeGenesis()
 	_, db := heavy.CreateDBConnection()
 	l := chain.NewDBLoader(db, genesis)
 
-	// TODO: inject the proper RUSK client
-	chainProcess, err := chain.New(eventBus, rpcBus, counter, l, l, srv, nil)
+	// TODO: inject the proper interface
+	chainProcess, err := chain.New(eventBus, rpcBus, counter, l, l, srv, proxy.Executor())
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +64,7 @@ func LaunchChain(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *ch
 		return nil, err
 	}
 
-	go chainProcess.Listen()
+	go chainProcess.Listen(ctx)
 	return l, nil
 }
 
@@ -71,6 +73,8 @@ func LaunchChain(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *ch
 // and launches a monitor client (if configuration demands it), and inits the
 // Stake and Blind Bid channels
 func Setup() *Server {
+	ctx := context.Background()
+
 	grpcServer, err := rpc.SetupgRPCServer()
 	if err != nil {
 		log.Panic(err)
@@ -86,12 +90,13 @@ func Setup() *Server {
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	client := rpc.InitRPCClients("127.0.0.1:8080", rpcBus)
+	client := rpc.InitRPCClients(ctx, "127.0.0.1:8080", rpcBus)
+	proxy := transactions.NewProxy(client.RuskClient)
 
 	m := mempool.NewMempool(eventBus, rpcBus, nil, grpcServer)
 	m.Run()
 
-	chainDBLoader, err := LaunchChain(eventBus, rpcBus, counter, grpcServer)
+	chainDBLoader, err := LaunchChain(proxy, ctx, eventBus, rpcBus, counter, grpcServer)
 	if err != nil {
 		log.Panic(err)
 	}
