@@ -288,6 +288,11 @@ type SecretKey struct {
 	B *Scalar `json:"b"`
 }
 
+// IsEmpty is used when passing the SecretKey by value
+func (s SecretKey) IsEmpty() bool {
+	return s.A == nil && s.B == nil
+}
+
 // MSecretKey copy the USecretKey from rusk to transactions datastruct
 func MSecretKey(r *rusk.SecretKey, n *SecretKey) {
 	r.A = new(rusk.Scalar)
@@ -368,6 +373,11 @@ type PublicKey struct {
 	BG *CompressedPoint `json:"b_g"`
 }
 
+// IsEmpty is used to check whether the public key is empty
+func (pk PublicKey) IsEmpty() bool {
+	return pk.AG == nil && pk.BG == nil
+}
+
 // ToAddr returns the HEX encoded string representation of the concatenation of
 // the two compressed points identifying the PublicKey
 func (pk *PublicKey) ToAddr() []byte {
@@ -378,8 +388,13 @@ func (pk *PublicKey) ToAddr() []byte {
 // MPublicKey copies the PublicKey from rusk to transactions datastructs
 func MPublicKey(r *rusk.PublicKey, n *PublicKey) {
 	r.AG = new(rusk.CompressedPoint)
-	MCompressedPoint(r.AG, n.AG)
 	r.BG = new(rusk.CompressedPoint)
+	// TODO: check if protobuf does not vomit if the PublicKey is empty (which
+	// is the case for all genesis contracts)
+	if n.IsEmpty() {
+		return
+	}
+	MCompressedPoint(r.AG, n.AG)
 	MCompressedPoint(r.BG, n.BG)
 }
 
