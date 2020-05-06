@@ -88,10 +88,9 @@ func Equal(a, b ContractCall) bool {
 }
 
 // Marshal a ContractCall into a binary buffer
-func Marshal(c ContractCall) (*bytes.Buffer, error) {
-	buf := new(bytes.Buffer)
+func Marshal(buf *bytes.Buffer, c ContractCall) error {
 	if err := encoding.WriteUint8(buf, uint8(c.Type())); err != nil {
-		return nil, err
+		return err
 	}
 
 	var err error
@@ -113,10 +112,10 @@ func Marshal(c ContractCall) (*bytes.Buffer, error) {
 	case *WithdrawBidTransaction:
 		err = MarshalWithdrawBid(buf, *t)
 	default:
-		return nil, errors.New("structure to encode is not a contract call")
+		return errors.New("structure to encode is not a contract call")
 	}
 
-	return buf, err
+	return err
 }
 
 // Unmarshal the binary buffer into a ContractCall interface

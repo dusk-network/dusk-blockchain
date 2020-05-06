@@ -206,15 +206,13 @@ func marshal(s Message, b *bytes.Buffer) error {
 }
 
 // marshalMessage marshals a Message carrying a payload different than a Buffer
-// TODO: interface - this should be the actual marshal as soon as the internal
-// messages will skip the useless encoding
 func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) error {
 	var err error
 	switch topic {
 
 	case topics.Tx:
 		tx := payload.(transactions.ContractCall)
-		buf, err = transactions.Marshal(tx)
+		err = transactions.Marshal(buf, tx)
 	case topics.Candidate, topics.RoundResults:
 		candidate := payload.(Candidate)
 		err = MarshalCandidate(buf, candidate)

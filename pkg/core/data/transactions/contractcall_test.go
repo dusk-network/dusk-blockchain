@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -16,7 +17,8 @@ func TestUnMarshal(t *testing.T) {
 	cc, _ := DecodeContractCall(RuskTx)
 	assert.Equal(Tx, cc.Type())
 
-	b, err := Marshal(cc)
+	b := new(bytes.Buffer)
+	err := Marshal(b, cc)
 	assert.NoError(err)
 
 	ccOther := new(Transaction)

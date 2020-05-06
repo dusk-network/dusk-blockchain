@@ -154,8 +154,8 @@ func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
 func marshalTx(tx transactions.ContractCall) (*bytes.Buffer, error) {
 	//TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
 	// buf := topics.Topics[topics.Block].Buffer
-	buf, err := transactions.Marshal(tx)
-	if err != nil {
+	buf := new(bytes.Buffer)
+	if err := transactions.Marshal(buf, tx); err != nil {
 		return nil, err
 	}
 

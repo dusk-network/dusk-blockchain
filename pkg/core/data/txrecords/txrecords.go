@@ -58,12 +58,7 @@ func Encode(b *bytes.Buffer, t *TxRecord) error {
 		return err
 	}
 
-	buf, err := transactions.Marshal(t.ContractCall)
-	if err != nil {
-		return err
-	}
-
-	if _, err := b.ReadFrom(buf); err != nil {
+	if err := transactions.Marshal(b, t.ContractCall); err != nil {
 		return err
 	}
 

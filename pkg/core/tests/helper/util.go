@@ -14,7 +14,8 @@ func TxsToBuffer(t *testing.T, txs []transactions.ContractCall) *bytes.Buffer {
 	whole := new(bytes.Buffer)
 
 	for _, tx := range txs {
-		buf, err := transactions.Marshal(tx)
+		buf := new(bytes.Buffer)
+		err := transactions.Marshal(buf, tx)
 		if err != nil {
 			assert.Nil(t, err)
 		}
