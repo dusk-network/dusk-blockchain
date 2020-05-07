@@ -1,9 +1,11 @@
 package score
 
 import (
-	"github.com/bwesterb/go-ristretto"
+	"context"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -15,10 +17,12 @@ type Factory struct {
 	Bus eventbus.Broker
 	db  database.DB
 	key.Keys
+	bg  transactions.BlockGenerator
+	ctx context.Context
 }
 
 // NewFactory instantiates a Factory.
-func NewFactory(broker eventbus.Broker, consensusKeys key.Keys, db database.DB) *Factory {
+func NewFactory(ctx context.Context, broker eventbus.Broker, consensusKeys key.Keys, db database.DB, proxy transactions.Proxy) *Factory {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -26,6 +30,8 @@ func NewFactory(broker eventbus.Broker, consensusKeys key.Keys, db database.DB) 
 		Bus:  broker,
 		db:   db,
 		Keys: consensusKeys,
+		ctx:  ctx,
+		bg:   proxy.BlockGenerator(),
 	}
 }
 
@@ -34,9 +40,11 @@ func NewFactory(broker eventbus.Broker, consensusKeys key.Keys, db database.DB) 
 // can not be kept on the Factory for this reason.
 // Implements consensus.ComponentFactory.
 func (f *Factory) Instantiate() consensus.Component {
-	var d, k []byte
+	var d, k, edPk []byte
 	err := f.db.View(func(t database.Transaction) error {
 		var err error
+		// FIXME: change the FetchBidValues to return EdPK as well
+		// d, k, edPk, err = t.FetchBidValues()
 		d, k, err = t.FetchBidValues()
 		return err
 	})
@@ -45,14 +53,5 @@ func (f *Factory) Instantiate() consensus.Component {
 		log.WithField("process", "proof generator factory").WithError(err).Warnln("error retrieving bid values from database")
 	}
 
-	var dScalar, kScalar ristretto.Scalar
-	if err := dScalar.UnmarshalBinary(d); err != nil {
-		log.WithField("process", "score generator factory").WithError(err).Errorln("could not unmarshal D bytes into a scalar")
-	}
-
-	if err := kScalar.UnmarshalBinary(k); err != nil {
-		log.WithField("process", "score generator factory").WithError(err).Errorln("could not unmarshal K bytes into a scalar")
-	}
-
-	return NewComponent(f.Bus, f.Keys, dScalar, kScalar)
+	return NewComponent(f.ctx, f.Bus, f.Keys, d, k, edPk, f.bg)
 }

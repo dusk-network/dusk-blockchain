@@ -18,7 +18,7 @@ import (
 )
 
 // LaunchConsensus start the whole consensus algorithm
-func LaunchConsensus(ctx context.Context, eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, _ *chainsync.Counter, proxy *transactions.Proxy) {
+func LaunchConsensus(ctx context.Context, eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, _ *chainsync.Counter, proxy transactions.Proxy) {
 	// Setting up the consensus factory
 	f := factory.New(ctx, eventBroker, rpcBus, config.ConsensusTimeOut, &w.SecretKey, &w.PublicKey, w.Keys(), proxy)
 	f.StartConsensus()

@@ -38,15 +38,10 @@ func MakeGenesisTxRequest(sk SecretKey, amount uint64, fee uint64, isObfuscated 
 
 // ScoreRequest is utilized to produce a score
 type ScoreRequest struct {
-	D      []byte
-	K      []byte
-	Y      []byte
-	YInv   []byte
-	Q      []byte
-	Z      []byte
-	Seed   []byte
-	Bids   []byte
-	BidPos uint64
+	D    []byte
+	K    []byte
+	Seed []byte
+	EdPk []byte
 }
 
 // Score encapsulates the score values calculated by rusk
@@ -81,8 +76,9 @@ type Provider interface {
 	// NewWithdrawStake creates a WithdrawStake transaction
 	NewWithdrawStakeTx(context.Context, TxRequest) (WithdrawStakeTransaction, error)
 
-	// NewBidTx creates a new Blind Bid
-	NewBidTx(context.Context, TxRequest) (BidTransaction, error)
+	// NewBidTx creates a new Blind Bid. The call accepts a context, the secret
+	// `K`, the Edward Public Key `EdPk`, the `seed` and the `expirationHeight`
+	NewBidTx(context.Context, []byte, []byte, []byte, uint64, TxRequest) (BidTransaction, error)
 	// NewWithdrawBidTx creates a Bid withdrawal request
 	NewWithdrawBidTx(context.Context, TxRequest) (WithdrawBidTransaction, error)
 }
@@ -132,47 +128,56 @@ type BlockGenerator interface {
 }
 
 // Proxy toward the rusk client
-type Proxy struct {
+type Proxy interface {
+	Provisioner() Provisioner
+	Provider() Provider
+	Verifier() Verifier
+	KeyMaster() KeyMaster
+	Executor() Executor
+	BlockGenerator() BlockGenerator
+}
+
+type proxy struct {
 	client rusk.RuskClient
 }
 
 // NewProxy creates a new Proxy
-func NewProxy(client rusk.RuskClient) *Proxy {
-	return &Proxy{client: client}
+func NewProxy(client rusk.RuskClient) Proxy {
+	return &proxy{client: client}
 }
 
 // Verifier returned by the Proxy
-func (p *Proxy) Verifier() Verifier {
+func (p *proxy) Verifier() Verifier {
 	return &verifier{p}
 }
 
 // KeyMaster returned by the Proxy
-func (p *Proxy) KeyMaster() KeyMaster {
+func (p *proxy) KeyMaster() KeyMaster {
 	return &keymaster{p}
 }
 
 // Executor returned by the Proxy
-func (p *Proxy) Executor() Executor {
+func (p *proxy) Executor() Executor {
 	return &executor{p}
 }
 
 // Provisioner returned by the Proxy
-func (p *Proxy) Provisioner() Provisioner {
+func (p *proxy) Provisioner() Provisioner {
 	return &provisioner{p}
 }
 
 // Provider returned by the Proxy
-func (p *Proxy) Provider() Provider {
+func (p *proxy) Provider() Provider {
 	return &provider{p}
 }
 
 // BlockGenerator returned by the Proxy
-func (p *Proxy) BlockGenerator() BlockGenerator {
+func (p *proxy) BlockGenerator() BlockGenerator {
 	return &blockgenerator{p}
 }
 
 type verifier struct {
-	*Proxy
+	*proxy
 }
 
 // VerifyTransaction verifies a contract call transaction
@@ -193,7 +198,7 @@ func (v *verifier) VerifyTransaction(ctx context.Context, cc ContractCall) error
 }
 
 type provider struct {
-	*Proxy
+	*proxy
 }
 
 // GetBalance returns the balance of the client expressed in (unit?) of
@@ -280,15 +285,20 @@ func (p *provider) NewWithdrawStakeTx(ctx context.Context, tx TxRequest) (Withdr
 	return *wsTx, nil
 }
 
-// NewBidTx creates a new Blind Bid
-// TODO: most likely, the Bid Transaction request will need some more
-// parameters
-func (p *provider) NewBidTx(ctx context.Context, tx TxRequest) (BidTransaction, error) {
+// NewBidTx creates a new Blind Bid. It uses the secret K, the Edward PK, the
+// seed and the block height for unlocking
+func (p *provider) NewBidTx(ctx context.Context, k, edPk, seed []byte, expirationHeight uint64, tx TxRequest) (BidTransaction, error) {
 	bidTx := new(BidTransaction)
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
 	str := new(rusk.BidTransactionRequest)
+	str.Tx = tr
+	str.K = k
+	str.EdPk = edPk
+	str.Seed = seed
+	str.ExpirationHeight = expirationHeight
+
 	res, err := p.client.NewBid(ctx, str)
 	if err != nil {
 		return *bidTx, err
@@ -319,7 +329,7 @@ func (p *provider) NewWithdrawBidTx(ctx context.Context, tx TxRequest) (Withdraw
 }
 
 type keymaster struct {
-	*Proxy
+	*proxy
 }
 
 // GenerateSecretKey creates a SecretKey using a []byte as Seed
@@ -356,7 +366,7 @@ func (k *keymaster) Keys(ctx context.Context, sk SecretKey) (PublicKey, ViewKey,
 // TODO: implement
 // FullScanOwnedNotes(ViewKey) (OwnedNotesResponse)
 type executor struct {
-	*Proxy
+	*proxy
 }
 
 // ValidateStateTransition takes a bunch of ContractCalls and the block
@@ -373,14 +383,17 @@ func (e *executor) ValidateStateTransition(ctx context.Context, calls []Contract
 	}
 	vstr.CurrentHeight = height
 
-	// TODO: filter based on the indexes within the response once
-	// #dusk-protobuf#77 is solved
-	_, err = e.client.ValidateStateTransition(ctx, vstr)
+	res, err := e.client.ValidateStateTransition(ctx, vstr)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	validTxs := make([]ContractCall, len(res.SuccessfulCalls))
+	for i, idx := range res.SuccessfulCalls {
+		validTxs[i] = calls[idx]
+	}
+
+	return validTxs, nil
 }
 
 // ExecuteStateTransition performs a global state mutation and steps the
@@ -426,7 +439,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 }
 
 type provisioner struct {
-	*Proxy
+	*proxy
 }
 
 // NewSlashTx creates a Slash transaction
@@ -472,21 +485,16 @@ func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, tx TxRequest) (With
 }
 
 type blockgenerator struct {
-	*Proxy
+	*proxy
 }
 
 // GenerateScore to participate in the block generation lottery
 func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Score, error) {
 	gsr := &rusk.GenerateScoreRequest{
-		D:      s.D,
-		K:      s.K,
-		Y:      s.Y,
-		YInv:   s.YInv,
-		Q:      s.Q,
-		Z:      s.Z,
-		Seed:   s.Seed,
-		Bids:   s.Bids,
-		BidPos: s.BidPos,
+		D:    s.D,
+		K:    s.K,
+		Seed: s.Seed,
+		EdPk: s.EdPk,
 	}
 	score, err := b.client.GenerateScore(ctx, gsr)
 	if err != nil {

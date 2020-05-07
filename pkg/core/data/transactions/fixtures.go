@@ -6,6 +6,34 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
+// MockProxy mocks a proxy for ease of testing
+type MockProxy struct {
+	P  Provisioner
+	Pr Provider
+	V  Verifier
+	KM KeyMaster
+	E  Executor
+	BG BlockGenerator
+}
+
+// Provisioner ...
+func (m MockProxy) Provisioner() Provisioner { return m.P }
+
+// Provider ...
+func (m MockProxy) Provider() Provider { return m.Pr }
+
+// Verifier ...
+func (m MockProxy) Verifier() Verifier { return m.V }
+
+// KeyMaster ...
+func (m MockProxy) KeyMaster() KeyMaster { return m.KM }
+
+// Executor ...
+func (m MockProxy) Executor() Executor { return m.E }
+
+// BlockGenerator ...
+func (m MockProxy) BlockGenerator() BlockGenerator { return m.BG }
+
 // MockKeys mocks the keys
 func MockKeys() (*SecretKey, *PublicKey) {
 	sk := new(SecretKey)

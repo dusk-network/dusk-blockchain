@@ -293,15 +293,18 @@ func (s SecretKey) IsEmpty() bool {
 	return s.A == nil && s.B == nil
 }
 
-// MSecretKey copy the USecretKey from rusk to transactions datastruct
+// MSecretKey copy the SecretKey from transactions datastruct to rusk.SecretKey
 func MSecretKey(r *rusk.SecretKey, n *SecretKey) {
+	if n.IsEmpty() {
+		return
+	}
 	r.A = new(rusk.Scalar)
 	MScalar(r.A, n.A)
 	r.B = new(rusk.Scalar)
 	MScalar(r.B, n.B)
 }
 
-// USecretKey copy the USecretKey from rusk to transactions datastruct
+// USecretKey copy the SecretKey from rusk datastruct to transactions.SecretKey
 func USecretKey(r *rusk.SecretKey, n *SecretKey) {
 	n.A = new(Scalar)
 	UScalar(r.A, n.A)

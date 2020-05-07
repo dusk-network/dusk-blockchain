@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
 type (
@@ -42,13 +42,13 @@ func EmptyScoreProposal(hdr header.Header) ScoreProposal {
 }
 
 // NewScoreProposal creates a new ScoreProposa
-func NewScoreProposal(hdr header.Header, seed []byte, proof zkproof.ZkProof) ScoreProposal {
+func NewScoreProposal(hdr header.Header, seed []byte, score transactions.Score) ScoreProposal {
 	return ScoreProposal{
 		hdr:           hdr,
-		Score:         proof.Score,
-		Proof:         proof.Proof,
-		Z:             proof.Z,
-		BidListSubset: proof.BinaryBidList,
+		Score:         score.Score,
+		Proof:         score.Proof,
+		Z:             score.Z,
+		BidListSubset: score.Bids,
 		Seed:          seed,
 	}
 }
