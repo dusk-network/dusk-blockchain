@@ -15,11 +15,11 @@ type Factory struct {
 	RBus          *rpcbus.RPCBus
 	walletPrivKey *transactions.SecretKey
 	walletPubKey  *transactions.PublicKey
-	proxy         *transactions.Proxy
+	proxy         transactions.Proxy
 }
 
 // NewFactory instantiates a Factory.
-func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, walletPrivKey *transactions.SecretKey, walletPubKey *transactions.PublicKey, proxy *transactions.Proxy) *Factory {
+func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, walletPrivKey *transactions.SecretKey, walletPubKey *transactions.PublicKey, proxy transactions.Proxy) *Factory {
 	return &Factory{
 		Bus:           broker,
 		RBus:          rpcBus,
