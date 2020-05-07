@@ -83,13 +83,30 @@ func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
 }
 
 func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
-	ctx := context.Background()
-	records, err := t.walletClient.GetTxHistory(ctx, &node.EmptyRequest{})
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
+
+	records, err := t.w.FetchTxHistory()
 	if err != nil {
 		return nil, err
 	}
 
-	return records, nil
+	resp := &node.TxHistoryResponse{Records: []*node.TxRecord{}}
+
+	for i, record := range records {
+		resp.Records[i] = &node.TxRecord{
+			Direction: node.Direction(record.Direction),
+			Timestamp: record.Timestamp,
+			Height:    record.Height,
+			Type:      node.TxType(record.TxType),
+			//TODO: what happened to this fields ?
+			//Amount:       record.Amount,
+			//UnlockHeight: record.UnlockHeight,
+		}
+	}
+
+	return resp, nil
 }
 
 func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse, error) {
