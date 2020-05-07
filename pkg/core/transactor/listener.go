@@ -132,10 +132,11 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	// TODO the Bid transaction needs more input
 	txReq := transactions.MakeGenesisTxRequest(t.w.SecretKey, uint64(0), req.Fee, true)
 	tx, err := t.provider.NewBidTx(ctx, txReq)
-
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: store the K and D in storage for the block generator
 
 	hash, err := t.publishTx(&tx)
 	if err != nil {
