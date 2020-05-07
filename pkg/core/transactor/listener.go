@@ -95,14 +95,16 @@ func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
 	resp := &node.TxHistoryResponse{Records: []*node.TxRecord{}}
 
 	for i, record := range records {
+		var amount uint64
+		for _, v := range record.StandardTx().Outputs {
+			amount += v.Value
+		}
 		resp.Records[i] = &node.TxRecord{
 			Direction: node.Direction(record.Direction),
 			Timestamp: record.Timestamp,
 			Height:    record.Height,
 			Type:      node.TxType(record.TxType),
-			//TODO: what happened to this fields ?
-			//Amount:       record.Amount,
-			//UnlockHeight: record.UnlockHeight,
+			Amount:    amount,
 		}
 	}
 
