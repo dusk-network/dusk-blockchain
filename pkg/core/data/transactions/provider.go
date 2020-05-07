@@ -383,14 +383,17 @@ func (e *executor) ValidateStateTransition(ctx context.Context, calls []Contract
 	}
 	vstr.CurrentHeight = height
 
-	// TODO: filter based on the indexes within the response once
-	// #dusk-protobuf#77 is solved
-	_, err = e.client.ValidateStateTransition(ctx, vstr)
+	res, err := e.client.ValidateStateTransition(ctx, vstr)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	validTxs := make([]ContractCall, len(res.SuccessfulCalls))
+	for i, idx := range res.SuccessfulCalls {
+		validTxs[i] = calls[idx]
+	}
+
+	return validTxs, nil
 }
 
 // ExecuteStateTransition performs a global state mutation and steps the

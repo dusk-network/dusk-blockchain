@@ -226,6 +226,7 @@ func (bg *Generator) constructCoinbaseTx() (*transactions.DistributeTransaction,
 	// TODO: what do we set as reward?
 	// TODO: should the reward be a matter of configuration or it should be
 	// dynamic?
+	// FIXME: where does the BlockGenerator get the Provisioners?
 	txReq := transactions.MakeGenesisTxRequest(*bg.genPrivKey, config.GeneratorReward, 100, false)
 	dTx, err := bg.gen.NewDistributeTx(ctx, txReq)
 	if err != nil {
