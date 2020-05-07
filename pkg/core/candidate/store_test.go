@@ -8,16 +8,19 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test basic storage-related functionality.
 func TestStoreFetchClear(t *testing.T) {
+	assert := require.New(t)
 	c := newStore()
 
 	// Store a candidate
@@ -28,20 +31,22 @@ func TestStoreFetchClear(t *testing.T) {
 	// Hash is genesis hash
 	genesis := config.DecodeGenesis()
 	fetched := c.fetchCandidateMessage(genesis.Header.Hash)
-	assert.NotNil(t, fetched)
+	assert.NotNil(fetched)
 
 	// Correctness checks
-	assert.True(t, genesis.Equals(fetched.Block))
-	assert.True(t, fetched.Certificate.Equals(block.EmptyCertificate()))
+	assert.True(genesis.Equals(fetched.Block))
+	assert.True(fetched.Certificate.Equals(block.EmptyCertificate()))
 
 	// Check that Clear empties the entire candidate store
 	n := c.Clear(1)
-	assert.Equal(t, 1, n)
-	assert.Empty(t, c.messages)
+	assert.Equal(1, n)
+	assert.Empty(c.messages)
 }
 
 // Test the candidate request functionality.
 func TestRequestCandidate(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	b := NewBroker(eb, rpc)
@@ -62,7 +67,7 @@ func TestRequestCandidate(t *testing.T) {
 		}
 		c := resp.(message.Candidate)
 
-		if !assert.True(t, c.Block.Equals(genesis)) {
+		if !assert.True(c.Block.Equals(genesis)) {
 			if !c.Block.Header.Equals(genesis.Header) {
 				errChan <- fmt.Errorf("Candidate Header (hash: %s) is not equal to Genesis Header (hash: %s)", c, util.StringifyBytes(genesis.Header.Hash))
 				return
@@ -73,17 +78,14 @@ func TestRequestCandidate(t *testing.T) {
 				return
 			}
 
-			// TODO: add equals methods for phoenix/RUSK transactions
-			/*
-				for i, tx := range genesis.Txs {
-					 otherTx := c.Block.Txs[i]
+			for i, tx := range genesis.Txs {
+				otherTx := c.Block.Txs[i]
 
-						if !tx.Equals(otherTx) {
-							errChan <- fmt.Errorf("Candidate Block Tx #%d is different from genesis block Tx", i)
-							return
-						}
+				if !transactions.Equal(tx, otherTx) {
+					errChan <- fmt.Errorf("Candidate Block Tx #%d is different from genesis block Tx", i)
+					return
 				}
-			*/
+			}
 			panic("problem with block.Block.Equals")
 		}
 
@@ -96,22 +98,16 @@ func TestRequestCandidate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !assert.Equal(t, topics.GetCandidate, topics.Topic(bin[0])) {
-		t.FailNow()
-	}
+	require.Equal(topics.GetCandidate, topics.Topic(bin[0]))
 
 	// Make sure we got a request for the genesis block
-	if !assert.True(t, bytes.Equal(bin[1:], genesis.Header.Hash)) {
-		t.FailNow()
-	}
+	require.True(bytes.Equal(bin[1:], genesis.Header.Hash))
 
 	// Send genesis back as a Candidate message
 	cm := mockCandidate()
 	msg := message.New(topics.Candidate, cm)
 	eb.Publish(topics.Candidate, msg)
-	if err := <-doneChan; err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(<-doneChan)
 }
 
 // Mocks a candidate message. It is not in the message package since it uses
