@@ -55,8 +55,9 @@ type Helper struct {
 
 // NewHelper creates a Helper
 func NewHelper(t *testing.T, eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, txBatchCount uint16) *Helper {
-	_, pk := transactions.MockKeys()
-	factory := NewFactory(eb, rpcBus, pk)
+	sk, pk := transactions.MockKeys()
+	// TODO: add mocked rusk client
+	factory := NewFactory(eb, rpcBus, sk, pk, nil)
 	g := factory.Instantiate()
 	gen := g.(*Generator)
 	pubkey, _ := crypto.RandEntropy(32)

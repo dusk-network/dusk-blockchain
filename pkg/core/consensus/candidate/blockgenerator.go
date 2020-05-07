@@ -2,12 +2,15 @@ package candidate
 
 import (
 	"bytes"
+	"context"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -27,22 +30,26 @@ const MaxTxSetSize = 150000
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator struct {
-	publisher eventbus.Publisher
-	// generator Public Keys to sign the rewards tx
-	genPubKey *transactions.PublicKey
-	rpcBus    *rpcbus.RPCBus
-	signer    consensus.Signer
+	publisher  eventbus.Publisher
+	genPrivKey *transactions.SecretKey
+	genPubKey  *transactions.PublicKey
+	rpcBus     *rpcbus.RPCBus
+	signer     consensus.Signer
 
 	roundInfo    consensus.RoundUpdate
 	scoreEventID uint32
+
+	rusk rusk.RuskClient
 }
 
 // NewComponent returns an uninitialized candidate generator.
-func NewComponent(publisher eventbus.Publisher, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
+func NewComponent(publisher eventbus.Publisher, genPrivKey *transactions.SecretKey, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus, rusk rusk.RuskClient) *Generator {
 	return &Generator{
-		publisher: publisher,
-		rpcBus:    rpcBus,
-		genPubKey: genPubKey,
+		publisher:  publisher,
+		rpcBus:     rpcBus,
+		genPrivKey: genPrivKey,
+		genPubKey:  genPubKey,
+		rusk:       rusk,
 	}
 }
 
@@ -177,16 +184,10 @@ func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 	return candidateBlock, nil
 }
 
-// ConstructBlockTxs will fetch all valid transactions from the mempool, prepend a coinbase
+// ConstructBlockTxs will fetch all valid transactions from the mempool, append a coinbase
 // transaction, and return them all.
 func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.ContractCall, error) {
-
 	txs := make([]transactions.ContractCall, 0)
-
-	// Construct and append coinbase Tx to reward the generator
-	coinbaseTx := constructCoinbaseTx(bg.genPubKey, proof, score)
-
-	txs = append(txs, coinbaseTx)
 
 	// Retrieve and append the verified transactions from Mempool
 	if bg.rpcBus != nil {
@@ -206,42 +207,43 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Cont
 		txs = append(txs, resp.([]transactions.ContractCall)...)
 	}
 
-	// TODO Append Provisioners rewards
+	// Construct and append coinbase Tx to reward the generator
+	coinbaseTx, err := bg.constructCoinbaseTx()
+	if err != nil {
+		return nil, err
+	}
+
+	txs = append(txs, coinbaseTx)
 
 	return txs, nil
 }
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
-func constructCoinbaseTx(rewardReceiver *transactions.PublicKey, proof []byte, score []byte) *transactions.DistributeTransaction {
-	// TODO: adjust this for rusk/phoenix
-	/*
-		// The rewards for both the Generator and the Provisioners are disclosed.
-		// Provisioner reward addresses do not require obfuscation
-		// The Generator address rewards do.
+func (bg *Generator) constructCoinbaseTx() (*transactions.DistributeTransaction, error) {
+	ruskSecretKey := &rusk.SecretKey{}
+	ruskPublicKey := &rusk.PublicKey{}
+	transactions.MSecretKey(ruskSecretKey, bg.genPrivKey)
+	transactions.MPublicKey(ruskPublicKey, bg.genPubKey)
 
-		// Construct one-time address derived from block generator public key
-		// the big random number to be used in calculating P and R
-		var r ristretto.Scalar
-		r.Rand()
+	req := &rusk.DistributeTransactionRequest{
+		Tx: &rusk.NewTransactionRequest{
+			Sk:         ruskSecretKey,
+			Recipient:  ruskPublicKey,
+			Value:      config.GeneratorReward,
+			Fee:        100, // TODO: what do we set as fee here?
+			Obfuscated: false,
+		},
+	}
 
-		// Create transaction
-		tx := transactions.NewCoinbase(proof, score, 2)
+	resp, err := bg.rusk.NewDistribute(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
 
-		// Set r to our generated value
-		tx.SetTxPubKey(r)
+	tx := &transactions.DistributeTransaction{}
+	if err := transactions.UDistribute(resp, tx); err != nil {
+		return nil, err
+	}
 
-		// Disclose  reward
-		var reward ristretto.Scalar
-		reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
-
-		// Store the reward in the coinbase tx
-		// TODO: what happens if the maximum amount of outputs has been reached?
-		_ = tx.AddReward(*rewardReceiver, reward)
-
-		// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
-		// This could be achieved with a request to dusk-blockchain/pkg/core/data
-		return tx
-	*/
-
-	return nil
+	return tx, nil
 }
