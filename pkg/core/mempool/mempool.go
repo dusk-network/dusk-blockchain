@@ -63,8 +63,6 @@ type Mempool struct {
 	latestBlockTimestamp int64
 
 	eventBus *eventbus.EventBus
-	// TODO: do we still need a DB in the mempool?
-	// db       database.DB
 
 	// the magic function that knows best what is valid chain Tx
 	verifier transactions.Verifier
@@ -85,16 +83,6 @@ func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 	if err := m.verifier.VerifyTransaction(ctx, tx); err != nil {
 		return fmt.Errorf("transaction verification failed: %v", err)
 	}
-
-	// TODO: is this still needed?
-	// retrieve read-only connection to the blockchain database
-	// if m.db == nil {
-	// 	_, m.db = heavy.CreateDBConnection()
-	// }
-
-	// run the default blockchain verifier
-	// approxBlockTime := uint64(consensusSeconds) + uint64(m.latestBlockTimestamp)
-	// return verifiers.CheckTx(m.db, 0, approxBlockTime, tx)
 	return nil
 }
 
