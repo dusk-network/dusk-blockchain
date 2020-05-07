@@ -118,8 +118,6 @@ type Provisioner interface {
 	// NewSlashTx creates a Slash transaction
 	NewSlashTx(context.Context, TxRequest) (SlashTransaction, error)
 
-	// NewDistributeTx creates a new Distribute transaction
-	NewDistributeTx(context.Context, TxRequest) (DistributeTransaction, error)
 	// NewWithdrawFeesTx creates a new WithdrawFees transaction
 	NewWithdrawFeesTx(context.Context, TxRequest) (WithdrawFeesTransaction, error)
 }
@@ -128,6 +126,9 @@ type Provisioner interface {
 type BlockGenerator interface {
 	// GenerateScore to participate in the block generation lottery
 	GenerateScore(context.Context, ScoreRequest) (Score, error)
+
+	// NewDistributeTx creates a new Distribute transaction
+	NewDistributeTx(context.Context, TxRequest) (DistributeTransaction, error)
 }
 
 // Proxy toward the rusk client
@@ -448,25 +449,6 @@ func (p *provisioner) NewSlashTx(ctx context.Context, tx TxRequest) (SlashTransa
 	return *slashTx, nil
 }
 
-// NewDistributeTx creates a new Distribute transaction
-func (p *provisioner) NewDistributeTx(ctx context.Context, tx TxRequest) (DistributeTransaction, error) {
-	dTx := new(DistributeTransaction)
-	tr := new(rusk.NewTransactionRequest)
-	MTxRequest(tr, tx)
-
-	dt := new(rusk.DistributeTransactionRequest)
-	dt.Tx = tr
-	res, err := p.client.NewDistribute(ctx, dt)
-	if err != nil {
-		return *dTx, err
-	}
-
-	if err := UDistribute(res, dTx); err != nil {
-		return *dTx, err
-	}
-	return *dTx, nil
-}
-
 // NewWithdrawFeesTx creates a new WithdrawFees transaction
 // TODO: add missing parameters like BLS PubKey, BLS Signature and message (?)
 func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, tx TxRequest) (WithdrawFeesTransaction, error) {
@@ -516,6 +498,25 @@ func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Sco
 		Z:     score.Z,
 		Bids:  score.Bids,
 	}, nil
+}
+
+// NewDistributeTx creates a new Distribute transaction
+func (b *blockgenerator) NewDistributeTx(ctx context.Context, tx TxRequest) (DistributeTransaction, error) {
+	dTx := new(DistributeTransaction)
+	tr := new(rusk.NewTransactionRequest)
+	MTxRequest(tr, tx)
+
+	dt := new(rusk.DistributeTransactionRequest)
+	dt.Tx = tr
+	res, err := b.client.NewDistribute(ctx, dt)
+	if err != nil {
+		return *dTx, err
+	}
+
+	if err := UDistribute(res, dTx); err != nil {
+		return *dTx, err
+	}
+	return *dTx, nil
 }
 
 // UMember deep copies from the rusk.Provisioner

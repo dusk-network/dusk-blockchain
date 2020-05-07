@@ -10,7 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -39,17 +38,18 @@ type Generator struct {
 	roundInfo    consensus.RoundUpdate
 	scoreEventID uint32
 
-	rusk rusk.RuskClient
+	gen transactions.BlockGenerator
+	ctx context.Context
 }
 
 // NewComponent returns an uninitialized candidate generator.
-func NewComponent(publisher eventbus.Publisher, genPrivKey *transactions.SecretKey, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus, rusk rusk.RuskClient) *Generator {
+func NewComponent(ctx context.Context, publisher eventbus.Publisher, genPrivKey *transactions.SecretKey, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus, gen transactions.BlockGenerator) *Generator {
 	return &Generator{
 		publisher:  publisher,
 		rpcBus:     rpcBus,
 		genPrivKey: genPrivKey,
 		genPubKey:  genPubKey,
-		rusk:       rusk,
+		gen:        gen,
 	}
 }
 
@@ -220,30 +220,17 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Cont
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
 func (bg *Generator) constructCoinbaseTx() (*transactions.DistributeTransaction, error) {
-	ruskSecretKey := &rusk.SecretKey{}
-	ruskPublicKey := &rusk.PublicKey{}
-	transactions.MSecretKey(ruskSecretKey, bg.genPrivKey)
-	transactions.MPublicKey(ruskPublicKey, bg.genPubKey)
+	ctx, cancel := context.WithDeadline(bg.ctx, time.Now().Add(500*time.Millisecond))
+	defer cancel()
 
-	req := &rusk.DistributeTransactionRequest{
-		Tx: &rusk.NewTransactionRequest{
-			Sk:         ruskSecretKey,
-			Recipient:  ruskPublicKey,
-			Value:      config.GeneratorReward,
-			Fee:        100, // TODO: what do we set as fee here?
-			Obfuscated: false,
-		},
-	}
-
-	resp, err := bg.rusk.NewDistribute(context.Background(), req)
+	// TODO: what do we set as reward?
+	// TODO: should the reward be a matter of configuration or it should be
+	// dynamic?
+	txReq := transactions.MakeGenesisTxRequest(*bg.genPrivKey, config.GeneratorReward, 100, false)
+	dTx, err := bg.gen.NewDistributeTx(ctx, txReq)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := &transactions.DistributeTransaction{}
-	if err := transactions.UDistribute(resp, tx); err != nil {
-		return nil, err
-	}
-
-	return tx, nil
+	return &dTx, nil
 }

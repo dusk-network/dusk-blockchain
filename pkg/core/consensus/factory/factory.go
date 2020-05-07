@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,11 +32,11 @@ type ConsensusFactory struct {
 	key.Keys
 	timerLength time.Duration
 
-	rusk rusk.RuskClient
+	proxy *transactions.Proxy
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, privKey *transactions.SecretKey, pubKey *transactions.PublicKey, keys key.Keys, rusk rusk.RuskClient) *ConsensusFactory {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, privKey *transactions.SecretKey, pubKey *transactions.PublicKey, keys key.Keys, proxy *transactions.Proxy) *ConsensusFactory {
 	return &ConsensusFactory{
 		eventBus:    eventBus,
 		rpcBus:      rpcBus,
@@ -45,7 +44,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Du
 		pubKey:      pubKey,
 		Keys:        keys,
 		timerLength: timerLength,
-		rusk:        rusk,
+		proxy:       proxy,
 	}
 }
 
@@ -54,7 +53,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Du
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	gen := generation.NewFactory()
-	cgen := candidate.NewFactory(c.eventBus, c.rpcBus, c.privKey, c.pubKey, c.rusk)
+	cgen := candidate.NewFactory(c.eventBus, c.rpcBus, c.privKey, c.pubKey, c.proxy)
 	sgen := score.NewFactory(c.eventBus, c.Keys, nil)
 	sel := selection.NewFactory(c.eventBus, c.timerLength)
 	redFirstStep := firststep.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
