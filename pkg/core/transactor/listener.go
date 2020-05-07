@@ -129,9 +129,11 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	// TODO context should be created from the parent one
 	ctx := context.Background()
 
-	// TODO the Bid transaction needs more input
-	txReq := transactions.MakeGenesisTxRequest(t.w.SecretKey, uint64(0), req.Fee, true)
-	tx, err := t.provider.NewBidTx(ctx, txReq)
+	txReq := transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, true)
+	// FIXME: here we need to create K, EdPk; retrieve seed somehow and decide
+	// an ExpirationHeight (most likely the last 2 should be retrieved from he
+	// DB)
+	tx, err := t.provider.NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
 
 	if err != nil {
 		return nil, err
