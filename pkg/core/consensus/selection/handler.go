@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
@@ -19,8 +18,6 @@ type (
 	// ScoreHandler manages the score threshold, performs verification of
 	// message.Score, keeps tab of the highest score so far
 	ScoreHandler struct {
-		bidList user.BidList
-
 		// Threshold number that a score needs to be greater than in order to be considered
 		// for selection. Messages with scores lower than this threshold should not be
 		// repropagated.
@@ -41,9 +38,8 @@ type (
 )
 
 // NewScoreHandler returns a new instance if ScoreHandler
-func NewScoreHandler(bidList user.BidList, scoreVerifier transactions.Provisioner) *ScoreHandler {
+func NewScoreHandler(scoreVerifier transactions.Provisioner) *ScoreHandler {
 	return &ScoreHandler{
-		bidList:       bidList,
 		threshold:     consensus.NewThreshold(),
 		scoreVerifier: scoreVerifier,
 	}

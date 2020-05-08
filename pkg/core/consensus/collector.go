@@ -23,11 +23,10 @@ type (
 	// RoundUpdate carries the data about the new Round, such as the active
 	// Provisioners, the BidList, the Seed and the Hash
 	RoundUpdate struct {
-		Round   uint64
-		P       user.Provisioners
-		BidList user.BidList
-		Seed    []byte
-		Hash    []byte
+		Round uint64
+		P     user.Provisioners
+		Seed  []byte
+		Hash  []byte
 	}
 )
 

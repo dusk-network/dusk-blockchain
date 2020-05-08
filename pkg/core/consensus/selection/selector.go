@@ -67,7 +67,7 @@ func NewComponent(ctx context.Context, publisher eventbus.Publisher, timeout tim
 func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.eventPlayer = eventPlayer
 	s.signer = signer
-	s.handler = NewScoreHandler(r.BidList, s.provisioner)
+	s.handler = NewScoreHandler(s.provisioner)
 	s.timer = &timer{s: s}
 
 	scoreSubscriber := consensus.TopicListener{

@@ -1,7 +1,6 @@
 package maintainer
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -33,7 +32,6 @@ type StakeAutomaton struct {
 	pubKeyBLS []byte
 	m         ristretto.Scalar
 	p         user.Provisioners
-	bidList   user.BidList
 
 	bidEndHeight   uint64
 	stakeEndHeight uint64
@@ -81,24 +79,23 @@ func (m *StakeAutomaton) Listen() {
 	for roundUpdate := range m.roundChan {
 		// Rehydrate consensus state
 		m.p = roundUpdate.P
-		m.bidList = roundUpdate.BidList
 
-		// TODO: handle new provisioners and bidlist coming from roundupdate
-		if roundUpdate.Round+renewalOffset >= m.bidEndHeight {
-			endHeight := m.findMostRecentBid()
+		//// TODO: handle new provisioners coming from roundupdate
+		//if roundUpdate.Round+renewalOffset >= m.bidEndHeight {
+		//	endHeight := m.findMostRecentBid()
 
-			// Only send bid if this is the first time we notice it's about to expire
-			if endHeight > m.bidEndHeight {
-				m.bidEndHeight = endHeight
-			} else if m.bidEndHeight != 0 {
-				if err := m.sendBid(); err != nil {
-					l.WithError(err).Warnln("could not send bid tx")
-					continue
-				}
-				// Set end height to 0 to ensure we only send a transaction once
-				m.bidEndHeight = 0
-			}
-		}
+		//	// Only send bid if this is the first time we notice it's about to expire
+		//	if endHeight > m.bidEndHeight {
+		//		m.bidEndHeight = endHeight
+		//	} else if m.bidEndHeight != 0 {
+		//		if err := m.sendBid(); err != nil {
+		//			l.WithError(err).Warnln("could not send bid tx")
+		//			continue
+		//		}
+		//		// Set end height to 0 to ensure we only send a transaction once
+		//		m.bidEndHeight = 0
+		//	}
+		//}
 
 		if roundUpdate.Round+renewalOffset >= m.stakeEndHeight {
 			endHeight := m.findMostRecentStake()
@@ -117,17 +114,6 @@ func (m *StakeAutomaton) Listen() {
 	}
 }
 
-func (m *StakeAutomaton) findMostRecentBid() uint64 {
-	var highest uint64
-	for _, bid := range m.bidList {
-		if bytes.Equal(m.m.Bytes(), bid.M[:]) && bid.EndHeight > highest {
-			highest = bid.EndHeight
-		}
-	}
-
-	return highest
-}
-
 func (m *StakeAutomaton) findMostRecentStake() uint64 {
 	member := m.p.GetMember(m.pubKeyBLS)
 	if member != nil {
@@ -143,6 +129,7 @@ func (m *StakeAutomaton) findMostRecentStake() uint64 {
 	return 0
 }
 
+// nolint
 func (m *StakeAutomaton) sendBid() error {
 	amount, lockTime := m.getTxSettings()
 	if amount == 0 || lockTime == 0 {

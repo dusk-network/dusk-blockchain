@@ -13,19 +13,13 @@ func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) R
 		provisioners, _ = MockProvisioners(1)
 	}
 
-	var bidders = bidList
-	if bidList == nil || len(bidList) == 0 {
-		bidders = MockBidList(1)
-	}
-
 	seed, _ := crypto.RandEntropy(33)
 	hash, _ := crypto.RandEntropy(32)
 	return RoundUpdate{
-		Round:   round,
-		P:       *provisioners,
-		BidList: bidders,
-		Seed:    seed,
-		Hash:    hash,
+		Round: round,
+		P:     *provisioners,
+		Seed:  seed,
+		Hash:  hash,
 	}
 }
 
