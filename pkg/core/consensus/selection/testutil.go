@@ -8,12 +8,13 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
+
+var defaultScoreNr = 10
 
 // NOTE: looks like this is not used. In case, we need to use it, we need to
 // add the Header from the Helper through a callback
@@ -53,17 +54,20 @@ func (m *mockSigner) SendInternally(topic topics.Topic, msg message.Message, id 
 // Helper for reducing selection test boilerplate
 type Helper struct {
 	*Factory
-	BidList  user.BidList
 	Selector *Selector
 	*consensus.SimplePlayer
 	signer consensus.Signer
 
 	BestScoreChan chan message.Message
+	scoreToSpawn  int
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus) *Helper {
-	bidList := consensus.MockBidList(10)
+func NewHelper(eb *eventbus.EventBus, scoreToSpawn ...int) *Helper {
+	scores := defaultScoreNr
+	if len(scoreToSpawn) > 0 {
+		scores = scoreToSpawn[0]
+	}
 	mockProxy := transactions.MockProxy{
 		P: transactions.PermissiveProvisioner{},
 	}
@@ -73,11 +77,11 @@ func NewHelper(eb *eventbus.EventBus) *Helper {
 	keys, _ := key.NewRandKeys()
 	hlp := &Helper{
 		Factory:       factory,
-		BidList:       bidList,
 		Selector:      sel,
 		SimplePlayer:  consensus.NewSimplePlayer(),
 		signer:        &mockSigner{keys.BLSPubKeyBytes, eb},
 		BestScoreChan: make(chan message.Message, 1),
+		scoreToSpawn:  scores,
 	}
 	hlp.createResultChan()
 	return hlp
@@ -93,10 +97,10 @@ func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 	h.Selector.Initialize(h, h.signer, ru)
 }
 
-// Spawn a set of score events.
+// Spawn 10 score events.
 func (h *Helper) Spawn(hash []byte) []message.Score {
-	evs := make([]message.Score, 0, len(h.BidList))
-	for i := 0; i < len(h.BidList); i++ {
+	evs := make([]message.Score, 0, h.scoreToSpawn)
+	for i := 0; i < h.scoreToSpawn; i++ {
 		keys, _ := key.NewRandKeys()
 		hdr := header.Header{
 			Round:     h.Round,

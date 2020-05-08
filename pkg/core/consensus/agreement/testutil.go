@@ -29,7 +29,7 @@ func WireAgreement(nrProvisioners int) (*consensus.Coordinator, *Helper) {
 	factory := NewFactory(eb, h.Keys[0])
 	coordinator := consensus.Start(eb, h.Keys[0], factory)
 	// starting up the coordinator
-	ru := consensus.MockRoundUpdate(1, h.P, nil)
+	ru := consensus.MockRoundUpdate(1, h.P)
 	msg := message.New(topics.RoundUpdate, ru)
 	if err := coordinator.CollectRoundUpdate(msg); err != nil {
 		panic(err)
@@ -93,7 +93,7 @@ func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
 // LaunchHelper configures and launches a LaunchHelper
 func LaunchHelper(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
 	hlp := NewHelper(eb, nr)
-	roundUpdate := consensus.MockRoundUpdate(1, hlp.P, nil)
+	roundUpdate := consensus.MockRoundUpdate(1, hlp.P)
 	hlp.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)
 	return hlp, hash
