@@ -2,14 +2,15 @@ package selection
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"sync"
+	"time"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
 var _ Handler = (*ScoreHandler)(nil)
@@ -25,12 +26,14 @@ type (
 		// repropagated.
 		lock      sync.RWMutex
 		threshold *consensus.Threshold
+
+		scoreVerifier transactions.Provisioner
 	}
 
 	// Handler is an abstraction of the selection component event handler.
 	// It is primarily used for testing purposes, to bypass the zkproof verification.
 	Handler interface {
-		Verify(message.Score) error
+		Verify(context.Context, message.Score) error
 		ResetThreshold()
 		LowerThreshold()
 		Priority(message.Score, message.Score) bool
@@ -38,10 +41,11 @@ type (
 )
 
 // NewScoreHandler returns a new instance if ScoreHandler
-func NewScoreHandler(bidList user.BidList) *ScoreHandler {
+func NewScoreHandler(bidList user.BidList, scoreVerifier transactions.Provisioner) *ScoreHandler {
 	return &ScoreHandler{
-		bidList:   bidList,
-		threshold: consensus.NewThreshold(),
+		bidList:       bidList,
+		threshold:     consensus.NewThreshold(),
+		scoreVerifier: scoreVerifier,
 	}
 }
 
@@ -67,7 +71,7 @@ func (sh *ScoreHandler) Priority(first, second message.Score) bool {
 }
 
 // Verify a score by delegating the ZK library to validate the proof
-func (sh *ScoreHandler) Verify(m message.Score) error {
+func (sh *ScoreHandler) Verify(ctx context.Context, m message.Score) error {
 	// Check threshold
 	sh.lock.RLock()
 	defer sh.lock.RUnlock()
@@ -80,22 +84,30 @@ func (sh *ScoreHandler) Verify(m message.Score) error {
 		return err
 	}
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(500*time.Millisecond))
+	defer cancel()
+
+	return sh.scoreVerifier.VerifyScore(ctx, transactions.Score{
+		Proof: m.Proof,
+		Score: m.Score,
+		Z:     m.Z,
+		Bids:  m.BidListSubset,
+	})
+
 	// Verify the proof
-	seedScalar := ristretto.Scalar{}
-	seedScalar.Derive(m.Seed)
+	//seedScalar := ristretto.Scalar{}
+	//seedScalar.Derive(m.Seed)
 
-	proof := zkproof.ZkProof{
-		Proof:         m.Proof,
-		Score:         m.Score,
-		Z:             m.Z,
-		BinaryBidList: m.BidListSubset,
-	}
+	//proof := zkproof.ZkProof{
+	//	Proof:         m.Proof,
+	//	Score:         m.Score,
+	//	Z:             m.Z,
+	//	BinaryBidList: m.BidListSubset,
+	//}
 
-	if !proof.Verify(seedScalar) {
-		return errors.New("proof verification failed")
-	}
-
-	return nil
+	//if !proof.Verify(seedScalar) {
+	//	return errors.New("proof verification failed")
+	//}
 }
 
 func (sh *ScoreHandler) validateBidListSubset(bidListSubsetBytes []byte) error {

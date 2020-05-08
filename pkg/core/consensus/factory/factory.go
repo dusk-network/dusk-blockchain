@@ -58,7 +58,7 @@ func (c *ConsensusFactory) StartConsensus() {
 	gen := generation.NewFactory()
 	cgen := candidate.NewFactory(c.ctx, c.eventBus, c.rpcBus, c.privKey, c.pubKey, c.proxy)
 	sgen := score.NewFactory(c.ctx, c.eventBus, c.Keys, nil, c.proxy)
-	sel := selection.NewFactory(c.eventBus, c.timerLength)
+	sel := selection.NewFactory(c.ctx, c.eventBus, c.timerLength, c.proxy)
 	redFirstStep := firststep.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
 	redSecondStep := secondstep.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
 	agr := agreement.NewFactory(c.eventBus, c.Keys)
