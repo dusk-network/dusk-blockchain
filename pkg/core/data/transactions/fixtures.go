@@ -1,10 +1,30 @@
 package transactions
 
 import (
+	"context"
 	"crypto/rand"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
+
+// PermissiveProvisioner mocks verification of scores
+type PermissiveProvisioner struct {
+}
+
+// VerifyScore returns nil all the time
+func (p PermissiveProvisioner) VerifyScore(context.Context, Score) error {
+	return nil
+}
+
+// NewSlashTx creates a Slash transaction
+func (p PermissiveProvisioner) NewSlashTx(context.Context, TxRequest) (SlashTransaction, error) {
+	return SlashTransaction{}, nil
+}
+
+// NewWithdrawFeesTx creates a new WithdrawFees transaction
+func (p PermissiveProvisioner) NewWithdrawFeesTx(context.Context, TxRequest) (WithdrawFeesTransaction, error) {
+	return WithdrawFeesTransaction{}, nil
+}
 
 // MockProxy mocks a proxy for ease of testing
 type MockProxy struct {

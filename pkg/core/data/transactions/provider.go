@@ -116,6 +116,9 @@ type Provisioner interface {
 
 	// NewWithdrawFeesTx creates a new WithdrawFees transaction
 	NewWithdrawFeesTx(context.Context, TxRequest) (WithdrawFeesTransaction, error)
+
+	// VerifyScore created by the BlockGenerator
+	VerifyScore(context.Context, Score) error
 }
 
 // BlockGenerator encapsulates the operations performed by the BlockGenerator
@@ -482,6 +485,22 @@ func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, tx TxRequest) (With
 	}
 
 	return *feeTx, nil
+}
+
+// VerifyScore to participate in the block generation lottery
+func (p *provisioner) VerifyScore(ctx context.Context, score Score) error {
+	/*
+		gsr := &rusk.GenerateScoreResponse{
+			Proof: score.Proof,
+			Score: score.Score,
+			Z:     score.Z,
+			Bids:  score.Bids,
+		}
+		if _, err := b.client.VerifyScore(ctx, gsr); err != nil {
+			return err
+		}
+	*/
+	return nil
 }
 
 type blockgenerator struct {
