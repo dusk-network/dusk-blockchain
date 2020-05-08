@@ -224,9 +224,11 @@ func (bg *Generator) constructCoinbaseTx() (*transactions.DistributeTransaction,
 	defer cancel()
 
 	// TODO: what do we set as reward?
-	// TODO: should the reward be a matter of configuration or it should be
+	// TODO: should the reward be a matter of configuration or should it be
 	// dynamic?
-	// FIXME: where does the BlockGenerator get the Provisioners?
+	// FIXME: The provisioners' bitset is carried in the certificate. However, we need
+	// the full list of Provisioners for the last round to be able to recreate
+	// the committee
 	txReq := transactions.MakeGenesisTxRequest(*bg.genPrivKey, config.GeneratorReward, 100, false)
 	dTx, err := bg.gen.NewDistributeTx(ctx, txReq)
 	if err != nil {

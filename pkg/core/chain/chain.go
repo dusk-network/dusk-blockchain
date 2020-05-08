@@ -34,9 +34,9 @@ var log = logger.WithFields(logger.Fields{"process": "chain"})
 // Verifier performs checks on the blockchain and potentially new incoming block
 type Verifier interface {
 	// PerformSanityCheck on first N blocks and M last blocks
-	PerformSanityCheck(uint64, uint64, uint64) error
-	// CheckBlock will verify whether a block is valid according to the rules of the consensus
-	CheckBlock(prevBlock block.Block, blk block.Block) error
+	PerformSanityCheck(startAt uint64, firstBlocksAmount uint64, lastBlockAmount uint64) error
+	// SanityCheckBlock will verify whether a block is valid according to the rules of the consensus
+	SanityCheckBlock(prevBlock block.Block, blk block.Block) error
 }
 
 // Loader is an interface which abstracts away the storage used by the Chain to
@@ -47,7 +47,7 @@ type Loader interface {
 	// Clear removes everything from the DB
 	Clear() error
 	// Close the Loader and finalizes any pending connection
-	Close(string) error
+	Close(driver string) error
 	// Height returns the current height as stored in the loader
 	Height() (uint64, error)
 	// BlockAt returns the block at a given height
@@ -270,7 +270,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	l.Trace("verifying block")
 
 	// 1. Check that stateless and stateful checks pass
-	if err := c.verifier.CheckBlock(c.prevBlock, blk); err != nil {
+	if err := c.verifier.SanityCheckBlock(c.prevBlock, blk); err != nil {
 		l.WithError(err).Warnln("block verification failed")
 		return err
 	}
@@ -345,17 +345,39 @@ func (c *Chain) sendRoundUpdate() error {
 }
 
 func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
+	var res rpcbus.Response
 	// We need to verify the candidate block against the newest
 	// intermediate block. The intermediate block would be the most
 	// recent block before the candidate.
 	if c.intermediateBlock == nil {
-		r.RespChan <- rpcbus.Response{Resp: nil, Err: errors.New("no intermediate block hash known")}
+		res.Err = errors.New("no intermediate block hash known")
+		r.RespChan <- res
 		return
 	}
 	cm := r.Params.(message.Candidate)
 
-	err := c.verifier.CheckBlock(*c.intermediateBlock, *cm.Block)
-	r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
+	// We first perform a quick check on the Block Header and
+	if err := c.verifier.SanityCheckBlock(*c.intermediateBlock, *cm.Block); err != nil {
+		res.Err = err
+		r.RespChan <- res
+		return
+	}
+
+	ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(500*time.Millisecond))
+	defer cancel()
+
+	calls, err := c.executor.ValidateStateTransition(ctx, c.intermediateBlock.Txs, c.intermediateBlock.Header.Height)
+	if err != nil {
+		res.Err = err
+		r.RespChan <- res
+		return
+	}
+
+	if len(calls) != len(c.intermediateBlock.Txs) {
+		res.Err = errors.New("block contains invalid transactions")
+	}
+
+	r.RespChan <- res
 }
 
 // Send Inventory message to all peers
@@ -454,7 +476,18 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 			cm := m.Payload().(message.Candidate)
 
 			// Check block and certificate for correctness
-			if err := c.verifier.CheckBlock(c.prevBlock, *cm.Block); err != nil {
+			if err := c.verifier.SanityCheckBlock(c.prevBlock, *cm.Block); err != nil {
+				continue
+			}
+
+			ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(500*time.Millisecond))
+			defer cancel()
+			calls, err := c.executor.ValidateStateTransition(ctx, c.prevBlock.Txs, c.prevBlock.Header.Height)
+			if err != nil {
+				continue
+			}
+
+			if len(calls) != len(c.prevBlock.Txs) {
 				continue
 			}
 

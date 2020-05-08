@@ -52,7 +52,6 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 	_, db := heavy.CreateDBConnection()
 	l := chain.NewDBLoader(db, genesis)
 
-	// TODO: inject the proper interface
 	chainProcess, err := chain.New(ctx, eventBus, rpcBus, counter, l, l, srv, proxy.Executor())
 	if err != nil {
 		return nil, err
