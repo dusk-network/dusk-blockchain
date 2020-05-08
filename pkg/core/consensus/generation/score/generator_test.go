@@ -1,11 +1,13 @@
 package score
 
 import (
+	"context"
+	"crypto/rand"
 	"testing"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
@@ -18,7 +20,9 @@ func TestCorrectBidValues(t *testing.T) {
 	keys, _ := key.NewRandKeys()
 	_, db := lite.CreateDBConnection()
 
-	f := NewFactory(eb, keys, db)
+	p := transactions.MockProxy{}
+	// FIXME: mock the BG here
+	f := NewFactory(context.Background(), eb, keys, db, p)
 
 	genesis := config.DecodeGenesis()
 	assert.NoError(t, db.Update(func(t database.Transaction) error {
@@ -34,8 +38,8 @@ func TestCorrectBidValues(t *testing.T) {
 
 	c := f.Instantiate().(*Generator)
 
-	assert.Equal(t, d1, c.d.Bytes())
-	assert.Equal(t, k1, c.k.Bytes())
+	assert.Equal(t, d1, c.d)
+	assert.Equal(t, k1, c.k)
 
 	// Now update our state so that the previous bid values are removed
 	blk := helper.RandomBlock(t, 1200, 1)
@@ -45,16 +49,17 @@ func TestCorrectBidValues(t *testing.T) {
 
 	c = f.Instantiate().(*Generator)
 
-	assert.Equal(t, d2, c.d.Bytes())
-	assert.Equal(t, k2, c.k.Bytes())
+	assert.Equal(t, d2, c.d)
+	assert.Equal(t, k2, c.k)
 }
 
 func addBidValues(db database.DB, lockTime uint64) ([]byte, []byte, error) {
-	var d ristretto.Scalar
-	d.Rand()
-	var k ristretto.Scalar
-	k.Rand()
-	return d.Bytes(), k.Bytes(), db.Update(func(t database.Transaction) error {
-		return t.StoreBidValues(d.Bytes(), k.Bytes(), lockTime)
+	d := make([]byte, 64)
+	k := make([]byte, 64)
+	_, _ = rand.Read(d)
+	_, _ = rand.Read(k)
+
+	return d, k, db.Update(func(t database.Transaction) error {
+		return t.StoreBidValues(d, k, lockTime)
 	})
 }

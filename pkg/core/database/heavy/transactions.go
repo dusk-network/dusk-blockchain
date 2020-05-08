@@ -111,9 +111,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Put block transaction data. A KV pair per a single transaction is added
 	// into the store
 	for i, tx := range b.Txs {
-
 		txID, err := tx.CalculateHash()
-
 		if err != nil {
 			return err
 		}
@@ -147,33 +145,6 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// For the retrival of a single transaction by TxId
 
 		t.put(append(TxIDPrefix, txID...), b.Header.Hash)
-
-		// Schema
-		//
-		// Key = KeyImagePrefix + tx.input.KeyImage
-		// Value = txID
-		//
-		// To make FetchKeyImageExists functioning
-		for _, input := range tx.StandardTx().Inputs {
-			t.put(append(KeyImagePrefix, input.KeyImage.Bytes()...), txID)
-		}
-
-		// Schema
-		//
-		// Key = OutputKeyPrefix + tx.output.PublicKey
-		// Value = unlockheight
-		//
-		// To make FetchOutputKey functioning
-		for i, output := range tx.StandardTx().Outputs {
-			v := make([]byte, 8)
-			// Only lock the first output, so that change outputs are
-			// not affected.
-			if i == 0 {
-				binary.LittleEndian.PutUint64(v, tx.LockTime()+b.Header.Height)
-			}
-			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), v)
-		}
-
 	}
 
 	// Key = HeightPrefix + block.header.height
@@ -367,10 +338,10 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	return header, nil
 }
 
-func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transaction, error) {
+func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.ContractCall, error) {
 
 	scanFilter := append(TxPrefix, hashHeader...)
-	tempTxs := make(map[uint32]transactions.Transaction)
+	tempTxs := make(map[uint32]transactions.ContractCall)
 
 	// Read all the transactions that belong to a single block
 	// Scan filter = TX_PREFIX + block.header.hash
@@ -395,14 +366,16 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transactio
 	}
 
 	// Reorder Tx slice as per retrieved indexes
-	resultTxs := make([]transactions.Transaction, len(tempTxs))
+	resultTxs := make([]transactions.ContractCall, len(tempTxs))
 	for k, v := range tempTxs {
 		resultTxs[k] = v
 	}
 
 	// Let's ensure coinbase tx is here
 	if len(resultTxs) > 0 {
-		if resultTxs[0].Type() != transactions.CoinbaseType {
+		// NOTE: coinbase is the last tx in the block, with the upgrade to
+		// a VM-based tx layer
+		if resultTxs[len(resultTxs)-1].Type() != transactions.Distribute {
 			return resultTxs, errors.New("missing coinbase tx")
 		}
 	}
@@ -446,7 +419,7 @@ func (t transaction) put(key []byte, value []byte) {
 	}
 }
 
-func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, uint32, []byte, error) {
+func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall, uint32, []byte, error) {
 
 	txIndex := uint32(math.MaxUint32)
 

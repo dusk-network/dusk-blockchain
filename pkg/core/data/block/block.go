@@ -8,7 +8,7 @@ import (
 // Block defines a block on the Dusk blockchain.
 type Block struct {
 	Header *Header
-	Txs    []transactions.Transaction
+	Txs    []transactions.ContractCall
 }
 
 // NewBlock will return an empty Block with an empty BlockHeader.
@@ -28,7 +28,7 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 	// convert Transaction interface to Payload interface
 	var txs []merkletree.Payload
 	for _, tx := range b.Txs {
-		txs = append(txs, tx)
+		txs = append(txs, tx.(merkletree.Payload))
 	}
 
 	tree, err := merkletree.NewTree(txs)
@@ -40,7 +40,7 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 }
 
 // AddTx will add a transaction to the block.
-func (b *Block) AddTx(tx transactions.Transaction) {
+func (b *Block) AddTx(tx transactions.ContractCall) {
 	b.Txs = append(b.Txs, tx)
 }
 
@@ -69,11 +69,8 @@ func (b *Block) Equals(other *Block) bool {
 		return false
 	}
 
-	for i := range b.Txs {
-		tx := b.Txs[i]
-		otherTx := other.Txs[i]
-
-		if !tx.Equals(otherTx) {
+	for i := 0; i < len(b.Txs); i++ {
+		if !transactions.Equal(b.Txs[i], other.Txs[i]) {
 			return false
 		}
 	}

@@ -1,6 +1,7 @@
 package selection
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -32,8 +34,6 @@ func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
 		return err
 	}
 
-	// TODO: interface - setting the payload to a buffer will go away as soon as the Marshaling
-	// is performed where it is supposed to (i.e. after the Gossip)
 	serialized := message.New(msg.Category(), buf)
 
 	// gossip away
@@ -64,7 +64,10 @@ type Helper struct {
 // NewHelper creates a Helper
 func NewHelper(eb *eventbus.EventBus) *Helper {
 	bidList := consensus.MockBidList(10)
-	factory := NewFactory(eb, 1000*time.Millisecond)
+	mockProxy := transactions.MockProxy{
+		P: transactions.PermissiveProvisioner{},
+	}
+	factory := NewFactory(context.Background(), eb, 1000*time.Millisecond, mockProxy)
 	s := factory.Instantiate()
 	sel := s.(*Selector)
 	keys, _ := key.NewRandKeys()

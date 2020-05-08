@@ -7,23 +7,22 @@ import (
 	"time"
 
 	"encoding/binary"
-	"fmt"
 	"sync"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+
+	//"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -35,9 +34,9 @@ var log = logger.WithFields(logger.Fields{"process": "chain"})
 // Verifier performs checks on the blockchain and potentially new incoming block
 type Verifier interface {
 	// PerformSanityCheck on first N blocks and M last blocks
-	PerformSanityCheck(uint64, uint64, uint64) error
-	// CheckBlock will verify whether a block is valid according to the rules of the consensus
-	CheckBlock(prevBlock block.Block, blk block.Block) error
+	PerformSanityCheck(startAt uint64, firstBlocksAmount uint64, lastBlockAmount uint64) error
+	// SanityCheckBlock will verify whether a block is valid according to the rules of the consensus
+	SanityCheckBlock(prevBlock block.Block, blk block.Block) error
 }
 
 // Loader is an interface which abstracts away the storage used by the Chain to
@@ -48,7 +47,7 @@ type Loader interface {
 	// Clear removes everything from the DB
 	Clear() error
 	// Close the Loader and finalizes any pending connection
-	Close(string) error
+	Close(driver string) error
 	// Height returns the current height as stored in the loader
 	Height() (uint64, error)
 	// BlockAt returns the block at a given height
@@ -97,11 +96,16 @@ type Chain struct {
 	certificateChan <-chan certMsg
 	highestSeenChan <-chan uint64
 
+	// rusk client
+	executor transactions.Executor
+
 	// rpcbus channels
 	getLastBlockChan         <-chan rpcbus.Request
 	verifyCandidateBlockChan <-chan rpcbus.Request
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
+
+	ctx context.Context
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -111,7 +115,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server) (*Chain, error) {
+func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, executor transactions.Executor) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -148,6 +152,8 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		getRoundResultsChan:      getRoundResultsChan,
 		loader:                   loader,
 		verifier:                 verifier,
+		executor:                 executor,
+		ctx:                      ctx,
 	}
 
 	prevBlock, err := loader.LoadTip()
@@ -168,10 +174,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		chain.intermediateBlock = blk
 	}
 	chain.prevBlock = *prevBlock
-
-	if err := chain.restoreConsensusData(); err != nil {
-		log.WithError(err).Warnln("error in calling chain.restoreConsensusData from chain.New. The error is not propagated")
-	}
 
 	if srv != nil {
 		node.RegisterChainServer(srv, chain)
@@ -201,17 +203,10 @@ func (c *Chain) Listen() {
 			c.provideLastCertificate(r)
 		case r := <-c.getRoundResultsChan:
 			c.provideRoundResults(r)
+		case <-c.ctx.Done():
+			// TODO: dispose the Chain
 		}
 	}
-}
-
-func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) {
-	var bid user.Bid
-	x := calculateXFromBytes(tx.Outputs[0].Commitment.Bytes(), tx.M)
-	copy(bid.X[:], x.Bytes())
-	copy(bid.M[:], tx.M)
-	bid.EndHeight = startHeight + tx.Lock
-	c.addBid(bid)
 }
 
 func (c *Chain) onAcceptBlock(m message.Message) error {
@@ -230,7 +225,9 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	blk := m.Payload().(block.Block)
 
 	// This will decrement the sync counter
-	if err := c.AcceptBlock(blk); err != nil {
+	// TODO: a new context should be created with timeout, cancelation, etc
+	// instead of reusing the Chain global one
+	if err := c.AcceptBlock(c.ctx, blk); err != nil {
 		return err
 	}
 
@@ -263,7 +260,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 // 1. We have not seen it before
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
-func (c *Chain) AcceptBlock(blk block.Block) error {
+func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -273,7 +270,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	l.Trace("verifying block")
 
 	// 1. Check that stateless and stateful checks pass
-	if err := c.verifier.CheckBlock(c.prevBlock, blk); err != nil {
+	if err := c.verifier.SanityCheckBlock(c.prevBlock, blk); err != nil {
 		l.WithError(err).Warnln("block verification failed")
 		return err
 	}
@@ -288,24 +285,23 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	// 3. Add provisioners and block generators
-	l.Trace("adding consensus nodes")
-	// We set the stake start height as blk.Header.Height+2.
-	// This is because, once this block is accepted, the consensus will
-	// be 2 rounds ahead of this current block height. As a result,
-	// if we pick the start height to just be the block height, we
-	// run into some inconsistencies when accepting the next block,
-	// as the certificate could've been made with a different committee.
-	c.addConsensusNodes(blk.Txs, blk.Header.Height+2)
+	// 3. Call ExecuteStateTransitionFunction
+	l.Debug("calling ExecuteStateTransitionFunction")
+	_, provisioners, bidList, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
+	if err != nil {
+		l.WithError(err).Errorln("Error in executing the state transition")
+	}
 
-	// 4. Store block in database
+	// Caching the provisioners and bidList
+	c.p = &provisioners
+	c.bidList = &bidList
+
+	// 4. Store the approved block
 	l.Trace("storing block in db")
 	if err := c.loader.Append(&blk); err != nil {
 		l.WithError(err).Errorln("block storing failed")
 		return err
 	}
-
-	c.prevBlock = blk
 
 	// 5. Gossip advertise block Hash
 	l.Trace("gossiping block")
@@ -314,12 +310,9 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	// 6. Remove expired provisioners and bids
-	l.Trace("removing expired consensus transactions")
-	c.removeExpiredProvisioners(blk.Header.Height)
-	c.removeExpiredBids(blk.Header.Height + 2)
+	c.prevBlock = blk
 
-	// 7. Notify other subsystems for the accepted block
+	// 6. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
 	// consensus.generation.broker
@@ -338,6 +331,7 @@ func (c *Chain) onInitialization(message.Message) error {
 
 func (c *Chain) sendRoundUpdate() error {
 	hdr := c.intermediateBlock.Header
+
 	ru := consensus.RoundUpdate{
 		Round:   hdr.Height + 1,
 		P:       *c.p,
@@ -350,36 +344,40 @@ func (c *Chain) sendRoundUpdate() error {
 	return nil
 }
 
-func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight uint64) {
-	field := logger.Fields{"process": "accept block"}
-	l := log.WithFields(field)
-
-	for _, tx := range txs {
-		switch tx.Type() {
-		case transactions.StakeType:
-			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
-				l.Errorf("adding provisioner failed: %s", err.Error())
-			}
-		case transactions.BidType:
-			bid := tx.(*transactions.Bid)
-			c.addBidder(bid, startHeight)
-		}
-	}
-}
-
 func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
+	var res rpcbus.Response
 	// We need to verify the candidate block against the newest
 	// intermediate block. The intermediate block would be the most
 	// recent block before the candidate.
 	if c.intermediateBlock == nil {
-		r.RespChan <- rpcbus.Response{Resp: nil, Err: errors.New("no intermediate block hash known")}
+		res.Err = errors.New("no intermediate block hash known")
+		r.RespChan <- res
 		return
 	}
 	cm := r.Params.(message.Candidate)
 
-	err := c.verifier.CheckBlock(*c.intermediateBlock, *cm.Block)
-	r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
+	// We first perform a quick check on the Block Header and
+	if err := c.verifier.SanityCheckBlock(*c.intermediateBlock, *cm.Block); err != nil {
+		res.Err = err
+		r.RespChan <- res
+		return
+	}
+
+	ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(500*time.Millisecond))
+	defer cancel()
+
+	calls, err := c.executor.ValidateStateTransition(ctx, c.intermediateBlock.Txs, c.intermediateBlock.Header.Height)
+	if err != nil {
+		res.Err = err
+		r.RespChan <- res
+		return
+	}
+
+	if len(calls) != len(c.intermediateBlock.Txs) {
+		res.Err = errors.New("block contains invalid transactions")
+	}
+
+	r.RespChan <- res
 }
 
 // Send Inventory message to all peers
@@ -401,151 +399,10 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	return nil
 }
 
-// TODO: consensus data should be persisted to disk, to decrease
-// startup times
-func (c *Chain) restoreConsensusData() error {
-	currentHeight, err := c.loader.Height()
-	if err != nil {
-		log.WithError(err).Warnln("could not fetch current height from disk")
-		currentHeight = 0
-	}
-
-	searchingHeight := uint64(0)
-	if currentHeight > transactions.MaxLockTime {
-		searchingHeight = currentHeight - transactions.MaxLockTime
-	}
-
-	for {
-		blk, loadErr := c.loader.BlockAt(searchingHeight)
-		if loadErr != nil {
-			log.WithError(err).Debugln("cannot fetch hash by heigth, quitting restoreConsensusData routine")
-			break
-		}
-
-		for _, tx := range blk.Txs {
-			switch t := tx.(type) {
-			case *transactions.Stake:
-				// Only add them if their stake is still valid
-				if searchingHeight+t.Lock > currentHeight {
-					amount := t.Outputs[0].EncryptedAmount.BigInt().Uint64()
-					if err := c.addProvisioner(t.PubKeyBLS, amount, searchingHeight+2, searchingHeight+t.Lock); err != nil {
-						return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
-					}
-				}
-			case *transactions.Bid:
-				// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
-				// to work with the `zkproof` package. Investigate if we should change this (reserve for testnet v2,
-				// as this is most likely a consensus-breaking change)
-				if searchingHeight+t.Lock > currentHeight {
-					c.addBidder(t, searchingHeight)
-				}
-			}
-		}
-
-		searchingHeight++
-	}
-
-	return nil
-}
-
-// RemoveExpired removes Provisioners which stake expired
-func (c *Chain) removeExpiredProvisioners(round uint64) {
-	for pk, member := range c.p.Members {
-		for i := 0; i < len(member.Stakes); i++ {
-			if member.Stakes[i].EndHeight < round {
-				member.RemoveStake(i)
-				// If they have no stakes left, we should remove them entirely.
-				if len(member.Stakes) == 0 {
-					c.removeProvisioner([]byte(pk))
-				}
-
-				// Reset index
-				i = -1
-			}
-		}
-	}
-}
-
-// addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
-func (c *Chain) addProvisioner(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
-	if len(pubKeyBLS) != 129 {
-		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
-	}
-
-	i := string(pubKeyBLS)
-	stake := user.Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
-
-	// Check for duplicates
-	_, inserted := c.p.Set.IndexOf(pubKeyBLS)
-	if inserted {
-		// If they already exist, just add their new stake
-		c.p.Members[i].AddStake(stake)
-		return nil
-	}
-
-	// This is a new provisioner, so let's initialize the Member struct and add them to the list
-	c.p.Set.Insert(pubKeyBLS)
-	m := &user.Member{}
-
-	m.PublicKeyBLS = pubKeyBLS
-	m.AddStake(stake)
-
-	c.p.Members[i] = m
-	return nil
-}
-
-// Remove a Member, designated by their BLS public key.
-func (c *Chain) removeProvisioner(pubKeyBLS []byte) bool {
-	delete(c.p.Members, string(pubKeyBLS))
-	return c.p.Set.Remove(pubKeyBLS)
-}
-
-func calculateXFromBytes(d, m []byte) ristretto.Scalar {
-	var dBytes [32]byte
-	copy(dBytes[:], d)
-	var mBytes [32]byte
-	copy(mBytes[:], m)
-	var dScalar ristretto.Scalar
-	dScalar.SetBytes(&dBytes)
-	var mScalar ristretto.Scalar
-	mScalar.SetBytes(&mBytes)
-	x := zkproof.CalculateX(dScalar, mScalar)
-	return x
-}
-
-// AddBid will add a bid to the BidList.
-func (c *Chain) addBid(bid user.Bid) {
-	// Check for duplicates
-	for _, bidFromList := range *c.bidList {
-		if bidFromList.Equals(bid) {
-			return
-		}
-	}
-
-	*c.bidList = append(*c.bidList, bid)
-}
-
-// RemoveBid will iterate over a BidList to remove a specified bid.
-func (c *Chain) removeBid(bid user.Bid) {
-	for i, bidFromList := range *c.bidList {
-		if bidFromList.Equals(bid) {
-			c.bidList.Remove(i)
-		}
-	}
-}
-
-// RemoveExpired iterates over a BidList to remove expired bids.
-func (c *Chain) removeExpiredBids(round uint64) {
-	for _, bid := range *c.bidList {
-		if bid.EndHeight < round {
-			// We need to call RemoveBid here and loop twice, as the index
-			// could be off if more than one bid is removed.
-			c.removeBid(bid)
-		}
-	}
-}
-
 func (c *Chain) handleCertificateMessage(cMsg certMsg) {
+
+	ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(1*time.Second))
+	defer cancel()
 	// Set latest certificate
 	c.lastCertificate = cMsg.cert
 
@@ -566,7 +423,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 		return
 	}
 
-	if err := c.finalizeIntermediateBlock(cm.Certificate); err != nil {
+	if err := c.finalizeIntermediateBlock(ctx, cm.Certificate); err != nil {
 		log.WithError(err).Warnln("could not accept intermediate block")
 		return
 	}
@@ -578,14 +435,15 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	msg := message.New(topics.IntermediateBlock, *cm.Block)
 	c.eventBus.Publish(topics.IntermediateBlock, msg)
 
+	// propagate round update
 	go func() {
 		_ = c.sendRoundUpdate()
 	}()
 }
 
-func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {
+func (c *Chain) finalizeIntermediateBlock(ctx context.Context, cert *block.Certificate) error {
 	c.intermediateBlock.Header.Certificate = cert
-	return c.AcceptBlock(*c.intermediateBlock)
+	return c.AcceptBlock(ctx, *c.intermediateBlock)
 }
 
 // Send out a query for agreement messages and an intermediate block.
@@ -618,7 +476,18 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 			cm := m.Payload().(message.Candidate)
 
 			// Check block and certificate for correctness
-			if err := c.verifier.CheckBlock(c.prevBlock, *cm.Block); err != nil {
+			if err := c.verifier.SanityCheckBlock(c.prevBlock, *cm.Block); err != nil {
+				continue
+			}
+
+			ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(500*time.Millisecond))
+			defer cancel()
+			calls, err := c.executor.ValidateStateTransition(ctx, c.prevBlock.Txs, c.prevBlock.Header.Height)
+			if err != nil {
+				continue
+			}
+
+			if len(calls) != len(c.prevBlock.Txs) {
 				continue
 			}
 
@@ -763,8 +632,5 @@ func (c *Chain) resetState() error {
 	c.intermediateBlock = intermediateBlock
 
 	c.lastCertificate = block.EmptyCertificate()
-	if err := c.restoreConsensusData(); err != nil {
-		log.WithError(err).Warnln("error in calling chain.restoreConsensusData from resetState. The error is not propagated")
-	}
 	return nil
 }

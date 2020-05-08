@@ -13,8 +13,8 @@ type (
 	// Member contains the bytes of a provisioner's Ed25519 public key,
 	// the bytes of his BLS public key, and how much he has staked.
 	Member struct {
-		PublicKeyBLS []byte
-		Stakes       []Stake
+		PublicKeyBLS []byte  `json:"bls_key"`
+		Stakes       []Stake `json:"stakes"`
 	}
 
 	// Provisioners is a map of Members, and makes up the current set of provisioners.
@@ -23,11 +23,11 @@ type (
 		Members map[string]*Member
 	}
 
-	// Stake of the Provisioner
+	// Stake represents the Provisioner's stake
 	Stake struct {
-		Amount      uint64
-		StartHeight uint64
-		EndHeight   uint64
+		Amount      uint64 `json:"amount"`
+		StartHeight uint64 `json:"start_height"`
+		EndHeight   uint64 `json:"end_height"`
 	}
 )
 

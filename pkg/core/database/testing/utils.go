@@ -51,8 +51,7 @@ func generateChainBlocks(test *testing.T, blocksCount int) ([]*block.Block, erro
 		b.Header.Timestamp = int64(10 * b.Header.Height)
 
 		for _, tx := range b.Txs {
-			_, err := tx.CalculateHash()
-			if err != nil {
+			if _, err := tx.CalculateHash(); err != nil {
 				return nil, err
 			}
 		}

@@ -44,8 +44,9 @@ type databaseConfiguration struct {
 
 // wallet configs
 type walletConfiguration struct {
-	File  string
-	Store string
+	File          string
+	SecretKeyFile string
+	Store         string
 }
 
 // pprof configs

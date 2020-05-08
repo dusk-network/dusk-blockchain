@@ -3,11 +3,8 @@ package txrecords
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"io/ioutil"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
@@ -29,28 +26,18 @@ type TxRecord struct {
 	Timestamp int64
 	Height    uint64
 	transactions.TxType
-	Amount       uint64
-	UnlockHeight uint64
-	Recipient    string
+	transactions.ContractCall
 }
 
 // New creates a TxRecord
-func New(tx transactions.Transaction, height uint64, direction Direction, privView *key.PrivateView) *TxRecord {
-	t := &TxRecord{
+func New(tx transactions.ContractCall, height uint64, direction Direction) *TxRecord {
+	return &TxRecord{
 		Direction:    direction,
 		Timestamp:    time.Now().Unix(),
 		Height:       height,
 		TxType:       tx.Type(),
-		Amount:       tx.StandardTx().Outputs[0].EncryptedAmount.BigInt().Uint64(),
-		UnlockHeight: height + tx.LockTime(),
-		Recipient:    hex.EncodeToString(tx.StandardTx().Outputs[0].PubKey.P.Bytes()),
+		ContractCall: tx,
 	}
-
-	if transactions.ShouldEncryptValues(tx) {
-		amountScalar := transactions.DecryptAmount(tx.StandardTx().Outputs[0].EncryptedAmount, tx.StandardTx().R, 0, *privView)
-		t.Amount = amountScalar.BigInt().Uint64()
-	}
-	return t
 }
 
 // Encode the TxRecord into a buffer
@@ -71,16 +58,11 @@ func Encode(b *bytes.Buffer, t *TxRecord) error {
 		return err
 	}
 
-	if err := binary.Write(b, binary.LittleEndian, t.Amount); err != nil {
+	if err := transactions.Marshal(b, t.ContractCall); err != nil {
 		return err
 	}
 
-	if err := binary.Write(b, binary.LittleEndian, t.UnlockHeight); err != nil {
-		return err
-	}
-
-	_, err := b.Write([]byte(t.Recipient))
-	return err
+	return nil
 }
 
 // Decode a TxRecord from a buffer
@@ -101,19 +83,30 @@ func Decode(b *bytes.Buffer, t *TxRecord) error {
 		return err
 	}
 
-	if err := binary.Read(b, binary.LittleEndian, &t.Amount); err != nil {
+	var call transactions.ContractCall
+	switch t.TxType {
+	case transactions.Tx:
+		call = new(transactions.Transaction)
+	case transactions.Distribute:
+		call = new(transactions.DistributeTransaction)
+	case transactions.WithdrawFees:
+		call = new(transactions.WithdrawFeesTransaction)
+	case transactions.Bid:
+		call = new(transactions.BidTransaction)
+	case transactions.Stake:
+		call = new(transactions.StakeTransaction)
+	case transactions.Slash:
+		call = new(transactions.SlashTransaction)
+	case transactions.WithdrawStake:
+		call = new(transactions.WithdrawStakeTransaction)
+	case transactions.WithdrawBid:
+		call = new(transactions.WithdrawBidTransaction)
+	}
+
+	if err := transactions.Unmarshal(b, call); err != nil {
 		return err
 	}
 
-	if err := binary.Read(b, binary.LittleEndian, &t.UnlockHeight); err != nil {
-		return err
-	}
-
-	recipientBytes, err := ioutil.ReadAll(b)
-	if err != nil {
-		return err
-	}
-
-	t.Recipient = string(recipientBytes)
+	t.ContractCall = call
 	return nil
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -356,68 +355,6 @@ func TestFetchBlockHashByHeight(test *testing.T) {
 	})
 }
 
-func TestFetchKeyImageExists(test *testing.T) {
-
-	test.Parallel()
-
-	// Ensure all KeyImages have been stored to the KeyImage "table"
-	err := db.View(func(t database.Transaction) error {
-		for _, block := range blocks {
-			for _, tx := range block.Txs {
-				for _, input := range tx.StandardTx().Inputs {
-
-					if len(input.KeyImage.Bytes()) == 0 {
-						test.Fatal("Testing with empty keyImage")
-					}
-
-					exists, txID, err := t.FetchKeyImageExists(input.KeyImage.Bytes())
-
-					if !exists {
-						test.Fatal("FetchKeyImageExists cannot find keyImage")
-					}
-
-					if txID == nil {
-						test.Fatal("FetchKeyImageExists found keyImage on invalid tx")
-					}
-
-					if err != nil {
-						test.Fatal(err.Error())
-					}
-				}
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err.Error())
-	}
-
-	// Ensure it fails properly when a non-existing KeyImage is checked
-	_ = db.View(func(t database.Transaction) error {
-		invalidKeyImage, _ := crypto.RandEntropy(32)
-
-		if len(invalidKeyImage) == 0 {
-			test.Fatal("Testing with empty KeyImage")
-		}
-
-		exists, txID, err := t.FetchKeyImageExists(invalidKeyImage)
-
-		if exists {
-			test.Fatal("KeyImage is not supposed to be found")
-		}
-
-		if txID != nil {
-			test.Fatal("Invalid TxID for non-existing KeyImage")
-		}
-
-		if err != database.ErrKeyImageNotFound {
-			test.Fatal("ErrKeyImageNotFound is expected when fetching non-existing KeyImage")
-		}
-		return nil
-	})
-}
-
 // TestAtomicUpdates ensures no change is applied into storage state when DB
 // writable tx does fail
 func TestAtomicUpdates(test *testing.T) {
@@ -619,8 +556,8 @@ func TestFetchBlockTxByHash(test *testing.T) {
 	// Ensure we can fetch one by one each transaction by its TxID without
 	// providing block.header.hash
 	err := db.View(func(t database.Transaction) error {
-		for _, block := range blocks {
-			for txIndex, originTx := range block.Txs {
+		for _, blk := range blocks {
+			for txIndex, originTx := range blk.Txs {
 
 				// FetchBlockTxByHash
 				txID, _ := originTx.CalculateHash()
@@ -723,121 +660,6 @@ func TestClearDatabase(test *testing.T) {
 	// repopulate db for the other tests
 	if err := storeBlocks(db, blocks); err != nil {
 		test.Fatal(err)
-	}
-}
-
-func TestFetchOutputExists(test *testing.T) {
-	test.Parallel()
-
-	err := db.View(func(t database.Transaction) error {
-		for _, block := range blocks {
-			for _, tx := range block.Txs {
-				for _, output := range tx.StandardTx().Outputs {
-					exists, err := t.FetchOutputExists(output.PubKey.P.Bytes())
-					if err != nil {
-						return err
-					}
-
-					if !exists {
-						test.Fatal("output key missing")
-					}
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err)
-	}
-}
-
-func TestFetchOutputUnlockHeight(test *testing.T) {
-	test.Parallel()
-
-	err := db.View(func(t database.Transaction) error {
-		for _, block := range blocks {
-			for _, tx := range block.Txs {
-				for i, output := range tx.StandardTx().Outputs {
-					unlockHeight, err := t.FetchOutputUnlockHeight(output.PubKey.P.Bytes())
-					if err != nil {
-						return err
-					}
-
-					// If it's a bid or a stake, the unlockheight should
-					// be non-zero for the first output
-					if i == 0 && (tx.Type() == transactions.BidType || tx.Type() == transactions.StakeType) {
-						if unlockHeight == 0 {
-							test.Fatal("found bid or stake with 0 unlockheight")
-						}
-					}
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err)
-	}
-}
-
-func TestFetchDecoys(test *testing.T) {
-	test.Parallel()
-
-	// 7 is the standard number of decoys
-	numDecoys := 7
-	hits := 0
-	err := db.View(func(t database.Transaction) error {
-		decoys := t.FetchDecoys(numDecoys)
-		// We should have at least 90 txs in our database, so plenty of
-		// decoys to choose from, and under no circumstance should we
-		// come up short.
-		if len(decoys) != numDecoys {
-			return errors.New("did not receive requested amount of decoys")
-		}
-
-		currentHeight, err := t.FetchCurrentHeight()
-		if err != nil {
-			return err
-		}
-
-		// Make sure these decoy points belong to transactions in
-		// our db, which are unlocked.
-		for _, decoy := range decoys {
-			// Make sure it's a real output
-			exists, err := t.FetchOutputExists(decoy.Bytes())
-			if err != nil {
-				return err
-			}
-
-			if !exists {
-				return errors.New("fetched a decoy for which there is no output entry")
-			}
-
-			unlockHeight, err := t.FetchOutputUnlockHeight(decoy.Bytes())
-			if err != nil {
-				return err
-			}
-
-			// Unlock height should be equal to or lower than the current
-			// height for it to be considered unlocked.
-			if unlockHeight <= currentHeight {
-				hits++
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err)
-	}
-
-	if hits != numDecoys {
-		test.Fatalf("incorrect amount of hits - %v/%v", hits, numDecoys)
 	}
 }
 

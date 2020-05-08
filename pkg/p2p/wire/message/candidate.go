@@ -29,6 +29,8 @@ func NewCandidate() *Candidate {
 // MakeCandidate creates a Candidate from a block and a certificate. It is
 // meant for actual creation of the Candidate, rather than struct-decoding of a
 // transmitted one
+// It includes the certificates of the previous block, so the generator can use
+// it in the Distribute transaction to reward those provisioners
 func MakeCandidate(blk *block.Block, cert *block.Certificate) Candidate {
 	c := NewCandidate()
 	c.Block = blk

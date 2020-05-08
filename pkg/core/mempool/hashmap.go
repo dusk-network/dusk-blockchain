@@ -1,7 +1,6 @@
 package mempool
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -65,7 +64,7 @@ func (m *HashMap) Put(t TxDesc) error {
 	// sort keys by Fee
 	// Bulk sort like (sort.Slice) performs a few times slower than
 	// a simple binarysearch&shift algorithm.
-	fee := t.tx.StandardTx().Fee.BigInt().Uint64()
+	fee := t.tx.StandardTx().Fee.Value
 
 	index := sort.Search(len(m.sorted), func(i int) bool {
 		return m.sorted[i].f < fee
@@ -76,23 +75,26 @@ func (m *HashMap) Put(t TxDesc) error {
 	m.sorted[index] = keyFee{k: k, f: fee}
 
 	// store all tx key images, if provided
-	for i, input := range t.tx.StandardTx().Inputs {
-		if len(input.KeyImage.Bytes()) == keyImageSize {
-			var ki keyImage
-			copy(ki[:], input.KeyImage.Bytes())
-			m.spentkeyImages[ki] = true
-		} else {
-			return fmt.Errorf("invalid key image found at index %d", i)
+	// TODO: update for phoenix txs
+	/*
+		for i, input := range t.tx.StandardTx().Inputs {
+			if len(input.KeyImage.Bytes()) == keyImageSize {
+				var ki keyImage
+				copy(ki[:], input.KeyImage.Bytes())
+				m.spentkeyImages[ki] = true
+			} else {
+				return fmt.Errorf("invalid key image found at index %d", i)
+			}
 		}
-	}
+	*/
 
 	return nil
 }
 
 // Clone the entire pool
-func (m HashMap) Clone() []transactions.Transaction {
+func (m HashMap) Clone() []transactions.ContractCall {
 
-	r := make([]transactions.Transaction, len(m.data))
+	r := make([]transactions.ContractCall, len(m.data))
 	i := 0
 	for _, t := range m.data {
 		r[i] = t.tx
@@ -104,8 +106,8 @@ func (m HashMap) Clone() []transactions.Transaction {
 
 // FilterByType returns all transactions for a specific type that are
 // currently in the HashMap.
-func (m HashMap) FilterByType(filterType transactions.TxType) []transactions.Transaction {
-	txs := make([]transactions.Transaction, 0)
+func (m HashMap) FilterByType(filterType transactions.TxType) []transactions.ContractCall {
+	txs := make([]transactions.ContractCall, 0)
 	for _, t := range m.data {
 		if t.tx.Type() == filterType {
 			txs = append(txs, t.tx)
@@ -124,7 +126,7 @@ func (m *HashMap) Contains(txID []byte) bool {
 }
 
 // Get returns a tx for a given txID if it exists.
-func (m *HashMap) Get(txID []byte) transactions.Transaction {
+func (m *HashMap) Get(txID []byte) transactions.ContractCall {
 	var k txHash
 	copy(k[:], txID)
 	txd, ok := m.data[k]

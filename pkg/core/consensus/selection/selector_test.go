@@ -2,6 +2,7 @@ package selection_test
 
 import (
 	"bytes"
+	"context"
 	"sort"
 	"sync"
 	"testing"
@@ -112,7 +113,7 @@ func newMockHandler() *mockHandler {
 	return &mockHandler{}
 }
 
-func (m *mockHandler) Verify(message.Score) error {
+func (m *mockHandler) Verify(context.Context, message.Score) error {
 	time.Sleep(500 * time.Millisecond)
 	return nil
 }

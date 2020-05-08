@@ -46,7 +46,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 		if err != nil {
 			return "", err
 		}
-		r := resp.([]txs.Transaction)
+		r := resp.([]txs.ContractCall)
 
 		txs := make([]queryTx, 0)
 		for i := 0; i < len(r); i++ {

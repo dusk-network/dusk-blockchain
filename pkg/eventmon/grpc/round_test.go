@@ -22,7 +22,6 @@ func (h *helloSrv) NotifyBlock(ctx context.Context, req *monitor.BlockUpdate) (*
 // BlockUpdate
 func TestNotifyBlockUpdate(t *testing.T) {
 	client := grpc.New(testURL)
-
 	height := uint64(200)
 	testData := helper.RandomBlock(t, height, 2)
 	call := callTest{

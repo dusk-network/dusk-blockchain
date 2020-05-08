@@ -24,14 +24,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// verifier func mock
-var verifyFunc = func(tx transactions.Transaction) error {
+// mockVerifier mocks the Mempool verifier
+type mockVerifier struct {
+}
+
+func (m *mockVerifier) VerifyTransaction(ctx context.Context, tx transactions.ContractCall) error {
 
 	// some dummy check to distinguish between valid and non-valid txs for
-	// this test
-	val := float64(tx.StandardTx().Version)
-	if math.Mod(val, 2) != 0 {
-		return errors.New("invalid tx version")
+	// this test. In this case we mark the tx with an unexisting TX TYPE
+	if uint8(tx.Type()) > 8 {
+		return errors.New("invalid tx type")
 	}
 	return nil
 }
@@ -42,7 +44,7 @@ var c *ctx
 // ctx main role is to collect the expected verified and propagated txs so that
 // it can assert that mempool has the proper set of txs after particular events
 type ctx struct {
-	verifiedTx []transactions.Transaction
+	verifiedTx []transactions.ContractCall
 	propagated [][]byte
 	mu         sync.Mutex
 
@@ -57,7 +59,7 @@ func (c *ctx) reset() {
 	c.mu.Lock()
 	c.m.Quit()
 	c.m.verified = c.m.newPool()
-	c.verifiedTx = make([]transactions.Transaction, 0)
+	c.verifiedTx = make([]transactions.ContractCall, 0)
 	c.propagated = make([][]byte, 0)
 	c.mu.Unlock()
 
@@ -93,7 +95,7 @@ func TestMain(m *testing.M) {
 	}(streamer, c)
 
 	// initiate a mempool with custom verification function
-	c.m = NewMempool(c.bus, c.rpcBus, verifyFunc, nil)
+	c.m = NewMempool(context.Background(), c.bus, c.rpcBus, &mockVerifier{}, nil)
 	c.m.Run()
 
 	code := m.Run()
@@ -101,10 +103,11 @@ func TestMain(m *testing.M) {
 }
 
 // adding tx in ctx means mempool is expected to store it in the verified list
-func (c *ctx) addTx(tx transactions.Transaction) {
+func (c *ctx) addTx(tx transactions.ContractCall) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := verifyFunc(tx); err == nil {
+	m := &mockVerifier{}
+	if err := m.VerifyTransaction(context.Background(), tx); err == nil {
 		c.verifiedTx = append(c.verifiedTx, tx)
 	}
 }
@@ -121,7 +124,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 	c.wait()
 
 	resp, _ := c.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
-	txs := resp.([]transactions.Transaction)
+	txs := resp.([]transactions.ContractCall)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -134,7 +137,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 		var exists bool
 		for _, memTx := range txs {
-			if memTx.Equals(tx) {
+			if transactions.Equal(memTx, tx) {
 				exists = true
 				break
 			}
@@ -153,7 +156,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 	}
 }
 
-func prepTx(tx transactions.Transaction) message.Message {
+func prepTx(tx transactions.ContractCall) message.Message {
 	return message.New(topics.Tx, tx)
 }
 
@@ -171,7 +174,6 @@ func TestProcessPendingTxs(t *testing.T) {
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
 		tx := helper.RandomStandardTx(t, false)
-		tx.Version++
 		txMsg = prepTx(tx)
 		c.addTx(tx)
 		c.bus.Publish(topics.Tx, txMsg)
@@ -215,7 +217,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		to := from + numOfTxsPerBatch
 
 		wg.Add(1)
-		go func(txs []transactions.Transaction) {
+		go func(txs []transactions.ContractCall) {
 			for _, tx := range txs {
 				txMsg := prepTx(tx)
 				c.bus.Publish(topics.Tx, txMsg)
@@ -230,7 +232,6 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		go func() {
 			for y := 0; y <= 5; y++ {
 				tx := helper.RandomStandardTx(t, false)
-				tx.Version++
 				txMsg := prepTx(tx)
 				c.bus.Publish(topics.Tx, txMsg)
 			}
@@ -250,7 +251,7 @@ func TestRemoveAccepted(t *testing.T) {
 
 	// Create a random block
 	b := helper.RandomBlock(t, 200, 0)
-	b.Txs = make([]transactions.Transaction, 0)
+	b.Txs = make([]transactions.ContractCall, 0)
 
 	counter := 0
 
@@ -412,7 +413,8 @@ func TestMempoolView(t *testing.T) {
 	assert.Equal(t, numTxs*4, len(resp.Result))
 
 	// Now, we single out one hash from the bunch
-	hash := hex.EncodeToString(txs[7].StandardTx().TxID)
+	txid, _ := txs[7].CalculateHash()
+	hash := hex.EncodeToString(txid)
 	resp, err = c.m.SelectTx(context.Background(), &node.SelectRequest{Id: hash})
 	if err != nil {
 		t.Fatal(err)
@@ -435,9 +437,9 @@ func TestMempoolView(t *testing.T) {
 	assert.Equal(t, numTxs, len(resp.Result))
 }
 
-// Only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
-func randomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.Transaction {
-	var txs []transactions.Transaction
+// randomSliceOfTxs only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
+func randomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.ContractCall {
+	var txs []transactions.ContractCall
 
 	var i uint16
 	for ; i < txsBatchCount; i++ {

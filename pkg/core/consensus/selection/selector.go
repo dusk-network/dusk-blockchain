@@ -1,11 +1,13 @@
 package selection
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -30,6 +32,8 @@ type Selector struct {
 
 	eventPlayer consensus.EventPlayer
 	signer      consensus.Signer
+	ctx         context.Context
+	provisioner transactions.Provisioner
 }
 
 type emptyScoreFactory struct {
@@ -48,11 +52,13 @@ func (e emptyScoreFactory) Create(pubkey []byte, round uint64, step uint8) conse
 // NewComponent creates and launches the component which responsibility is to validate
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
-func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector {
+func NewComponent(ctx context.Context, publisher eventbus.Publisher, timeout time.Duration, provisioner transactions.Provisioner) *Selector {
 	return &Selector{
-		timeout:   timeout,
-		publisher: publisher,
-		bestEvent: message.EmptyScore(),
+		timeout:     timeout,
+		publisher:   publisher,
+		bestEvent:   message.EmptyScore(),
+		ctx:         ctx,
+		provisioner: provisioner,
 	}
 }
 
@@ -61,7 +67,7 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector
 func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.eventPlayer = eventPlayer
 	s.signer = signer
-	s.handler = NewScoreHandler(r.BidList)
+	s.handler = NewScoreHandler(r.BidList, s.provisioner)
 	s.timer = &timer{s: s}
 
 	scoreSubscriber := consensus.TopicListener{
@@ -109,7 +115,7 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 		}
 	}
 
-	if err := s.handler.Verify(score); err != nil {
+	if err := s.handler.Verify(s.ctx, score); err != nil {
 		return err
 	}
 

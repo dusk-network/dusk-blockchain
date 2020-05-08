@@ -3,15 +3,18 @@ package transactor
 import (
 	"context"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"google.golang.org/grpc"
 )
 
-//nolint
+//Transactor is the implementation of both the Waller and the Transactor GRPC servers
 type Transactor struct { // TODO: rename
 	db database.DB
 	eb *eventbus.EventBus
@@ -20,11 +23,19 @@ type Transactor struct { // TODO: rename
 	// c                 *chainsync.Counter
 	// acceptedBlockChan <-chan block.Block
 
-	grpcClient rusk.RuskClient
+	secretKey transactions.SecretKey
+
+	//ruskClient       rusk.RuskClient
+	provider         transactions.Provider
+	keyMaster        transactions.KeyMaster
+	walletClient     node.WalletClient
+	transactorClient node.TransactorClient
+
+	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client rusk.RuskClient) *Transactor {
+func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client *rpc.Client, provider transactions.Provider, keyMaster transactions.KeyMaster) *Transactor {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -32,8 +43,11 @@ func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client rusk.Ru
 	t := &Transactor{
 		db: db,
 		eb: eb,
-		// c:           counter,
-		grpcClient: client,
+		//ruskClient:       client.RuskClient,
+		walletClient:     client.WalletClient,
+		transactorClient: client.TransactorClient,
+		keyMaster:        keyMaster,
+		provider:         provider,
 	}
 
 	if srv != nil {
@@ -70,8 +84,7 @@ func (t *Transactor) ClearWalletDatabase(ctx context.Context, e *node.EmptyReque
 
 // CallContract will create a transaction that calls a smart contract.
 func (t *Transactor) CallContract(ctx context.Context, c *node.CallContractRequest) (*node.TransactionResponse, error) {
-	// TODO: implement
-	return nil, nil
+	return t.handleSendContract(c)
 }
 
 // Transfer will create a normal transaction, transferring DUSK.

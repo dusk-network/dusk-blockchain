@@ -114,7 +114,7 @@ func marshalGetData(getData *peermsg.Inv) (*bytes.Buffer, error) {
 
 // GetMempoolTxs is a wire.GetMempoolTx API wrapper. Later it could be moved into
 // a separate utils pkg
-func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction, error) {
+func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.ContractCall, error) {
 
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write(txID)
@@ -122,7 +122,7 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction,
 	if err != nil {
 		return nil, err
 	}
-	mempoolTxs := resp.([]transactions.Transaction)
+	mempoolTxs := resp.([]transactions.ContractCall)
 
 	return mempoolTxs, nil
 }
