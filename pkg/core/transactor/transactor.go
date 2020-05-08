@@ -11,7 +11,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"google.golang.org/grpc"
 )
 
@@ -24,9 +23,11 @@ type Transactor struct { // TODO: rename
 	// c                 *chainsync.Counter
 	// acceptedBlockChan <-chan block.Block
 
-	secretKey *transactions.SecretKey
+	secretKey transactions.SecretKey
 
-	ruskClient       rusk.RuskClient
+	//ruskClient       rusk.RuskClient
+	provider         transactions.Provider
+	keyMaster        transactions.KeyMaster
 	walletClient     node.WalletClient
 	transactorClient node.TransactorClient
 
@@ -34,17 +35,19 @@ type Transactor struct { // TODO: rename
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client *rpc.Client) *Transactor {
+func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client *rpc.Client, provider transactions.Provider, keyMaster transactions.KeyMaster) *Transactor {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
 
 	t := &Transactor{
-		db:               db,
-		eb:               eb,
-		ruskClient:       client.RuskClient,
+		db: db,
+		eb: eb,
+		//ruskClient:       client.RuskClient,
 		walletClient:     client.WalletClient,
 		transactorClient: client.TransactorClient,
+		keyMaster:        keyMaster,
+		provider:         provider,
 	}
 
 	if srv != nil {

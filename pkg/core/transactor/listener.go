@@ -11,8 +11,6 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	logger "github.com/sirupsen/logrus"
 )
@@ -37,18 +35,18 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	}
 
 	//generate secret key with rusk
+	// TODO: use parent context
 	ctx := context.Background()
-	record, err := t.ruskClient.GenerateSecretKey(ctx, &rusk.GenerateSecretKeyRequest{B: req.Seed})
+	sk, err := t.keyMaster.GenerateSecretKey(ctx, req.Seed)
 	if err != nil {
 		return nil, err
 	}
 
 	//set it for further use
-	t.secretKey = new(transactions.SecretKey)
-	transactions.USecretKey(record.Sk, t.secretKey)
+	t.secretKey = sk
 
 	//create wallet with seed and pass
-	pubKey, err := t.createFromSeed(req.Seed, req.Password)
+	pubKey, _, err := t.createFromSeed(req.Seed, req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -56,29 +54,19 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	// TODO: will this still make sense after the migration
 	// t.launchConsensus()
 
-	// TODO: KEYS is hex encoding the PK correct?
 	return &node.LoadResponse{Key: &node.PubKey{
 		PublicKey: pubKey.ToAddr(),
 	}}, nil
 }
 
 func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
-	if t.w.SecretKey() == nil {
+	sk := t.w.SecretKey
+	if sk.IsEmpty() {
 		return nil, errors.New("SecretKey is not set")
 	}
 
-	ruskSK := new(rusk.SecretKey)
-	transactions.MSecretKey(ruskSK, t.w.SecretKey())
-
-	//get the pub key and return
-	ctx := context.Background()
-	pubKey, err := t.ruskClient.Keys(ctx, ruskSK)
-	if err != nil {
-		return nil, err
-	}
-
 	return &node.LoadResponse{Key: &node.PubKey{
-		PublicKey: []byte(pubKey.String()),
+		PublicKey: t.w.PublicKey.ToAddr(),
 	}}, nil
 }
 
@@ -117,7 +105,7 @@ func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse
 	// 	return nil, errWalletAlreadyLoaded
 	// }
 
-	pubKey, err := t.loadWallet(req.Password)
+	pubKey, _, err := t.loadWallet(req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -154,46 +142,29 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 		return nil, errWalletNotLoaded
 	}
 
-	// TODO: Make an internal call to the block generator, to retrieve the blind bid M value. (Scalar)
-
 	// // create and sign transaction
 	log.Tracef("Create a bid tx (%d,%d)", req.Amount, req.Locktime)
 
-	resp, err := t.handleAddress()
-	if err != nil {
-		return nil, err
-	}
-
+	// TODO context should be created from the parent one
 	ctx := context.Background()
 
-	pb, err := DecodeAddressToPublicKey(resp.GetKey().PublicKey)
+	txReq := transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, true)
+	// FIXME: here we need to create K, EdPk; retrieve seed somehow and decide
+	// an ExpirationHeight (most likely the last 2 should be retrieved from he
+	// DB)
+	// Create the Ed25519 Keypair
+	tx, err := t.provider.NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
+
 	if err != nil {
 		return nil, err
 	}
 
-	ruskSK := new(rusk.SecretKey)
-	transactions.MSecretKey(ruskSK, t.w.SecretKey())
-	tx, err := t.ruskClient.NewTransaction(ctx, &rusk.NewTransactionRequest{
-		//TODO: currently does not yet support adding any peripheral data to transactions
-		//Value:     c.Value,
-		Recipient: pb,
-		Fee:       req.Fee,
-		Sk:        ruskSK,
-	})
+	// TODO: store the K and D in storage for the block generator
+
+	hash, err := t.publishTx(&tx)
 	if err != nil {
 		return nil, err
 	}
-
-	hash, err := t.publishTx(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: will this still make sense after migration?
-	// Save relevant values in the database for the generation component to use
-	//if err := t.writeBidValues(tx); err != nil {
-	//	return nil, err
-	//}
 
 	return &node.TransactionResponse{Hash: hash}, nil
 }
@@ -211,35 +182,14 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 		return nil, errWalletNotLoaded
 	}
 
+	// TODO: use a parent context
 	ctx := context.Background()
-
-	resp, err := t.handleAddress()
+	tx, err := t.provider.NewStakeTx(ctx, blsKey.Marshal(), transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
 	if err != nil {
 		return nil, err
 	}
 
-	pb, err := DecodeAddressToPublicKey(resp.GetKey().PublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	ruskSK := new(rusk.SecretKey)
-	transactions.MSecretKey(ruskSK, t.w.SecretKey())
-	tx, err := t.ruskClient.NewStake(ctx, &rusk.StakeTransactionRequest{
-		BlsKey: blsKey.Marshal(),
-		Tx: &rusk.NewTransactionRequest{
-			//TODO: currently does not yet support adding any peripheral data to transactions
-			Value:     req.Amount,
-			Recipient: pb,
-			Fee:       req.Fee,
-			Sk:        ruskSK,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	hash, err := t.publishStakeTx(tx)
+	hash, err := t.publishTx(&tx)
 	if err != nil {
 		return nil, err
 	}
@@ -262,20 +212,14 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 		return nil, err
 	}
 
-	ruskSK := new(rusk.SecretKey)
-	transactions.MSecretKey(ruskSK, t.w.SecretKey())
-	tx, err := t.ruskClient.NewTransaction(ctx, &rusk.NewTransactionRequest{
-		Value:     req.Amount,
-		Recipient: pb,
-		Fee:       req.Fee,
-		Sk:        ruskSK,
-	})
+	txReq := transactions.MakeTxRequest(t.w.SecretKey, pb, req.Amount, req.Fee, false)
+	tx, err := t.provider.NewTransactionTx(ctx, txReq)
 	if err != nil {
 		return nil, err
 	}
 
 	// Publish transaction to the mempool processing
-	hash, err := t.publishTx(tx)
+	hash, err := t.publishTx(&tx)
 	if err != nil {
 		return nil, err
 	}
@@ -316,44 +260,19 @@ func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) 
 
 func (t *Transactor) handleIsWalletLoaded() (*node.WalletStatusResponse, error) {
 	isLoaded := false
-	if t.w != nil && t.w.SecretKey() != nil {
+	if t.w != nil && !t.w.SecretKey.IsEmpty() {
 		isLoaded = true
 	}
 	return &node.WalletStatusResponse{Loaded: isLoaded}, nil
 }
-func (t *Transactor) publishStakeTx(tx *rusk.StakeTransaction) ([]byte, error) {
-	phoenixTX := new(transactions.StakeTransaction)
 
-	err := transactions.MStake(tx, phoenixTX)
+func (t *Transactor) publishTx(tx transactions.ContractCall) ([]byte, error) {
+	hash, err := tx.CalculateHash()
 	if err != nil {
 		return nil, err
 	}
 
-	hash, err := phoenixTX.CalculateHash()
-	if err != nil {
-		return nil, err
-	}
-
-	msg := message.New(topics.Tx, phoenixTX)
-	t.eb.Publish(topics.Tx, msg)
-
-	return hash, nil
-}
-
-func (t *Transactor) publishTx(tx *rusk.Transaction) ([]byte, error) {
-	phoenixTX := new(transactions.Transaction)
-
-	err := transactions.UTx(tx, phoenixTX)
-	if err != nil {
-		return nil, err
-	}
-
-	hash, err := phoenixTX.CalculateHash()
-	if err != nil {
-		return nil, err
-	}
-
-	msg := message.New(topics.Tx, phoenixTX)
+	msg := message.New(topics.Tx, tx)
 	t.eb.Publish(topics.Tx, msg)
 
 	return hash, nil
@@ -367,15 +286,8 @@ func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.Tran
 		return nil, err
 	}
 
-	ruskSK := new(rusk.SecretKey)
-	transactions.MSecretKey(ruskSK, t.w.SecretKey())
-	tx, err := t.ruskClient.NewTransaction(ctx, &rusk.NewTransactionRequest{
-		//TODO: currently does not yet support adding calldata to transactions
-		//Value:     c.Value,
-		Recipient: pb,
-		Fee:       c.Fee,
-		Sk:        ruskSK,
-	})
+	txReq := transactions.MakeTxRequest(t.w.SecretKey, pb, uint64(0), c.Fee, true)
+	tx, err := t.provider.NewContractCall(ctx, c.Data, txReq)
 	if err != nil {
 		return nil, err
 	}

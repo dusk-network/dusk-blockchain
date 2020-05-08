@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"math"
 	"os"
 	"strings"
@@ -23,19 +24,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// verifier func mock
-var verifyFunc = func(tx transactions.ContractCall) error {
-	// TODO: come up with something else for RUSK integration
+// mockVerifier mocks the Mempool verifier
+type mockVerifier struct {
+}
 
-	/*
-		// some dummy check to distinguish between valid and non-valid txs for
-		// this test
-		val := float64(tx.StandardTx().Version)
-		if math.Mod(val, 2) != 0 {
-			return errors.New("invalid tx version")
-		}
-		return nil
-	*/
+func (m *mockVerifier) VerifyTransaction(ctx context.Context, tx transactions.ContractCall) error {
+
+	// some dummy check to distinguish between valid and non-valid txs for
+	// this test. In this case we mark the tx with an unexisting TX TYPE
+	if uint8(tx.Type()) > 8 {
+		return errors.New("invalid tx type")
+	}
 	return nil
 }
 
@@ -96,7 +95,7 @@ func TestMain(m *testing.M) {
 	}(streamer, c)
 
 	// initiate a mempool with custom verification function
-	c.m = NewMempool(c.bus, c.rpcBus, verifyFunc, nil)
+	c.m = NewMempool(context.Background(), c.bus, c.rpcBus, &mockVerifier{}, nil)
 	c.m.Run()
 
 	code := m.Run()
@@ -107,7 +106,8 @@ func TestMain(m *testing.M) {
 func (c *ctx) addTx(tx transactions.ContractCall) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := verifyFunc(tx); err == nil {
+	m := &mockVerifier{}
+	if err := m.VerifyTransaction(context.Background(), tx); err == nil {
 		c.verifiedTx = append(c.verifiedTx, tx)
 	}
 }
@@ -437,7 +437,7 @@ func TestMempoolView(t *testing.T) {
 	assert.Equal(t, numTxs, len(resp.Result))
 }
 
-// Only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
+// randomSliceOfTxs only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
 func randomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.ContractCall {
 	var txs []transactions.ContractCall
 

@@ -29,9 +29,9 @@ type Wallet struct {
 	//keyPair       *key.Key
 	consensusKeys *consensuskey.Keys
 
-	publicKey *transactions.PublicKey
-	viewKey   *transactions.ViewKey
-	secretKey *transactions.SecretKey
+	PublicKey transactions.PublicKey
+	ViewKey   transactions.ViewKey
+	SecretKey transactions.SecretKey
 }
 
 // New creates a wallet instance
@@ -115,9 +115,9 @@ func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, password string,
 		db:            db,
 		netPrefix:     netPrefix,
 		consensusKeys: &consensusKeys,
-		secretKey:     secretKey,
-		publicKey:     nil, //TODO: KEYS
-		viewKey:       nil, //TODO: KEYS
+		SecretKey:     *secretKey,
+		PublicKey:     transactions.PublicKey{}, //TODO: KEYS
+		ViewKey:       transactions.ViewKey{},   //TODO: KEYS
 	}
 
 	return w, nil
@@ -148,14 +148,17 @@ func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile, se
 		return nil, err
 	}
 
+	// TODO: publicKey manipulation
+	// TODO: viewKey manipulation
+
 	return &Wallet{
 		db:        db,
 		netPrefix: netPrefix,
 		//keyPair:       key.NewKeyPair(seed),
-		publicKey:     nil, // TODO: KEY generate from seed/SecretKey
-		viewKey:       nil, // TODO: KEY generate from seed/SecretKey
+		PublicKey:     transactions.PublicKey{}, // TODO: public key should be saved and retrieved later to spare a roundtrip to rusk
+		ViewKey:       transactions.ViewKey{},   // TODO: view key should be saved and retrieved later to spare a roundtrip to rusk
 		consensusKeys: &consensusKeys,
-		secretKey:     secretKey,
+		SecretKey:     *secretKey,
 	}, nil
 }
 
@@ -163,16 +166,6 @@ func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile, se
 // transactions made and received with this wallet.
 func (w *Wallet) FetchTxHistory() ([]txrecords.TxRecord, error) {
 	return w.db.FetchTxRecords()
-}
-
-//// PublicKey returns the wallet public key
-//func (w *Wallet) PublicKey() key.PublicKey {
-//	return *w.keyPair.PublicKey()
-//}
-
-// SecretKey returns the wallet secret key
-func (w *Wallet) SecretKey() *transactions.SecretKey {
-	return w.secretKey
 }
 
 // Keys returns the BLS keys

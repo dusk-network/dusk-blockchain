@@ -14,8 +14,8 @@ func (v *MockVerifier) PerformSanityCheck(uint64, uint64, uint64) error {
 	return nil
 }
 
-// CheckBlock will verify whether a block is valid according to the rules of the consensus
-func (v *MockVerifier) CheckBlock(prevBlock block.Block, blk block.Block) error {
+// SanityCheckBlock will verify whether a block is valid according to the rules of the consensus
+func (v *MockVerifier) SanityCheckBlock(prevBlock block.Block, blk block.Block) error {
 	return nil
 }
 

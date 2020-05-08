@@ -46,13 +46,12 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, proxy *transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server) (chain.Loader, error) {
+func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server) (chain.Loader, error) {
 	// creating and firing up the chain process
 	genesis := cfg.DecodeGenesis()
 	_, db := heavy.CreateDBConnection()
 	l := chain.NewDBLoader(db, genesis)
 
-	// TODO: inject the proper interface
 	chainProcess, err := chain.New(ctx, eventBus, rpcBus, counter, l, l, srv, proxy.Executor())
 	if err != nil {
 		return nil, err
@@ -93,7 +92,7 @@ func Setup() *Server {
 	client := rpc.InitRPCClients(ctx, "127.0.0.1:8080", rpcBus)
 	proxy := transactions.NewProxy(client.RuskClient)
 
-	m := mempool.NewMempool(eventBus, rpcBus, nil, grpcServer)
+	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Verifier(), grpcServer)
 	m.Run()
 
 	chainDBLoader, err := LaunchChain(ctx, proxy, eventBus, rpcBus, counter, grpcServer)
@@ -132,7 +131,7 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	_ = transactor.New(eventBus, nil, grpcServer, client)
+	_ = transactor.New(eventBus, nil, grpcServer, client, proxy.Provider(), proxy.KeyMaster())
 	if err != nil {
 		log.Panic(err)
 	}

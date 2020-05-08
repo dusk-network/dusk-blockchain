@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"context"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -27,19 +28,26 @@ type ConsensusFactory struct {
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 
-	walletPubKey *transactions.PublicKey
+	privKey *transactions.SecretKey
+	pubKey  *transactions.PublicKey
 	key.Keys
 	timerLength time.Duration
+
+	proxy transactions.Proxy
+	ctx   context.Context
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, walletPubKey *transactions.PublicKey, keys key.Keys) *ConsensusFactory {
+func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, privKey *transactions.SecretKey, pubKey *transactions.PublicKey, keys key.Keys, proxy transactions.Proxy) *ConsensusFactory {
 	return &ConsensusFactory{
-		eventBus:     eventBus,
-		rpcBus:       rpcBus,
-		walletPubKey: walletPubKey,
-		Keys:         keys,
-		timerLength:  timerLength,
+		eventBus:    eventBus,
+		rpcBus:      rpcBus,
+		privKey:     privKey,
+		pubKey:      pubKey,
+		Keys:        keys,
+		timerLength: timerLength,
+		proxy:       proxy,
+		ctx:         ctx,
 	}
 }
 
@@ -48,9 +56,9 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Du
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	gen := generation.NewFactory()
-	cgen := candidate.NewFactory(c.eventBus, c.rpcBus, c.walletPubKey)
-	sgen := score.NewFactory(c.eventBus, c.Keys, nil)
-	sel := selection.NewFactory(c.eventBus, c.timerLength)
+	cgen := candidate.NewFactory(c.ctx, c.eventBus, c.rpcBus, c.privKey, c.pubKey, c.proxy)
+	sgen := score.NewFactory(c.ctx, c.eventBus, c.Keys, nil, c.proxy)
+	sel := selection.NewFactory(c.ctx, c.eventBus, c.timerLength, c.proxy)
 	redFirstStep := firststep.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
 	redSecondStep := secondstep.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
 	agr := agreement.NewFactory(c.eventBus, c.Keys)

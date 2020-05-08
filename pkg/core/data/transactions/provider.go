@@ -18,17 +18,30 @@ type TxRequest struct {
 	Obfuscated bool
 }
 
+// MakeTxRequest populates a TxRequest with all needed data
+// ContractCall. As such, it does not need the Public Key
+func MakeTxRequest(sk SecretKey, pk PublicKey, amount uint64, fee uint64, isObfuscated bool) TxRequest {
+	return TxRequest{
+		SK:         sk,
+		PK:         pk,
+		Amount:     amount,
+		Fee:        fee,
+		Obfuscated: isObfuscated,
+	}
+}
+
+// MakeGenesisTxRequest creates a transaction to be embedded in a genesis
+// ContractCall. As such, it does not need the Public Key
+func MakeGenesisTxRequest(sk SecretKey, amount uint64, fee uint64, isObfuscated bool) TxRequest {
+	return MakeTxRequest(sk, PublicKey{}, amount, fee, isObfuscated)
+}
+
 // ScoreRequest is utilized to produce a score
 type ScoreRequest struct {
-	D      []byte
-	K      []byte
-	Y      []byte
-	YInv   []byte
-	Q      []byte
-	Z      []byte
-	Seed   []byte
-	Bids   []byte
-	BidPos uint64
+	D    []byte
+	K    []byte
+	Seed []byte
+	EdPk []byte
 }
 
 // Score encapsulates the score values calculated by rusk
@@ -51,6 +64,8 @@ type Provider interface {
 	// DUSK. It accepts the ViewKey as parameter
 	GetBalance(context.Context, ViewKey) (uint64, error)
 
+	NewContractCall(context.Context, []byte, TxRequest) (ContractCall, error)
+
 	// NewTransaction creates a new transaction using the user's PrivateKey
 	// It accepts the PublicKey of the recipient, a value, a fee and whether
 	// the transaction should be obfuscated or otherwise
@@ -61,8 +76,9 @@ type Provider interface {
 	// NewWithdrawStake creates a WithdrawStake transaction
 	NewWithdrawStakeTx(context.Context, TxRequest) (WithdrawStakeTransaction, error)
 
-	// NewBidTx creates a new Blind Bid
-	NewBidTx(context.Context, TxRequest) (BidTransaction, error)
+	// NewBidTx creates a new Blind Bid. The call accepts a context, the secret
+	// `K`, the Edward Public Key `EdPk`, the `seed` and the `expirationHeight`
+	NewBidTx(context.Context, []byte, []byte, []byte, uint64, TxRequest) (BidTransaction, error)
 	// NewWithdrawBidTx creates a Bid withdrawal request
 	NewWithdrawBidTx(context.Context, TxRequest) (WithdrawBidTransaction, error)
 }
@@ -98,60 +114,73 @@ type Provisioner interface {
 	// NewSlashTx creates a Slash transaction
 	NewSlashTx(context.Context, TxRequest) (SlashTransaction, error)
 
-	// NewDistributeTx creates a new Distribute transaction
-	NewDistributeTx(context.Context, TxRequest) (DistributeTransaction, error)
 	// NewWithdrawFeesTx creates a new WithdrawFees transaction
 	NewWithdrawFeesTx(context.Context, TxRequest) (WithdrawFeesTransaction, error)
+
+	// VerifyScore created by the BlockGenerator
+	VerifyScore(context.Context, Score) error
 }
 
 // BlockGenerator encapsulates the operations performed by the BlockGenerator
 type BlockGenerator interface {
 	// GenerateScore to participate in the block generation lottery
 	GenerateScore(context.Context, ScoreRequest) (Score, error)
+
+	// NewDistributeTx creates a new Distribute transaction
+	NewDistributeTx(context.Context, TxRequest) (DistributeTransaction, error)
 }
 
 // Proxy toward the rusk client
-type Proxy struct {
+type Proxy interface {
+	Provisioner() Provisioner
+	Provider() Provider
+	Verifier() Verifier
+	KeyMaster() KeyMaster
+	Executor() Executor
+	BlockGenerator() BlockGenerator
+}
+
+type proxy struct {
 	client rusk.RuskClient
 }
 
 // NewProxy creates a new Proxy
-func NewProxy(client rusk.RuskClient) *Proxy {
-	return &Proxy{client: client}
+func NewProxy(client rusk.RuskClient) Proxy {
+	return &proxy{client: client}
 }
 
 // Verifier returned by the Proxy
-func (p *Proxy) Verifier() Verifier {
+func (p *proxy) Verifier() Verifier {
 	return &verifier{p}
 }
 
 // KeyMaster returned by the Proxy
-func (p *Proxy) KeyMaster() KeyMaster {
+func (p *proxy) KeyMaster() KeyMaster {
 	return &keymaster{p}
 }
 
 // Executor returned by the Proxy
-func (p *Proxy) Executor() Executor {
+func (p *proxy) Executor() Executor {
 	return &executor{p}
 }
 
 // Provisioner returned by the Proxy
-func (p *Proxy) Provisioner() Provisioner {
+func (p *proxy) Provisioner() Provisioner {
 	return &provisioner{p}
 }
 
 // Provider returned by the Proxy
-func (p *Proxy) Provider() Provider {
+func (p *proxy) Provider() Provider {
 	return &provider{p}
 }
 
 // BlockGenerator returned by the Proxy
-func (p *Proxy) BlockGenerator() BlockGenerator {
+func (p *proxy) BlockGenerator() BlockGenerator {
 	return &blockgenerator{p}
 }
 
 type verifier struct {
-	*Proxy
+	*proxy
 }
 
 // VerifyTransaction verifies a contract call transaction
@@ -172,7 +201,7 @@ func (v *verifier) VerifyTransaction(ctx context.Context, cc ContractCall) error
 }
 
 type provider struct {
-	*Proxy
+	*proxy
 }
 
 // GetBalance returns the balance of the client expressed in (unit?) of
@@ -186,6 +215,18 @@ func (p *provider) GetBalance(ctx context.Context, vk ViewKey) (uint64, error) {
 	}
 
 	return res.Balance, nil
+}
+
+// NewContractCall creates a new transaction using the user's PrivateKey
+// It accepts the PublicKey of the recipient, a value, a fee and whether
+// the transaction should be obfuscated or otherwise
+func (p *provider) NewContractCall(ctx context.Context, b []byte, tx TxRequest) (ContractCall, error) {
+	//trans := new(Transaction)
+	//tr := new(rusk.NewTransactionRequest)
+	//MTxRequest(tr, tx)
+	//res, err := p.client.NewContractCall(ctx, tr)
+
+	return nil, errors.New("not implemented yet")
 }
 
 // NewTransaction creates a new transaction using the user's PrivateKey
@@ -247,15 +288,20 @@ func (p *provider) NewWithdrawStakeTx(ctx context.Context, tx TxRequest) (Withdr
 	return *wsTx, nil
 }
 
-// NewBidTx creates a new Blind Bid
-// TODO: most likely, the Bid Transaction request will need some more
-// parameters
-func (p *provider) NewBidTx(ctx context.Context, tx TxRequest) (BidTransaction, error) {
+// NewBidTx creates a new Blind Bid. It uses the secret K, the Edward PK, the
+// seed and the block height for unlocking
+func (p *provider) NewBidTx(ctx context.Context, k, edPk, seed []byte, expirationHeight uint64, tx TxRequest) (BidTransaction, error) {
 	bidTx := new(BidTransaction)
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
 	str := new(rusk.BidTransactionRequest)
+	str.Tx = tr
+	str.K = k
+	str.EdPk = edPk
+	str.Seed = seed
+	str.ExpirationHeight = expirationHeight
+
 	res, err := p.client.NewBid(ctx, str)
 	if err != nil {
 		return *bidTx, err
@@ -286,7 +332,7 @@ func (p *provider) NewWithdrawBidTx(ctx context.Context, tx TxRequest) (Withdraw
 }
 
 type keymaster struct {
-	*Proxy
+	*proxy
 }
 
 // GenerateSecretKey creates a SecretKey using a []byte as Seed
@@ -323,7 +369,7 @@ func (k *keymaster) Keys(ctx context.Context, sk SecretKey) (PublicKey, ViewKey,
 // TODO: implement
 // FullScanOwnedNotes(ViewKey) (OwnedNotesResponse)
 type executor struct {
-	*Proxy
+	*proxy
 }
 
 // ValidateStateTransition takes a bunch of ContractCalls and the block
@@ -340,14 +386,17 @@ func (e *executor) ValidateStateTransition(ctx context.Context, calls []Contract
 	}
 	vstr.CurrentHeight = height
 
-	// TODO: filter based on the indexes within the response once
-	// #dusk-protobuf#77 is solved
-	_, err = e.client.ValidateStateTransition(ctx, vstr)
+	res, err := e.client.ValidateStateTransition(ctx, vstr)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	validTxs := make([]ContractCall, len(res.SuccessfulCalls))
+	for i, idx := range res.SuccessfulCalls {
+		validTxs[i] = calls[idx]
+	}
+
+	return validTxs, nil
 }
 
 // ExecuteStateTransition performs a global state mutation and steps the
@@ -393,7 +442,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 }
 
 type provisioner struct {
-	*Proxy
+	*proxy
 }
 
 // NewSlashTx creates a Slash transaction
@@ -414,25 +463,6 @@ func (p *provisioner) NewSlashTx(ctx context.Context, tx TxRequest) (SlashTransa
 		return *slashTx, err
 	}
 	return *slashTx, nil
-}
-
-// NewDistributeTx creates a new Distribute transaction
-func (p *provisioner) NewDistributeTx(ctx context.Context, tx TxRequest) (DistributeTransaction, error) {
-	dTx := new(DistributeTransaction)
-	tr := new(rusk.NewTransactionRequest)
-	MTxRequest(tr, tx)
-
-	dt := new(rusk.DistributeTransactionRequest)
-	dt.Tx = tr
-	res, err := p.client.NewDistribute(ctx, dt)
-	if err != nil {
-		return *dTx, err
-	}
-
-	if err := UDistribute(res, dTx); err != nil {
-		return *dTx, err
-	}
-	return *dTx, nil
 }
 
 // NewWithdrawFeesTx creates a new WithdrawFees transaction
@@ -457,22 +487,33 @@ func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, tx TxRequest) (With
 	return *feeTx, nil
 }
 
+// VerifyScore to participate in the block generation lottery
+func (p *provisioner) VerifyScore(ctx context.Context, score Score) error {
+	/*
+		gsr := &rusk.GenerateScoreResponse{
+			Proof: score.Proof,
+			Score: score.Score,
+			Z:     score.Z,
+			Bids:  score.Bids,
+		}
+		if _, err := b.client.VerifyScore(ctx, gsr); err != nil {
+			return err
+		}
+	*/
+	return nil
+}
+
 type blockgenerator struct {
-	*Proxy
+	*proxy
 }
 
 // GenerateScore to participate in the block generation lottery
 func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Score, error) {
 	gsr := &rusk.GenerateScoreRequest{
-		D:      s.D,
-		K:      s.K,
-		Y:      s.Y,
-		YInv:   s.YInv,
-		Q:      s.Q,
-		Z:      s.Z,
-		Seed:   s.Seed,
-		Bids:   s.Bids,
-		BidPos: s.BidPos,
+		D:    s.D,
+		K:    s.K,
+		Seed: s.Seed,
+		EdPk: s.EdPk,
 	}
 	score, err := b.client.GenerateScore(ctx, gsr)
 	if err != nil {
@@ -484,6 +525,25 @@ func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Sco
 		Z:     score.Z,
 		Bids:  score.Bids,
 	}, nil
+}
+
+// NewDistributeTx creates a new Distribute transaction
+func (b *blockgenerator) NewDistributeTx(ctx context.Context, tx TxRequest) (DistributeTransaction, error) {
+	dTx := new(DistributeTransaction)
+	tr := new(rusk.NewTransactionRequest)
+	MTxRequest(tr, tx)
+
+	dt := new(rusk.DistributeTransactionRequest)
+	dt.Tx = tr
+	res, err := b.client.NewDistribute(ctx, dt)
+	if err != nil {
+		return *dTx, err
+	}
+
+	if err := UDistribute(res, dTx); err != nil {
+		return *dTx, err
+	}
+	return *dTx, nil
 }
 
 // UMember deep copies from the rusk.Provisioner
