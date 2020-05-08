@@ -13,7 +13,7 @@ import (
 type DistributeTransaction struct {
 	*ContractTx
 	TotalReward           uint64     `json:"total_reward"`
-	ProvisionersAddresses []byte     `json:"provisioners_addresses"`
+	ProvisionersAddresses [][]byte   `json:"provisioners_addresses"`
 	BgPk                  *PublicKey `json:"bg_pk"`
 }
 
@@ -34,7 +34,11 @@ func MDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error 
 		return err
 	}
 	r.TotalReward = t.TotalReward
-	r.ProvisionersAddresses = make([]byte, len(t.ProvisionersAddresses))
+	r.ProvisionersAddresses = make([][]byte, len(t.ProvisionersAddresses))
+	for i, p := range t.ProvisionersAddresses {
+		r.ProvisionersAddresses[i] = make([]byte, len(p))
+		copy(r.ProvisionersAddresses[i], p)
+	}
 	copy(r.ProvisionersAddresses, t.ProvisionersAddresses)
 	UPublicKey(r.BgPk, t.BgPk)
 	return nil
@@ -48,8 +52,11 @@ func UDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error 
 		return err
 	}
 	t.TotalReward = r.TotalReward
-	t.ProvisionersAddresses = make([]byte, len(r.ProvisionersAddresses))
-	copy(t.ProvisionersAddresses, r.ProvisionersAddresses)
+	t.ProvisionersAddresses = make([][]byte, len(r.ProvisionersAddresses))
+	for i, p := range r.ProvisionersAddresses {
+		t.ProvisionersAddresses[i] = make([]byte, len(p))
+		copy(t.ProvisionersAddresses[i], p)
+	}
 	UPublicKey(r.BgPk, t.BgPk)
 	return nil
 }
@@ -64,8 +71,18 @@ func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
 		return err
 	}
 
-	if err := encoding.WriteVarBytes(r, s.ProvisionersAddresses); err != nil {
+	if err := encoding.WriteVarInt(r, uint64(len(s.ProvisionersAddresses))); err != nil {
 		return err
+	}
+
+	for _, p := range s.ProvisionersAddresses {
+		if err := encoding.WriteVarInt(r, uint64(len(p))); err != nil {
+			return err
+		}
+
+		if err := encoding.WriteVarBytes(r, p); err != nil {
+			return err
+		}
 	}
 
 	if err := MarshalPublicKey(r, *s.BgPk); err != nil {
@@ -87,8 +104,22 @@ func UnmarshalDistribute(r *bytes.Buffer, s *DistributeTransaction) error {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &s.ProvisionersAddresses); err != nil {
+	nrProvs, err := encoding.ReadVarInt(r)
+	if err != nil {
 		return err
+	}
+
+	s.ProvisionersAddresses = make([][]byte, nrProvs)
+	for i := 0; i < int(nrProvs); i++ {
+		blsKeySize, err := encoding.ReadVarInt(r)
+		if err != nil {
+			return err
+		}
+
+		s.ProvisionersAddresses[i] = make([]byte, blsKeySize)
+		if err := encoding.ReadVarBytes(r, &s.ProvisionersAddresses[i]); err != nil {
+			return err
+		}
 	}
 
 	s.BgPk = new(PublicKey)

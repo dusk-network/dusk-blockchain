@@ -17,12 +17,12 @@ func (p PermissiveProvisioner) VerifyScore(context.Context, uint64, uint8, Score
 }
 
 // NewSlashTx creates a Slash transaction
-func (p PermissiveProvisioner) NewSlashTx(context.Context, TxRequest) (SlashTransaction, error) {
+func (p PermissiveProvisioner) NewSlashTx(context.Context, SlashTxRequest, TxRequest) (SlashTransaction, error) {
 	return SlashTransaction{}, nil
 }
 
 // NewWithdrawFeesTx creates a new WithdrawFees transaction
-func (p PermissiveProvisioner) NewWithdrawFeesTx(context.Context, TxRequest) (WithdrawFeesTransaction, error) {
+func (p PermissiveProvisioner) NewWithdrawFeesTx(context.Context, []byte, []byte, []byte, TxRequest) (WithdrawFeesTransaction, error) {
 	return WithdrawFeesTransaction{}, nil
 }
 

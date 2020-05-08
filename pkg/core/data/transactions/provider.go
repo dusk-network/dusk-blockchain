@@ -18,6 +18,18 @@ type TxRequest struct {
 	Obfuscated bool
 }
 
+// SlashTxRequest is a convenient struct to group all input parameters to
+// create a SlashRequest
+type SlashTxRequest struct {
+	Step      uint8
+	Round     uint64
+	BlsKey    []byte
+	FirstMsg  []byte
+	FirstSig  []byte
+	SecondMsg []byte
+	SecondSig []byte
+}
+
 // MakeTxRequest populates a TxRequest with all needed data
 // ContractCall. As such, it does not need the Public Key
 func MakeTxRequest(sk SecretKey, pk PublicKey, amount uint64, fee uint64, isObfuscated bool) TxRequest {
@@ -74,23 +86,21 @@ type Provider interface {
 	NewTransactionTx(context.Context, TxRequest) (Transaction, error)
 	// NewStakeTx transaction accepts the BLSPubKey of the provisioner and the
 	// transaction request
-	NewStakeTx(context.Context, []byte, TxRequest) (StakeTransaction, error)
+	NewStakeTx(ctx context.Context, blsKey []byte, expirationHeight uint64, txr TxRequest) (StakeTransaction, error)
 	// NewWithdrawStake creates a WithdrawStake transaction
-	NewWithdrawStakeTx(context.Context, TxRequest) (WithdrawStakeTransaction, error)
+	NewWithdrawStakeTx(context.Context, []byte, []byte, TxRequest) (WithdrawStakeTransaction, error)
 
 	// NewBidTx creates a new Blind Bid. The call accepts a context, the secret
 	// `K`, the Edward Public Key `EdPk`, the `seed` and the `expirationHeight`
 	NewBidTx(context.Context, []byte, []byte, []byte, uint64, TxRequest) (BidTransaction, error)
 	// NewWithdrawBidTx creates a Bid withdrawal request
-	NewWithdrawBidTx(context.Context, TxRequest) (WithdrawBidTransaction, error)
+	NewWithdrawBidTx(context.Context, []byte, []byte, TxRequest) (WithdrawBidTransaction, error)
 }
 
 // KeyMaster Encapsulates the Key creation and retrieval operations
 type KeyMaster interface {
 	// GenerateSecretKey creates a SecretKey using a []byte as Seed
-	// TODO: shouldn't this also return the PublicKey and the ViewKey to spare
-	// a roundtrip?
-	GenerateSecretKey(context.Context, []byte) (SecretKey, error)
+	GenerateSecretKey(context.Context, []byte) (SecretKey, PublicKey, ViewKey, error)
 
 	// Keys returns the PublicKey and ViewKey from the SecretKey
 	Keys(context.Context, SecretKey) (PublicKey, ViewKey, error)
@@ -114,10 +124,11 @@ type Executor interface {
 // consensus
 type Provisioner interface {
 	// NewSlashTx creates a Slash transaction
-	NewSlashTx(context.Context, TxRequest) (SlashTransaction, error)
+	NewSlashTx(context.Context, SlashTxRequest, TxRequest) (SlashTransaction, error)
 
-	// NewWithdrawFeesTx creates a new WithdrawFees transaction
-	NewWithdrawFeesTx(context.Context, TxRequest) (WithdrawFeesTransaction, error)
+	// NewWithdrawFeesTx creates a new WithdrawFees transaction using the BLS
+	// Key, signature and a Msg
+	NewWithdrawFeesTx(context.Context, []byte, []byte, []byte, TxRequest) (WithdrawFeesTransaction, error)
 
 	// VerifyScore created by the BlockGenerator
 	VerifyScore(context.Context, uint64, uint8, Score) error
@@ -129,7 +140,7 @@ type BlockGenerator interface {
 	GenerateScore(context.Context, ScoreRequest) (Score, error)
 
 	// NewDistributeTx creates a new Distribute transaction
-	NewDistributeTx(context.Context, TxRequest) (DistributeTransaction, error)
+	NewDistributeTx(ctx context.Context, reward uint64, provisionerAddresses [][]byte, tx TxRequest) (DistributeTransaction, error)
 }
 
 // Proxy toward the rusk client
@@ -249,7 +260,7 @@ func (p *provider) NewTransactionTx(ctx context.Context, tx TxRequest) (Transact
 }
 
 // NewStakeTx transaction
-func (p *provider) NewStakeTx(ctx context.Context, pubKeyBLS []byte, tx TxRequest) (StakeTransaction, error) {
+func (p *provider) NewStakeTx(ctx context.Context, pubKeyBLS []byte, expirationHeight uint64, tx TxRequest) (StakeTransaction, error) {
 	stakeTx := new(StakeTransaction)
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
@@ -257,6 +268,7 @@ func (p *provider) NewStakeTx(ctx context.Context, pubKeyBLS []byte, tx TxReques
 	str := new(rusk.StakeTransactionRequest)
 	str.BlsKey = make([]byte, len(pubKeyBLS))
 	copy(str.BlsKey, pubKeyBLS)
+	str.ExpirationHeight = expirationHeight
 	res, err := p.client.NewStake(ctx, str)
 	if err != nil {
 		return *stakeTx, err
@@ -272,12 +284,16 @@ func (p *provider) NewStakeTx(ctx context.Context, pubKeyBLS []byte, tx TxReques
 // NewWithdrawStake creates a WithdrawStake transaction
 // TODO: most likely we will need a BLS signature and a BLS public key as
 // parameters
-func (p *provider) NewWithdrawStakeTx(ctx context.Context, tx TxRequest) (WithdrawStakeTransaction, error) {
+func (p *provider) NewWithdrawStakeTx(ctx context.Context, blsKey, sig []byte, tx TxRequest) (WithdrawStakeTransaction, error) {
 	wsTx := new(WithdrawStakeTransaction)
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
-	res, err := p.client.NewWithdrawStake(ctx, &rusk.WithdrawStakeTransactionRequest{Tx: tr})
+	res, err := p.client.NewWithdrawStake(ctx, &rusk.WithdrawStakeTransactionRequest{
+		Tx:     tr,
+		BlsKey: blsKey,
+		Sig:    sig,
+	})
 	if err != nil {
 		return *wsTx, nil
 	}
@@ -315,12 +331,16 @@ func (p *provider) NewBidTx(ctx context.Context, k, edPk, seed []byte, expiratio
 }
 
 // NewWithdrawBidTx creates a Bid withdrawal request
-func (p *provider) NewWithdrawBidTx(ctx context.Context, tx TxRequest) (WithdrawBidTransaction, error) {
+func (p *provider) NewWithdrawBidTx(ctx context.Context, edPk []byte, sig []byte, tx TxRequest) (WithdrawBidTransaction, error) {
 	wsTx := new(WithdrawBidTransaction)
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
-	res, err := p.client.NewWithdrawBid(ctx, &rusk.WithdrawBidTransactionRequest{Tx: tr})
+	res, err := p.client.NewWithdrawBid(ctx, &rusk.WithdrawBidTransactionRequest{
+		Tx:   tr,
+		EdPk: edPk,
+		Sig:  sig,
+	})
 	if err != nil {
 		return *wsTx, nil
 	}
@@ -338,17 +358,21 @@ type keymaster struct {
 // GenerateSecretKey creates a SecretKey using a []byte as Seed
 // TODO: shouldn't this also return the PublicKey and the ViewKey to spare
 // a roundtrip?
-func (k *keymaster) GenerateSecretKey(ctx context.Context, seed []byte) (SecretKey, error) {
+func (k *keymaster) GenerateSecretKey(ctx context.Context, seed []byte) (SecretKey, PublicKey, ViewKey, error) {
 	sk := new(SecretKey)
+	pk := new(PublicKey)
+	vk := new(ViewKey)
 	gskr := new(rusk.GenerateSecretKeyRequest)
 	gskr.B = seed
 	res, err := k.client.GenerateSecretKey(ctx, gskr)
 	if err != nil {
-		return *sk, err
+		return *sk, *pk, *vk, err
 	}
 
 	USecretKey(res.Sk, sk)
-	return *sk, nil
+	UPublicKey(res.Pk, pk)
+	UViewKey(res.Vk, vk)
+	return *sk, *pk, *vk, nil
 }
 
 // Keys returns the PublicKey and ViewKey from the SecretKey
@@ -439,14 +463,20 @@ type provisioner struct {
 }
 
 // NewSlashTx creates a Slash transaction
-// TODO: add the necessary parameters
-func (p *provisioner) NewSlashTx(ctx context.Context, tx TxRequest) (SlashTransaction, error) {
+func (p *provisioner) NewSlashTx(ctx context.Context, str SlashTxRequest, tx TxRequest) (SlashTransaction, error) {
 	slashTx := new(SlashTransaction)
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
 	st := new(rusk.SlashTransactionRequest)
 	st.Tx = tr
+	st.Round = str.Round
+	st.Step = uint32(str.Step)
+	st.BlsKey = str.BlsKey
+	st.FirstMsg = str.FirstMsg
+	st.FirstSig = str.FirstSig
+	st.SecondMsg = str.SecondMsg
+	st.SecondSig = str.SecondSig
 
 	res, err := p.client.NewSlash(ctx, st)
 	if err != nil {
@@ -460,12 +490,15 @@ func (p *provisioner) NewSlashTx(ctx context.Context, tx TxRequest) (SlashTransa
 
 // NewWithdrawFeesTx creates a new WithdrawFees transaction
 // TODO: add missing parameters like BLS PubKey, BLS Signature and message (?)
-func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, tx TxRequest) (WithdrawFeesTransaction, error) {
+func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, blsKey, sig, msg []byte, tx TxRequest) (WithdrawFeesTransaction, error) {
 	feeTx := new(WithdrawFeesTransaction)
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 	wftr := &rusk.WithdrawFeesTransactionRequest{
-		Tx: tr,
+		Tx:     tr,
+		BlsKey: blsKey,
+		Sig:    sig,
+		Msg:    msg,
 	}
 
 	wf, err := p.client.NewWithdrawFees(ctx, wftr)
@@ -523,13 +556,19 @@ func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Sco
 }
 
 // NewDistributeTx creates a new Distribute transaction
-func (b *blockgenerator) NewDistributeTx(ctx context.Context, tx TxRequest) (DistributeTransaction, error) {
+func (b *blockgenerator) NewDistributeTx(ctx context.Context, reward uint64, provisionerAddresses [][]byte, tx TxRequest) (DistributeTransaction, error) {
 	dTx := new(DistributeTransaction)
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
 	dt := new(rusk.DistributeTransactionRequest)
 	dt.Tx = tr
+	dt.TotalReward = reward
+	dt.ProvisionersAddresses = make([][]byte, len(provisionerAddresses))
+	for i, p := range provisionerAddresses {
+		dt.ProvisionersAddresses[i] = make([]byte, len(p))
+		copy(dt.ProvisionersAddresses[i], p)
+	}
 	res, err := b.client.NewDistribute(ctx, dt)
 	if err != nil {
 		return *dTx, err
