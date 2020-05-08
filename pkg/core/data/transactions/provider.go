@@ -38,18 +38,20 @@ func MakeGenesisTxRequest(sk SecretKey, amount uint64, fee uint64, isObfuscated 
 
 // ScoreRequest is utilized to produce a score
 type ScoreRequest struct {
-	D    []byte
-	K    []byte
-	Seed []byte
-	EdPk []byte
+	D     []byte
+	K     []byte
+	Seed  []byte
+	EdPk  []byte
+	Round uint64
+	Step  uint8
 }
 
 // Score encapsulates the score values calculated by rusk
 type Score struct {
-	Proof []byte
-	Score []byte
-	Z     []byte
-	Bids  []byte
+	Proof    []byte
+	Score    []byte
+	Seed     []byte
+	Identity []byte
 }
 
 // Verifier performs verification of contract calls (transactions)
@@ -105,7 +107,7 @@ type Executor interface {
 
 	// ExecuteStateTransition performs a global state mutation and steps the
 	// block-height up
-	ExecuteStateTransition(context.Context, []ContractCall) (uint64, user.Provisioners, user.BidList, error)
+	ExecuteStateTransition(context.Context, []ContractCall) (uint64, user.Provisioners, error)
 }
 
 // Provisioner encapsulates the operations common to a Provisioner during the
@@ -118,7 +120,7 @@ type Provisioner interface {
 	NewWithdrawFeesTx(context.Context, TxRequest) (WithdrawFeesTransaction, error)
 
 	// VerifyScore created by the BlockGenerator
-	VerifyScore(context.Context, Score) error
+	VerifyScore(context.Context, uint64, uint8, Score) error
 }
 
 // BlockGenerator encapsulates the operations performed by the BlockGenerator
@@ -190,7 +192,6 @@ func (v *verifier) VerifyTransaction(ctx context.Context, cc ContractCall) error
 		return err
 	}
 
-	// TODO: change signature within dusk-protobuf
 	if res, err := v.client.VerifyTransaction(ctx, ccTx); err != nil {
 		return err
 	} else if !res.Verified {
@@ -225,7 +226,6 @@ func (p *provider) NewContractCall(ctx context.Context, b []byte, tx TxRequest) 
 	//tr := new(rusk.NewTransactionRequest)
 	//MTxRequest(tr, tx)
 	//res, err := p.client.NewContractCall(ctx, tr)
-
 	return nil, errors.New("not implemented yet")
 }
 
@@ -401,24 +401,24 @@ func (e *executor) ValidateStateTransition(ctx context.Context, calls []Contract
 
 // ExecuteStateTransition performs a global state mutation and steps the
 // block-height up
-func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall) (uint64, user.Provisioners, user.BidList, error) {
+func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall) (uint64, user.Provisioners, error) {
 	vstr := new(rusk.ExecuteStateTransitionRequest)
 	vstr.Calls = make([]*rusk.ContractCallTx, len(calls))
 	var err error
 	for i, call := range calls {
 		vstr.Calls[i], err = EncodeContractCall(call)
 		if err != nil {
-			return 0, user.Provisioners{}, user.BidList{}, err
+			return 0, user.Provisioners{}, err
 		}
 	}
 
 	res, err := e.client.ExecuteStateTransition(ctx, vstr)
 	if err != nil {
-		return 0, user.Provisioners{}, user.BidList{}, err
+		return 0, user.Provisioners{}, err
 	}
 
 	if !res.Success {
-		return 0, user.Provisioners{}, user.BidList{}, errors.New("unsuccessful state transition function execution")
+		return 0, user.Provisioners{}, errors.New("unsuccessful state transition function execution")
 	}
 
 	provisioners := user.NewProvisioners()
@@ -431,14 +431,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	}
 	provisioners.Members = memberMap
 
-	bids := make([]user.Bid, len(res.BidList.BidList))
-	for i, x := range res.BidList.BidList {
-		bid := user.Bid{}
-		copy(bid.X[:], x)
-		bids[i] = bid
-	}
-
-	return res.CurrentHeight, *provisioners, user.BidList(bids), nil
+	return res.CurrentHeight, *provisioners, nil
 }
 
 type provisioner struct {
@@ -488,18 +481,18 @@ func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, tx TxRequest) (With
 }
 
 // VerifyScore to participate in the block generation lottery
-func (p *provisioner) VerifyScore(ctx context.Context, score Score) error {
-	/*
-		gsr := &rusk.GenerateScoreResponse{
-			Proof: score.Proof,
-			Score: score.Score,
-			Z:     score.Z,
-			Bids:  score.Bids,
-		}
-		if _, err := b.client.VerifyScore(ctx, gsr); err != nil {
-			return err
-		}
-	*/
+func (p *provisioner) VerifyScore(ctx context.Context, round uint64, step uint8, score Score) error {
+	gsr := &rusk.VerifyScoreRequest{
+		Proof:    score.Proof,
+		Score:    score.Score,
+		Identity: score.Identity,
+		Seed:     score.Seed,
+		Round:    round,
+		Step:     uint32(step),
+	}
+	if _, err := p.client.VerifyScore(ctx, gsr); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -510,20 +503,22 @@ type blockgenerator struct {
 // GenerateScore to participate in the block generation lottery
 func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Score, error) {
 	gsr := &rusk.GenerateScoreRequest{
-		D:    s.D,
-		K:    s.K,
-		Seed: s.Seed,
-		EdPk: s.EdPk,
+		D:     s.D,
+		K:     s.K,
+		Seed:  s.Seed,
+		EdPk:  s.EdPk,
+		Round: s.Round,
+		Step:  uint32(s.Step),
 	}
 	score, err := b.client.GenerateScore(ctx, gsr)
 	if err != nil {
 		return Score{}, err
 	}
 	return Score{
-		Proof: score.Proof,
-		Score: score.Score,
-		Z:     score.Z,
-		Bids:  score.Bids,
+		Proof:    score.Proof,
+		Score:    score.Score,
+		Seed:     score.Seed,
+		Identity: score.Identity,
 	}, nil
 }
 

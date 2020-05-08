@@ -12,9 +12,9 @@ import (
 // allocation to the Provisioners
 type DistributeTransaction struct {
 	*ContractTx
-	TotalReward           uint64     `protobuf:"fixed64,2,opt,name=total_reward,json=totalReward,proto3" json:"total_reward,omitempty"`
-	ProvisionersAddresses []byte     `protobuf:"bytes,3,opt,name=provisioners_addresses,json=provisionersAddresses,proto3" json:"provisioners_addresses,omitempty"`
-	BgPk                  *PublicKey `protobuf:"bytes,4,opt,name=bg_pk,json=bgPk,proto3" json:"bg_pk,omitempty"`
+	TotalReward           uint64     `json:"total_reward"`
+	ProvisionersAddresses []byte     `json:"provisioners_addresses"`
+	BgPk                  *PublicKey `json:"bg_pk"`
 }
 
 // CalculateHash complies with merkletree.Payload interface

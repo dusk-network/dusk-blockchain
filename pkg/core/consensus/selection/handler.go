@@ -33,7 +33,7 @@ type (
 	// Handler is an abstraction of the selection component event handler.
 	// It is primarily used for testing purposes, to bypass the zkproof verification.
 	Handler interface {
-		Verify(context.Context, message.Score) error
+		Verify(context.Context, uint64, uint8, message.Score) error
 		ResetThreshold()
 		LowerThreshold()
 		Priority(message.Score, message.Score) bool
@@ -71,7 +71,7 @@ func (sh *ScoreHandler) Priority(first, second message.Score) bool {
 }
 
 // Verify a score by delegating the ZK library to validate the proof
-func (sh *ScoreHandler) Verify(ctx context.Context, m message.Score) error {
+func (sh *ScoreHandler) Verify(ctx context.Context, round uint64, step uint8, m message.Score) error {
 	// Check threshold
 	sh.lock.RLock()
 	defer sh.lock.RUnlock()
@@ -79,42 +79,13 @@ func (sh *ScoreHandler) Verify(ctx context.Context, m message.Score) error {
 		return errors.New("threshold exceeds score")
 	}
 
-	// Check if the BidList contains valid bids
-	if err := sh.validateBidListSubset(m.BidListSubset); err != nil {
-		return err
-	}
-
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(500*time.Millisecond))
 	defer cancel()
 
-	return sh.scoreVerifier.VerifyScore(ctx, transactions.Score{
-		Proof: m.Proof,
-		Score: m.Score,
-		Z:     m.Z,
-		Bids:  m.BidListSubset,
+	return sh.scoreVerifier.VerifyScore(ctx, round, step, transactions.Score{
+		Proof:    m.Proof,
+		Score:    m.Score,
+		Identity: m.Identity,
+		Seed:     m.Seed,
 	})
-
-	// Verify the proof
-	//seedScalar := ristretto.Scalar{}
-	//seedScalar.Derive(m.Seed)
-
-	//proof := zkproof.ZkProof{
-	//	Proof:         m.Proof,
-	//	Score:         m.Score,
-	//	Z:             m.Z,
-	//	BinaryBidList: m.BidListSubset,
-	//}
-
-	//if !proof.Verify(seedScalar) {
-	//	return errors.New("proof verification failed")
-	//}
-}
-
-func (sh *ScoreHandler) validateBidListSubset(bidListSubsetBytes []byte) error {
-	bidListSubset, err := user.ReconstructBidListSubset(bidListSubsetBytes)
-	if err != nil {
-		return err
-	}
-
-	return sh.bidList.ValidateBids(bidListSubset)
 }

@@ -15,12 +15,11 @@ type (
 
 	// ScoreProposal is an internal packet created by the node. the Score Message with the fields consistent with the Blind Bid data structure
 	ScoreProposal struct {
-		hdr           header.Header
-		Score         []byte
-		Proof         []byte
-		Z             []byte
-		BidListSubset []byte
-		Seed          []byte
+		hdr      header.Header
+		Score    []byte
+		Proof    []byte
+		Identity []byte
+		Seed     []byte
 	}
 
 	// Score extends the ScoreProposal with additional fields related to the
@@ -44,12 +43,11 @@ func EmptyScoreProposal(hdr header.Header) ScoreProposal {
 // NewScoreProposal creates a new ScoreProposa
 func NewScoreProposal(hdr header.Header, seed []byte, score transactions.Score) ScoreProposal {
 	return ScoreProposal{
-		hdr:           hdr,
-		Score:         score.Score,
-		Proof:         score.Proof,
-		Z:             score.Z,
-		BidListSubset: score.Bids,
-		Seed:          seed,
+		hdr:      hdr,
+		Score:    score.Score,
+		Proof:    score.Proof,
+		Seed:     seed,
+		Identity: score.Identity,
 	}
 }
 
@@ -65,7 +63,7 @@ func (e ScoreProposal) State() header.Header {
 
 // Sender of a Score event is the anonymous Z
 func (e ScoreProposal) Sender() []byte {
-	return e.Z
+	return e.Identity
 }
 
 // String representation of the ScoreProposal
@@ -151,12 +149,8 @@ func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
 		return err
 	}
 
-	sev.Z = make([]byte, 32)
-	if err := encoding.Read256(r, sev.Z); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadVarBytes(r, &sev.BidListSubset); err != nil {
+	sev.Identity = make([]byte, 32)
+	if err := encoding.Read256(r, sev.Identity); err != nil {
 		return err
 	}
 
@@ -197,13 +191,8 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 		return err
 	}
 
-	// Z
-	if err := encoding.Write256(r, sev.Z); err != nil {
-		return err
-	}
-
-	// BidList
-	if err := encoding.WriteVarBytes(r, sev.BidListSubset); err != nil {
+	// Identity
+	if err := encoding.Write256(r, sev.Identity); err != nil {
 		return err
 	}
 
@@ -227,16 +216,14 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 func MockScoreProposal(hdr header.Header) ScoreProposal {
 	score, _ := crypto.RandEntropy(32)
 	proof, _ := crypto.RandEntropy(1477)
-	z, _ := crypto.RandEntropy(32)
-	subset, _ := crypto.RandEntropy(32)
+	identity, _ := crypto.RandEntropy(32)
 	seed, _ := crypto.RandEntropy(33)
 	return ScoreProposal{
-		hdr:           hdr,
-		Score:         score,
-		Proof:         proof,
-		Z:             z,
-		BidListSubset: subset,
-		Seed:          seed,
+		hdr:      hdr,
+		Score:    score,
+		Proof:    proof,
+		Identity: identity,
+		Seed:     seed,
 	}
 }
 

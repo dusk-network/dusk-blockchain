@@ -287,14 +287,13 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 
 	// 3. Call ExecuteStateTransitionFunction
 	l.Debug("calling ExecuteStateTransitionFunction")
-	_, provisioners, bidList, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
+	_, provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
 	if err != nil {
 		l.WithError(err).Errorln("Error in executing the state transition")
 	}
 
 	// Caching the provisioners and bidList
 	c.p = &provisioners
-	c.bidList = &bidList
 
 	// 4. Store the approved block
 	l.Trace("storing block in db")

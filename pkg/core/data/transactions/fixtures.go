@@ -12,7 +12,7 @@ type PermissiveProvisioner struct {
 }
 
 // VerifyScore returns nil all the time
-func (p PermissiveProvisioner) VerifyScore(context.Context, Score) error {
+func (p PermissiveProvisioner) VerifyScore(context.Context, uint64, uint8, Score) error {
 	return nil
 }
 

@@ -113,7 +113,7 @@ func newMockHandler() *mockHandler {
 	return &mockHandler{}
 }
 
-func (m *mockHandler) Verify(context.Context, message.Score) error {
+func (m *mockHandler) Verify(context.Context, uint64, uint8, message.Score) error {
 	time.Sleep(500 * time.Millisecond)
 	return nil
 }
