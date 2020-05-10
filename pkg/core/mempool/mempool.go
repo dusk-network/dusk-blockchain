@@ -15,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -244,13 +245,24 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 		return txid, fmt.Errorf("store: %v", err)
 	}
 
-	// advertise the hash of the verified tx to the P2P network
-	if err := m.advertiseTx(txid); err != nil {
-		// TODO: Perform re-advertise procedure
-		return txid, fmt.Errorf("advertise: %v", err)
-	}
+	// try to (re)propagate transaction in both gossip and kadcast networks
+	go m.propagateTx(t, txid)
 
 	return txid, nil
+}
+
+func (m *Mempool) propagateTx(t TxDesc, txid []byte) {
+
+	// Kadcast complete transaction data
+	if err := m.kadcastTx(t); err != nil {
+		log.WithError(err).Warn("Transaction kadcast sending failed")
+	}
+
+	// Put priority on kadcast propagation
+	time.Sleep(1 * time.Second)
+
+	// Advertise the transaction hash to gossip network via "Inventory Vectors"
+	m.advertiseTxHash(txid)
 }
 
 func (m *Mempool) onBlock(b block.Block) {
@@ -365,7 +377,22 @@ func (m *Mempool) newPool() Pool {
 // NB This is always run in a different than main mempool routine
 func (m *Mempool) CollectPending(msg message.Message) error {
 	tx := msg.Payload().(transactions.Transaction)
-	m.pending <- TxDesc{tx: tx, received: time.Now(), size: uint(len(msg.Id()))}
+
+	// set initial kadcast height.
+	// If message does bring kadHeight, this is transaction propagation
+	// If not, transaction is propagated for the first time
+	h := kadcast.InitHeight
+
+	if len(msg.Header()) > 0 {
+		h = msg.Header()[0]
+	}
+
+	m.pending <- TxDesc{
+		tx:        tx,
+		received:  time.Now(),
+		size:      uint(len(msg.Id())),
+		kadHeight: h}
+
 	return nil
 }
 
@@ -487,7 +514,10 @@ func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, err
 		return nil, err
 	}
 
-	txDesc := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len())}
+	txDesc := TxDesc{tx: tx,
+		received:  time.Now(),
+		size:      uint(buf.Len()),
+		kadHeight: kadcast.InitHeight}
 
 	// Process request
 	return m.onPendingTx(txDesc)
@@ -514,7 +544,7 @@ func (m *Mempool) Quit() {
 
 // Send Inventory message to all peers
 //nolint:unparam
-func (m *Mempool) advertiseTx(txID []byte) error {
+func (m *Mempool) advertiseTxHash(txID []byte) {
 
 	msg := &peermsg.Inv{}
 	msg.AddItem(peermsg.InvTypeMempoolTx, txID)
@@ -532,6 +562,28 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 	// TODO: interface - marshaling should done after the Gossip, not before
 	packet := message.New(topics.Inv, *buf)
 	m.eventBus.Publish(topics.Gossip, packet)
+}
+
+// kadcastTx (re)propagates transaction in kadcast network
+func (m *Mempool) kadcastTx(t TxDesc) error {
+
+	if t.kadHeight > kadcast.InitHeight {
+		return errors.New("invalid kadcast height")
+	}
+
+	/// repropagate
+	buf := new(bytes.Buffer)
+	if err := message.MarshalTx(buf, t.tx); err != nil {
+		return err
+	}
+
+	if err := topics.Prepend(buf, topics.Tx); err != nil {
+		return err
+	}
+
+	msg := message.NewWithHeader(topics.Tx, *buf, []byte{t.kadHeight})
+	m.eventBus.Publish(topics.Kadcast, msg)
+
 	return nil
 }
 
