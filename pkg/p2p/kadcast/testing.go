@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -21,20 +22,20 @@ func TraceRoutingState(r *RoutingTable) {
 	log.Tracef("this_peer: %s, bucket peers num %d", peer.String(), r.tree.getTotalPeers())
 	for _, b := range r.tree.buckets {
 		for _, p := range b.entries {
-			_, dist := peer.computeDistance(p)
+			_, dist := ComputeDistance(peer, p)
 			log.Tracef("bucket: %d, peer: %s, distance: %s", b.idLength, p.String(), hex.EncodeToString(dist[:]))
 		}
 	}
 }
 
 // testPeerInfo creates a peer with local IP
-func testPeerInfo(port uint16) PeerInfo {
+func testPeerInfo(port uint16) encoding.PeerInfo {
 
 	lAddr := getLocalUDPAddress(int(port))
 	var ip [4]byte
 	copy(ip[:], lAddr.IP)
 
-	peer := MakePeer(ip, port)
+	peer := encoding.MakePeer(ip, port)
 	return peer
 }
 
@@ -45,7 +46,7 @@ func TestRouter(port uint16, id [16]byte) *RoutingTable {
 	var ip [4]byte
 	copy(ip[:], lAddr.IP)
 
-	peer := PeerInfo{ip, port, id}
+	peer := encoding.PeerInfo{ip, port, id}
 
 	r := makeRoutingTableFromPeer(peer)
 	return &r
@@ -152,7 +153,7 @@ func TestNetwork(num int, basePort int) ([]*Node, error) {
 
 	// List of all peer routers
 	nodes := make([]*Node, 0)
-	bootstrapNodes := make([]PeerInfo, 0)
+	bootstrapNodes := make([]encoding.PeerInfo, 0)
 
 	for i := 0; i < num; i++ {
 		n := TestNode(basePort + i)

@@ -62,7 +62,8 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message, height byte) 
 	// Publish wire message to the eventbus so that the subscribed
 	// components could handle it
 	switch category {
-	case topics.Tx: // TODO:  Not supported yet
+	case topics.Tx:
+		m.publisher.Publish(category, msg)
 	case topics.Candidate: // TODO:  Not supported yet
 	case topics.Reduction: // TODO:  Not supported yet
 	case topics.Agreement: // TODO:  Not supported yet

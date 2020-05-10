@@ -19,13 +19,11 @@ var DefaultAlphaClosestNodes int = 1
 var DefaultKNumber int = 20
 
 const (
-	// Message types over UDP
 
-	pingMsg      = 0
-	pongMsg      = 1
-	findNodesMsg = 2
-	nodesMsg     = 3
+	// MaxTCPacketSize is the max size allowed of TCP packet
+	MaxTCPacketSize = 500000
 
-	// Message types over TCP
-	broadcastMsg = 10
+	// MaxUDPacketSize max size of a UDP packet. As per default MTU 1500, UDP
+	// packet should be up to 1472 bytes
+	MaxUDPacketSize = 1472
 )

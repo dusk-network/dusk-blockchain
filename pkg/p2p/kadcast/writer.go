@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -91,7 +92,7 @@ func (w *Writer) broadcastPacket(height byte, payload []byte) {
 	}
 }
 
-func (w *Writer) fetchDelegates(H byte) []PeerInfo {
+func (w *Writer) fetchDelegates(H byte) []encoding.PeerInfo {
 
 	router := w.router
 	myPeer := w.router.LpeerInfo
@@ -106,7 +107,7 @@ func (w *Writer) fetchDelegates(H byte) []PeerInfo {
 		return nil
 	}
 
-	delegates := make([]PeerInfo, 0)
+	delegates := make([]encoding.PeerInfo, 0)
 
 	if b.idLength == 0 {
 		// the bucket B 0 only holds one specific node of distance one
@@ -124,7 +125,7 @@ func (w *Writer) fetchDelegates(H byte) []PeerInfo {
 		//	delegates. This severely increases the probability that at least one
 		//	out of the multiple selected nodes is honest and reachable.
 
-		in := make([]PeerInfo, len(b.entries))
+		in := make([]encoding.PeerInfo, len(b.entries))
 		copy(in, b.entries)
 
 		if err := generateRandomDelegates(router.beta, in, &delegates); err != nil {
@@ -135,7 +136,7 @@ func (w *Writer) fetchDelegates(H byte) []PeerInfo {
 	return delegates
 }
 
-func (w *Writer) sendToDelegates(delegates []PeerInfo, H byte, payload []byte) {
+func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []byte) {
 
 	if len(delegates) == 0 {
 		return
@@ -143,12 +144,18 @@ func (w *Writer) sendToDelegates(delegates []PeerInfo, H byte, payload []byte) {
 
 	localPeer := w.router.LpeerInfo
 
-	// Construct broadcast packet
-	var p Packet
-	p.setHeadersInfo(broadcastMsg, w.router)
-	p.setChunksPayloadInfo(H, payload)
+	// Marshal message data
+	h := makeHeader(encoding.BroadcastMsg, w.router)
 
-	broadcastPacketBytes := marshalPacket(p)
+	p := encoding.BroadcastPayload{
+		Height:      H,
+		GossipFrame: data,
+	}
+
+	var buf bytes.Buffer
+	if err := encoding.MarshalBinary(h, &p, &buf); err != nil {
+		return
+	}
 
 	// For each of the delegates found from this bucket, make an attempt to
 	// repropagate Broadcast message
@@ -164,7 +171,7 @@ func (w *Writer) sendToDelegates(delegates []PeerInfo, H byte, payload []byte) {
 			WithField("height", H).
 			Traceln("Sending Broadcast message")
 
-		go sendTCPStream(destPeer.getUDPAddr(), broadcastPacketBytes)
+		go sendTCPStream(destPeer.GetUDPAddr(), buf.Bytes())
 	}
 }
 
