@@ -7,25 +7,19 @@ import (
 )
 
 // MockRoundUpdate mocks a round update
-func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) RoundUpdate {
+func MockRoundUpdate(round uint64, p *user.Provisioners) RoundUpdate {
 	var provisioners = p
 	if p == nil {
 		provisioners, _ = MockProvisioners(1)
 	}
 
-	var bidders = bidList
-	if bidList == nil || len(bidList) == 0 {
-		bidders = MockBidList(1)
-	}
-
 	seed, _ := crypto.RandEntropy(33)
 	hash, _ := crypto.RandEntropy(32)
 	return RoundUpdate{
-		Round:   round,
-		P:       *provisioners,
-		BidList: bidders,
-		Seed:    seed,
-		Hash:    hash,
+		Round: round,
+		P:     *provisioners,
+		Seed:  seed,
+		Hash:  hash,
 	}
 }
 
@@ -81,19 +75,4 @@ func MockMember(keys key.Keys) *user.Member {
 	member.Stakes[0].Amount = 500
 	member.Stakes[0].EndHeight = 10000
 	return member
-}
-
-// MockBidList mocks a bid list
-func MockBidList(amount int) user.BidList {
-	bidList := make([]user.Bid, amount)
-	for i := 0; i < amount; i++ {
-		xSlice, _ := crypto.RandEntropy(32)
-		mSlice, _ := crypto.RandEntropy(32)
-		var x [32]byte
-		var m [32]byte
-		copy(x[:], xSlice)
-		copy(m[:], mSlice)
-		bidList[i] = user.Bid{X: x, M: m, EndHeight: 10}
-	}
-	return bidList
 }

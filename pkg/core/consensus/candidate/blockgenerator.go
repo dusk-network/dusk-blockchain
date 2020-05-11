@@ -103,7 +103,7 @@ func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus
 func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	sev := e.(message.ScoreProposal)
 
-	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpbus.EmptyRequest(), 5*time.Second)
+	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	}
 
 	// Create candidate message
-	resp, err := bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), 5*time.Second)
+	resp, err = bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func (bg *Generator) Generate(sev message.ScoreProposal, keys [][]byte) (*block.
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
-func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error, keys [][]byte) {
+func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
 	txs, err := bg.ConstructBlockTxs(proof, score, keys)
 	if err != nil {
 		return nil, err
@@ -232,11 +232,9 @@ func (bg *Generator) constructCoinbaseTx(keys [][]byte) (*transactions.Distribut
 	// TODO: what do we set as reward?
 	// TODO: should the reward be a matter of configuration or should it be
 	// dynamic?
-	// FIXME: The provisioners' bitset is carried in the certificate. However, we need
-	// the full list of Provisioners for the last round to be able to recreate
-	// the committee
 	txReq := transactions.MakeGenesisTxRequest(*bg.genPrivKey, config.GeneratorReward, 100, false)
-	dTx, err := bg.gen.NewDistributeTx(ctx, txReq)
+	// FIXME: fetch reward somehow
+	dTx, err := bg.gen.NewDistributeTx(ctx, 100000000000, keys, txReq)
 	if err != nil {
 		return nil, err
 	}

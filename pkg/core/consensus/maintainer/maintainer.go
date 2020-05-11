@@ -1,11 +1,9 @@
 package maintainer
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -20,7 +18,7 @@ import (
 
 var l = log.WithField("process", "StakeAutomaton")
 
-// TODO: Logic needs to be adjusted to work with Rusk
+// FIXME: Logic needs to be adjusted to work with Rusk
 
 // The StakeAutomaton is a process that keeps note of when certain consensus transactions
 // expire, and makes sure the node remains within the bidlist/committee, when those
@@ -31,9 +29,7 @@ type StakeAutomaton struct {
 	roundChan   <-chan consensus.RoundUpdate
 
 	pubKeyBLS []byte
-	m         ristretto.Scalar
 	p         user.Provisioners
-	bidList   user.BidList
 
 	bidEndHeight   uint64
 	stakeEndHeight uint64
@@ -48,13 +44,13 @@ const renewalOffset = 100
 // New creates a new instance of StakeAutomaton that is used to automate the
 // resending of stakes and alleviate the burden for a user to having to
 // manually manage restaking
-func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar, srv *grpc.Server) *StakeAutomaton {
+// FIXME: the Automaton needs the EdPk (and maybe X)
+func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, srv *grpc.Server) *StakeAutomaton {
 	a := &StakeAutomaton{
 		eventBroker:    eventBroker,
 		rpcBus:         rpcBus,
 		roundChan:      consensus.InitRoundUpdate(eventBroker),
 		pubKeyBLS:      pubKeyBLS,
-		m:              m,
 		bidEndHeight:   1,
 		stakeEndHeight: 1,
 		running:        false,
@@ -81,24 +77,23 @@ func (m *StakeAutomaton) Listen() {
 	for roundUpdate := range m.roundChan {
 		// Rehydrate consensus state
 		m.p = roundUpdate.P
-		m.bidList = roundUpdate.BidList
 
-		// TODO: handle new provisioners and bidlist coming from roundupdate
-		if roundUpdate.Round+renewalOffset >= m.bidEndHeight {
-			endHeight := m.findMostRecentBid()
+		//// TODO: handle new provisioners coming from roundupdate
+		//if roundUpdate.Round+renewalOffset >= m.bidEndHeight {
+		//	endHeight := m.findMostRecentBid()
 
-			// Only send bid if this is the first time we notice it's about to expire
-			if endHeight > m.bidEndHeight {
-				m.bidEndHeight = endHeight
-			} else if m.bidEndHeight != 0 {
-				if err := m.sendBid(); err != nil {
-					l.WithError(err).Warnln("could not send bid tx")
-					continue
-				}
-				// Set end height to 0 to ensure we only send a transaction once
-				m.bidEndHeight = 0
-			}
-		}
+		//	// Only send bid if this is the first time we notice it's about to expire
+		//	if endHeight > m.bidEndHeight {
+		//		m.bidEndHeight = endHeight
+		//	} else if m.bidEndHeight != 0 {
+		//		if err := m.sendBid(); err != nil {
+		//			l.WithError(err).Warnln("could not send bid tx")
+		//			continue
+		//		}
+		//		// Set end height to 0 to ensure we only send a transaction once
+		//		m.bidEndHeight = 0
+		//	}
+		//}
 
 		if roundUpdate.Round+renewalOffset >= m.stakeEndHeight {
 			endHeight := m.findMostRecentStake()
@@ -117,17 +112,6 @@ func (m *StakeAutomaton) Listen() {
 	}
 }
 
-func (m *StakeAutomaton) findMostRecentBid() uint64 {
-	var highest uint64
-	for _, bid := range m.bidList {
-		if bytes.Equal(m.m.Bytes(), bid.M[:]) && bid.EndHeight > highest {
-			highest = bid.EndHeight
-		}
-	}
-
-	return highest
-}
-
 func (m *StakeAutomaton) findMostRecentStake() uint64 {
 	member := m.p.GetMember(m.pubKeyBLS)
 	if member != nil {
@@ -143,6 +127,7 @@ func (m *StakeAutomaton) findMostRecentStake() uint64 {
 	return 0
 }
 
+// nolint
 func (m *StakeAutomaton) sendBid() error {
 	amount, lockTime := m.getTxSettings()
 	if amount == 0 || lockTime == 0 {

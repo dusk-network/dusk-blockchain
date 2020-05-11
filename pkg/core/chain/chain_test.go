@@ -220,7 +220,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	// Add some provisioners to our chain, including one that is just about to expire
 	p, k := consensus.MockProvisioners(3)
 	p.Members[string(k[0].BLSPubKeyBytes)].Stakes[0].EndHeight = 1
-	ru := consensus.MockRoundUpdate(2, p, nil)
+	ru := consensus.MockRoundUpdate(2, p)
 	msg := message.New(topics.RoundUpdate, ru)
 	// Update round. This should not remove the third provisioner from our committee
 	eb.Publish(topics.RoundUpdate, msg)

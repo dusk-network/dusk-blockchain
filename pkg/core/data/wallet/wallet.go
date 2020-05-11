@@ -110,7 +110,6 @@ func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, password string,
 	}
 
 	//TODO: KEYS generate PublicKey and ViewKey from SecretKey
-
 	w := &Wallet{
 		db:            db,
 		netPrefix:     netPrefix,
@@ -176,6 +175,15 @@ func (w *Wallet) Keys() consensuskey.Keys {
 // ClearDatabase will remove all info from the database.
 func (w *Wallet) ClearDatabase() error {
 	return w.db.Clear()
+}
+
+// ToKey gets a string as public address and returns a PublicKey
+// FIXME: this is used within the cmd/wallet transferDusk function. Not clear
+// if still needed.
+// Old implementation can be find here
+// (https://github.com/dusk-network/dusk-wallet/blob/master/v2/key/publickey.go#L26)
+func (w *Wallet) ToKey(address string) (transactions.PublicKey, error) {
+	return transactions.PublicKey{}, nil
 }
 
 func generateKeys(seed []byte) (consensuskey.Keys, error) {

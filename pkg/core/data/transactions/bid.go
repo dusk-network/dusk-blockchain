@@ -178,8 +178,8 @@ type WithdrawBidTransaction struct {
 	Commitment       []byte `json:"commitment"`
 	EncryptedValue   []byte `json:"encrypted_value"`
 	EncryptedBlinder []byte `json:"encrypted_blinder"`
-	Bid              []byte `json:"bid"`
 	Sig              []byte `json:"sig"`
+	EdPk             []byte `json:"ed_pk"`
 }
 
 // CalculateHash complies with merkletree.Payload interface
@@ -205,10 +205,10 @@ func MWithdrawBid(r *rusk.WithdrawBidTransaction, t *WithdrawBidTransaction) err
 	copy(r.EncryptedValue, t.EncryptedValue)
 	r.EncryptedBlinder = make([]byte, len(t.EncryptedBlinder))
 	copy(r.EncryptedBlinder, t.EncryptedBlinder)
-	r.Bid = make([]byte, len(t.Bid))
-	copy(r.Bid, t.Bid)
 	r.Sig = make([]byte, len(t.Sig))
 	copy(r.Sig, t.Sig)
+	r.EdPk = make([]byte, len(t.EdPk))
+	copy(r.EdPk, t.EdPk)
 	return nil
 }
 
@@ -225,8 +225,8 @@ func UWithdrawBid(r *rusk.WithdrawBidTransaction, t *WithdrawBidTransaction) err
 	copy(t.EncryptedValue, r.EncryptedValue)
 	t.EncryptedBlinder = make([]byte, len(r.EncryptedBlinder))
 	copy(t.EncryptedBlinder, r.EncryptedBlinder)
-	t.Bid = make([]byte, len(r.Bid))
-	copy(t.Bid, r.Bid)
+	t.EdPk = make([]byte, len(r.EdPk))
+	copy(t.EdPk, r.EdPk)
 	t.Sig = make([]byte, len(r.Sig))
 	copy(t.Sig, r.Sig)
 	return nil
@@ -250,11 +250,11 @@ func MarshalWithdrawBid(r *bytes.Buffer, s WithdrawBidTransaction) error {
 		return err
 	}
 
-	if err := encoding.WriteVarBytes(r, s.Bid); err != nil {
+	if err := encoding.WriteVarBytes(r, s.Sig); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteVarBytes(r, s.Sig); err != nil {
+	if err := encoding.WriteVarBytes(r, s.EdPk); err != nil {
 		return err
 	}
 
@@ -281,11 +281,11 @@ func UnmarshalWithdrawBid(r *bytes.Buffer, s *WithdrawBidTransaction) error {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &s.Bid); err != nil {
+	if err := encoding.ReadVarBytes(r, &s.Sig); err != nil {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &s.Sig); err != nil {
+	if err := encoding.ReadVarBytes(r, &s.EdPk); err != nil {
 		return err
 	}
 

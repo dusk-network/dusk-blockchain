@@ -66,7 +66,7 @@ func TestQueuedDispatch(t *testing.T) {
 	assert.Equal(t, 1, len(c.eventqueue.entries[2][0]))
 
 	// Update to round 2. The queued event should be dispatched
-	ru := MockRoundUpdate(2, nil, nil)
+	ru := MockRoundUpdate(2, nil)
 	msg := message.New(topics.RoundUpdate, ru)
 	c.CollectRoundUpdate(msg)
 	// Update our reference to `comp`, as it was swapped out.
@@ -140,7 +140,7 @@ func TestQueueDispatchAgreement(t *testing.T) {
 	assert.Equal(t, 1, len(c.roundQueue.entries[2][3]))
 
 	// Update the round to dispatch the event
-	ru := MockRoundUpdate(2, nil, nil)
+	ru := MockRoundUpdate(2, nil)
 	msg := message.New(topics.RoundUpdate, ru)
 	c.CollectRoundUpdate(msg)
 	agComp := c.store.components[0].(*mockComponent)
@@ -163,7 +163,7 @@ func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Co
 	}
 
 	c := Start(bus, keys, factories...)
-	ru := MockRoundUpdate(1, nil, nil)
+	ru := MockRoundUpdate(1, nil)
 	msg := message.New(topics.RoundUpdate, ru)
 
 	// Collect the round update to initialize the state

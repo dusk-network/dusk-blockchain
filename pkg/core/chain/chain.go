@@ -62,7 +62,6 @@ type Chain struct {
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 	p        *user.Provisioners
-	bidList  *user.BidList
 	counter  *chainsync.Counter
 
 	// loader abstracts away the persistence aspect of Block operations
@@ -150,7 +149,6 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		eventBus:                 eventBus,
 		rpcBus:                   rpcBus,
 		p:                        user.NewProvisioners(),
-		bidList:                  &user.BidList{},
 		counter:                  counter,
 		certificateChan:          certificateChan,
 		highestSeenChan:          highestSeenChan,
@@ -298,14 +296,13 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 
 	// 3. Call ExecuteStateTransitionFunction
 	l.Debug("calling ExecuteStateTransitionFunction")
-	_, provisioners, bidList, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
+	_, provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
 	if err != nil {
 		l.WithError(err).Errorln("Error in executing the state transition")
 	}
 
 	// Caching the provisioners and bidList
 	c.p = &provisioners
-	c.bidList = &bidList
 
 	// 4. Store the approved block
 	l.Trace("storing block in db")
@@ -344,11 +341,10 @@ func (c *Chain) sendRoundUpdate() error {
 	hdr := c.intermediateBlock.Header
 
 	ru := consensus.RoundUpdate{
-		Round:   hdr.Height + 1,
-		P:       *c.p,
-		BidList: *c.bidList,
-		Seed:    hdr.Seed,
-		Hash:    hdr.Hash,
+		Round: hdr.Height + 1,
+		P:     *c.p,
+		Seed:  hdr.Seed,
+		Hash:  hdr.Hash,
 	}
 	msg := message.New(topics.RoundUpdate, ru)
 	c.eventBus.Publish(topics.RoundUpdate, msg)
@@ -656,7 +652,6 @@ func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.G
 
 func (c *Chain) resetState() error {
 	c.p = user.NewProvisioners()
-	c.bidList = &user.BidList{}
 	intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
 	if err != nil {
 		return err

@@ -116,7 +116,7 @@ func wireReduction(t *testing.T, bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) 
 	f2 := secondstep.NewFactory(bus, rpcBus, hlp.Keys[0], 1*time.Second)
 	c := consensus.Start(bus, hlp.Keys[0], f1, f2)
 	// Starting the coordinator
-	ru := consensus.MockRoundUpdate(1, hlp.P, nil)
+	ru := consensus.MockRoundUpdate(1, hlp.P)
 	msg := message.New(topics.RoundUpdate, ru)
 	if err := c.CollectRoundUpdate(msg); err != nil {
 		t.Fatal(err)

@@ -14,8 +14,6 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/bwesterb/go-ristretto v1.0.0/go.mod h1:N/KzfPHVf0cM6so9lbr2hamEhlH9xev3NIj+B6p+Eyc=
 github.com/bwesterb/go-ristretto v1.1.0 h1:KiOn1eqKcCe5X4Y6OPGS4u3XyVmxUnh/WAHU7bO3XXo=
 github.com/bwesterb/go-ristretto v1.1.0/go.mod h1:N/KzfPHVf0cM6so9lbr2hamEhlH9xev3NIj+B6p+Eyc=
-github.com/bwesterb/go-ristretto v1.1.1 h1:ScMQxfIReRWsrKhQ+rR9R4CoaS+9Mf+GqaGP8NQEEJg=
-github.com/bwesterb/go-ristretto v1.1.1/go.mod h1:fUIoIZaG73pV5biE2Blr2xEzDoMj7NFEuV9ekS419A0=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/chzyer/logex v1.1.10 h1:Swpa1K6QvQznwJRcfTfQJmTE72DqScAa40E+fbHEXEE=
@@ -46,10 +44,8 @@ github.com/dusk-network/bn256 v0.5.1-lattices/go.mod h1:ddVn3p/nch27uVwd+3QGreud
 github.com/dusk-network/dusk-crypto v0.1.0/go.mod h1:Hgr/7jihizg4T/om70iCt4p0uon2asf/9AAzeegu9CU=
 github.com/dusk-network/dusk-crypto v0.1.1 h1:o9CIDb/YrcMAmGQVfdNfets0hJrIsEQbka6LMjTAWdA=
 github.com/dusk-network/dusk-crypto v0.1.1/go.mod h1:XEU09/mHLIAg9cS0m/6Hu2+wvJPxybfoXYSCrveHh3U=
-github.com/dusk-network/dusk-protobuf v0.1.1-0.20200507173945-4547c2284e06 h1:fiZ7h6CA0f6yOgGy7bpGTP2pyjfVyxInFiXFQLapkG0=
-github.com/dusk-network/dusk-protobuf v0.1.1-0.20200507173945-4547c2284e06/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
-github.com/dusk-network/dusk-wallet/v2 v2.0.2 h1:t/nH//N6eUjfwh05im44ncx1Z+auLyTeieNtL3EvNzg=
-github.com/dusk-network/dusk-wallet/v2 v2.0.2/go.mod h1:iweGXUe9XLFWh04TgfBfUu4hkhp4WNsrPWPYt2AHNwY=
+github.com/dusk-network/dusk-protobuf v0.2.2 h1:0imCBtZSpDtdvLzBtaqT+L2KOJVfq6LyNRq+nNBEtmg=
+github.com/dusk-network/dusk-protobuf v0.2.2/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee/go.mod h1:PpPxJzdlQ023fALM5AGWeFrIaIU2igVmxr3QiRaf+ks=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
@@ -88,6 +84,7 @@ github.com/golang/protobuf v1.4.0-rc.2/go.mod h1:LlEzMj4AhA7rCAGe4KMBDvJI+AwstrU
 github.com/golang/protobuf v1.4.0-rc.4.0.20200313231945-b860323f09d0/go.mod h1:WU3c8KckQ9AFe+yFwt9sWVRKCVIyN9cPHBJSNnbL67w=
 github.com/golang/protobuf v1.4.0 h1:oOuy+ugB+P/kBdUnG5QaMXSIyJ1q38wWSojYCb3z5VQ=
 github.com/golang/protobuf v1.4.0/go.mod h1:jodUvKwWbYaEsadDk5Fwe5c77LiNKVO9IDvqG2KuDX0=
+github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db h1:woRePGFeVFfLKN/pOkfl+p/TAqKOfFu+7KPlMVpok/w=
 github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/golang/snappy v0.0.1 h1:Qgr9rKW7uDUkrbSmQeiDsGa8SjGyCOGtuasMWwvp2P4=
 github.com/golang/snappy v0.0.1/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
