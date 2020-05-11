@@ -103,7 +103,13 @@ func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus
 func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	sev := e.(message.ScoreProposal)
 
-	blk, err := bg.Generate(sev)
+	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpbus.EmptyRequest(), 5*time.Second)
+	if err != nil {
+		return err
+	}
+	keys := resp.([][]byte)
+
+	blk, err := bg.Generate(sev, keys)
 	if err != nil {
 		return err
 	}
@@ -138,14 +144,14 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 }
 
 // Generate a Block
-func (bg *Generator) Generate(sev message.ScoreProposal) (*block.Block, error) {
-	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof, sev.Score, bg.roundInfo.Hash)
+func (bg *Generator) Generate(sev message.ScoreProposal, keys [][]byte) (*block.Block, error) {
+	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof, sev.Score, bg.roundInfo.Hash, keys)
 }
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
-func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error) {
-	txs, err := bg.ConstructBlockTxs(proof, score)
+func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error, keys [][]byte) {
+	txs, err := bg.ConstructBlockTxs(proof, score, keys)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +192,7 @@ func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 
 // ConstructBlockTxs will fetch all valid transactions from the mempool, append a coinbase
 // transaction, and return them all.
-func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.ContractCall, error) {
+func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]transactions.ContractCall, error) {
 	txs := make([]transactions.ContractCall, 0)
 
 	// Retrieve and append the verified transactions from Mempool
@@ -208,7 +214,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Cont
 	}
 
 	// Construct and append coinbase Tx to reward the generator
-	coinbaseTx, err := bg.constructCoinbaseTx()
+	coinbaseTx, err := bg.constructCoinbaseTx(keys)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +225,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Cont
 }
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
-func (bg *Generator) constructCoinbaseTx() (*transactions.DistributeTransaction, error) {
+func (bg *Generator) constructCoinbaseTx(keys [][]byte) (*transactions.DistributeTransaction, error) {
 	ctx, cancel := context.WithDeadline(bg.ctx, time.Now().Add(500*time.Millisecond))
 	defer cancel()
 

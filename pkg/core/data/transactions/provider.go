@@ -127,7 +127,7 @@ type BlockGenerator interface {
 	GenerateScore(context.Context, ScoreRequest) (Score, error)
 
 	// NewDistributeTx creates a new Distribute transaction
-	NewDistributeTx(context.Context, TxRequest) (DistributeTransaction, error)
+	NewDistributeTx(context.Context, TxRequest, [][]byte) (DistributeTransaction, error)
 }
 
 // Proxy toward the rusk client
@@ -528,13 +528,14 @@ func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Sco
 }
 
 // NewDistributeTx creates a new Distribute transaction
-func (b *blockgenerator) NewDistributeTx(ctx context.Context, tx TxRequest) (DistributeTransaction, error) {
+func (b *blockgenerator) NewDistributeTx(ctx context.Context, tx TxRequest, keys [][]byte) (DistributeTransaction, error) {
 	dTx := new(DistributeTransaction)
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
 	dt := new(rusk.DistributeTransactionRequest)
 	dt.Tx = tr
+	dt.ProvisionersAddresses = keys
 	res, err := b.client.NewDistribute(ctx, dt)
 	if err != nil {
 		return *dTx, err
