@@ -7,7 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
 // TestMockAgreementEvent tests the general layout of a mock Agreement (i.e. the BitSet)
@@ -25,9 +25,7 @@ func TestVoteVerification(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
 	ev := message.MockAgreement(hash, 1, 3, keys, p)
 	handler := NewHandler(keys[0], *p)
-	if !assert.NoError(t, handler.Verify(ev)) {
-		assert.FailNow(t, "problems in verification logic")
-	}
+	assert.NoError(t, handler.Verify(ev), "problems in verification logic")
 }
 
 func TestGetVoterKeys(t *testing.T) {
