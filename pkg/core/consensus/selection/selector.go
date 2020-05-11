@@ -67,7 +67,7 @@ func NewComponent(ctx context.Context, publisher eventbus.Publisher, timeout tim
 func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.eventPlayer = eventPlayer
 	s.signer = signer
-	s.handler = NewScoreHandler(r.BidList, s.provisioner)
+	s.handler = NewScoreHandler(s.provisioner)
 	s.timer = &timer{s: s}
 
 	scoreSubscriber := consensus.TopicListener{
@@ -101,6 +101,7 @@ func (s *Selector) Finalize() {
 // it has a higher score, verifies, propagates and saves it
 func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	score := packet.(message.Score)
+	h := packet.State()
 
 	// Locking here prevents the named pipe from filling up with requests to verify
 	// Score messages with a low score, as only one Score message will be verified
@@ -115,7 +116,7 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 		}
 	}
 
-	if err := s.handler.Verify(s.ctx, score); err != nil {
+	if err := s.handler.Verify(s.ctx, h.Round, h.Step, score); err != nil {
 		return err
 	}
 

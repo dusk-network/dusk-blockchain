@@ -23,7 +23,7 @@ func TestSelection(t *testing.T) {
 	// Sub to BestScore, to observe the outcome of the Selector
 	bestScoreChan := make(chan message.Message, 1)
 	bus.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
-	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+	hlp.Initialize(consensus.MockRoundUpdate(1, nil))
 
 	// Make sure to replace the handler, to avoid zkproof verification
 	hlp.SetHandler(newMockHandler())
@@ -48,7 +48,7 @@ func TestMultipleVerification(t *testing.T) {
 	// Sub to gossip, so we can catch any outgoing events
 	gossipChan := make(chan message.Message, 10)
 	bus.Subscribe(topics.Gossip, eventbus.NewChanListener(gossipChan))
-	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+	hlp.Initialize(consensus.MockRoundUpdate(1, nil))
 
 	// Make sure to replace the handler, to avoid zkproof verification
 	hlp.SetHandler(newMockHandler())
@@ -91,7 +91,7 @@ func TestCollectNoGeneration(t *testing.T) {
 	assert.NotPanics(t, func() {
 		bus := eventbus.New()
 		hlp := selection.NewHelper(bus)
-		hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+		hlp.Initialize(consensus.MockRoundUpdate(1, nil))
 
 		// Make sure to replace the handler, to avoid zkproof verification
 		hlp.SetHandler(newMockHandler())
@@ -113,7 +113,7 @@ func newMockHandler() *mockHandler {
 	return &mockHandler{}
 }
 
-func (m *mockHandler) Verify(context.Context, message.Score) error {
+func (m *mockHandler) Verify(context.Context, uint64, uint8, message.Score) error {
 	time.Sleep(500 * time.Millisecond)
 	return nil
 }

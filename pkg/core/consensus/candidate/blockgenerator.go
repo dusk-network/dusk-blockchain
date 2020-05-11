@@ -230,7 +230,8 @@ func (bg *Generator) constructCoinbaseTx() (*transactions.DistributeTransaction,
 	// the full list of Provisioners for the last round to be able to recreate
 	// the committee
 	txReq := transactions.MakeGenesisTxRequest(*bg.genPrivKey, config.GeneratorReward, 100, false)
-	dTx, err := bg.gen.NewDistributeTx(ctx, txReq)
+	// FIXME: fetch reward somehow
+	dTx, err := bg.gen.NewDistributeTx(ctx, 100000000000, nil, txReq)
 	if err != nil {
 		return nil, err
 	}

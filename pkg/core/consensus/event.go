@@ -9,8 +9,6 @@ var emptyHash [32]byte
 // InternalPacket is a specialization of the Payload of message.Message. It is used to
 // unify messages used by the consensus, which need to carry the header.Header
 // for consensus specific operations
-// TODO: interface - consider breaking the Header down into
-// AsyncState/SignedState/Header
 type InternalPacket interface {
 	State() header.Header
 }

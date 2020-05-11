@@ -37,7 +37,9 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	//generate secret key with rusk
 	// TODO: use parent context
 	ctx := context.Background()
-	sk, err := t.keyMaster.GenerateSecretKey(ctx, req.Seed)
+	// QUESTION: since GenerateSecretKey also returns a PublicKey and a
+	// ViewKey, does it still make sense to call `createFromSeed` later on?
+	sk, _, _, err := t.keyMaster.GenerateSecretKey(ctx, req.Seed)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +186,10 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 
 	// TODO: use a parent context
 	ctx := context.Background()
-	tx, err := t.provider.NewStakeTx(ctx, blsKey.Marshal(), transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
+	// FIXME: we should calculate the expirationHeight somehow (maybe with the
+	// RPCBus?)
+	var expirationHeight uint64
+	tx, err := t.provider.NewStakeTx(ctx, blsKey.Marshal(), expirationHeight, transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
 	if err != nil {
 		return nil, err
 	}

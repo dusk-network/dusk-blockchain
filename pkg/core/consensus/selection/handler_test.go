@@ -15,6 +15,6 @@ func TestPriority(t *testing.T) {
 	ev := message.MockScore(hdr, hash)
 
 	// Comparing the same event should return true
-	handler := NewScoreHandler(nil, nil)
+	handler := NewScoreHandler(nil)
 	assert.True(t, handler.Priority(ev, ev))
 }

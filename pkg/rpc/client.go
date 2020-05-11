@@ -6,7 +6,6 @@ import (
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -21,9 +20,7 @@ type Client struct {
 	rusk.RuskClient
 	node.WalletClient
 	node.TransactorClient
-	conn           *grpc.ClientConn
-	validateSTChan chan rpcbus.Request
-	executeSTChan  chan rpcbus.Request
+	conn *grpc.ClientConn
 }
 
 // InitRPCClients opens the connection with the Rusk gRPC server, and
