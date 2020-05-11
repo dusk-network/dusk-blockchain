@@ -12,26 +12,30 @@ import (
 
 var testnet = byte(2)
 
-func (t *Transactor) createFromSeed(seedBytes []byte, password string) (transactions.PublicKey, transactions.ViewKey, error) {
-	var pk transactions.PublicKey
-	var vk transactions.ViewKey
+func (t *Transactor) loadWalletFromSeedPbAndVk(seedBytes []byte, password string, pk transactions.PublicKey, vk transactions.ViewKey) error {
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
-		return pk, vk, err
+		return err
 	}
 
 	// Then create the wallet with seed and password
-	_, err = wallet.LoadFromSeed(seedBytes, testnet, db, password, cfg.Get().Wallet.File, cfg.Get().Wallet.SecretKeyFile, &t.secretKey)
+	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, password, cfg.Get().Wallet.File, cfg.Get().Wallet.SecretKeyFile, &t.secretKey)
 	if err != nil {
 		_ = db.Close()
-		return pk, vk, err
+		return err
 	}
 
-	return t.loadPK(t.secretKey)
+	w.PublicKey = pk
+	w.ViewKey = vk
+
+	// assign wallet
+	t.w = w
+
+	return nil
 }
 
-func (t *Transactor) loadWallet(password string) (transactions.PublicKey, transactions.ViewKey, error) {
+func (t *Transactor) loadWalletFromPasswordAndLoadPkVk(password string) (transactions.PublicKey, transactions.ViewKey, error) {
 	var pk transactions.PublicKey
 	var vk transactions.ViewKey
 	// First load the database
@@ -47,12 +51,21 @@ func (t *Transactor) loadWallet(password string) (transactions.PublicKey, transa
 		return pk, vk, err
 	}
 
-	// //TODO: assign wallet here still make sense ?
-	// t.w = w
-	return t.loadPK(w.SecretKey)
+	pk, vk, err = t.loadPublicKeyAndViewKey(w.SecretKey)
+	if err != nil {
+		return pk, vk, err
+	}
+
+	w.PublicKey = pk
+	w.ViewKey = vk
+
+	// assign wallet
+	t.w = w
+
+	return pk, vk, nil
 }
 
-func (t *Transactor) loadPK(sk transactions.SecretKey) (transactions.PublicKey, transactions.ViewKey, error) {
+func (t *Transactor) loadPublicKeyAndViewKey(sk transactions.SecretKey) (transactions.PublicKey, transactions.ViewKey, error) {
 	//get the pub key and return
 	// TODO: use a parent context here
 	ctx := context.Background()
