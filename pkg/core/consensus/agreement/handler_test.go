@@ -1,6 +1,7 @@
 package agreement
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -26,6 +27,27 @@ func TestVoteVerification(t *testing.T) {
 	handler := NewHandler(keys[0], *p)
 	if !assert.NoError(t, handler.Verify(ev)) {
 		assert.FailNow(t, "problems in verification logic")
+	}
+}
+
+func TestGetVoterKeys(t *testing.T) {
+	p, keys := consensus.MockProvisioners(3)
+	hash, _ := crypto.RandEntropy(32)
+	ev := message.MockAgreement(hash, 1, 3, keys, p)
+	handler := NewHandler(keys[0], *p)
+
+	voterKeys := handler.getVoterKeys(ev)
+
+	// Ensure voterKeys only contains keys from `keys`
+	for _, key := range voterKeys {
+		found := false
+		for _, k := range keys {
+			if bytes.Equal(k.BLSPubKeyBytes, key) {
+				found = true
+			}
+		}
+
+		assert.True(t, found)
 	}
 }
 
