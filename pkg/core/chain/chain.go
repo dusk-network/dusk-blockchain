@@ -536,18 +536,7 @@ func (c *Chain) provideLastCommittee(r rpcbus.Request) {
 		return
 	}
 
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteVarInt(buf, uint64(len(c.lastCommittee))); err != nil {
-		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, err)
-	}
-
-	for _, key := range c.lastCommittee {
-		if err := encoding.WriteBLS(buf, key); err != nil {
-			r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, err)
-		}
-	}
-
-	r.RespChan <- rpcbus.NewResponse(*buf, nil)
+	r.RespChan <- rpcbus.NewResponse(c.lastCommittee, nil)
 }
 
 func (c *Chain) provideRoundResults(r rpcbus.Request) {
