@@ -66,7 +66,7 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 
 // CreateVotingCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step and round.
-// FIXME: running this with weird setup causes infinite looping (to reproduce, hardcode `3` on MockProvisioners when calling agreement.NewHelper in the agreement tests)
+// TODO: running this with weird setup causes infinite looping (to reproduce, hardcode `3` on MockProvisioners when calling agreement.NewHelper in the agreement tests)
 func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) VotingCommittee {
 	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(p.TotalWeight())

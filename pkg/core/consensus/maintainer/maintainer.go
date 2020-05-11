@@ -18,7 +18,7 @@ import (
 
 var l = log.WithField("process", "StakeAutomaton")
 
-// FIXME: Logic needs to be adjusted to work with Rusk
+// FIXME: 481 - Logic needs to be adjusted to work with Rusk
 
 // The StakeAutomaton is a process that keeps note of when certain consensus transactions
 // expire, and makes sure the node remains within the bidlist/committee, when those
@@ -78,7 +78,7 @@ func (m *StakeAutomaton) Listen() {
 		// Rehydrate consensus state
 		m.p = roundUpdate.P
 
-		//// TODO: handle new provisioners coming from roundupdate
+		//// FIXME: handle new provisioners coming from roundupdate
 		//if roundUpdate.Round+renewalOffset >= m.bidEndHeight {
 		//	endHeight := m.findMostRecentBid()
 
@@ -168,7 +168,7 @@ func (m *StakeAutomaton) getTxSettings() (uint64, uint64) {
 	settings := config.Get().Consensus
 	amount := settings.DefaultAmount
 	lockTime := settings.DefaultLockTime
-	// TODO: this no longer exists. investigate if we should reinstate it
+	// FIXME: 481 - this no longer exists. investigate if we should reinstate it
 	// if lockTime > transactions.MaxLockTime {
 	// 	l.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v", lockTime, transactions.MaxLockTime)
 	// 	lockTime = transactions.MaxLockTime

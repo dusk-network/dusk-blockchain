@@ -6,7 +6,7 @@ import (
 
 func TestGenerateGenesis(t *testing.T) {
 
-	// TODO: KEYS the key generation from the SEED uses rusk atm. Also, the
+	// FIXME: 417 - KEYS the key generation from the SEED uses rusk atm. Also, the
 	// genesis needs to be regenerated accordingly. This test should be
 	// adjusted to become an integration test
 
@@ -43,7 +43,7 @@ func TestGenerateGenesis(t *testing.T) {
 }
 
 func TestGenesisBlock(t *testing.T) {
-	// TODO: rework for RUSK integration
+	// FIXME: 417  rework for RUSK integration
 	/*
 		// read the hard-coded genesis blob for testnet
 		blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)

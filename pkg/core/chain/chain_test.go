@@ -243,7 +243,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 }
 
 func TestRebuildChain(t *testing.T) {
-	// TODO: rework this for RUSK integration
+	// FIXME: 417 - rework this as soon as we have a viable block to mock Genesis
 	/*
 		eb, rb, c := setupChainTest(t, true)
 		catchClearWalletDatabaseRequest(rb)

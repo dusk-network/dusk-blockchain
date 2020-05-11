@@ -10,8 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO: these can absolutely be table tests
-
+// FIXME: 496 - Re-enable these tests and use table testing
 func TestEncodeDecodeStandard(t *testing.T) {
 
 	assert := assert.New(t)

@@ -75,7 +75,7 @@ func (m *HashMap) Put(t TxDesc) error {
 	m.sorted[index] = keyFee{k: k, f: fee}
 
 	// store all tx key images, if provided
-	// TODO: update for phoenix txs
+	// FIXME: 496 - update for phoenix txs
 	/*
 		for i, input := range t.tx.StandardTx().Inputs {
 			if len(input.KeyImage.Bytes()) == keyImageSize {

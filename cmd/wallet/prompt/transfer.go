@@ -12,6 +12,7 @@ import (
 func transferDusk(client node.TransactorClient) (*node.TransactionResponse, error) {
 	amount := getAmount()
 
+	// FIXME: 493 - there should be syntax-validation of address
 	validateAddress := func(input string) error {
 		// FIXME: there is no ToKey method in the wallet currently
 		//address := key.PublicAddress(input)

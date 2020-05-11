@@ -20,17 +20,22 @@ const (
 )
 
 // TxRecord encapsulates the data stored on the DB related to a transaction such as block
-// heigth, direction, amount, etc
+// height, direction, amount, etc
 type TxRecord struct {
 	Direction
 	Timestamp int64
 	Height    uint64
 	transactions.TxType
+	Amount   uint64 // can be zero for smart contract calls not related to transfer of value
+	Fee      uint64 // is essentially gas
+	Data     []byte // binary  representation of the smart contract call inputs
+	LockTime uint64 // expressed in blockheight terms
 	transactions.ContractCall
 }
 
 // New creates a TxRecord
 func New(tx transactions.ContractCall, height uint64, direction Direction) *TxRecord {
+	// FIXME: 459 translate the ContractCall into the above struct
 	return &TxRecord{
 		Direction:    direction,
 		Timestamp:    time.Now().Unix(),

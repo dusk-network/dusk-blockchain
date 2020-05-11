@@ -94,7 +94,7 @@ func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, er
 }
 
 func mockDeterministicCoinbase() transactions.ContractCall {
-	// FIXME: update for phoenix
+	// FIXME: 494 - update for phoenix
 	/*
 		seed := make([]byte, 32)
 

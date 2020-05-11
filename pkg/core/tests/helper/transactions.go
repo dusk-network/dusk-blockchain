@@ -6,6 +6,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
+//FIXME: 496 - These mocks are the basis of many different tests. They all need
+//to be reinstated
+
 //const (
 //	lockTime = uint64(2000000000)
 //	fee      = int64(200)

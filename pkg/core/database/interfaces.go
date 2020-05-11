@@ -98,6 +98,7 @@ type Transaction interface {
 
 	// FetchBidValues retrieves the D and K values with the lowest
 	// expiry height from the database.
+	// FIXME: 476
 	FetchBidValues() (D []byte, K []byte /* EdPk []byte, */, err error)
 
 	// FetchBlockHeightSince try to find height of a block generated around

@@ -89,6 +89,7 @@ func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
 		for _, v := range record.StandardTx().Outputs {
 			amount += v.Value
 		}
+		// FIXME: 459 lockheight is included in the TxRecord struct
 		resp.Records[i] = &node.TxRecord{
 			Direction: node.Direction(record.Direction),
 			Timestamp: record.Timestamp,
@@ -151,7 +152,7 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	ctx := context.Background()
 
 	txReq := transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, true)
-	// FIXME: here we need to create K, EdPk; retrieve seed somehow and decide
+	// FIXME: 476 - here we need to create K, EdPk; retrieve seed somehow and decide
 	// an ExpirationHeight (most likely the last 2 should be retrieved from he
 	// DB)
 	// Create the Ed25519 Keypair
@@ -186,8 +187,9 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 
 	// TODO: use a parent context
 	ctx := context.Background()
-	// FIXME: we should calculate the expirationHeight somehow (maybe with the
-	// RPCBus?)
+	// FIXME: 476 - we should calculate the expirationHeight somehow (by asking
+	// the chain for the last block through the RPC bus and calculating the
+	// height)
 	var expirationHeight uint64
 	tx, err := t.provider.NewStakeTx(ctx, blsKey.Marshal(), expirationHeight, transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
 	if err != nil {
