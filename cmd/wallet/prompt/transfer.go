@@ -4,9 +4,8 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	"github.com/dusk-network/dusk-wallet/v2/key"
-	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	"github.com/manifoldco/promptui"
 )
 
@@ -14,11 +13,12 @@ func transferDusk(client node.TransactorClient) (*node.TransactionResponse, erro
 	amount := getAmount()
 
 	validateAddress := func(input string) error {
-		address := key.PublicAddress(input)
-		// TODO: use netprefix inferred from config
-		if _, err := address.ToKey(2); err != nil {
-			return err
-		}
+		// FIXME: there is no ToKey method in the wallet currently
+		//address := key.PublicAddress(input)
+		//// TODO: use netprefix inferred from config
+		//if _, err := address.ToKey(2); err != nil {
+		//	return err
+		//}
 
 		return nil
 	}

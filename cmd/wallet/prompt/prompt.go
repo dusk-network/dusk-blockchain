@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/cmd/wallet/conf"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	"github.com/manifoldco/promptui"
 )
 
