@@ -110,7 +110,7 @@ func TestAcceptIntermediate(t *testing.T) {
 	cert = block.EmptyCertificate()
 	cert.Step = 5
 
-	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
+	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert, nil})
 
 	// Should have `blk` as intermediate block now
 	assert.True(t, blk.Equals(c.intermediateBlock))
@@ -153,7 +153,7 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	c.intermediateBlock = nil
 
 	// Now pretend we finalized on it
-	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
+	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert, nil})
 
 	// Ensure everything is still the same
 	assert.True(t, currPrevBlock.Equals(&c.prevBlock))

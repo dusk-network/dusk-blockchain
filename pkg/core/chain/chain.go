@@ -87,6 +87,9 @@ type Chain struct {
 	// for including it with the candidate message.
 	lastCertificate *block.Certificate
 
+	// Most recent committee, responsible for finalizing the intermediate block.
+	lastCommittee [][]byte
+
 	// The highest block we've seen from the network. This is updated
 	// by the synchronizer, and used to calculate our synchronization
 	// progress.
@@ -403,8 +406,9 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 
 	ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(1*time.Second))
 	defer cancel()
-	// Set latest certificate
+	// Set latest certificate and committee
 	c.lastCertificate = cMsg.cert
+	c.lastCommittee = cMsg.committee
 
 	// Fetch new intermediate block and corresponding certificate
 	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), 5*time.Second)
