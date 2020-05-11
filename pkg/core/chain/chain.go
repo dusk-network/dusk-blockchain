@@ -86,7 +86,7 @@ type Chain struct {
 	// for including it with the candidate message.
 	lastCertificate *block.Certificate
 
-	// Most recent committee, responsible for finalizing the intermediate block.
+	// BLS keys of the most recent committee, responsible for finalizing the intermediate block.
 	lastCommittee [][]byte
 
 	// The highest block we've seen from the network. This is updated
