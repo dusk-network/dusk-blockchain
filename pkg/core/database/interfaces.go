@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -81,10 +80,6 @@ type Transaction interface {
 	// FetchCurrentHeight returns the height of the most recently stored
 	// block in the database.
 	FetchCurrentHeight() (uint64, error)
-
-	// FetchDecoys will return a number of decoy public keys, to be used
-	// when constructing a ring signature for a transaction.
-	FetchDecoys(numDecoys int) []ristretto.Point
 
 	// FetchOutputExists returns whether or not an output exists for the
 	// given destination public key

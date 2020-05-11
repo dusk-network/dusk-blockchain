@@ -83,13 +83,21 @@ These features will be introduced in the later iterations of the Testnet (starti
 
 ## How to use the wallet?
 
-The wallet is hosted in a separate repo, [found here](https://github.com/dusk-network/dusk-wallet-cli). Please refer to that repository for build instructions.
+The wallet is hosted in a separate repo, [found here](https://github.com/dusk-network/cmd/wallet). Please refer to that repository for build instructions. 
 
-After building, ensure you move the `dusk-wallet-cli` executable into the same folder as your `testnet`, `blindbid` and `dusk.toml` files. You can start the wallet after launching the node.
+## Build Wallet
+
+The wallet is a command within `dusk-blockchain` repository. To build it, it is enough to trigger the related make target
 
 ```bash
-./dusk-wallet-cli
+make wallet
 ```
+
+## Run the Wallet
+
+FIXME
+
+## How to use the wallet
 
 The wallet will show you a menu with available options, that you can navigate with the arrow keys and the enter key.
 

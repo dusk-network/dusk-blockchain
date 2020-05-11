@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-wallet/v2/key"
 	assert "github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -127,7 +126,7 @@ func TestClear(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func randTxForRecord(t transactions.TxType) (transactions.ContractCall, *key.PrivateView) { //nolint
+func randTxForRecord(t transactions.TxType) transactions.ContractCall { //nolint
 	// TODO: rework for RUSK integration
 	/*
 		var tx transactions.Transaction
@@ -170,5 +169,5 @@ func randTxForRecord(t transactions.TxType) (transactions.ContractCall, *key.Pri
 
 		return tx, privView
 	*/
-	return nil, nil
+	return nil
 }
