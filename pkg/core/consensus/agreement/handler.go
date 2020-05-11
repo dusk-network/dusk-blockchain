@@ -107,9 +107,7 @@ func (a *handler) getVoterKeys(ev message.Agreement) [][]byte {
 		committee := a.Committee(hdr.Round, step)
 		subcommittee := committee.IntersectCluster(votes.BitSet)
 
-		for _, key := range subcommittee.Unravel() {
-			keys = append(keys, key)
-		}
+		keys = append(keys, subcommittee.Unravel()...)
 	}
 
 	return keys
