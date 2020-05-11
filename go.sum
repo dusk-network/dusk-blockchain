@@ -14,8 +14,6 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/bwesterb/go-ristretto v1.0.0/go.mod h1:N/KzfPHVf0cM6so9lbr2hamEhlH9xev3NIj+B6p+Eyc=
 github.com/bwesterb/go-ristretto v1.1.0 h1:KiOn1eqKcCe5X4Y6OPGS4u3XyVmxUnh/WAHU7bO3XXo=
 github.com/bwesterb/go-ristretto v1.1.0/go.mod h1:N/KzfPHVf0cM6so9lbr2hamEhlH9xev3NIj+B6p+Eyc=
-github.com/bwesterb/go-ristretto v1.1.1 h1:ScMQxfIReRWsrKhQ+rR9R4CoaS+9Mf+GqaGP8NQEEJg=
-github.com/bwesterb/go-ristretto v1.1.1/go.mod h1:fUIoIZaG73pV5biE2Blr2xEzDoMj7NFEuV9ekS419A0=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/chzyer/logex v1.1.10 h1:Swpa1K6QvQznwJRcfTfQJmTE72DqScAa40E+fbHEXEE=
@@ -46,10 +44,6 @@ github.com/dusk-network/bn256 v0.5.1-lattices/go.mod h1:ddVn3p/nch27uVwd+3QGreud
 github.com/dusk-network/dusk-crypto v0.1.0/go.mod h1:Hgr/7jihizg4T/om70iCt4p0uon2asf/9AAzeegu9CU=
 github.com/dusk-network/dusk-crypto v0.1.1 h1:o9CIDb/YrcMAmGQVfdNfets0hJrIsEQbka6LMjTAWdA=
 github.com/dusk-network/dusk-crypto v0.1.1/go.mod h1:XEU09/mHLIAg9cS0m/6Hu2+wvJPxybfoXYSCrveHh3U=
-github.com/dusk-network/dusk-protobuf v0.2.0 h1:2aaQ4Vmz9ahajlKX3Vu7BXH8SOZrEFaWZH/MGZNLJRE=
-github.com/dusk-network/dusk-protobuf v0.2.0/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
-github.com/dusk-network/dusk-protobuf v0.2.1 h1:YHtPX+ZfjjMJzz6BKhR+vQXUbdRVyqn9jvbwk6TcMQw=
-github.com/dusk-network/dusk-protobuf v0.2.1/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/dusk-network/dusk-protobuf v0.2.2 h1:0imCBtZSpDtdvLzBtaqT+L2KOJVfq6LyNRq+nNBEtmg=
 github.com/dusk-network/dusk-protobuf v0.2.2/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/dusk-network/dusk-wallet/v2 v2.0.2 h1:t/nH//N6eUjfwh05im44ncx1Z+auLyTeieNtL3EvNzg=

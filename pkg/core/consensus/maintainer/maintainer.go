@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -19,7 +18,7 @@ import (
 
 var l = log.WithField("process", "StakeAutomaton")
 
-// TODO: Logic needs to be adjusted to work with Rusk
+// FIXME: Logic needs to be adjusted to work with Rusk
 
 // The StakeAutomaton is a process that keeps note of when certain consensus transactions
 // expire, and makes sure the node remains within the bidlist/committee, when those
@@ -30,7 +29,6 @@ type StakeAutomaton struct {
 	roundChan   <-chan consensus.RoundUpdate
 
 	pubKeyBLS []byte
-	m         ristretto.Scalar
 	p         user.Provisioners
 
 	bidEndHeight   uint64
@@ -46,13 +44,13 @@ const renewalOffset = 100
 // New creates a new instance of StakeAutomaton that is used to automate the
 // resending of stakes and alleviate the burden for a user to having to
 // manually manage restaking
-func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar, srv *grpc.Server) *StakeAutomaton {
+// FIXME: the Automaton needs the EdPk (and maybe X)
+func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, srv *grpc.Server) *StakeAutomaton {
 	a := &StakeAutomaton{
 		eventBroker:    eventBroker,
 		rpcBus:         rpcBus,
 		roundChan:      consensus.InitRoundUpdate(eventBroker),
 		pubKeyBLS:      pubKeyBLS,
-		m:              m,
 		bidEndHeight:   1,
 		stakeEndHeight: 1,
 		running:        false,

@@ -1,7 +1,6 @@
 module github.com/dusk-network/dusk-blockchain
 
 require (
-	github.com/bwesterb/go-ristretto v1.1.1
 	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/dusk-network/dusk-crypto v0.1.1
 	github.com/dusk-network/dusk-protobuf v0.2.2

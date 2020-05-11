@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -198,29 +197,6 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 	}
 
 	return true, txID, nil
-}
-
-func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
-	points := make([]ristretto.Point, 0, numDecoys)
-	for key := range t.db.storage[outputKeyInd] {
-		// Ignore locked outputs
-		unlockHeight := binary.LittleEndian.Uint64(t.db.storage[outputKeyInd][key])
-		if unlockHeight != 0 {
-			continue
-		}
-
-		var p ristretto.Point
-		var pBytes [32]byte
-		copy(pBytes[:], key[:])
-		p.SetBytes(&pBytes)
-
-		points = append(points, p)
-		if len(points) == numDecoys {
-			break
-		}
-	}
-
-	return points
 }
 
 func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
