@@ -81,13 +81,13 @@ func TestStableSortedKeys(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
+	assert := assert.New(t)
 	txsCount := 10
 	pool := HashMap{Capacity: uint32(txsCount)}
 
 	// Generate 10 random txs
 	hashes := make([][]byte, txsCount)
 	for i := 0; i < txsCount; i++ {
-
 		amount := transactions.RandUint64()
 		bf := transactions.RandBlind()
 		tx := transactions.MockTx(amount, uint64(20), false, bf)
@@ -95,29 +95,21 @@ func TestGet(t *testing.T) {
 		hashes[i] = hash
 
 		td := TxDesc{tx: tx, received: time.Now()}
-		if err := pool.Put(td); err != nil {
-			t.Fatal(err.Error())
-		}
+		assert.NoError(pool.Put(td))
 	}
 
 	// Get a random tx from the pool
 	n := rand.Intn(txsCount)
-	tx := pool.Get(hashes[n])
-	if tx == nil {
-		t.Fatal("tx is not supposed to be nil")
-	}
+	assert.NotNil(pool.Get(hashes[n]))
 
 	// Now get a tx for a hash that is not in the pool
 	hash, _ := crypto.RandEntropy(32)
-	tx = pool.Get(hash)
-	if tx != nil {
-		t.Fatal("should not have gotten a tx")
-	}
+	assert.Nil(pool.Get(hash))
 }
 
 func BenchmarkPut(b *testing.B) {
 
-	txs := dummyTransactionsSet(50000)
+	txs := transactions.RandContractCalls(50000, 0, false)
 	b.ResetTimer()
 
 	// Put all transactions
@@ -137,7 +129,7 @@ func BenchmarkPut(b *testing.B) {
 
 func BenchmarkContains(b *testing.B) {
 
-	txs := dummyTransactionsSet(50000)
+	txs := transactions.RandContractCalls(50000, 0, false)
 
 	// Put all transactions
 	pool := HashMap{Capacity: uint32(len(txs))}
@@ -165,7 +157,7 @@ func BenchmarkContains(b *testing.B) {
 
 func BenchmarkRangeSort(b *testing.B) {
 
-	txs := dummyTransactionsSet(10000)
+	txs := transactions.RandContractCalls(10000, 0, false)
 
 	// Put all transactions
 	pool := HashMap{Capacity: uint32(len(txs))}
@@ -190,26 +182,4 @@ func BenchmarkRangeSort(b *testing.B) {
 	}
 
 	b.Logf("Pool number of txs: %d", pool.Len())
-}
-
-func dummyTransactionsSet(size int) []transactions.ContractCall {
-	/*
-		txs := make([]transactions.ContractCall, size)
-		// Generate N random tx
-		dummyTx, _ := transactions.NewStandard(0, 2, 0)
-		for i := 0; i < len(txs); i++ {
-
-			// change fee to enable sorting
-			randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(1000000)))
-			dummyTx.Fee.SetBigInt(randFee)
-
-			clone := *dummyTx
-			clone.TxID, _ = crypto.RandEntropy(32)
-
-			txs[i] = &clone
-		}
-
-		return txs
-	*/
-	return nil
 }

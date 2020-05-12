@@ -7,7 +7,7 @@ import (
 )
 
 //FIXME: 499 - These mocks are the basis of many different tests. They all need
-//to be reinstated
+//to be reinstated (and moved to transactions/fixtures.go)
 
 //const (
 //	lockTime = uint64(2000000000)
