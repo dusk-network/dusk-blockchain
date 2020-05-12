@@ -22,7 +22,7 @@ type Header struct {
 // MarshalBinary marshal wire header into bytes buffer, if valid
 func (h *Header) MarshalBinary(buf *bytes.Buffer) error {
 
-	if MsgTypeToString(h.MsgType) == "UNKNOWN" {
+	if _, err := MsgTypeToString(h.MsgType); err != nil {
 		return errors.New("unknown message type")
 	}
 
@@ -69,7 +69,7 @@ func (h *Header) UnmarshalBinary(buf *bytes.Buffer) error {
 		return err
 	}
 
-	if MsgTypeToString(msgType) == "UNKNOWN" {
+	if _, err := MsgTypeToString(msgType); err != nil {
 		return errors.New("unknown message type")
 	}
 

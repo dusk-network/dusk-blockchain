@@ -62,14 +62,14 @@ func makeRoutingTableFromPeer(peer encoding.PeerInfo) RoutingTable {
 
 // Returns the complete list of Peers in order to be sorted
 // as they have the xor distance in respec to a Peer as a parameter.
-func (router *RoutingTable) getPeerSortDist(refPeer encoding.PeerInfo) []PeerSort {
+func (rt *RoutingTable) getPeerSortDist(refPeer encoding.PeerInfo) []PeerSort {
 	var peerList []encoding.PeerInfo
-	router.tree.mu.RLock()
-	for buckIdx, bucket := range router.tree.buckets {
+	rt.tree.mu.RLock()
+	for buckIdx, bucket := range rt.tree.buckets {
 		if buckIdx == 0 {
 			// Look for neighbor peer in spanning tree
 			for _, p := range bucket.entries {
-				if !router.LpeerInfo.IsEqual(p) {
+				if !rt.LpeerInfo.IsEqual(p) {
 					// neighbor peer
 					peerList = append(peerList, p)
 				}
@@ -78,7 +78,7 @@ func (router *RoutingTable) getPeerSortDist(refPeer encoding.PeerInfo) []PeerSor
 			peerList = append(peerList, bucket.entries[:]...)
 		}
 	}
-	router.tree.mu.RUnlock()
+	rt.tree.mu.RUnlock()
 	var peerListSort []PeerSort
 	for _, peer := range peerList {
 		// We don't want to return the Peer struct of the Peer
@@ -116,9 +116,9 @@ func (a ByXORDist) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 // Returns a list of the selected number of closest peers
 // in respect to a certain `Peer`.
-func (router *RoutingTable) getXClosestPeersTo(peerNum int, refPeer encoding.PeerInfo) []encoding.PeerInfo {
+func (rt *RoutingTable) getXClosestPeersTo(peerNum int, refPeer encoding.PeerInfo) []encoding.PeerInfo {
 	var xPeers []encoding.PeerInfo
-	peerList := router.getPeerSortDist(refPeer)
+	peerList := rt.getPeerSortDist(refPeer)
 	sort.Sort(ByXORDist(peerList))
 
 	// Get the `peerNum` closest ones.

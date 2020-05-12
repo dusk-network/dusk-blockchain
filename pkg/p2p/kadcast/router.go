@@ -56,7 +56,7 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message, height byte) 
 
 	// Filter duplicated messages
 	if !m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
-		return fmt.Errorf("duplicated message received with topic %s", category.String())
+		// return fmt.Errorf("duplicated message received with topic %s", category.String())
 	}
 
 	// Publish wire message to the eventbus so that the subscribed

@@ -9,16 +9,27 @@ import (
 const (
 	// Message types over UDP
 
-	PingMsg      = 0
-	PongMsg      = 1
+	// PingMsg wire Ping message id
+	PingMsg = 0
+
+	// PongMsg wire Pong message id
+	PongMsg = 1
+
+	// FindNodesMsg wire FindNodes message id
 	FindNodesMsg = 2
-	NodesMsg     = 3
+
+	// NodesMsg wire Nodes message id
+	NodesMsg = 3
 
 	// Message types over TCP
 
+	// BroadcastMsg wire Broadcast message id
 	BroadcastMsg = 10
 
-	IDLen    = 16
+	// IDLen PeerInfo ID length
+	IDLen = 16
+
+	// NonceLen PoW-Nonce length
 	NonceLen = 4
 )
 

@@ -93,7 +93,9 @@ func TestGenerateRandomDelegates(t *testing.T) {
 
 	in := make([]encoding.PeerInfo, 10)
 	for i := 0; i < len(in); i++ {
-		in[i] = encoding.PeerInfo{ip, uint16(i), id}
+		in[i] = encoding.PeerInfo{IP: ip,
+			Port: uint16(i),
+			ID:   id}
 	}
 
 	for i := 0; i < len(in); i++ {

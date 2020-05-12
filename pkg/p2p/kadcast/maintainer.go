@@ -106,8 +106,8 @@ func (m *Maintainer) processPacket(srcAddr net.UDPAddr, buf *bytes.Buffer) {
 		return
 	}
 
-	llog.WithField("msg_type", encoding.MsgTypeToString(header.MsgType)).
-		WithField("msg_len", buf.Len()).
+	tn, _ := encoding.MsgTypeToString(header.MsgType)
+	llog.WithField("msg_type", tn).WithField("msg_len", buf.Len()).
 		Traceln("Received UDP packet")
 
 	// Check packet type and process it.
@@ -183,7 +183,7 @@ func (m *Maintainer) sendNodesMsg(receiver encoding.PeerInfo) error {
 	}
 
 	h := makeHeader(encoding.NodesMsg, m.rtable)
-	p := encoding.NodesPayload{kClosestPeers}
+	p := encoding.NodesPayload{Peers: kClosestPeers}
 
 	var buf bytes.Buffer
 	if err := encoding.MarshalBinary(h, &p, &buf); err != nil {

@@ -46,7 +46,9 @@ func TestRouter(port uint16, id [16]byte) *RoutingTable {
 	var ip [4]byte
 	copy(ip[:], lAddr.IP)
 
-	peer := encoding.PeerInfo{ip, port, id}
+	peer := encoding.PeerInfo{IP: ip,
+		Port: port,
+		ID:   id}
 
 	r := makeRoutingTableFromPeer(peer)
 	return &r

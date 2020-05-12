@@ -16,6 +16,7 @@ type NodesPayload struct {
 	Peers []PeerInfo
 }
 
+// MarshalBinary implements BinaryMarshaler
 func (payload *NodesPayload) MarshalBinary(buf *bytes.Buffer) error {
 
 	peersNum := uint16(len(payload.Peers))
@@ -38,6 +39,8 @@ func (payload *NodesPayload) MarshalBinary(buf *bytes.Buffer) error {
 
 	return nil
 }
+
+// UnmarshalBinary implements BinaryMarshaler
 func (payload *NodesPayload) UnmarshalBinary(buf *bytes.Buffer) error {
 
 	var b [2]byte
@@ -57,6 +60,7 @@ func (payload *NodesPayload) UnmarshalBinary(buf *bytes.Buffer) error {
 	return nil
 }
 
+// MarshalBinary implements BinaryMarshaler
 func (payload *BroadcastPayload) MarshalBinary(buf *bytes.Buffer) error {
 
 	if err := buf.WriteByte(payload.Height); err != nil {
@@ -77,6 +81,8 @@ func (payload *BroadcastPayload) MarshalBinary(buf *bytes.Buffer) error {
 
 	return nil
 }
+
+// UnmarshalBinary implements BinaryMarshaler
 func (payload *BroadcastPayload) UnmarshalBinary(buf *bytes.Buffer) error {
 
 	height, err := buf.ReadByte()

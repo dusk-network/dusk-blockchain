@@ -26,22 +26,22 @@ func verifyIDNonce(id [16]byte, nonce []byte) error {
 }
 
 // MsgTypeToString translates wire message into string name
-func MsgTypeToString(t byte) string {
+func MsgTypeToString(t byte) (string, error) {
 
 	switch t {
 	case PingMsg:
-		return "PING"
+		return "PING", nil
 	case PongMsg:
-		return "PONG"
+		return "PONG", nil
 	case FindNodesMsg:
-		return "FIND_NODES"
+		return "FIND_NODES", nil
 	case NodesMsg:
-		return "NODES"
+		return "NODES", nil
 	case BroadcastMsg:
-		return "BROADCAST"
+		return "BROADCAST", nil
 	}
 
-	return "UNKNOWN"
+	return "UNKNOWN", errors.New("not supported")
 }
 
 // ComputeNonce receives the user's `Peer` ID and computes the
