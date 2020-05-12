@@ -468,6 +468,10 @@ func MockInvalidTx() *Transaction {
 	return tx
 }
 
+/******************/
+/** INVALID NOTE **/
+/******************/
+
 // RuskInvalidNote is an invalid note
 var RuskInvalidNote = &rusk.Note{
 	NoteType:        1,
