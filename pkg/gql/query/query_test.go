@@ -44,7 +44,7 @@ func initializeDB(db database.DB) {
 	// Generate a dummy chain with a few blocks to test against
 	chain := make([]*block.Block, 0)
 
-	// Even random func is used, particular fields are hard-coded to make
+	// Even if random func is used, particular fields are hard-coded to make
 	// comparison easier
 
 	// block height 0

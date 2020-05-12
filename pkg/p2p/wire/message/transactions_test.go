@@ -64,35 +64,28 @@ func TestEncodeDecodeBid(t *testing.T) {
 	assert := assert.New(t)
 
 	// random bid tx
-	tx, err := helper.RandomBidTx(t, false)
-	assert.Nil(err)
+	tx := transactions.RandBidTx(0)
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err = message.MarshalTx(buf, tx)
-	assert.Nil(err)
+	assert.Nil(message.MarshalTx(buf, tx))
 
 	// Decode buffer into a bid TX struct
 	decTX, err := message.UnmarshalTx(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
-	// TODO: add equals method for RUSK/phoenix transactions
-	// assert.True(tx.Equals(decTX))
-
 	assert.True(transactions.Equal(tx, decTX))
 
 	// Check that type is correct
-	// assert.Equal(transactions.BidType, decTX.(*transactions.Bid).TxType)
+	assert.Equal(transactions.Bid, decTX.Type())
 }
 
 func TestEqualsMethodBid(t *testing.T) {
 	assert := assert.New(t)
 
-	a, err := helper.RandomBidTx(t, false)
-	assert.Nil(err)
-	b, err := helper.RandomBidTx(t, false)
-	assert.Nil(err)
+	a := transactions.RandBidTx(0)
+	b := transactions.RandBidTx(0)
 	c := a
 
 	assert.False(transactions.Equal(a, b))
@@ -101,36 +94,30 @@ func TestEqualsMethodBid(t *testing.T) {
 }
 
 func TestEncodeDecodeStake(t *testing.T) {
-
 	assert := assert.New(t)
 
 	// random Stake tx
-	tx, err := helper.RandomStakeTx(t, false)
-	assert.Nil(err)
+	tx := transactions.RandStakeTx(0)
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err = message.MarshalTx(buf, tx)
-	assert.Nil(err)
+	assert.NoError(message.MarshalTx(buf, tx))
 
 	// Decode buffer into a Stake TX struct
 	decTX, err := message.UnmarshalTx(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
-	// TODO: add equals method for RUSK/phoenix transactions
 	assert.True(transactions.Equal(tx, decTX))
 	// Check that type is correct
-	// assert.Equal(transactions.StakeType, decTX.(*transactions.Stake).TxType)
+	assert.Equal(transactions.Stake, decTX.Type())
 }
 
 func TestEqualsMethodStake(t *testing.T) {
 	assert := assert.New(t)
 
-	a, err := helper.RandomStakeTx(t, false)
-	assert.Nil(err)
-	b, err := helper.RandomStakeTx(t, false)
-	assert.Nil(err)
+	a := transactions.RandStakeTx(0)
+	b := transactions.RandStakeTx(0)
 	c := a
 
 	assert.False(transactions.Equal(a, b))
@@ -143,7 +130,7 @@ func TestEncodeDecodeCoinbase(t *testing.T) {
 	assert := assert.New(t)
 
 	// random coinbase tx
-	tx := helper.RandomCoinBaseTx(t, false)
+	tx := transactions.RandDistributeTx(0, 35)
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
@@ -161,45 +148,8 @@ func TestEncodeDecodeCoinbase(t *testing.T) {
 func TestEqualsMethodCoinBase(t *testing.T) {
 	assert := assert.New(t)
 
-	a := helper.RandomCoinBaseTx(t, false)
-	b := helper.RandomCoinBaseTx(t, false)
-	c := a
-
-	assert.False(transactions.Equal(a, b))
-	assert.False(transactions.Equal(b, c))
-	assert.True(transactions.Equal(a, c))
-}
-
-func TestEncodeDecodeTLock(t *testing.T) {
-
-	assert := assert.New(t)
-
-	// random timelock tx
-	tx := helper.RandomTLockTx(t, false)
-
-	// Encode TX into a buffer
-	buf := new(bytes.Buffer)
-	err := message.MarshalTx(buf, tx)
-	assert.Nil(err)
-
-	// Decode buffer into a TimeLock TX struct
-	decTX, err := message.UnmarshalTx(buf)
-	assert.Nil(err)
-
-	// Check both structs are equal
-	assert.True(transactions.Equal(tx, decTX))
-
-	// Check that type is correct
-	// TODO: this type does not exist in the RUSK migration
-	// assert.Equal(transactions.TimelockType, decTX.(*transactions.Timelock).TxType)
-}
-
-func TestEqualsMethodTimeLock(t *testing.T) {
-	// TODO: add equals method for RUSK/phoenix transactions
-	assert := assert.New(t)
-
-	a := helper.RandomTLockTx(t, false)
-	b := helper.RandomTLockTx(t, false)
+	a := transactions.RandDistributeTx(0, 35)
+	b := transactions.RandDistributeTx(0, 35)
 	c := a
 
 	assert.False(transactions.Equal(a, b))
