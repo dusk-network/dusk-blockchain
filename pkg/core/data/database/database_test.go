@@ -50,11 +50,11 @@ func TestPutGet(t *testing.T) {
 }
 
 func TestPutFetchTxRecord(t *testing.T) {
-	// FIXME: 496
+	// FIXME: 459
 }
 
 func TestPutTxRecord(t *testing.T) {
-	// FIXME: 496
+	// FIXME: 459
 }
 
 func TestClear(t *testing.T) {

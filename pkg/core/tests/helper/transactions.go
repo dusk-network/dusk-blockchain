@@ -6,7 +6,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
-//FIXME: 496 - These mocks are the basis of many different tests. They all need
+//FIXME: 499 - These mocks are the basis of many different tests. They all need
 //to be reinstated
 
 //const (

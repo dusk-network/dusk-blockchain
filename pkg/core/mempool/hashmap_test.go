@@ -21,7 +21,7 @@ func TestSortedKeys(t *testing.T) {
 
 		tx := helper.RandomStandardTx(t, false)
 
-		// FIXME: 496 - rework for RUSK integration
+		// FIXME: 498 - rework for RUSK integration
 		// randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(10000)))
 		// tx.Fee.SetBigInt(randFee)
 
@@ -100,7 +100,7 @@ func TestGet(t *testing.T) {
 
 		tx := helper.RandomStandardTx(t, false)
 
-		// FIXME: 496 - rework for RUSK integration
+		// FIXME: 498 - rework for RUSK integration
 		// constFee := big.NewInt(0).SetUint64(20)
 		// tx.Fee.SetBigInt(constFee)
 
@@ -206,7 +206,7 @@ func BenchmarkRangeSort(b *testing.B) {
 }
 
 func dummyTransactionsSet(size int) []transactions.ContractCall {
-	// FIXME: 496 - rework for RUSK integration
+	// FIXME: 498 - rework for RUSK integration
 
 	/*
 		txs := make([]transactions.ContractCall, size)

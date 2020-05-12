@@ -6,7 +6,7 @@ import (
 
 // Ensure integrity of data between encoding and decoding
 func TestEncodeDecodeTxRecord(t *testing.T) {
-	// FIXME: 496 - rework for RUSK integration
+	// FIXME: 459 - rework for RUSK integration
 	/*
 		r := &txrecords.TxRecord{
 			Direction:    txrecords.In,

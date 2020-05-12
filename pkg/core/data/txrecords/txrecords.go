@@ -21,6 +21,7 @@ const (
 
 // TxRecord encapsulates the data stored on the DB related to a transaction such as block
 // height, direction, amount, etc
+// FIXME: 459
 type TxRecord struct {
 	Direction
 	Timestamp int64
