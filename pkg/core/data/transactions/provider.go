@@ -356,8 +356,6 @@ type keymaster struct {
 }
 
 // GenerateSecretKey creates a SecretKey using a []byte as Seed
-// TODO: shouldn't this also return the PublicKey and the ViewKey to spare
-// a roundtrip?
 func (k *keymaster) GenerateSecretKey(ctx context.Context, seed []byte) (SecretKey, PublicKey, ViewKey, error) {
 	sk := new(SecretKey)
 	pk := new(PublicKey)
