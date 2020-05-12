@@ -41,8 +41,8 @@ func TestAgreement(t *testing.T) {
 	}
 
 	res := <-hlp.CertificateChan
-	cert := res.Payload().(message.Agreement)
-	assert.Equal(t, hash, cert.State().BlockHash)
+	cert := res.Payload().(message.Certificate)
+	assert.Equal(t, hash, cert.Ag.State().BlockHash)
 }
 
 // Test that we properly clean up after calling Finalize.

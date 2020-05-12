@@ -23,7 +23,7 @@ func GenerateGenesisBlock(generatorPubKey *transactions.PublicKey) (string, erro
 	proof, _ := crypto.RandEntropy(32)
 	score, _ := crypto.RandEntropy(32)
 
-	b, err := g.GenerateBlock(0, seed, proof, score, make([]byte, 32))
+	b, err := g.GenerateBlock(0, seed, proof, score, make([]byte, 32), nil)
 	if err != nil {
 		return "", err
 	}

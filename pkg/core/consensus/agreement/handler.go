@@ -99,6 +99,20 @@ func (a *handler) Verify(ev message.Agreement) error {
 	return nil
 }
 
+func (a *handler) getVoterKeys(ev message.Agreement) [][]byte {
+	hdr := ev.State()
+	keys := make([][]byte, 0)
+	for i, votes := range ev.VotesPerStep {
+		step := hdr.Step - 2 + uint8(i)
+		committee := a.Committee(hdr.Round, step)
+		subcommittee := committee.IntersectCluster(votes.BitSet)
+
+		keys = append(keys, subcommittee.Unravel()...)
+	}
+
+	return keys
+}
+
 func verifyWhole(a message.Agreement) error {
 	hdr := a.State()
 	r := new(bytes.Buffer)

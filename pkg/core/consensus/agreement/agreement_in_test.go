@@ -31,9 +31,9 @@ func TestCollectAgreementEvent(t *testing.T) {
 	hlp, hash := ProduceWinningHash(eb, 3)
 
 	certMsg := <-hlp.CertificateChan
-	aggro := certMsg.Payload().(message.Agreement)
+	aggro := certMsg.Payload().(message.Certificate)
 
-	assert.Equal(t, hash, aggro.State().BlockHash)
+	assert.Equal(t, hash, aggro.Ag.State().BlockHash)
 }
 
 func TestFinalize(t *testing.T) {

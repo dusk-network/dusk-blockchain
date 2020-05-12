@@ -69,6 +69,7 @@ const (
 	GetMempoolTxsBySize
 	VerifyCandidateBlock
 	GetLastCertificate
+	GetLastCommittee
 	SendMempoolTx
 	ValidateStateTransition
 	ExecuteStateTransition
@@ -157,6 +158,7 @@ var Topics = [...]topicBuf{
 	{GetMempoolTxsBySize, *(bytes.NewBuffer([]byte{byte(GetMempoolTxsBySize)})), "getmempooltxsbysize"},
 	{VerifyCandidateBlock, *(bytes.NewBuffer([]byte{byte(VerifyCandidateBlock)})), "verifycandidateblock"},
 	{GetLastCertificate, *(bytes.NewBuffer([]byte{byte(GetLastCertificate)})), "getlastcertificate"},
+	{GetLastCommittee, *(bytes.NewBuffer([]byte{byte(GetLastCommittee)})), "getlastcommittee"},
 	{SendMempoolTx, *(bytes.NewBuffer([]byte{byte(SendMempoolTx)})), "sendmempooltx"},
 	{ValidateStateTransition, *(bytes.NewBuffer([]byte{byte(ValidateStateTransition)})), "validatestatetransition"},
 	{ExecuteStateTransition, *(bytes.NewBuffer([]byte{byte(ExecuteStateTransition)})), "executestatetransition"},

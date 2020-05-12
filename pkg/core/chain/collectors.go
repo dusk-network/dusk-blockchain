@@ -13,8 +13,9 @@ type (
 	}
 
 	certMsg struct {
-		hash []byte
-		cert *block.Certificate
+		hash      []byte
+		cert      *block.Certificate
+		committee [][]byte
 	}
 
 	highestSeenCollector struct {
@@ -31,9 +32,9 @@ func initCertificateCollector(subscriber eventbus.Subscriber) <-chan certMsg {
 }
 
 func (c *certificateCollector) Collect(m message.Message) error {
-	aggro := m.Payload().(message.Agreement)
-	cert := aggro.GenerateCertificate()
-	c.certificateChan <- certMsg{aggro.State().BlockHash, cert}
+	cmsg := m.Payload().(message.Certificate)
+	cert := cmsg.Ag.GenerateCertificate()
+	c.certificateChan <- certMsg{cmsg.Ag.State().BlockHash, cert, cmsg.Keys}
 	return nil
 }
 

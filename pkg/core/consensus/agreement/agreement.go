@@ -95,7 +95,9 @@ func (a *agreement) listen() {
 }
 
 func (a *agreement) sendCertificate(ag message.Agreement) {
-	msg := message.New(topics.Agreement, ag)
+	keys := a.handler.getVoterKeys(ag)
+	cert := message.NewCertificate(ag, keys)
+	msg := message.New(topics.Certificate, cert)
 	a.publisher.Publish(topics.Certificate, msg)
 }
 

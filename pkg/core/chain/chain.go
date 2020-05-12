@@ -86,6 +86,9 @@ type Chain struct {
 	// for including it with the candidate message.
 	lastCertificate *block.Certificate
 
+	// BLS keys of the most recent committee, responsible for finalizing the intermediate block.
+	lastCommittee [][]byte
+
 	// The highest block we've seen from the network. This is updated
 	// by the synchronizer, and used to calculate our synchronization
 	// progress.
@@ -103,6 +106,7 @@ type Chain struct {
 	verifyCandidateBlockChan <-chan rpcbus.Request
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
+	getLastCommitteeChan     <-chan rpcbus.Request
 
 	ctx context.Context
 }
@@ -124,6 +128,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
 	getLastCertificateChan := make(chan rpcbus.Request, 1)
 	getRoundResultsChan := make(chan rpcbus.Request, 1)
+	getLastCommitteeChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetLastBlock, getLastBlockChan); err != nil {
 		return nil, err
 	}
@@ -134,6 +139,9 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		return nil, err
 	}
 	if err := rpcBus.Register(topics.GetRoundResults, getRoundResultsChan); err != nil {
+		return nil, err
+	}
+	if err := rpcBus.Register(topics.GetLastCommittee, getLastCommitteeChan); err != nil {
 		return nil, err
 	}
 
@@ -148,6 +156,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
 		getLastCertificateChan:   getLastCertificateChan,
 		getRoundResultsChan:      getRoundResultsChan,
+		getLastCommitteeChan:     getLastCommitteeChan,
 		loader:                   loader,
 		verifier:                 verifier,
 		executor:                 executor,
@@ -201,6 +210,8 @@ func (c *Chain) Listen() {
 			c.provideLastCertificate(r)
 		case r := <-c.getRoundResultsChan:
 			c.provideRoundResults(r)
+		case r := <-c.getLastCommitteeChan:
+			c.provideLastCommittee(r)
 		case <-c.ctx.Done():
 			// TODO: dispose the Chain
 		}
@@ -399,8 +410,9 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 
 	ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(1*time.Second))
 	defer cancel()
-	// Set latest certificate
+	// Set latest certificate and committee
 	c.lastCertificate = cMsg.cert
+	c.lastCommittee = cMsg.committee
 
 	// Fetch new intermediate block and corresponding certificate
 	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), 5*time.Second)
@@ -516,6 +528,15 @@ func (c *Chain) provideLastCertificate(r rpcbus.Request) {
 	buf := new(bytes.Buffer)
 	err := message.MarshalCertificate(buf, c.lastCertificate)
 	r.RespChan <- rpcbus.NewResponse(*buf, err)
+}
+
+func (c *Chain) provideLastCommittee(r rpcbus.Request) {
+	if c.lastCommittee == nil {
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("no last committee present"))
+		return
+	}
+
+	r.RespChan <- rpcbus.NewResponse(c.lastCommittee, nil)
 }
 
 func (c *Chain) provideRoundResults(r rpcbus.Request) {
