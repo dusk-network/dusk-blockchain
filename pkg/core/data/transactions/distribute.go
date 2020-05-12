@@ -18,6 +18,13 @@ type DistributeTransaction struct {
 	BgPk                  *PublicKey `json:"bg_pk"`
 }
 
+func newDistribute() *DistributeTransaction {
+	dt := new(DistributeTransaction)
+	dt.ContractTx = new(ContractTx)
+	dt.ContractTx.Tx = new(Transaction)
+	return dt
+}
+
 // CalculateHash complies with merkletree.Payload interface
 func (t *DistributeTransaction) CalculateHash() ([]byte, error) {
 	b := new(bytes.Buffer)

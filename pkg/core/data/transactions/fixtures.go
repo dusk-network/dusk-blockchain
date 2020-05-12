@@ -185,8 +185,7 @@ func RandDistributeTx(reward uint64, provisionerNr int) *DistributeTransaction {
 
 // MockDistributeTx creates a DistributeTransaction
 func MockDistributeTx(reward uint64, provisioners [][]byte, bgPk PublicKey) *DistributeTransaction {
-	dtx := new(DistributeTransaction)
-	dtx.Tx = new(Transaction)
+	dtx := newDistribute()
 	rtx := mockRuskTx(reward, RandUint64(), false, Rand32Bytes())
 	if err := UTx(rtx, dtx.Tx); err != nil {
 		panic(err)
@@ -213,8 +212,7 @@ func RandStakeTx(expiration uint64) *StakeTransaction {
 
 // MockStakeTx creates a StakeTransaction
 func MockStakeTx(amount, expiration uint64, blsKey []byte) *StakeTransaction {
-	stx := new(StakeTransaction)
-	stx.Tx = new(Transaction)
+	stx := newStake()
 	rtx := mockRuskTx(amount, RandUint64(), false, Rand32Bytes())
 	if err := UTx(rtx, stx.Tx); err != nil {
 		panic(err)
@@ -241,8 +239,7 @@ func RandBidTx(expiration uint64) *BidTransaction {
 
 // MockBidTx creates a DistributeTransaction
 func MockBidTx(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
-	stx := new(BidTransaction)
-	stx.Tx = new(Transaction)
+	stx := newBid()
 	rtx := mockRuskTx(amount, RandUint64(), true, Rand32Bytes())
 	if err := UTx(rtx, stx.Tx); err != nil {
 		panic(err)

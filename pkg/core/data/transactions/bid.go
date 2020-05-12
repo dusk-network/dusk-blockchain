@@ -25,6 +25,13 @@ type BidTransaction struct {
 	ExpirationHeight uint64 `json:"expiration_height"`
 }
 
+func newBid() *BidTransaction {
+	bt := new(BidTransaction)
+	bt.ContractTx = new(ContractTx)
+	bt.ContractTx.Tx = new(Transaction)
+	return bt
+}
+
 // MBid copies the Bid rusk struct into the transaction datastruct
 func MBid(r *rusk.BidTransaction, t *BidTransaction) error {
 	r.Tx = new(rusk.Transaction)
