@@ -73,16 +73,16 @@ func TestNewWallet(t *testing.T) {
 	assert.NotNil(sk.A.Data)
 	assert.NotNil(sk.B.Data)
 
-	w, err := New(nil, seed, netPrefix, db, "pass", seedFile, secretFile, sk)
+	w, err := New(nil, seed, netPrefix, db, "pass", seedFile, sk)
 	assert.NoError(err)
 
 	// wrong wallet password
-	loadedWallet, err := LoadFromFile(netPrefix, db, "wrongPass", seedFile, secretFile)
+	loadedWallet, err := LoadFromFile(netPrefix, db, "wrongPass", seedFile)
 	assert.NotNil(err)
 	assert.Nil(loadedWallet)
 
 	// correct wallet password
-	loadedWallet, err = LoadFromFile(netPrefix, db, "pass", seedFile, secretFile)
+	loadedWallet, err = LoadFromFile(netPrefix, db, "pass", seedFile)
 	assert.Nil(err)
 
 	assert.Equal(w.SecretKey.A.Data, loadedWallet.SecretKey.A.Data)
@@ -116,7 +116,7 @@ func TestCatchEOF(t *testing.T) {
 		transactions.USecretKey(secretKey.Sk, sk)
 		require.Nil(t, err)
 
-		_, err = New(nil, seed, netPrefix, db, "pass", seedFile, secretFile, sk)
+		_, err = New(nil, seed, netPrefix, db, "pass", seedFile, sk)
 		assert.Nil(t, err)
 		os.Remove(seedFile)
 		os.Remove(secretFile)

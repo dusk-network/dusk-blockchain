@@ -28,19 +28,8 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 		return nil, errors.New("seed must be at least 64 bytes in size")
 	}
 
-	//generate secret key with rusk
-	// TODO: use parent context
-	ctx := context.Background()
-	sk, pb, vk, err := t.keyMaster.GenerateSecretKey(ctx, req.Seed)
-	if err != nil {
-		return nil, err
-	}
-
-	//set it for further use
-	t.secretKey = sk
-
 	//create wallet with seed and pass
-	err = t.loadWalletFromSeedPbAndVk(req.Seed, req.Password, pb, vk)
+	err := t.createWallet(req.Seed, req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +37,7 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	// TODO: will this still make sense after the migration
 	// t.launchConsensus()
 
-	return loadResponseFromPub(pb), nil
+	return loadResponseFromPub(t.w.PublicKey), nil
 }
 
 func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
@@ -94,7 +83,7 @@ func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse
 		return nil, errWalletAlreadyLoaded
 	}
 
-	pubKey, _, err := t.loadWalletFromPasswordAndLoadPkVk(req.Password)
+	pubKey, err := t.loadWallet(req.Password)
 	if err != nil {
 		return nil, err
 	}
