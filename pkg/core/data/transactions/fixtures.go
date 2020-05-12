@@ -65,22 +65,41 @@ func MockKeys() (*SecretKey, *PublicKey) {
 	return sk, pk
 }
 
+/******************/
+/** ContractCall **/
+/******************/
+
+// FIXME 499: create a RandContractCall function that returns a seemingly valid
+// ContractCall
+
 /************/
 /**** TX ****/
 /************/
+
+// RandTx returns a random transaction. The randomization includes the amount,
+// the fee, the blinding factor and whether the transaction is obfuscated or
+// otherwise
+func RandTx() *Transaction {
+	bf := make([]byte, 32)
+	if _, err := rand.Read(bf); err != nil {
+		panic(err)
+	}
+
+	return MockTx(RandUint64(), RandUint64(), RandBool(), bf)
+}
 
 // MockTx mocks a transfer transaction. For simplicity it includes a single
 // output with the amount specified. The blinding factor can be left to nil if
 // the test is not interested in Transaction equality/differentiation.
 // Otherwise it can be used to identify/differentiate the transaction
-func MockTx(amount uint64, fee uint64, obfuscated bool, blindingFactor []byte) (*Transaction, error) {
+func MockTx(amount uint64, fee uint64, obfuscated bool, blindingFactor []byte) *Transaction {
 	ccTx := new(Transaction)
 	rtx := mockRuskTx(amount, fee, obfuscated, blindingFactor)
 	if err := UTx(rtx, ccTx); err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	return ccTx, nil
+	return ccTx
 }
 
 /************/
@@ -336,4 +355,31 @@ var RuskPublicKey = &rusk.PublicKey{
 var RuskSecretKey = &rusk.SecretKey{
 	A: &rusk.Scalar{Data: []byte{0x55, 0x66}},
 	B: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+}
+
+/*************/
+/** UTILITY **/
+/*************/
+
+// RandUint64 returns a random uint64
+func RandUint64() uint64 {
+	bint64 := make([]byte, 8)
+	if _, err := rand.Read(bint64); err != nil {
+		panic(err)
+	}
+	return binary.LittleEndian.Uint64(bint64)
+}
+
+// RandBlind returns a random uint64
+func RandBlind() []byte {
+	blind := make([]byte, 32)
+	if _, err := rand.Read(blind); err != nil {
+		panic(err)
+	}
+	return blind
+}
+
+// RandBool returns a random boolean
+func RandBool() bool {
+	return RandUint64()&(1<<63) == 0
 }
