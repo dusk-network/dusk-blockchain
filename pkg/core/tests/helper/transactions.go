@@ -130,37 +130,6 @@ func RandomTLockTx(t *testing.T, malformed bool) transactions.ContractCall {
 	return nil
 }
 
-// RandomStandardTx returns a random standard tx for testing
-func RandomStandardTx(t *testing.T, malformed bool) *transactions.Transaction {
-	/*
-		tx, err := transactions.NewStandard(0, 2, fee)
-		if err != nil {
-			t.Fatal(err)
-		}
-		rp := randomRangeProofBuffer(t)
-		if e := tx.RangeProof.Decode(rp, true); e != nil {
-			t.Fatal(e)
-		}
-
-		// Inputs
-		tx.Inputs = RandomInputs(t, numInputs)
-
-		// Outputs
-		tx.Outputs = RandomOutputs(t, numOutputs)
-
-		// Set TxID
-		hash, err := tx.CalculateHash()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		tx.TxID = hash
-
-		return tx
-	*/
-	return nil
-}
-
 // RandomStakeTx returns a random stake tx for testing
 func RandomStakeTx(t *testing.T, malformed bool) (*transactions.StakeTransaction, error) {
 	/*
