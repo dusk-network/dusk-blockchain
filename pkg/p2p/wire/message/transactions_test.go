@@ -2,17 +2,17 @@ package message_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
 // FIXME: 500 - Re-enable these tests and use table testing
 func TestEncodeDecodeStandard(t *testing.T) {
-
 	assert := assert.New(t)
 
 	// random standard tx
@@ -28,7 +28,7 @@ func TestEncodeDecodeStandard(t *testing.T) {
 	assert.Nil(err)
 
 	// Check both structs are equal
-	// assert.True(tx.Equals(decTX))
+	assert.True(transactions.Equal(tx, decTX))
 
 	// Check that Hashes are equal
 	txid, err := tx.CalculateHash()
@@ -208,21 +208,23 @@ func TestEqualsMethodTimeLock(t *testing.T) {
 }
 
 func TestDecodeTransactions(t *testing.T) {
-	txs := helper.RandomSliceOfTxs(t, 2)
+	assert := assert.New(t)
+	txs := transactions.RandContractCalls(2, 0, false)
 	r := helper.TxsToBuffer(t, txs)
 
 	decTxs := make([]transactions.ContractCall, len(txs))
 	for i := 0; i < len(txs); i++ {
 		tx, err := message.UnmarshalTx(r)
-		assert.Nil(t, err)
+		assert.NoError(err)
 		decTxs[i] = tx
 	}
 
-	assert.Equal(t, len(txs), len(decTxs))
+	assert.Equal(len(txs), len(decTxs))
 
 	for i := range txs {
 		tx := txs[i]
 		decTx := decTxs[i]
-		assert.True(t, transactions.Equal(tx, decTx))
+		fmt.Println(decTx)
+		assert.True(transactions.Equal(tx, decTx))
 	}
 }

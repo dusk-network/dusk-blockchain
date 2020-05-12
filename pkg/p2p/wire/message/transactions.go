@@ -6,6 +6,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
+// FIXME: 500 - all methods in this file are obsolete and should point to transactions.(Un-)Marshal
+
 // UnmarshalTxMessage unmarshals a Message carrying a tx from a buffer
 func UnmarshalTxMessage(r *bytes.Buffer, m SerializableMessage) error {
 	/*

@@ -9,7 +9,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -128,9 +127,7 @@ func (h *Helper) ProvideTransactions(t *testing.T) {
 
 	go func(reqChan chan rpcbus.Request) {
 		r := <-reqChan
-		txs := helper.RandomSliceOfTxs(t, h.txBatchCount)
-		// Remove coinbase
-		txs = txs[1:]
+		txs := transactions.RandContractCalls(int(h.txBatchCount), 0, false)
 		r.RespChan <- rpcbus.NewResponse(txs, nil)
 	}(reqChan)
 }

@@ -18,31 +18,31 @@ import (
 
 // RandomSliceOfTxs returns a random slice of transactions for testing
 // Each tx batch represents all 4 non-coinbase tx types
-func RandomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.ContractCall {
-	/*
-		var txs []transactions.ContractCall
-
-		txs = append(txs, RandomCoinBaseTx(t, false))
-
-		var i uint16
-		for ; i < txsBatchCount; i++ {
-
-			txs = append(txs, RandomStandardTx(t, false))
-			txs = append(txs, RandomTLockTx(t, false))
-
-			stake, err := RandomStakeTx(t, false)
-			assert.Nil(t, err)
-			txs = append(txs, stake)
-
-			bid, err := RandomBidTx(t, false)
-			assert.Nil(t, err)
-			txs = append(txs, bid)
-		}
-
-		return txs
-	*/
-	return nil
-}
+//func RandomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.ContractCall {
+//	/*
+//		var txs []transactions.ContractCall
+//
+//		txs = append(txs, RandomCoinBaseTx(t, false))
+//
+//		var i uint16
+//		for ; i < txsBatchCount; i++ {
+//
+//			txs = append(txs, RandomStandardTx(t, false))
+//			txs = append(txs, RandomTLockTx(t, false))
+//
+//			stake, err := RandomStakeTx(t, false)
+//			assert.Nil(t, err)
+//			txs = append(txs, stake)
+//
+//			bid, err := RandomBidTx(t, false)
+//			assert.Nil(t, err)
+//			txs = append(txs, bid)
+//		}
+//
+//		return txs
+//	*/
+//	return nil
+//}
 
 // RandomBidTx returns a random bid transaction for testing
 func RandomBidTx(t *testing.T, malformed bool) (*transactions.BidTransaction, error) {
