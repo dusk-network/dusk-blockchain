@@ -8,27 +8,20 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	assert "github.com/stretchr/testify/require"
 )
 
 func TestSortedKeys(t *testing.T) {
+	assert := assert.New(t)
 
 	pool := &HashMap{Capacity: 100}
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
-
-		tx := helper.RandomStandardTx(t, false)
-
-		// FIXME: 498 - rework for RUSK integration
-		// randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(10000)))
-		// tx.Fee.SetBigInt(randFee)
-
+		tx := transactions.RandTx()
 		td := TxDesc{tx: tx}
-		if err := pool.Put(td); err != nil {
-			t.Fatal(err.Error())
-		}
+		assert.NoError(pool.Put(td))
 	}
 
 	// Iterate through all tx expecting each one has lower fee than
@@ -59,12 +52,9 @@ func TestStableSortedKeys(t *testing.T) {
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
 
-		tx := helper.RandomStandardTx(t, false)
-
-		// TODO: rework for RUSK integration
-		// constFee := big.NewInt(0).SetUint64(20)
-		// tx.Fee.SetBigInt(constFee)
-
+		amount := transactions.RandUint64()
+		bf := transactions.RandBlind()
+		tx := transactions.MockTx(amount, uint64(20), false, bf)
 		td := TxDesc{tx: tx, received: time.Now()}
 		if err := pool.Put(td); err != nil {
 			t.Fatal(err.Error())
@@ -98,12 +88,9 @@ func TestGet(t *testing.T) {
 	hashes := make([][]byte, txsCount)
 	for i := 0; i < txsCount; i++ {
 
-		tx := helper.RandomStandardTx(t, false)
-
-		// FIXME: 498 - rework for RUSK integration
-		// constFee := big.NewInt(0).SetUint64(20)
-		// tx.Fee.SetBigInt(constFee)
-
+		amount := transactions.RandUint64()
+		bf := transactions.RandBlind()
+		tx := transactions.MockTx(amount, uint64(20), false, bf)
 		hash, _ := tx.CalculateHash()
 		hashes[i] = hash
 
@@ -206,8 +193,6 @@ func BenchmarkRangeSort(b *testing.B) {
 }
 
 func dummyTransactionsSet(size int) []transactions.ContractCall {
-	// FIXME: 498 - rework for RUSK integration
-
 	/*
 		txs := make([]transactions.ContractCall, size)
 		// Generate N random tx

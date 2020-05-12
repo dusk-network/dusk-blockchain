@@ -6,13 +6,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
 
-const (
-	keyImageSize = 32
-)
-
 type (
-	keyImage [keyImageSize]byte
-
 	keyFee struct {
 		k txHash
 		f uint64
@@ -30,9 +24,9 @@ type (
 		sorted []keyFee
 
 		// spent key images from the transactions in the pool
-		spentkeyImages map[keyImage]bool
-		Capacity       uint32
-		txsSize        uint32
+		//spentkeyImages map[keyImage]bool
+		Capacity uint32
+		txsSize  uint32
 	}
 )
 
@@ -43,10 +37,6 @@ func (m *HashMap) Put(t TxDesc) error {
 	if m.data == nil {
 		m.data = make(map[txHash]TxDesc, m.Capacity)
 		m.sorted = make([]keyFee, 0, m.Capacity)
-	}
-
-	if m.spentkeyImages == nil {
-		m.spentkeyImages = make(map[keyImage]bool)
 	}
 
 	// store tx
@@ -73,20 +63,6 @@ func (m *HashMap) Put(t TxDesc) error {
 	m.sorted = append(m.sorted, keyFee{})
 	copy(m.sorted[index+1:], m.sorted[index:])
 	m.sorted[index] = keyFee{k: k, f: fee}
-
-	// store all tx key images, if provided
-	// FIXME: 498 - update for phoenix txs
-	/*
-		for i, input := range t.tx.StandardTx().Inputs {
-			if len(input.KeyImage.Bytes()) == keyImageSize {
-				var ki keyImage
-				copy(ki[:], input.KeyImage.Bytes())
-				m.spentkeyImages[ki] = true
-			} else {
-				return fmt.Errorf("invalid key image found at index %d", i)
-			}
-		}
-	*/
 
 	return nil
 }
@@ -173,13 +149,4 @@ func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error {
 		}
 	}
 	return nil
-}
-
-// ContainsKeyImage returns true if txpool includes a input that contains
-// this keyImage
-func (m *HashMap) ContainsKeyImage(txInputKeyImage []byte) bool {
-	var ki keyImage
-	copy(ki[:], txInputKeyImage)
-	_, ok := m.spentkeyImages[ki]
-	return ok
 }

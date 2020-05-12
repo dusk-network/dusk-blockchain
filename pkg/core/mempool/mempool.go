@@ -74,7 +74,8 @@ type Mempool struct {
 	ctx context.Context
 }
 
-// checkTx is responsible to determine if a tx is valid or not
+// checkTx is responsible to determine if a tx is valid or not.
+// Among the other checks, the underlying verifier also checks double spending
 func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 	ctx, cancel := context.WithDeadline(m.ctx, time.Now().Add(500*time.Millisecond))
 	defer cancel()
@@ -122,6 +123,8 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 		verifier:                verifier,
 	}
 
+	// Setting the pool where to cache verified transactions.
+	// The pool is normally a Hashmap
 	m.verified = m.newPool()
 
 	log.Infof("Running with pool type %s", config.Get().Mempool.PoolType)
@@ -211,11 +214,6 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	// expect it is not already a verified tx
 	if m.verified.Contains(txid) {
 		return txid, ErrAlreadyExists
-	}
-
-	// expect it is not already spent from mempool verified txs
-	if err := m.checkTXDoubleSpent(t.tx); err != nil {
-		return txid, ErrDoubleSpending
 	}
 
 	// execute tx verification procedure
@@ -490,23 +488,6 @@ func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, err
 
 	// Process request
 	return m.onPendingTx(txDesc)
-}
-
-// checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executes on
-// all checks against mempool verified txs but not blockchain db.on
-func (m *Mempool) checkTXDoubleSpent(tx transactions.ContractCall) error {
-	// TODO: update for phoenix
-	/*
-		for _, input := range tx.StandardTx().Inputs {
-
-			exists := m.verified.ContainsKeyImage(input.KeyImage.Bytes())
-			if exists {
-				return errors.New("tx already spent")
-			}
-		}
-	*/
-
-	return nil
 }
 
 // Quit makes mempool main loop to terminate
