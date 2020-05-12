@@ -10,6 +10,9 @@ import (
 
 // BidTransaction is the transaction created by BlockGenerators to be able to
 // calculate the scores to accompany block candidates
+// FIXME: 501 - absorb `EncryptedValue` and `EncryptedBlinder` within
+// ContractTx.TransactionOutput.Blinder and
+// ContractTx.TransactionOutput.EncryptedValue
 type BidTransaction struct {
 	*ContractTx
 	M                []byte `json:"m"`
