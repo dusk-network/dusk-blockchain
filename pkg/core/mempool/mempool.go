@@ -246,7 +246,7 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	}
 
 	// try to (re)propagate transaction in both gossip and kadcast networks
-	go m.propagateTx(t, txid)
+	m.propagateTx(t, txid)
 
 	return txid, nil
 }
@@ -257,9 +257,6 @@ func (m *Mempool) propagateTx(t TxDesc, txid []byte) {
 	if err := m.kadcastTx(t); err != nil {
 		log.WithError(err).Warn("Transaction kadcast sending failed")
 	}
-
-	// Put priority on kadcast propagation
-	time.Sleep(1 * time.Second)
 
 	// Advertise the transaction hash to gossip network via "Inventory Vectors"
 	m.advertiseTxHash(txid)
