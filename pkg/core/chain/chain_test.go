@@ -34,7 +34,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
 
 	// First, test accepting a block when the counter is set to not syncing.
-	blk := helper.RandomBlock(t, 1, 1)
+	blk := helper.RandomBlock(1, 1)
 	msg := message.New(topics.AcceptedBlock, *blk)
 
 	assert.NoError(t, c.onAcceptBlock(msg))
@@ -100,7 +100,7 @@ func TestAcceptIntermediate(t *testing.T) {
 	eb.Subscribe(topics.RoundUpdate, eventbus.NewChanListener(roundUpdateChan))
 
 	// Make a 'winning' candidate message
-	blk := helper.RandomBlock(t, 2, 1)
+	blk := helper.RandomBlock(2, 1)
 	cert := block.EmptyCertificate()
 	provideCandidate(rpc, message.MakeCandidate(blk, cert))
 
@@ -139,7 +139,7 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
 
 	// Make a 'winning' candidate message
-	blk := helper.RandomBlock(t, 2, 1)
+	blk := helper.RandomBlock(2, 1)
 	cert := block.EmptyCertificate()
 
 	cm := message.MakeCandidate(blk, cert)
@@ -226,7 +226,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb.Publish(topics.RoundUpdate, msg)
 
 	// Create block 1
-	blk := helper.RandomBlock(t, 1, 1)
+	blk := helper.RandomBlock(1, 1)
 	// Remove all txs except coinbase, as the helper transactions do not pass verification
 	blk.Txs = blk.Txs[0:1]
 	root, _ := blk.CalculateRoot()
@@ -331,7 +331,7 @@ func TestRebuildChain(t *testing.T) {
 //nolint:unused
 func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
 	// Create block 1
-	blk := helper.RandomBlock(t, 1, 1)
+	blk := helper.RandomBlock(1, 1)
 	// Remove all txs except coinbase, as the helper transactions do not pass verification
 	blk.Txs = blk.Txs[0:1]
 	root, _ := blk.CalculateRoot()

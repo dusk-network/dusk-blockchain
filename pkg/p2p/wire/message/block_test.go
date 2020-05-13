@@ -8,7 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
 func TestEncodeDecodeBlock(t *testing.T) {
@@ -16,7 +16,7 @@ func TestEncodeDecodeBlock(t *testing.T) {
 	assert := assert.New(t)
 
 	// random block
-	blk := helper.RandomBlock(t, 200, 2)
+	blk := helper.RandomBlock(200, 2)
 
 	// Encode block into a buffer
 	buf := new(bytes.Buffer)
@@ -34,7 +34,7 @@ func TestEncodeDecodeCert(t *testing.T) {
 	assert := assert.New(t)
 
 	// random certificate
-	cert := helper.RandomCertificate(t)
+	cert := helper.RandomCertificate()
 
 	// Encode certificate into a buffer
 	buf := new(bytes.Buffer)
@@ -56,7 +56,7 @@ func TestEncodeDecodeHeader(t *testing.T) {
 	assert := assert.New(t)
 
 	// Create a random header
-	hdr := helper.RandomHeader(t, 200)
+	hdr := helper.RandomHeader(200)
 	hash, err := hdr.CalculateHash()
 	hdr.Hash = hash
 	assert.Nil(err)

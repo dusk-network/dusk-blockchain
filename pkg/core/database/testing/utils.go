@@ -38,7 +38,7 @@ func storeBlocks(db database.DB, blocks []*block.Block) error {
 }
 
 // A helper function to generate a set of blocks that can be chained
-func generateChainBlocks(test *testing.T, blocksCount int) ([]*block.Block, error) {
+func generateChainBlocks(blocksCount int) ([]*block.Block, error) {
 
 	overallBlockTxs := 1 + 4*int(sampleTxsBatchCount)
 	overallTxsCount := blocksCount * overallBlockTxs
@@ -46,7 +46,7 @@ func generateChainBlocks(test *testing.T, blocksCount int) ([]*block.Block, erro
 
 	newBlocks := make([]*block.Block, blocksCount)
 	for i := 0; i < blocksCount; i++ {
-		b := helper.RandomBlock(test, atomic.AddUint64(&heightCounter, 1), sampleTxsBatchCount)
+		b := helper.RandomBlock(atomic.AddUint64(&heightCounter, 1), sampleTxsBatchCount)
 		// assume consensus time is 10sec
 		b.Header.Timestamp = int64(10 * b.Header.Height)
 
@@ -65,7 +65,7 @@ func generateChainBlocks(test *testing.T, blocksCount int) ([]*block.Block, erro
 func generateRandomBlocks(test *testing.T, blocksCount int) []*block.Block {
 	newBlocks := make([]*block.Block, blocksCount)
 	for i := 0; i < blocksCount; i++ {
-		newBlocks[i] = helper.RandomBlock(test, uint64(i+1), sampleTxsBatchCount)
+		newBlocks[i] = helper.RandomBlock(uint64(i+1), sampleTxsBatchCount)
 	}
 	return newBlocks
 }
