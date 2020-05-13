@@ -56,8 +56,7 @@ type Helper struct {
 // NewHelper creates a Helper
 func NewHelper(t *testing.T, eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, txBatchCount uint16) *Helper {
 	sk, pk := transactions.MockKeys()
-	// TODO: add mocked proxy
-	factory := NewFactory(context.Background(), eb, rpcBus, sk, pk, nil)
+	factory := NewFactory(context.Background(), eb, rpcBus, sk, pk, &transactions.MockProxy{BG: transactions.MockBlockGenerator{}})
 	g := factory.Instantiate()
 	gen := g.(*Generator)
 	pubkey, _ := crypto.RandEntropy(32)

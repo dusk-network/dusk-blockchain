@@ -50,6 +50,7 @@ func NewComponent(ctx context.Context, publisher eventbus.Publisher, genPrivKey 
 		genPrivKey: genPrivKey,
 		genPubKey:  genPubKey,
 		gen:        gen,
+		ctx:        ctx,
 	}
 }
 
