@@ -54,7 +54,7 @@ func provideCandidate(rb *rpcbus.RPCBus, correctHash []byte) chan struct{} {
 				}
 
 				if bytes.Equal(hash, correctHash) {
-					blk := helper.RandomBlock(&testing.T{}, 2, 1)
+					blk := helper.RandomBlock(2, 1)
 					cm := message.NewCandidate()
 					cm.Block = blk
 					r.RespChan <- rpcbus.NewResponse(*cm, nil)

@@ -43,7 +43,7 @@ func TestCorrectBidValues(t *testing.T) {
 	assert.Equal(t, edPk1, c.edPk)
 
 	// Now update our state so that the previous bid values are removed
-	blk := helper.RandomBlock(t, 1200, 1)
+	blk := helper.RandomBlock(1200, 1)
 	assert.NoError(t, db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(blk)
 	}))

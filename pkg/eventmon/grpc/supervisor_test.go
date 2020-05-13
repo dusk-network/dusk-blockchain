@@ -59,7 +59,7 @@ func TestNotifySlowdown(t *testing.T) {
 	s := grpc.NewSupervisor(eb, testURL, 300*time.Millisecond)
 	log.AddHook(s)
 	height := uint64(200)
-	testData := helper.RandomBlock(t, height, 2)
+	testData := helper.RandomBlock(height, 2)
 	callBlockSetup := callTest{
 		clientMethod: func() error {
 			return s.Client().NotifyBlockUpdate(context.Background(), *testData)

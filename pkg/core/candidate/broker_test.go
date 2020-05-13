@@ -24,8 +24,8 @@ func TestValidHashes(t *testing.T) {
 	go b.Listen()
 
 	// Store two blocks in the queue
-	blk := helper.RandomBlock(t, 1, 3)
-	blk2 := helper.RandomBlock(t, 1, 3)
+	blk := helper.RandomBlock(1, 3)
+	blk2 := helper.RandomBlock(1, 3)
 	cert := block.EmptyCertificate()
 	hash, _ := blk.CalculateHash()
 	blk.Header.Hash = hash

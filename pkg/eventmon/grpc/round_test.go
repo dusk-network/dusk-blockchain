@@ -23,7 +23,7 @@ func (h *helloSrv) NotifyBlock(ctx context.Context, req *monitor.BlockUpdate) (*
 func TestNotifyBlockUpdate(t *testing.T) {
 	client := grpc.New(testURL)
 	height := uint64(200)
-	testData := helper.RandomBlock(t, height, 2)
+	testData := helper.RandomBlock(height, 2)
 	call := callTest{
 		clientMethod: func() error {
 			return client.NotifyBlockUpdate(context.Background(), *testData)
@@ -64,8 +64,8 @@ func TestBlockTime(t *testing.T) {
 	client := grpc.New(testURL)
 
 	height := uint64(200)
-	firstBlock := helper.RandomBlock(t, height, 2)
-	secondBlock := helper.RandomBlock(t, height+1, 2)
+	firstBlock := helper.RandomBlock(height, 2)
+	secondBlock := helper.RandomBlock(height+1, 2)
 
 	// first we submit a block
 	firstCall := callTest{

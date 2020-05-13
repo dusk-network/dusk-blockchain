@@ -84,7 +84,7 @@ func TestPoolBasicScenario(t *testing.T) {
 	ctxSentMsgs := make([]string, 0)
 	for height := 0; height < 5; height++ {
 
-		blk := helper.RandomBlock(t, uint64(height), 3)
+		blk := helper.RandomBlock(uint64(height), 3)
 		hash, _ := blk.CalculateHash()
 		blk.Header.Hash = hash
 

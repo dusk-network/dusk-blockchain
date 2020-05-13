@@ -111,8 +111,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 
 	// Generate a few blocks to be used as sample objects
 	// Less blocks are used as we have CI out-of-memory error
-	t := &testing.T{}
-	blocks, err = generateChainBlocks(t, 10)
+	blocks, err = generateChainBlocks(10)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -145,7 +144,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 func TestStoreBlock(test *testing.T) {
 
 	// Generate additional blocks to store
-	genBlocks, err := generateChainBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -494,7 +493,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	}()
 
 	// Initialize db and a slice of 10 blocks with 2 transactions.Transaction each
-	genBlocks, err := generateChainBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -698,7 +697,7 @@ func TestStoreFetchBidValues(test *testing.T) {
 	}))
 
 	// Update state to after 1000
-	blk := helper.RandomBlock(test, 1200, 1)
+	blk := helper.RandomBlock(1200, 1)
 	assert.NoError(test, db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(blk)
 	}))

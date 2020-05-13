@@ -65,7 +65,7 @@ func generateBlocks(t *testing.T, amount int) ([][]byte, []*block.Block) {
 	var hashes [][]byte
 	var blocks []*block.Block
 	for i := 0; i < amount; i++ {
-		blk := helper.RandomBlock(t, uint64(i), 2)
+		blk := helper.RandomBlock(uint64(i), 2)
 		hashes = append(hashes, blk.Header.Hash)
 		blocks = append(blocks, blk)
 	}
