@@ -9,7 +9,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
 var (
@@ -35,7 +34,7 @@ func EncodeBlockTx(tx transactions.ContractCall, txIndex uint32) ([]byte, error)
 	}
 
 	// Write transactions.ContractCall bytes
-	err := message.MarshalTx(buf, tx)
+	err := transactions.Marshal(buf, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +70,7 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Co
 		return nil, txIndex, e
 	}
 
-	tx, err = message.UnmarshalTx(reader)
+	tx, err = transactions.Unmarshal(reader)
 	return tx, txIndex, err
 }
 

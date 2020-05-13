@@ -89,27 +89,8 @@ func Decode(b *bytes.Buffer, t *TxRecord) error {
 		return err
 	}
 
-	var call transactions.ContractCall
-	switch t.TxType {
-	case transactions.Tx:
-		call = new(transactions.Transaction)
-	case transactions.Distribute:
-		call = new(transactions.DistributeTransaction)
-	case transactions.WithdrawFees:
-		call = new(transactions.WithdrawFeesTransaction)
-	case transactions.Bid:
-		call = new(transactions.BidTransaction)
-	case transactions.Stake:
-		call = new(transactions.StakeTransaction)
-	case transactions.Slash:
-		call = new(transactions.SlashTransaction)
-	case transactions.WithdrawStake:
-		call = new(transactions.WithdrawStakeTransaction)
-	case transactions.WithdrawBid:
-		call = new(transactions.WithdrawBidTransaction)
-	}
-
-	if err := transactions.Unmarshal(b, call); err != nil {
+	call, err := transactions.Unmarshal(b)
+	if err != nil {
 		return err
 	}
 

@@ -170,6 +170,11 @@ func MockTx(amount uint64, fee uint64, obfuscated bool, blindingFactor []byte) *
 
 // RandDistributeTx creates a random distribute transaction
 func RandDistributeTx(reward uint64, provisionerNr int) *DistributeTransaction {
+	rew := reward
+	if reward == uint64(0) {
+		rew = RandUint64()
+	}
+
 	ps := make([][]byte, provisionerNr)
 	for i := 0; i < provisionerNr; i++ {
 		ps[i] = Rand32Bytes()
@@ -177,7 +182,7 @@ func RandDistributeTx(reward uint64, provisionerNr int) *DistributeTransaction {
 
 	_, pk := RandKeys()
 	return MockDistributeTx(
-		RandUint64(),
+		rew,
 		ps,
 		pk,
 	)

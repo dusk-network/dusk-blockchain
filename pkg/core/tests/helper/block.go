@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +15,7 @@ import (
 func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block {
 	b := &block.Block{
 		Header: RandomHeader(t, height),
-		Txs:    RandomSliceOfTxs(t, txBatchCount),
+		Txs:    transactions.RandContractCalls(int(txBatchCount), 0, true),
 	}
 	hash, err := b.CalculateHash()
 	assert.NoError(t, err)
@@ -29,7 +30,7 @@ func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block 
 func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 	blk0 := &block.Block{
 		Header: RandomHeader(t, 200),
-		Txs:    RandomSliceOfTxs(t, 20),
+		Txs:    transactions.RandContractCalls(19, 0, true),
 	}
 	hash, err := blk0.CalculateHash()
 	assert.Nil(t, err)
@@ -37,7 +38,7 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 
 	blk1 := &block.Block{
 		Header: RandomHeader(t, 200),
-		Txs:    RandomSliceOfTxs(t, 20),
+		Txs:    transactions.RandContractCalls(19, 0, true),
 	}
 
 	blk1.Header.PrevBlockHash = blk0.Header.Hash
@@ -67,9 +68,9 @@ func RandomHeader(t *testing.T, height uint64) *block.Header {
 		Height:    height,
 		Timestamp: time.Now().Unix(),
 
-		PrevBlockHash: RandomSlice(t, 32),
-		Seed:          RandomSlice(t, 33),
-		TxRoot:        RandomSlice(t, 32),
+		PrevBlockHash: transactions.Rand32Bytes(),
+		Seed:          transactions.Rand32Bytes(),
+		TxRoot:        transactions.Rand32Bytes(),
 
 		Certificate: RandomCertificate(t),
 	}
@@ -79,7 +80,7 @@ func RandomHeader(t *testing.T, height uint64) *block.Header {
 
 // GenesisMock should mock a valid genesis block. For now, it just creates a
 // random block, but this should change to a more sophisticated Genesis
-// TODO: create a believable Genesis block
+// FIXME: 417 - create a believable Genesis block
 func GenesisMock(t *testing.T, txNr uint16) *block.Block {
 	return RandomBlock(t, 0, txNr)
 }
