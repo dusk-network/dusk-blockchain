@@ -17,6 +17,13 @@ type StakeTransaction struct {
 	ExpirationHeight uint64 `json:"expiration_height"`
 }
 
+func newStake() *StakeTransaction {
+	stake := new(StakeTransaction)
+	stake.ContractTx = new(ContractTx)
+	stake.ContractTx.Tx = new(Transaction)
+	return stake
+}
+
 // MStake copies the Stake struct into the rusk datastruct
 func MStake(r *rusk.StakeTransaction, t *StakeTransaction) error {
 	r.Tx = new(rusk.Transaction)

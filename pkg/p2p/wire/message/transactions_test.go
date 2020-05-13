@@ -16,7 +16,7 @@ func TestEncodeDecodeStandard(t *testing.T) {
 	assert := assert.New(t)
 
 	// random standard tx
-	tx := helper.RandomStandardTx(t, false)
+	tx := transactions.RandTx()
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
@@ -40,7 +40,7 @@ func TestEncodeDecodeStandard(t *testing.T) {
 	assert.True(bytes.Equal(txid, decTxid))
 
 	// Check that type is correct
-	// assert.Equal(transactions.StandardType, decTX.(*transactions.Standard).TxType)
+	assert.Equal(transactions.Tx, decTX.Type())
 }
 
 func TestEqualsMethodStandard(t *testing.T) {

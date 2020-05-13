@@ -10,6 +10,9 @@ import (
 
 // BidTransaction is the transaction created by BlockGenerators to be able to
 // calculate the scores to accompany block candidates
+// FIXME: 501 - absorb `EncryptedValue` and `EncryptedBlinder` within
+// ContractTx.TransactionOutput.Blinder and
+// ContractTx.TransactionOutput.EncryptedValue
 type BidTransaction struct {
 	*ContractTx
 	M                []byte `json:"m"`
@@ -20,6 +23,13 @@ type BidTransaction struct {
 	R                []byte `json:"r"`
 	Seed             []byte `json:"seed"`
 	ExpirationHeight uint64 `json:"expiration_height"`
+}
+
+func newBid() *BidTransaction {
+	bt := new(BidTransaction)
+	bt.ContractTx = new(ContractTx)
+	bt.ContractTx.Tx = new(Transaction)
+	return bt
 }
 
 // MBid copies the Bid rusk struct into the transaction datastruct

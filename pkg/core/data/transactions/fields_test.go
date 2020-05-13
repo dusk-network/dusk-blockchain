@@ -20,7 +20,7 @@ func table(t *testing.T) (*assert.Assertions, []noteTable) {
 	return assert, []noteTable{
 		{
 			"one",
-			RuskTransparentNote,
+			RuskTransparentNote(),
 			func(tNote *Note) {
 				assert.Equal([]byte{0x55, 0x66}, tNote.ValueCommitment.Data)
 				assert.Equal([]byte{0x55, 0x66}, tNote.TransparentBlindingFactor.Data)
@@ -29,7 +29,7 @@ func table(t *testing.T) (*assert.Assertions, []noteTable) {
 		},
 		{
 			"two",
-			RuskObfuscatedNote,
+			RuskObfuscatedNote(),
 			func(tNote *Note) {
 				assert.Equal([]byte{0x56, 0x67}, tNote.EncryptedBlindingFactor)
 				assert.Equal([]byte{0x12, 0x02}, tNote.EncryptedValue)
@@ -55,7 +55,7 @@ func TestWireUnMarshalNote(t *testing.T) {
 
 func TestRuskUnMarshalNote(t *testing.T) {
 	assert := assert.New(t)
-	note := RuskTransparentNote
+	note := RuskTransparentNote()
 	n, err := notes(note)
 	assert.NoError(err)
 
@@ -71,7 +71,7 @@ func TestRuskUnMarshalNote(t *testing.T) {
 
 func TestInconsistentNote(t *testing.T) {
 	assert := assert.New(t)
-	_, err := notes(RuskInvalidNote)
+	_, err := notes(RuskInvalidNote())
 	assert.Error(err)
 }
 

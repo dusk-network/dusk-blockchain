@@ -31,9 +31,6 @@ type Pool interface {
 	Get(txID []byte) transactions.ContractCall
 	// Contains returns true if the given key is in the pool.
 	Contains(key []byte) bool
-	// ContainsKeyImage returns true if txpool includes a input that contains
-	// this keyImage
-	ContainsKeyImage(keyImage []byte) bool
 	// Clone the entire pool
 	Clone() []transactions.ContractCall
 

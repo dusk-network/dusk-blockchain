@@ -10,11 +10,19 @@ import (
 
 // DistributeTransaction includes coinbase output distribution and fee
 // allocation to the Provisioners
+// FIXME: 501 - absorb TotalReward within the TransparentOutput.Value field
 type DistributeTransaction struct {
 	*ContractTx
 	TotalReward           uint64     `json:"total_reward"`
 	ProvisionersAddresses [][]byte   `json:"provisioners_addresses"`
 	BgPk                  *PublicKey `json:"bg_pk"`
+}
+
+func newDistribute() *DistributeTransaction {
+	dt := new(DistributeTransaction)
+	dt.ContractTx = new(ContractTx)
+	dt.ContractTx.Tx = new(Transaction)
+	return dt
 }
 
 // CalculateHash complies with merkletree.Payload interface

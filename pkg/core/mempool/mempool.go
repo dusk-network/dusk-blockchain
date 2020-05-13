@@ -74,7 +74,8 @@ type Mempool struct {
 	ctx context.Context
 }
 
-// checkTx is responsible to determine if a tx is valid or not
+// checkTx is responsible to determine if a tx is valid or not.
+// Among the other checks, the underlying verifier also checks double spending
 func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 	ctx, cancel := context.WithDeadline(m.ctx, time.Now().Add(500*time.Millisecond))
 	defer cancel()
@@ -122,6 +123,8 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 		verifier:                verifier,
 	}
 
+	// Setting the pool where to cache verified transactions.
+	// The pool is normally a Hashmap
 	m.verified = m.newPool()
 
 	log.Infof("Running with pool type %s", config.Get().Mempool.PoolType)
@@ -211,11 +214,6 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	// expect it is not already a verified tx
 	if m.verified.Contains(txid) {
 		return txid, ErrAlreadyExists
-	}
-
-	// expect it is not already spent from mempool verified txs
-	if err := m.checkTXDoubleSpent(t.tx); err != nil {
-		return txid, ErrDoubleSpending
 	}
 
 	// execute tx verification procedure
@@ -391,6 +389,26 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 	return outputTxs, err
 }
 
+// uType translates the node.TxType into transactions.TxType
+func uType(t node.TxType) (transactions.TxType, error) {
+	switch t {
+	case node.TxType_COINBASE:
+		return transactions.Distribute, nil
+	case node.TxType_BID:
+		return transactions.Bid, nil
+	case node.TxType_STAKE:
+		return transactions.Stake, nil
+	case node.TxType_STANDARD:
+		return transactions.Tx, nil
+	case node.TxType_TIMELOCK:
+		return transactions.Tx, errors.New("Unsupported type")
+	case node.TxType_CONTRACT:
+		return transactions.Tx, nil
+	default:
+		return transactions.Tx, nil
+	}
+}
+
 // SelectTx will return a view of the mempool, with optional filters applied.
 func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {
 	txs := make([]transactions.ContractCall, 0)
@@ -411,7 +429,12 @@ func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.S
 		txs = append(txs, tx)
 	case len(req.Types) > 0:
 		for _, t := range req.Types {
-			txs = append(txs, m.verified.FilterByType(transactions.TxType(t))...)
+			trType, err := uType(t)
+			if err != nil {
+				// most likely an unsupported type. We just ignore it
+				continue
+			}
+			txs = append(txs, m.verified.FilterByType(trType)...)
 		}
 	default:
 		txs = m.verified.Clone()
@@ -490,23 +513,6 @@ func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, err
 
 	// Process request
 	return m.onPendingTx(txDesc)
-}
-
-// checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executes on
-// all checks against mempool verified txs but not blockchain db.on
-func (m *Mempool) checkTXDoubleSpent(tx transactions.ContractCall) error {
-	// TODO: update for phoenix
-	/*
-		for _, input := range tx.StandardTx().Inputs {
-
-			exists := m.verified.ContainsKeyImage(input.KeyImage.Bytes())
-			if exists {
-				return errors.New("tx already spent")
-			}
-		}
-	*/
-
-	return nil
 }
 
 // Quit makes mempool main loop to terminate

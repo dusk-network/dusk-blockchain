@@ -7,7 +7,7 @@ import (
 )
 
 //FIXME: 499 - These mocks are the basis of many different tests. They all need
-//to be reinstated
+//to be reinstated (and moved to transactions/fixtures.go)
 
 //const (
 //	lockTime = uint64(2000000000)
@@ -110,37 +110,6 @@ func RandomTLockTx(t *testing.T, malformed bool) transactions.ContractCall {
 		}
 		rp := randomRangeProofBuffer(t)
 		_ = tx.RangeProof.Decode(rp, true)
-
-		// Inputs
-		tx.Inputs = RandomInputs(t, numInputs)
-
-		// Outputs
-		tx.Outputs = RandomOutputs(t, numOutputs)
-
-		// Set TxID
-		hash, err := tx.CalculateHash()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		tx.TxID = hash
-
-		return tx
-	*/
-	return nil
-}
-
-// RandomStandardTx returns a random standard tx for testing
-func RandomStandardTx(t *testing.T, malformed bool) *transactions.Transaction {
-	/*
-		tx, err := transactions.NewStandard(0, 2, fee)
-		if err != nil {
-			t.Fatal(err)
-		}
-		rp := randomRangeProofBuffer(t)
-		if e := tx.RangeProof.Decode(rp, true); e != nil {
-			t.Fatal(e)
-		}
 
 		// Inputs
 		tx.Inputs = RandomInputs(t, numInputs)
