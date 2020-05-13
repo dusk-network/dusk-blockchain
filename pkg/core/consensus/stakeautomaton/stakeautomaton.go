@@ -27,9 +27,8 @@ type StakeAutomaton struct {
 	rpcBus      *rpcbus.RPCBus
 	roundChan   <-chan consensus.RoundUpdate
 
-	pubKeyBLS []byte
-	p         user.Provisioners
-	height    uint64
+	p      user.Provisioners
+	height uint64
 
 	stakeEndHeight uint64
 
@@ -43,11 +42,10 @@ const renewalOffset = 100
 // New creates a new instance of StakeAutomaton that is used to automate the
 // resending of stakes and alleviate the burden for a user to having to
 // manually manage restaking
-func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, srv *grpc.Server) *StakeAutomaton {
+func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, srv *grpc.Server) *StakeAutomaton {
 	a := &StakeAutomaton{
 		eventBroker:    eventBroker,
 		rpcBus:         rpcBus,
-		pubKeyBLS:      pubKeyBLS,
 		stakeEndHeight: 1,
 		running:        false,
 	}
@@ -74,40 +72,15 @@ func (m *StakeAutomaton) AutomateConsensusTxs(ctx context.Context, e *node.Empty
 // Listen to round updates and takes the proper decision Stake-wise
 func (m *StakeAutomaton) Listen() {
 	for roundUpdate := range m.roundChan {
-		// Rehydrate consensus state
-		m.p = roundUpdate.P
 		m.height = roundUpdate.Round
 
-		if roundUpdate.Round+renewalOffset >= m.stakeEndHeight {
-			endHeight := m.findMostRecentStake()
-
-			// Only send stake if this is the first time we notice it's about to expire
-			if endHeight > m.stakeEndHeight {
-				m.stakeEndHeight = endHeight
-			} else if m.stakeEndHeight != 0 {
-				if err := m.sendStake(); err != nil {
-					l.WithError(err).Warnln("could not send stake tx")
-					continue
-				}
-				m.stakeEndHeight = 0
+		if m.height+renewalOffset >= m.stakeEndHeight {
+			if err := m.sendStake(); err != nil {
+				l.WithError(err).Warnln("could not send stake tx")
+				continue
 			}
 		}
 	}
-}
-
-func (m *StakeAutomaton) findMostRecentStake() uint64 {
-	member := m.p.GetMember(m.pubKeyBLS)
-	if member != nil {
-		var highest uint64
-		for _, stake := range member.Stakes {
-			if stake.EndHeight > highest {
-				highest = stake.EndHeight
-			}
-		}
-		return highest
-	}
-
-	return 0
 }
 
 func (m *StakeAutomaton) sendStake() error {
@@ -127,7 +100,12 @@ func (m *StakeAutomaton) sendStake() error {
 		Locktime: lockTime,
 	}
 	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(req), 5*time.Second)
-	return err
+	if err != nil {
+		return err
+	}
+
+	m.stakeEndHeight = lockTime + m.height
+	return nil
 }
 
 func (m *StakeAutomaton) getTxSettings() (uint64, uint64) {
