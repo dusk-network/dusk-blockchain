@@ -9,7 +9,7 @@ import (
 
 func TestRuskTxInputUnMarshal(t *testing.T) {
 	assert := assert.New(t)
-	ruskIn := RuskTransparentTxIn
+	ruskIn := RuskTransparentTxIn()
 	in := new(TransactionInput)
 	assert.NoError(UTxIn(ruskIn, in))
 
@@ -23,7 +23,7 @@ func TestRuskTxInputUnMarshal(t *testing.T) {
 
 func TestRuskTxOutUnMarshal(t *testing.T) {
 	assert := assert.New(t)
-	ruskIn := RuskObfuscatedTxOut
+	ruskIn := RuskObfuscatedTxOut()
 	in := new(TransactionOutput)
 	assert.NoError(UTxOut(ruskIn, in))
 

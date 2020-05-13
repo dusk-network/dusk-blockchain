@@ -74,8 +74,8 @@ func (m MockProxy) BlockGenerator() BlockGenerator { return m.BG }
 func MockKeys() (*SecretKey, *PublicKey) {
 	sk := new(SecretKey)
 	pk := new(PublicKey)
-	USecretKey(RuskSecretKey, sk)
-	UPublicKey(RuskPublicKey, pk)
+	USecretKey(RuskSecretKey(), sk)
+	UPublicKey(RuskPublicKey(), pk)
 	return sk, pk
 }
 
@@ -262,7 +262,7 @@ func mockRuskTx(amount uint64, fee uint64, obfuscated bool, blindingFactor []byt
 	feeOut := mockRuskTransparentOutput(fee, nil)
 	if obfuscated {
 		return &rusk.Transaction{
-			Inputs:  []*rusk.TransactionInput{RuskTransparentTxIn},
+			Inputs:  []*rusk.TransactionInput{RuskTransparentTxIn()},
 			Outputs: []*rusk.TransactionOutput{mockRuskObfuscatedOutput(amount, blindingFactor)},
 			Fee:     feeOut,
 			Proof:   []byte{0xaa, 0xbb},
@@ -270,7 +270,7 @@ func mockRuskTx(amount uint64, fee uint64, obfuscated bool, blindingFactor []byt
 	}
 
 	return &rusk.Transaction{
-		Inputs:  []*rusk.TransactionInput{RuskTransparentTxIn},
+		Inputs:  []*rusk.TransactionInput{RuskTransparentTxIn()},
 		Outputs: []*rusk.TransactionOutput{mockRuskTransparentOutput(amount, blindingFactor)},
 		Fee:     feeOut,
 		Proof:   []byte{0xab, 0xbc},
@@ -278,15 +278,16 @@ func mockRuskTx(amount uint64, fee uint64, obfuscated bool, blindingFactor []byt
 }
 
 //RuskTx is the mock of a ContractCallTx
-var RuskTx = &rusk.ContractCallTx{
-	ContractCall: &rusk.ContractCallTx_Tx{
+func RuskTx() *rusk.ContractCallTx {
+	return &rusk.ContractCallTx{ContractCall: &rusk.ContractCallTx_Tx{
 		Tx: &rusk.Transaction{
-			Inputs:  []*rusk.TransactionInput{RuskTransparentTxIn},
-			Outputs: []*rusk.TransactionOutput{RuskTransparentTxOut},
-			Fee:     RuskTransparentTxOut,
+			Inputs:  []*rusk.TransactionInput{RuskTransparentTxIn()},
+			Outputs: []*rusk.TransactionOutput{RuskTransparentTxOut()},
+			Fee:     RuskTransparentTxOut(),
 			Proof:   []byte{0xaa, 0xbb},
 		},
 	},
+	}
 }
 
 /**************************/
@@ -304,7 +305,7 @@ func MockTransparentOutput(amount uint64, blindingFactor []byte) TransactionOutp
 }
 
 func mockRuskTransparentOutput(amount uint64, blindingFactor []byte) *rusk.TransactionOutput {
-	rto := RuskTransparentTxOut
+	rto := RuskTransparentTxOut()
 
 	rto.Note.Value = &rusk.Note_TransparentValue{
 		TransparentValue: amount,
@@ -321,25 +322,27 @@ func mockRuskTransparentOutput(amount uint64, blindingFactor []byte) *rusk.Trans
 }
 
 // RuskTransparentTxOut is a transparent Tx Out Mock
-var RuskTransparentTxOut = &rusk.TransactionOutput{
-	Note:           RuskTransparentNote,
-	Pk:             RuskPublicKey,
-	BlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+func RuskTransparentTxOut() *rusk.TransactionOutput {
+	return &rusk.TransactionOutput{Note: RuskTransparentNote(),
+		Pk:             RuskPublicKey(),
+		BlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+	}
 }
 
 // RuskTransparentNote is a transparent note
-var RuskTransparentNote = &rusk.Note{
-	NoteType:        0,
-	Nonce:           &rusk.Nonce{Bs: []byte{0x11, 0x22}},
-	RG:              &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-	PkR:             &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-	ValueCommitment: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	BlindingFactor: &rusk.Note_TransparentBlindingFactor{
-		TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	},
-	Value: &rusk.Note_TransparentValue{
-		TransparentValue: uint64(122),
-	},
+func RuskTransparentNote() *rusk.Note {
+	return &rusk.Note{NoteType: 0,
+		Nonce:           &rusk.Nonce{Bs: []byte{0x11, 0x22}},
+		RG:              &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+		PkR:             &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+		ValueCommitment: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+		BlindingFactor: &rusk.Note_TransparentBlindingFactor{
+			TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+		},
+		Value: &rusk.Note_TransparentValue{
+			TransparentValue: uint64(122),
+		},
+	}
 }
 
 // MockOfuscatedOutput returns a TransactionOutput with the amount hashed. To
@@ -357,7 +360,7 @@ func MockOfuscatedOutput(amount uint64, blindingFactor []byte) TransactionOutput
 }
 
 func mockRuskObfuscatedOutput(amount uint64, blindingFactor []byte) *rusk.TransactionOutput {
-	rto := RuskObfuscatedTxOut
+	rto := RuskObfuscatedTxOut()
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, amount)
 	hamount, err := hash.Sha3256(b)
@@ -383,28 +386,30 @@ func mockRuskObfuscatedOutput(amount uint64, blindingFactor []byte) *rusk.Transa
 }
 
 // RuskObfuscatedTxOut is an encrypted Tx Out Mock
-var RuskObfuscatedTxOut = &rusk.TransactionOutput{
-	Note: RuskObfuscatedNote,
-	Pk: &rusk.PublicKey{
-		AG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-		BG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-	},
-	BlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+func RuskObfuscatedTxOut() *rusk.TransactionOutput {
+	return &rusk.TransactionOutput{Note: RuskObfuscatedNote(),
+		Pk: &rusk.PublicKey{
+			AG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+			BG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+		},
+		BlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+	}
 }
 
 // RuskObfuscatedNote is an obfuscated note mock
-var RuskObfuscatedNote = &rusk.Note{
-	NoteType:        1,
-	Nonce:           &rusk.Nonce{},
-	RG:              &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-	PkR:             &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-	ValueCommitment: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	BlindingFactor: &rusk.Note_EncryptedBlindingFactor{
-		EncryptedBlindingFactor: []byte{0x56, 0x67},
-	},
-	Value: &rusk.Note_EncryptedValue{
-		EncryptedValue: []byte{0x12, 0x02},
-	},
+func RuskObfuscatedNote() *rusk.Note {
+	return &rusk.Note{NoteType: 1,
+		Nonce:           &rusk.Nonce{},
+		RG:              &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+		PkR:             &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+		ValueCommitment: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+		BlindingFactor: &rusk.Note_EncryptedBlindingFactor{
+			EncryptedBlindingFactor: []byte{0x56, 0x67},
+		},
+		Value: &rusk.Note_EncryptedValue{
+			EncryptedValue: []byte{0x12, 0x02},
+		},
+	}
 }
 
 /***************/
@@ -412,19 +417,23 @@ var RuskObfuscatedNote = &rusk.Note{
 /***************/
 
 // RuskTransparentTxIn is a transparent Tx Input mock
-var RuskTransparentTxIn = &rusk.TransactionInput{
-	Nullifier: &rusk.Nullifier{
-		H: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	},
-	MerkleRoot: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+func RuskTransparentTxIn() *rusk.TransactionInput {
+	return &rusk.TransactionInput{
+		Nullifier: &rusk.Nullifier{
+			H: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+		},
+		MerkleRoot: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+	}
 }
 
 // RuskObfuscatedTxIn is an encrypted Tx Input Mock
-var RuskObfuscatedTxIn = &rusk.TransactionInput{
-	Nullifier: &rusk.Nullifier{
-		H: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	},
-	MerkleRoot: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+func RuskObfuscatedTxIn() *rusk.TransactionInput {
+	return &rusk.TransactionInput{
+		Nullifier: &rusk.Nullifier{
+			H: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+		},
+		MerkleRoot: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+	}
 }
 
 /*************/
@@ -446,7 +455,7 @@ func MockInvalidTx() *Transaction {
 	tx := new(Transaction)
 
 	input := new(TransactionInput)
-	if err := UTxIn(RuskTransparentTxIn, input); err != nil {
+	if err := UTxIn(RuskTransparentTxIn(), input); err != nil {
 		panic(err)
 	}
 
@@ -473,18 +482,20 @@ func MockInvalidTx() *Transaction {
 /******************/
 
 // RuskInvalidNote is an invalid note
-var RuskInvalidNote = &rusk.Note{
-	NoteType:        1,
-	Nonce:           &rusk.Nonce{Bs: []byte{0x11, 0x22}},
-	RG:              &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-	PkR:             &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-	ValueCommitment: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	BlindingFactor: &rusk.Note_TransparentBlindingFactor{
-		TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	},
-	Value: &rusk.Note_TransparentValue{
-		TransparentValue: uint64(122),
-	},
+func RuskInvalidNote() *rusk.Note {
+	return &rusk.Note{
+		NoteType:        1,
+		Nonce:           &rusk.Nonce{Bs: []byte{0x11, 0x22}},
+		RG:              &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+		PkR:             &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+		ValueCommitment: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+		BlindingFactor: &rusk.Note_TransparentBlindingFactor{
+			TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+		},
+		Value: &rusk.Note_TransparentValue{
+			TransparentValue: uint64(122),
+		},
+	}
 }
 
 /**********/
@@ -510,15 +521,19 @@ func RandKeys() (SecretKey, PublicKey) {
 }
 
 // RuskPublicKey mocks rusk pk
-var RuskPublicKey = &rusk.PublicKey{
-	AG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
-	BG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+func RuskPublicKey() *rusk.PublicKey {
+	return &rusk.PublicKey{
+		AG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+		BG: &rusk.CompressedPoint{Y: []byte{0x33, 0x44}},
+	}
 }
 
 // RuskSecretKey mocks rusk sk
-var RuskSecretKey = &rusk.SecretKey{
-	A: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-	B: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+func RuskSecretKey() *rusk.SecretKey {
+	return &rusk.SecretKey{
+		A: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+		B: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+	}
 }
 
 /*************/
