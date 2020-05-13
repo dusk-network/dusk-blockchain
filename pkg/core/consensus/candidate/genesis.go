@@ -2,6 +2,7 @@ package candidate
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -13,10 +14,12 @@ import (
 // GenerateGenesisBlock is a developer utility for regenerating the genesis block
 // as they would be different per network type. Once a genesis block is
 // approved, its hex blob should be copied into config.TestNetGenesisBlob
-func GenerateGenesisBlock(rb *rpcbus.RPCBus, generatorPubKey *transactions.PublicKey) (string, error) {
+func GenerateGenesisBlock(rb *rpcbus.RPCBus, genPrivKey *transactions.SecretKey, generatorPubKey *transactions.PublicKey) (string, error) {
 	g := &Generator{
-		rpcBus:    rb,
-		genPubKey: generatorPubKey,
+		rpcBus:     rb,
+		genPrivKey: genPrivKey,
+		genPubKey:  generatorPubKey,
+		ctx:        context.Background(),
 	}
 
 	// TODO: do we need to generate correct proof and score
@@ -24,7 +27,7 @@ func GenerateGenesisBlock(rb *rpcbus.RPCBus, generatorPubKey *transactions.Publi
 	proof, _ := crypto.RandEntropy(32)
 	score, _ := crypto.RandEntropy(32)
 
-	b, err := g.GenerateBlock(0, seed, proof, score, make([]byte, 32), nil)
+	b, err := g.GenerateBlock(0, seed, proof, score, make([]byte, 32), [][]byte{[]byte{0}})
 	if err != nil {
 		return "", err
 	}
