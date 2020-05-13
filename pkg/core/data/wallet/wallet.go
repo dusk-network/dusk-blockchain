@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,8 +35,16 @@ type Wallet struct {
 	SecretKey transactions.SecretKey
 }
 
+// KeysJSON is a struct used to marshal / unmarshal fields to a encrypted file
+type KeysJSON struct {
+	Seed      []byte                 `json:"seed"`
+	SecretKey []byte                 `json:"secret_key"`
+	PublicKey transactions.PublicKey `json:"public_key"`
+	ViewKey   transactions.ViewKey   `json:"view_key"`
+}
+
 // New creates a wallet instance
-func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, db *database.DB, password string, seedFile, secretFile string, secretKey *transactions.SecretKey) (*Wallet, error) {
+func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, db *database.DB, password, seedFile string, secretKey *transactions.SecretKey) (*Wallet, error) {
 
 	//create new seed if seed comes empty
 	if len(seed) == 0 {
@@ -46,116 +55,94 @@ func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, 
 		}
 	}
 
-	return LoadFromSeed(seed, netPrefix, db, password, seedFile, secretFile, secretKey)
-}
-
-// GenerateNewSeed a new seed
-func GenerateNewSeed(Read func(buf []byte) (n int, err error)) ([]byte, error) {
-	var seed []byte
-	if Read == nil {
-		Read = rand.Read
+	skBuf := new(bytes.Buffer)
+	if err := transactions.MarshalSecretKey(skBuf, *secretKey); err != nil {
+		return nil, err
 	}
 
-	for {
-		// random seed
-		seed = make([]byte, 64)
-		_, err := Read(seed)
-		if err != nil {
-			return nil, err
-		}
-
-		// Ensure the seed can be used for generating a BLS keypair.
-		_, err = generateKeys(seed)
-		if err == nil {
-			break
-		}
-
-		if err != io.EOF {
-			return nil, err
-		}
-		// If not, we retry.
+	keysJSON := KeysJSON{
+		Seed:      seed,
+		SecretKey: skBuf.Bytes(),
 	}
-	return seed, nil
+	return LoadFromSeed(netPrefix, db, password, seedFile, keysJSON)
 }
 
 // LoadFromSeed loads a wallet from the seed
-func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, password string, seedFile, secretFile string, secretKey *transactions.SecretKey) (*Wallet, error) {
-	if len(seed) < 64 {
-		return nil, errors.New("seed must be atleast 64 bytes in size")
+func LoadFromSeed(netPrefix byte, db *database.DB, password, seedFile string, keysJSON KeysJSON) (*Wallet, error) {
+	if len(keysJSON.Seed) < 64 {
+		return nil, errors.New("seed must be at least 64 bytes in size")
+	}
+
+	secretKey := new(transactions.SecretKey)
+	err := transactions.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
+	if err != nil {
+		return nil, err
 	}
 
 	if secretKey.A == nil || secretKey.B == nil {
 		return nil, errors.New("secretKey must be valid")
 	}
 
-	//TODO: are we sure we want to save the seed when loading ?
-	if err := saveEncrypted(seed, password, seedFile); err != nil {
+	consensusKeys, err := generateKeys(keysJSON.Seed)
+	if err != nil {
 		return nil, err
 	}
 
-	//TODO: are we sure we want to save the secretKey when loading ?
-	//secretKey manipulation
-	skBuf := new(bytes.Buffer)
-	if err := transactions.MarshalSecretKey(skBuf, *secretKey); err != nil {
+	// transform keysJSON to []byte
+	data, err := json.Marshal(keysJSON)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := saveEncrypted(skBuf.Bytes(), password, secretFile); err != nil {
+	// store it in a encrypted file
+	if err := saveEncrypted(data, password, seedFile); err != nil {
 		return nil, err
 	}
 
-	consensusKeys, kerr := generateKeys(seed)
-	if kerr != nil {
-		return nil, kerr
-	}
-
-	//TODO: KEYS generate PublicKey and ViewKey from SecretKey
 	w := &Wallet{
 		db:            db,
 		netPrefix:     netPrefix,
 		consensusKeys: &consensusKeys,
 		SecretKey:     *secretKey,
-		PublicKey:     transactions.PublicKey{}, //TODO: KEYS
-		ViewKey:       transactions.ViewKey{},   //TODO: KEYS
+		PublicKey:     keysJSON.PublicKey,
+		ViewKey:       keysJSON.ViewKey,
 	}
 
 	return w, nil
 }
 
 // LoadFromFile loads a wallet from a .dat file
-func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile, secretKeyFile string) (*Wallet, error) {
+func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile string) (*Wallet, error) {
 
-	seed, err := fetchEncrypted(password, seedFile)
+	keysJSONArr, err := fetchEncrypted(password, seedFile)
 	if err != nil {
 		return nil, err
 	}
 
-	secretKeyByteArr, err := fetchEncrypted(password, secretKeyFile)
+	// transform []byte to keysJSON
+	keysJSON := new(KeysJSON)
+	err = json.Unmarshal(keysJSONArr, keysJSON)
 	if err != nil {
 		return nil, err
 	}
 
-	consensusKeys, err := generateKeys(seed)
+	consensusKeys, err := generateKeys(keysJSON.Seed)
 	if err != nil {
 		return nil, err
 	}
 
 	// secretKey manipulation
 	secretKey := new(transactions.SecretKey)
-	err = transactions.UnmarshalSecretKey(bytes.NewBuffer(secretKeyByteArr), secretKey)
+	err = transactions.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: publicKey manipulation
-	// TODO: viewKey manipulation
-
 	return &Wallet{
-		db:        db,
-		netPrefix: netPrefix,
-		//keyPair:       key.NewKeyPair(seed),
-		PublicKey:     transactions.PublicKey{}, // TODO: public key should be saved and retrieved later to spare a roundtrip to rusk
-		ViewKey:       transactions.ViewKey{},   // TODO: view key should be saved and retrieved later to spare a roundtrip to rusk
+		db:            db,
+		netPrefix:     netPrefix,
+		PublicKey:     keysJSON.PublicKey,
+		ViewKey:       keysJSON.ViewKey,
 		consensusKeys: &consensusKeys,
 		SecretKey:     *secretKey,
 	}, nil
@@ -196,4 +183,33 @@ func generateKeys(seed []byte) (consensuskey.Keys, error) {
 	consensusSeed := append(seedHash[:], secondSeedHash[:]...)
 
 	return consensuskey.NewKeysFromBytes(consensusSeed)
+}
+
+// GenerateNewSeed a new seed
+func GenerateNewSeed(Read func(buf []byte) (n int, err error)) ([]byte, error) {
+	var seed []byte
+	if Read == nil {
+		Read = rand.Read
+	}
+
+	for {
+		// random seed
+		seed = make([]byte, 64)
+		_, err := Read(seed)
+		if err != nil {
+			return nil, err
+		}
+
+		// Ensure the seed can be used for generating a BLS keypair.
+		_, err = generateKeys(seed)
+		if err == nil {
+			break
+		}
+
+		if err != io.EOF {
+			return nil, err
+		}
+		// If not, we retry.
+	}
+	return seed, nil
 }
