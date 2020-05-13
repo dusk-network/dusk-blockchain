@@ -16,7 +16,11 @@ const (
 	// ConsensusTimeOut is the time out for consensus step timers.
 	ConsensusTimeOut = 5 * time.Second
 
-	MinFee = int64(100)
+	MinFee = uint64(100)
+
+	// MaxLockTime is the maximum amount of time a consensus transaction (stake, bid)
+	// can be locked up for
+	MaxLockTime = uint64(250000)
 
 	// GenesisBlockBlob represents the genesis block bytes in hexadecimal format
 	// It's recommended to be regenerated with generation.GenerateGensisBlock() API
