@@ -4,8 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,7 +75,7 @@ func RandomHeader(height uint64) *block.Header {
 		Timestamp: time.Now().Unix(),
 
 		PrevBlockHash: transactions.Rand32Bytes(),
-		Seed:          transactions.Rand32Bytes(),
+		Seed:          RandomBLSSignature(),
 		TxRoot:        transactions.Rand32Bytes(),
 
 		Certificate: RandomCertificate(),
@@ -87,4 +89,15 @@ func RandomHeader(height uint64) *block.Header {
 // FIXME: 417 - create a believable Genesis block
 func GenesisMock(t *testing.T, txNr uint16) *block.Block {
 	return RandomBlock(0, txNr)
+}
+
+// RandomBLSSignature returns a valid BLS Signature of a bogus message
+func RandomBLSSignature() []byte {
+	msg := "this is a test"
+	keys, _ := key.NewRandKeys()
+	sig, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, []byte(msg))
+	if err != nil {
+		panic(err)
+	}
+	return sig.Compress()
 }

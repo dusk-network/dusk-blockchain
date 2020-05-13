@@ -10,7 +10,6 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
-// TODO: refactor into table tests
 func TestEncodeDecodeStandard(t *testing.T) {
 	assert := assert.New(t)
 
