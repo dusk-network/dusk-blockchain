@@ -1,6 +1,28 @@
-package maintainer_test
+package stakeautomaton_test
 
-/*
+import (
+	"os"
+	"testing"
+	"time"
+
+	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	zkproof "github.com/dusk-network/dusk-zkproof"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+)
+
 const pass = "password"
 
 // Test that the maintainer will properly send new stake and bid transactions, when
@@ -86,7 +108,6 @@ func TestSendOnce(t *testing.T) {
 func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request, *user.Provisioners, key.Keys, ristretto.Scalar) {
 	// Initial setup
 	bus := eventbus.New()
-	rpcBus := rpcbus.New()
 
 	_, db := lite.CreateDBConnection()
 	// Ensure we have a genesis block
@@ -109,7 +130,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	k, err := w.ReconstructK()
 	assert.NoError(t, err)
 	mScalar := zkproof.CalculateM(k)
-	m := maintainer.New(bus, rpcBus, w.Keys().BLSPubKeyBytes, mScalar)
+	m := stakeautomaton.New(bus, rpcBus, w.Keys().BLSPubKeyBytes, mScalar)
 	go m.Listen()
 
 	// Mock provisioners, and insert our wallet values
@@ -141,4 +162,3 @@ func createWallet(rpcBus *rpcbus.RPCBus, password string) error {
 	_, err := rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(&node.CreateRequest{Password: password}), 0)
 	return err
 }
-*/

@@ -1,0 +1,1 @@
+package bidautomaton_test

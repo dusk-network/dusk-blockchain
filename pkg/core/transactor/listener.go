@@ -157,7 +157,6 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	// DB)
 	// Create the Ed25519 Keypair
 	tx, err := t.provider.NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
-
 	if err != nil {
 		return nil, err
 	}
