@@ -14,6 +14,8 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
+var intermediateSecretKey = "b201b3b64c30f5cf6980f50c30b73e6d1352f08846fe5546282d84a827509409e83d98da3509ec2f7985e3899e575509101ec4b1db1f898be9c73868e4c8a107"
+
 var intermediatePublicKey = "61c36e407ac91f20174572eec95f692f5cff1c40bacd1b9f86c7fa7202e93bb6753c2f424caf3c9220876e8cfe0afdff7ffd7c984d5c7d95fa0b46cf3781d883"
 
 // PermissiveExecutor implements the transactions.Executor interface. It
