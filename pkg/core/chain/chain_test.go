@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -26,7 +26,7 @@ import (
 // This test ensures the correct behavior from the Chain, when
 // accepting a block from a peer.
 func TestAcceptFromPeer(t *testing.T) {
-	eb, _, c := setupChainTest(t, false)
+	eb, _, c := setupChainTest(1, false)
 	stopConsensusChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
 
@@ -92,7 +92,7 @@ func TestAcceptFromPeer(t *testing.T) {
 // This test ensures the correct behavior when accepting a block
 // directly from the consensus.
 func TestAcceptIntermediate(t *testing.T) {
-	eb, rpc, c := setupChainTest(t, false)
+	eb, rpc, c := setupChainTest(2, false)
 	go c.Listen()
 	intermediateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
@@ -134,7 +134,7 @@ func TestAcceptIntermediate(t *testing.T) {
 }
 
 func TestReturnOnNilIntermediateBlock(t *testing.T) {
-	eb, _, c := setupChainTest(t, false)
+	eb, _, c := setupChainTest(2, false)
 	intermediateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
 
@@ -184,7 +184,8 @@ func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 
 func createLoader() *DBLoader {
 	_, db := heavy.CreateDBConnection()
-	genesis := cfg.DecodeGenesis()
+	//genesis := cfg.DecodeGenesis()
+	genesis := helper.RandomBlock(0, 12)
 	return NewDBLoader(db, genesis)
 }
 
@@ -205,41 +206,6 @@ func TestFetchTip(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, chain.prevBlock.Header.Hash, s.TipHash)
-}
-
-// Make sure that certificates can still be properly verified when a provisioner is removed on round update.
-// TODO: this test currently doesn't test anything meaningful, and
-// should be refactored or removed.
-func TestCertificateExpiredProvisioner(t *testing.T) {
-	eb := eventbus.New()
-	rpc := rpcbus.New()
-	counter := chainsync.NewCounter(eb)
-	chain, err := New(context.Background(), eb, rpc, counter, createLoader(), &MockVerifier{}, nil, nil)
-	assert.Nil(t, err)
-
-	// Add some provisioners to our chain, including one that is just about to expire
-	p, k := consensus.MockProvisioners(3)
-	p.Members[string(k[0].BLSPubKeyBytes)].Stakes[0].EndHeight = 1
-	ru := consensus.MockRoundUpdate(2, p)
-	msg := message.New(topics.RoundUpdate, ru)
-	// Update round. This should not remove the third provisioner from our committee
-	eb.Publish(topics.RoundUpdate, msg)
-
-	// Create block 1
-	blk := helper.RandomBlock(1, 1)
-	// Remove all txs except coinbase, as the helper transactions do not pass verification
-	blk.Txs = blk.Txs[0:1]
-	root, _ := blk.CalculateRoot()
-	blk.Header.TxRoot = root
-	hash, _ := blk.CalculateHash()
-	blk.Header.Hash = hash
-	// Add cert and prev hash
-	blk.Header.Certificate = message.MockCertificate(blk.Header.Hash, 1, k, p)
-	blk.Header.PrevBlockHash = chain.prevBlock.Header.Hash
-	// Accept it
-	assert.NoError(t, chain.AcceptBlock(context.Background(), *blk))
-	// Provisioner with k3 should no longer be in the committee now
-	// assert.False(t, chain.p.GetMember(k[0].BLSPubKeyBytes) == nil)
 }
 
 func TestRebuildChain(t *testing.T) {
@@ -328,7 +294,7 @@ func TestRebuildChain(t *testing.T) {
 // mock a block which can be accepted by the chain.
 // note that this is only valid for height 1, as the certificate
 // is not checked on height 1 (for network bootstrapping)
-//nolint:unused
+//nolint
 func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
 	// Create block 1
 	blk := helper.RandomBlock(1, 1)
@@ -346,14 +312,17 @@ func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
 }
 
 //nolint:unparam
-func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
+func setupChainTest(startAtHeight uint64, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
 	loader := createLoader()
-	c, err := New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, nil)
+	proxy := &transactions.MockProxy{
+		E: transactions.MockExecutor(startAtHeight),
+	}
+	c, err := New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, proxy.Executor())
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	return eb, rpc, c
