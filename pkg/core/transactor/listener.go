@@ -22,33 +22,14 @@ var (
 	errWalletAlreadyLoaded = errors.New("wallet is already loaded") //nolint
 )
 
-//nolint
-func loadResponse(pubKey []byte) *node.LoadResponse {
-	pk := &node.PubKey{PublicKey: pubKey}
-	return &node.LoadResponse{Key: pk}
-}
-
 func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResponse, error) {
 	//return err if user sends no seed
 	if len(req.Seed) < 64 {
 		return nil, errors.New("seed must be at least 64 bytes in size")
 	}
 
-	//generate secret key with rusk
-	// TODO: use parent context
-	ctx := context.Background()
-	// QUESTION: since GenerateSecretKey also returns a PublicKey and a
-	// ViewKey, does it still make sense to call `createFromSeed` later on?
-	sk, _, _, err := t.keyMaster.GenerateSecretKey(ctx, req.Seed)
-	if err != nil {
-		return nil, err
-	}
-
-	//set it for further use
-	t.secretKey = sk
-
 	//create wallet with seed and pass
-	pubKey, _, err := t.createFromSeed(req.Seed, req.Password)
+	err := t.createWallet(req.Seed, req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -56,9 +37,7 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	// TODO: will this still make sense after the migration
 	// t.launchConsensus()
 
-	return &node.LoadResponse{Key: &node.PubKey{
-		PublicKey: pubKey.ToAddr(),
-	}}, nil
+	return loadResponseFromPub(t.w.PublicKey), nil
 }
 
 func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
@@ -67,9 +46,7 @@ func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
 		return nil, errors.New("SecretKey is not set")
 	}
 
-	return &node.LoadResponse{Key: &node.PubKey{
-		PublicKey: t.w.PublicKey.ToAddr(),
-	}}, nil
+	return loadResponseFromPub(t.w.PublicKey), nil
 }
 
 func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
@@ -103,30 +80,25 @@ func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
 }
 
 func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse, error) {
-	// TODO: will this still make sense after migration?
-	// if t.w != nil {
-	// 	return nil, errWalletAlreadyLoaded
-	// }
+	if t.w != nil {
+		return nil, errWalletAlreadyLoaded
+	}
 
-	pubKey, _, err := t.loadWallet(req.Password)
+	pubKey, err := t.loadWallet(req.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: will this still make sense after migration?
 	// t.launchConsensus()
-	// return loadResponse([]byte(pubKey)), nil
 
-	return &node.LoadResponse{Key: &node.PubKey{
-		PublicKey: pubKey.ToAddr(),
-	}}, nil
+	return loadResponseFromPub(pubKey), nil
 }
 
 func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadResponse, error) {
-	// TODO: will this still make sense after migration?
-	// if t.w != nil {
-	// 	return nil, errWalletAlreadyLoaded
-	// }
+	if t.w != nil {
+		return nil, errWalletAlreadyLoaded
+	}
 
 	ctx := context.Background()
 	records, err := t.walletClient.CreateFromSeed(ctx, &node.CreateRequest{Password: req.Password, Seed: req.Seed})
@@ -136,7 +108,7 @@ func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadRe
 
 	// TODO: will this still make sense after migration?
 	// t.launchConsensus()
-	// return loadResponse([]byte(pubKey)), nil
+
 	return records, nil
 }
 
@@ -306,6 +278,11 @@ func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.Tran
 	}
 
 	return &node.TransactionResponse{Hash: hash}, nil
+}
+
+func loadResponseFromPub(pubKey transactions.PublicKey) *node.LoadResponse {
+	pk := &node.PubKey{PublicKey: pubKey.ToAddr()}
+	return &node.LoadResponse{Key: pk}
 }
 
 //nolint:unused
