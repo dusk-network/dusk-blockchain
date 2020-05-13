@@ -61,7 +61,7 @@ func WalletMenu(client *conf.NodeClient) error {
 
 		prompt := promptui.Select{
 			Label: "Select action",
-			Items: []string{"Transfer DUSK", "Stake DUSK", "Bid DUSK", "Show Balance", "Show Address", "Show Transaction History", "Automate Consensus Participation", "Exit"},
+			Items: []string{"Transfer DUSK", "Stake DUSK", "Bid DUSK", "Show Balance", "Show Address", "Show Transaction History", "Automate Provisioner Participation", "Automate Block Generator Participation", "Exit"},
 			Size:  8,
 		}
 
@@ -115,8 +115,15 @@ func WalletMenu(client *conf.NodeClient) error {
 
 			s := formatRecords(resp)
 			res = s.String()
-		case "Automate Consensus Participation":
-			resp, err := client.MaintainerClient.AutomateConsensusTxs(context.Background(), &node.EmptyRequest{})
+		case "Automate Provisioner Participation":
+			resp, err := client.ProvisionerClient.AutomateStakes(context.Background(), &node.EmptyRequest{})
+			if err != nil {
+				return err
+			}
+
+			res = resp.Response
+		case "Automate Block Generator Participation":
+			resp, err := client.BlockGeneratorClient.AutomateBids(context.Background(), &node.EmptyRequest{})
 			if err != nil {
 				return err
 			}
