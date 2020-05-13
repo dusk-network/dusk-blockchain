@@ -91,15 +91,14 @@ type Transaction interface {
 
 	// StoreBidValues stores the D and K values passed by the caller in
 	// the database, as well as the expiry height. It should be passed
-	// the transaction locktime as a third argument, as the database
+	// the transaction lock time as a third argument, as the database
 	// can infer the current height and consequently, the expiry height,
 	// on its own.
-	StoreBidValues([]byte, []byte, uint64) error
+	StoreBidValues([]byte, []byte, []byte, uint64) error
 
 	// FetchBidValues retrieves the D and K values with the lowest
 	// expiry height from the database.
-	// FIXME: 476
-	FetchBidValues() (D []byte, K []byte /* EdPk []byte, */, err error)
+	FetchBidValues() (D []byte, K []byte, EdPk []byte, err error)
 
 	// FetchBlockHeightSince try to find height of a block generated around
 	// sinceUnixTime starting the search from height (tip - offset)

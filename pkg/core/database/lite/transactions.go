@@ -276,7 +276,7 @@ func (t *transaction) FetchCurrentHeight() (uint64, error) {
 	return header.Height, nil
 }
 
-func (t *transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
+func (t *transaction) StoreBidValues(d, k, edPk []byte, lockTime uint64) error {
 	currentHeight, err := t.FetchCurrentHeight()
 	if err != nil {
 		return err
@@ -286,11 +286,11 @@ func (t *transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
 	binary.LittleEndian.PutUint64(heightBytes, lockTime+currentHeight)
 	key := append([]byte("bidvalues"), heightBytes...)
 	bidKey := toKey(key)
-	t.batch[bidValuesInd][bidKey] = append(d, k...)
+	t.batch[bidValuesInd][bidKey] = append(d, append(k, edPk...)...)
 	return nil
 }
 
-func (t *transaction) FetchBidValues() ([]byte, []byte, error) {
+func (t *transaction) FetchBidValues() ([]byte, []byte, []byte, error) {
 	// Get bid values with lowest expiry height
 	lowestSeen := uint64(1<<64 - 1)
 	var values []byte
@@ -303,7 +303,7 @@ func (t *transaction) FetchBidValues() ([]byte, []byte, error) {
 		}
 	}
 
-	return values[0:32], values[32:], nil
+	return values[0:32], values[32:64], values[64:], nil
 }
 
 // FetchBlockHeightSince uses binary search to find a block height

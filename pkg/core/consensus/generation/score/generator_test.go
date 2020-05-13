@@ -31,15 +31,16 @@ func TestCorrectBidValues(t *testing.T) {
 
 	// Add two sets of bid values, one expiring at 1000, and one
 	// expiring at 2000
-	d1, k1, err := addBidValues(db, 1000)
+	d1, k1, edPk1, err := addBidValues(db, 1000)
 	assert.NoError(t, err)
-	d2, k2, err := addBidValues(db, 2000)
+	d2, k2, edPk2, err := addBidValues(db, 2000)
 	assert.NoError(t, err)
 
 	c := f.Instantiate().(*Generator)
 
 	assert.Equal(t, d1, c.d)
 	assert.Equal(t, k1, c.k)
+	assert.Equal(t, edPk1, c.edPk)
 
 	// Now update our state so that the previous bid values are removed
 	blk := helper.RandomBlock(t, 1200, 1)
@@ -51,15 +52,17 @@ func TestCorrectBidValues(t *testing.T) {
 
 	assert.Equal(t, d2, c.d)
 	assert.Equal(t, k2, c.k)
+	assert.Equal(t, edPk2, c.edPk)
 }
 
-func addBidValues(db database.DB, lockTime uint64) ([]byte, []byte, error) {
+func addBidValues(db database.DB, lockTime uint64) ([]byte, []byte, []byte, error) {
 	d := make([]byte, 64)
 	k := make([]byte, 64)
+	edPk := make([]byte, 64)
 	_, _ = rand.Read(d)
 	_, _ = rand.Read(k)
 
-	return d, k, db.Update(func(t database.Transaction) error {
-		return t.StoreBidValues(d, k, lockTime)
+	return d, k, edPk, db.Update(func(t database.Transaction) error {
+		return t.StoreBidValues(d, k, edPk, lockTime)
 	})
 }
