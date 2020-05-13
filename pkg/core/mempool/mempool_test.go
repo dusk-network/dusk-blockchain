@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"math"
 	"os"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -234,8 +236,6 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	c.assert(t, true)
 }
 
-// FIXME: 499
-/*
 func TestRemoveAccepted(t *testing.T) {
 	assert := assert.New(t)
 
@@ -253,9 +253,9 @@ func TestRemoveAccepted(t *testing.T) {
 		// We avoid sharing this pointer between the mempool and the block
 		// by marshaling and unmarshaling the tx
 		buf := new(bytes.Buffer)
-		assert.NoError(message.MarshalTx(buf, tx))
+		assert.NoError(transactions.Marshal(buf, tx))
 
-		txCopy, err := message.UnmarshalTx(buf)
+		txCopy, err := transactions.Unmarshal(buf)
 		assert.NoError(err)
 
 		txMsg := prepTx(txCopy)
@@ -283,7 +283,6 @@ func TestRemoveAccepted(t *testing.T) {
 
 	c.assert(t, false)
 }
-*/
 
 func TestCoinbaseTxsNotAllowed(t *testing.T) {
 	c.reset()
