@@ -3,12 +3,15 @@ package stakeautomaton
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -21,7 +24,7 @@ var l = log.WithField("process", "StakeAutomaton")
 // transactions are close to expiring.
 type StakeAutomaton struct {
 	eventBroker eventbus.Broker
-	client      node.TransactorClient
+	rpcBus      *rpcbus.RPCBus
 	roundChan   <-chan consensus.RoundUpdate
 
 	pubKeyBLS []byte
@@ -40,10 +43,10 @@ const renewalOffset = 100
 // New creates a new instance of StakeAutomaton that is used to automate the
 // resending of stakes and alleviate the burden for a user to having to
 // manually manage restaking
-func New(eventBroker eventbus.Broker, client node.TransactorClient, pubKeyBLS []byte, srv *grpc.Server) *StakeAutomaton {
+func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, srv *grpc.Server) *StakeAutomaton {
 	a := &StakeAutomaton{
 		eventBroker:    eventBroker,
-		client:         client,
+		rpcBus:         rpcBus,
 		pubKeyBLS:      pubKeyBLS,
 		stakeEndHeight: 1,
 		running:        false,
@@ -65,7 +68,7 @@ func (m *StakeAutomaton) AutomateConsensusTxs(ctx context.Context, e *node.Empty
 		go m.Listen()
 	}
 
-	return &node.GenericResponse{Response: "Maintainer started, consensus transactions are now being automated"}, nil
+	return &node.GenericResponse{Response: "stake transactions are now being automated"}, nil
 }
 
 // Listen to round updates and takes the proper decision Stake-wise
@@ -118,7 +121,12 @@ func (m *StakeAutomaton) sendStake() error {
 		"locktime": lockTime,
 	}).Tracef("Sending stake tx")
 
-	_, err := m.client.Stake(context.Background(), &node.StakeRequest{Amount: amount, Fee: config.MinFee, Locktime: lockTime})
+	req := &node.StakeRequest{
+		Amount:   amount,
+		Fee:      config.MinFee,
+		Locktime: lockTime,
+	}
+	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(req), 5*time.Second)
 	return err
 }
 
