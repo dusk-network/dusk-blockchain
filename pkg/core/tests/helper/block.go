@@ -80,7 +80,7 @@ func RandomHeader(t *testing.T, height uint64) *block.Header {
 
 // GenesisMock should mock a valid genesis block. For now, it just creates a
 // random block, but this should change to a more sophisticated Genesis
-// TODO: create a believable Genesis block
+// FIXME: 417 - create a believable Genesis block
 func GenesisMock(t *testing.T, txNr uint16) *block.Block {
 	return RandomBlock(t, 0, txNr)
 }

@@ -21,8 +21,8 @@ func TestUnMarshal(t *testing.T) {
 	err := Marshal(b, cc)
 	assert.NoError(err)
 
-	ccOther := new(Transaction)
-	assert.NoError(Unmarshal(b, ccOther))
+	ccOther, uerr := Unmarshal(b)
+	assert.NoError(uerr)
 
 	assert.True(Equal(cc, ccOther))
 }

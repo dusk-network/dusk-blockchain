@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"math"
 	"os"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -234,7 +236,8 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	c.assert(t, true)
 }
 
-/* FIXME: 499
+// FIXME: 499
+/*
 func TestRemoveAccepted(t *testing.T) {
 	assert := assert.New(t)
 
