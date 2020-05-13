@@ -34,6 +34,8 @@ type BidAutomaton struct {
 // renewed.
 const renewalOffset = 100
 
+// New creates a new instance of the BidAutomaton. Upon request, it will start automatically
+// sending bidding transactions whenever necessary to keep the node active as a block generator.
 func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, srv *grpc.Server) *BidAutomaton {
 	a := &BidAutomaton{
 		eventBroker:  eventBroker,
@@ -43,13 +45,13 @@ func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, srv *grpc.Server) *
 	}
 
 	if srv != nil {
-		node.RegisterMaintainerServer(srv, a)
+		node.RegisterBlockGeneratorServer(srv, a)
 	}
 	return a
 }
 
-// TODO: update protobuf to have a separate method from stake automaton
-func (m *BidAutomaton) AutomateConsensusTxs(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
+// AutomateBids will automate the sending of bids.
+func (m *BidAutomaton) AutomateBids(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	if !m.running {
 		m.roundChan = consensus.InitRoundUpdate(m.eventBroker)
 		m.running = true
@@ -59,6 +61,7 @@ func (m *BidAutomaton) AutomateConsensusTxs(ctx context.Context, e *node.EmptyRe
 	return &node.GenericResponse{Response: "Bid transactions are now being automated"}, nil
 }
 
+// Listen to round updates and send bids when necessary.
 func (m *BidAutomaton) Listen() {
 	for roundUpdate := range m.roundChan {
 		// Rehydrate consensus state

@@ -51,13 +51,13 @@ func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, srv *grpc.Server) *
 	}
 
 	if srv != nil {
-		node.RegisterMaintainerServer(srv, a)
+		node.RegisterProvisionerServer(srv, a)
 	}
 	return a
 }
 
-// AutomateConsensusTxs will automate the sending of stakes and bids.
-func (m *StakeAutomaton) AutomateConsensusTxs(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
+// AutomateStakes will automate the sending of stakes.
+func (m *StakeAutomaton) AutomateStakes(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	if !m.running {
 		// We only initialize the `roundChan` here so that we don't clog the channel with
 		// blocks while the maintainer is not actually running yet.
