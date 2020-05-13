@@ -195,8 +195,6 @@ func MockDistributeTx(reward uint64, provisioners [][]byte, bgPk PublicKey) *Dis
 	if err := UTx(rtx, dtx.Tx); err != nil {
 		panic(err)
 	}
-	// FIXME: 501 - this field is deprecated
-	dtx.TotalReward = reward
 	dtx.ProvisionersAddresses = provisioners
 	dtx.BgPk = &bgPk
 	return dtx
@@ -222,8 +220,6 @@ func MockStakeTx(amount, expiration uint64, blsKey []byte) *StakeTransaction {
 	if err := UTx(rtx, stx.Tx); err != nil {
 		panic(err)
 	}
-	// FIXME: 501 - this field is deprecated
-	stx.Value = amount
 	stx.BlsKey = blsKey
 	stx.ExpirationHeight = expiration
 	return stx
@@ -245,13 +241,11 @@ func RandBidTx(expiration uint64) *BidTransaction {
 // MockBidTx creates a DistributeTransaction
 func MockBidTx(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
 	stx := newBid()
+	// amount is set directly in the underlying ContractCallTx
 	rtx := mockRuskTx(amount, RandUint64(), true, Rand32Bytes())
 	if err := UTx(rtx, stx.Tx); err != nil {
 		panic(err)
 	}
-	// FIXME: 501 - EncryptedValue and EncryptedBlinder fields are deprecated
-	stx.EncryptedValue = Rand32Bytes()
-	stx.EncryptedBlinder = Rand32Bytes()
 	stx.Pk = edPk
 	stx.R = Rand32Bytes()
 	stx.Seed = seed
