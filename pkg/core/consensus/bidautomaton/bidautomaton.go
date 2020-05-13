@@ -96,6 +96,7 @@ func (m *BidAutomaton) sendBid() error {
 	}
 
 	m.bidEndHeight = lockTime + m.height
+	return nil
 }
 
 func (m *BidAutomaton) getTxSettings() (uint64, uint64) {
