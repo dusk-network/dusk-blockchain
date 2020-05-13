@@ -5,12 +5,45 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	mrand "math/rand"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
+
+var intermediatePublicKey = "61c36e407ac91f20174572eec95f692f5cff1c40bacd1b9f86c7fa7202e93bb6753c2f424caf3c9220876e8cfe0afdff7ffd7c984d5c7d95fa0b46cf3781d883"
+
+// PermissiveExecutor implements the transactions.Executor interface. It
+// simulates successful Validation and Execution of State transitions
+// all Validation and simulates
+type PermissiveExecutor struct {
+	height uint64
+	P      *user.Provisioners
+}
+
+// MockExecutor returns an instance of PermissiveExecutor
+func MockExecutor(height uint64) *PermissiveExecutor {
+	return &PermissiveExecutor{
+		height: height,
+		P:      user.NewProvisioners(),
+	}
+}
+
+// ValidateStateTransition returns all ContractCalls passed
+// height. It returns those ContractCalls deemed valid
+func (p *PermissiveExecutor) ValidateStateTransition(ctx context.Context, cc []ContractCall, height uint64) ([]ContractCall, error) {
+	return cc, nil
+}
+
+// ExecuteStateTransition performs a global state mutation and steps the
+// block-height up
+func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall) (uint64, user.Provisioners, error) {
+	p.height++
+	return p.height, *p.P, nil
+}
 
 // PermissiveProvisioner mocks verification of scores
 type PermissiveProvisioner struct {
@@ -167,6 +200,28 @@ func MockTx(amount uint64, fee uint64, obfuscated bool, blindingFactor []byte) *
 /****************/
 /** DISTRIBUTE **/
 /****************/
+
+// IntermediateCoinbase is the coinbase of the first intermediate block. It
+// needs to be deterministic because all consensus nodes will need to use the
+// same intermediate block with the same Hash to prevent forking immediately
+// after the genesis. The determinism comes from using the same PubliKey and an
+// empty set of provisioners
+func IntermediateCoinbase(reward uint64) *DistributeTransaction {
+	startingPk, err := hex.DecodeString(intermediatePublicKey)
+	if err != nil {
+		panic(err)
+	}
+
+	pk := new(PublicKey)
+
+	pk.AG = new(CompressedPoint)
+	pk.BG = new(CompressedPoint)
+
+	pk.AG.Y = startingPk[:len(startingPk)/2]
+	pk.BG.Y = startingPk[len(startingPk)/2:]
+
+	return MockDistributeTx(reward, [][]byte{}, *pk)
+}
 
 // RandDistributeTx creates a random distribute transaction
 func RandDistributeTx(reward uint64, provisionerNr int) *DistributeTransaction {

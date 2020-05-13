@@ -24,7 +24,7 @@ func TestSynchronizeBehind(t *testing.T) {
 
 	// Create a block that is a few rounds in the future
 	height := uint64(5)
-	blk := randomBlockBuffer(t, height, 20)
+	blk := randomBlockBuffer(height, 20)
 
 	if err := cs.Synchronize(blk, "test_peer"); err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	_ = eb.Subscribe(topics.Block, listener)
 
 	// Make a block which should follow our genesis block
-	blk := randomBlockBuffer(t, 1, 20)
+	blk := randomBlockBuffer(1, 20)
 
 	if err := cs.Synchronize(blk, "test_peer"); err != nil {
 		t.Fatal(err)
@@ -71,8 +71,8 @@ func TestSynchronizeSynced(t *testing.T) {
 }
 
 // Returns an encoded representation of a `helper.RandomBlock`.
-func randomBlockBuffer(t *testing.T, height uint64, txBatchCount uint16) *bytes.Buffer {
-	blk := helper.RandomBlock(t, height, txBatchCount)
+func randomBlockBuffer(height uint64, txBatchCount uint16) *bytes.Buffer {
+	blk := helper.RandomBlock(height, txBatchCount)
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, blk); err != nil {
 		panic(err)
@@ -97,5 +97,5 @@ func respond(t *testing.T, rpcBus *rpcbus.RPCBus) {
 	g := make(chan rpcbus.Request, 1)
 	rpcBus.Register(topics.GetLastBlock, g)
 	r := <-g
-	r.RespChan <- rpcbus.NewResponse(*helper.RandomBlock(t, 0, 1), nil)
+	r.RespChan <- rpcbus.NewResponse(*helper.RandomBlock(0, 1), nil)
 }

@@ -242,7 +242,7 @@ func TestRemoveAccepted(t *testing.T) {
 	c.reset()
 
 	// Create a random block
-	b := helper.RandomBlock(t, 200, 0)
+	b := helper.RandomBlock(200, 0)
 	b.Txs = make([]transactions.ContractCall, 0)
 
 	counter := 0
