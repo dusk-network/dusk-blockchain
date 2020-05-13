@@ -28,7 +28,7 @@ func TestMaintainStakes(t *testing.T) {
 	}()
 
 	c := make(chan struct{}, 1)
-	go catchStakeRequest(t, rb, c)
+	go catchStakeRequest(rb, c)
 
 	// Send round update, to start the maintainer.
 	ru := consensus.MockRoundUpdate(1, nil)
@@ -43,7 +43,7 @@ func TestMaintainStakes(t *testing.T) {
 	ruMsg = message.New(topics.RoundUpdate, ru)
 	bus.Publish(topics.RoundUpdate, ruMsg)
 
-	go catchStakeRequest(t, rb, c)
+	go catchStakeRequest(rb, c)
 
 	select {
 	case <-c:
@@ -72,9 +72,11 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, *rpcbus.RPCBus) {
 	return bus, rpcBus
 }
 
-func catchStakeRequest(t *testing.T, rb *rpcbus.RPCBus, respChan chan struct{}) {
+func catchStakeRequest(rb *rpcbus.RPCBus, respChan chan struct{}) {
 	c := make(chan rpcbus.Request, 1)
-	require.Nil(t, rb.Register(topics.SendStakeTx, c))
+	if err := rb.Register(topics.SendStakeTx, c); err != nil {
+		panic(err)
+	}
 
 	<-c
 	respChan <- struct{}{}
