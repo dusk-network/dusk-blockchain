@@ -20,13 +20,11 @@ func TestEncodeDecodeBlock(t *testing.T) {
 
 	// Encode block into a buffer
 	buf := new(bytes.Buffer)
-	err := message.MarshalBlock(buf, blk)
-	assert.Nil(err)
+	assert.NoError(message.MarshalBlock(buf, blk))
 
 	// Decode buffer into a block struct
 	decBlk := block.NewBlock()
-	err = message.UnmarshalBlock(buf, decBlk)
-	assert.Nil(err)
+	assert.NoError(message.UnmarshalBlock(buf, decBlk))
 
 	// Check both structs are equal
 	assert.True(blk.Equals(decBlk))
