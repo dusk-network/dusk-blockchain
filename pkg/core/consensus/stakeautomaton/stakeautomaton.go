@@ -7,7 +7,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -27,12 +26,9 @@ type StakeAutomaton struct {
 	rpcBus      *rpcbus.RPCBus
 	roundChan   <-chan consensus.RoundUpdate
 
-	p      user.Provisioners
-	height uint64
-
+	height         uint64
 	stakeEndHeight uint64
-
-	running bool
+	running        bool
 }
 
 // How many blocks away from expiration the transactions should be

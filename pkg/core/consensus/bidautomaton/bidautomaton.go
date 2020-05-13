@@ -23,11 +23,9 @@ type BidAutomaton struct {
 	rpcBus      *rpcbus.RPCBus
 	roundChan   <-chan consensus.RoundUpdate
 
-	height uint64
-
+	height       uint64
 	bidEndHeight uint64
-
-	running bool
+	running      bool
 }
 
 // How many blocks away from expiration the transactions should be
