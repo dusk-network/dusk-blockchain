@@ -282,8 +282,6 @@ func (p *provider) NewStakeTx(ctx context.Context, pubKeyBLS []byte, expirationH
 }
 
 // NewWithdrawStake creates a WithdrawStake transaction
-// TODO: most likely we will need a BLS signature and a BLS public key as
-// parameters
 func (p *provider) NewWithdrawStakeTx(ctx context.Context, blsKey, sig []byte, tx TxRequest) (WithdrawStakeTransaction, error) {
 	wsTx := new(WithdrawStakeTransaction)
 	tr := new(rusk.NewTransactionRequest)
@@ -356,8 +354,6 @@ type keymaster struct {
 }
 
 // GenerateSecretKey creates a SecretKey using a []byte as Seed
-// TODO: shouldn't this also return the PublicKey and the ViewKey to spare
-// a roundtrip?
 func (k *keymaster) GenerateSecretKey(ctx context.Context, seed []byte) (SecretKey, PublicKey, ViewKey, error) {
 	sk := new(SecretKey)
 	pk := new(PublicKey)
@@ -392,6 +388,7 @@ func (k *keymaster) Keys(ctx context.Context, sk SecretKey) (PublicKey, ViewKey,
 
 // TODO: implement
 // FullScanOwnedNotes(ViewKey) (OwnedNotesResponse)
+
 type executor struct {
 	*proxy
 }
@@ -488,8 +485,7 @@ func (p *provisioner) NewSlashTx(ctx context.Context, str SlashTxRequest, tx TxR
 	return *slashTx, nil
 }
 
-// NewWithdrawFeesTx creates a new WithdrawFees transaction
-// TODO: add missing parameters like BLS PubKey, BLS Signature and message (?)
+// NewWithdrawFeesTx creates a new WithdrawFees transaction using BLS PubKey, BLS Signature and message (?)
 func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, blsKey, sig, msg []byte, tx TxRequest) (WithdrawFeesTransaction, error) {
 	feeTx := new(WithdrawFeesTransaction)
 	tr := new(rusk.NewTransactionRequest)
