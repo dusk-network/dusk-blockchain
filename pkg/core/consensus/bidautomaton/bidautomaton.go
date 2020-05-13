@@ -3,11 +3,14 @@ package bidautomaton
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -17,10 +20,9 @@ var l = log.WithField("process", "BidAutomaton")
 
 type BidAutomaton struct {
 	eventBroker eventbus.Broker
-	client      node.TransactorClient
+	rpcBus      *rpcbus.RPCBus
 	roundChan   <-chan consensus.RoundUpdate
 
-	edPK   []byte
 	height uint64
 
 	bidEndHeight uint64
@@ -32,11 +34,10 @@ type BidAutomaton struct {
 // renewed.
 const renewalOffset = 100
 
-func New(eventBroker eventbus.Broker, client node.TransactorClient, edPK []byte, srv *grpc.Server) *BidAutomaton {
+func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, srv *grpc.Server) *BidAutomaton {
 	a := &BidAutomaton{
 		eventBroker:  eventBroker,
-		client:       client,
-		edPK:         edPK,
+		rpcBus:       rpcBus,
 		bidEndHeight: 1,
 		running:      false,
 	}
@@ -63,19 +64,10 @@ func (m *BidAutomaton) Listen() {
 		// Rehydrate consensus state
 		m.height = roundUpdate.Round
 
-		if roundUpdate.Round+renewalOffset >= m.bidEndHeight {
-			endHeight := m.findMostRecentBid()
-
-			// Only send bid if this is the first time we notice it's about to expire
-			if endHeight > m.bidEndHeight {
-				m.bidEndHeight = endHeight
-			} else if m.bidEndHeight != 0 {
-				if err := m.sendBid(); err != nil {
-					l.WithError(err).Warnln("could not send bid tx")
-					continue
-				}
-				// Set end height to 0 to ensure we only send a transaction once
-				m.bidEndHeight = 0
+		if m.height+renewalOffset >= m.bidEndHeight {
+			if err := m.sendBid(); err != nil {
+				l.WithError(err).Warnln("could not send bid tx")
+				continue
 			}
 		}
 	}
@@ -93,8 +85,17 @@ func (m *BidAutomaton) sendBid() error {
 		"locktime": lockTime,
 	}).Tracef("Sending bid tx")
 
-	_, err := m.client.Bid(context.Background(), &node.BidRequest{Amount: amount, Fee: config.MinFee, Locktime: lockTime})
-	return err
+	req := &node.BidRequest{
+		Amount:   amount,
+		Fee:      config.MinFee,
+		Locktime: lockTime,
+	}
+	_, err := m.rpcBus.Call(topics.SendBidTx, rpcbus.NewRequest(req), 5*time.Second)
+	if err != nil {
+		return err
+	}
+
+	m.bidEndHeight = lockTime + m.height
 }
 
 func (m *BidAutomaton) getTxSettings() (uint64, uint64) {
