@@ -4,23 +4,30 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/stretchr/testify/assert"
 )
 
 // RandomBlock returns a random block for testing.
 // For `height` see also helper.RandomHeader
 // For txBatchCount see also helper.RandomSliceOfTxs
-func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block {
+func RandomBlock(height uint64, txBatchCount uint16) *block.Block {
 	b := &block.Block{
-		Header: RandomHeader(t, height),
-		Txs:    RandomSliceOfTxs(t, txBatchCount),
+		Header: RandomHeader(height),
+		Txs:    transactions.RandContractCalls(int(txBatchCount), 0, true),
 	}
 	hash, err := b.CalculateHash()
-	assert.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 	b.Header.Hash = hash
-	root, err := b.CalculateRoot()
-	assert.NoError(t, err)
+	root, xerr := b.CalculateRoot()
+	if xerr != nil {
+		panic(xerr)
+	}
 	b.Header.TxRoot = root
 	return b
 }
@@ -28,16 +35,16 @@ func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block 
 // TwoLinkedBlocks returns two blocks that are linked via their headers
 func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 	blk0 := &block.Block{
-		Header: RandomHeader(t, 200),
-		Txs:    RandomSliceOfTxs(t, 20),
+		Header: RandomHeader(200),
+		Txs:    transactions.RandContractCalls(19, 0, true),
 	}
 	hash, err := blk0.CalculateHash()
 	assert.Nil(t, err)
 	blk0.Header.Hash = hash
 
 	blk1 := &block.Block{
-		Header: RandomHeader(t, 200),
-		Txs:    RandomSliceOfTxs(t, 20),
+		Header: RandomHeader(200),
+		Txs:    transactions.RandContractCalls(19, 0, true),
 	}
 
 	blk1.Header.PrevBlockHash = blk0.Header.Hash
@@ -54,24 +61,24 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 }
 
 // RandomCertificate returns a random block certificate for testing
-func RandomCertificate(t *testing.T) *block.Certificate {
+func RandomCertificate() *block.Certificate {
 	return block.EmptyCertificate()
 }
 
 // RandomHeader returns a random header for testing. `height` randomness is up
 // to the caller. A global atomic counter per pkg can handle it
-func RandomHeader(t *testing.T, height uint64) *block.Header {
+func RandomHeader(height uint64) *block.Header {
 
 	h := &block.Header{
 		Version:   0,
 		Height:    height,
 		Timestamp: time.Now().Unix(),
 
-		PrevBlockHash: RandomSlice(t, 32),
-		Seed:          RandomSlice(t, 33),
-		TxRoot:        RandomSlice(t, 32),
+		PrevBlockHash: transactions.Rand32Bytes(),
+		Seed:          RandomBLSSignature(),
+		TxRoot:        transactions.Rand32Bytes(),
 
-		Certificate: RandomCertificate(t),
+		Certificate: RandomCertificate(),
 	}
 
 	return h
@@ -79,7 +86,18 @@ func RandomHeader(t *testing.T, height uint64) *block.Header {
 
 // GenesisMock should mock a valid genesis block. For now, it just creates a
 // random block, but this should change to a more sophisticated Genesis
-// TODO: create a believable Genesis block
+// FIXME: 417 - create a believable Genesis block
 func GenesisMock(t *testing.T, txNr uint16) *block.Block {
-	return RandomBlock(t, 0, txNr)
+	return RandomBlock(0, txNr)
+}
+
+// RandomBLSSignature returns a valid BLS Signature of a bogus message
+func RandomBLSSignature() []byte {
+	msg := "this is a test"
+	keys, _ := key.NewRandKeys()
+	sig, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, []byte(msg))
+	if err != nil {
+		panic(err)
+	}
+	return sig.Compress()
 }

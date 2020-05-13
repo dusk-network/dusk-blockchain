@@ -12,9 +12,21 @@ import (
 // allocation to the Provisioners
 type DistributeTransaction struct {
 	*ContractTx
-	TotalReward           uint64     `json:"total_reward"`
 	ProvisionersAddresses [][]byte   `json:"provisioners_addresses"`
 	BgPk                  *PublicKey `json:"bg_pk"`
+}
+
+func newDistribute() *DistributeTransaction {
+	dt := new(DistributeTransaction)
+	dt.ContractTx = new(ContractTx)
+	dt.ContractTx.Tx = new(Transaction)
+	return dt
+}
+
+// TotalReward returns the reward set in the DistributeTransaction (coinbase).
+// It is the transparent value of the first output
+func (t *DistributeTransaction) TotalReward() uint64 {
+	return t.Tx.Outputs[0].Note.TransparentValue
 }
 
 // CalculateHash complies with merkletree.Payload interface
@@ -33,7 +45,6 @@ func MDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error 
 	if err := MTx(r.Tx, t.Tx); err != nil {
 		return err
 	}
-	r.TotalReward = t.TotalReward
 	r.ProvisionersAddresses = make([][]byte, len(t.ProvisionersAddresses))
 	for i, p := range t.ProvisionersAddresses {
 		r.ProvisionersAddresses[i] = make([]byte, len(p))
@@ -51,7 +62,6 @@ func UDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error 
 	if err != nil {
 		return err
 	}
-	t.TotalReward = r.TotalReward
 	t.ProvisionersAddresses = make([][]byte, len(r.ProvisionersAddresses))
 	for i, p := range r.ProvisionersAddresses {
 		t.ProvisionersAddresses[i] = make([]byte, len(p))
@@ -64,10 +74,6 @@ func UDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error 
 //MarshalDistribute into a buffer
 func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
 	if err := MarshalContractTx(r, *s.ContractTx); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint64LE(r, s.TotalReward); err != nil {
 		return err
 	}
 
@@ -97,10 +103,6 @@ func UnmarshalDistribute(r *bytes.Buffer, s *DistributeTransaction) error {
 	s.ContractTx = new(ContractTx)
 
 	if err := UnmarshalContractTx(r, s.ContractTx); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint64LE(r, &s.TotalReward); err != nil {
 		return err
 	}
 

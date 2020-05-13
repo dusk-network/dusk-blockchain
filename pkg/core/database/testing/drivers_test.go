@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -110,8 +111,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 
 	// Generate a few blocks to be used as sample objects
 	// Less blocks are used as we have CI out-of-memory error
-	t := &testing.T{}
-	blocks, err = generateChainBlocks(t, 10)
+	blocks, err = generateChainBlocks(10)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -144,7 +144,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 func TestStoreBlock(test *testing.T) {
 
 	// Generate additional blocks to store
-	genBlocks, err := generateChainBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -297,7 +297,7 @@ func TestFetchBlockTxs(test *testing.T) {
 				// Get bytes of the fetched transactions.Transaction
 				fblockTx := fblockTxs[index]
 				fetchedBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(fetchedBuf, fblockTx)
+				_ = transactions.Marshal(fetchedBuf, fblockTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
@@ -305,7 +305,7 @@ func TestFetchBlockTxs(test *testing.T) {
 
 				// Get bytes of the origin transactions.Transaction to compare with
 				originBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(originBuf, oBlockTx)
+				_ = transactions.Marshal(originBuf, oBlockTx)
 
 				if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
 					return errors.New("transactions.Transaction not retrieved properly from storage")
@@ -493,7 +493,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	}()
 
 	// Initialize db and a slice of 10 blocks with 2 transactions.Transaction each
-	genBlocks, err := generateChainBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -578,14 +578,14 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 
 				fetchedBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(fetchedBuf, fetchedTx)
+				_ = transactions.Marshal(fetchedBuf, fetchedTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
 				}
 
 				originBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(originBuf, originTx)
+				_ = transactions.Marshal(originBuf, originTx)
 
 				if !bytes.Equal(fetchedBuf.Bytes(), originBuf.Bytes()) {
 					test.Fatal("Invalid tx fetched")
@@ -693,7 +693,7 @@ func TestStoreFetchBidValues(test *testing.T) {
 	}))
 
 	// Update state to after 1000
-	blk := helper.RandomBlock(test, 1200, 1)
+	blk := helper.RandomBlock(1200, 1)
 	assert.NoError(test, db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(blk)
 	}))

@@ -13,8 +13,20 @@ import (
 type StakeTransaction struct {
 	*ContractTx
 	BlsKey           []byte `json:"bls_key"`
-	Value            uint64 `json:"value"`
 	ExpirationHeight uint64 `json:"expiration_height"`
+}
+
+// Amount returns the amount staked through this transaction. The amount is the
+// tranparent value of the note of the first of the transaction's outputs
+func (t *StakeTransaction) Amount() uint64 {
+	return t.Tx.Outputs[0].Note.TransparentValue
+}
+
+func newStake() *StakeTransaction {
+	stake := new(StakeTransaction)
+	stake.ContractTx = new(ContractTx)
+	stake.ContractTx.Tx = new(Transaction)
+	return stake
 }
 
 // MStake copies the Stake struct into the rusk datastruct
@@ -25,7 +37,6 @@ func MStake(r *rusk.StakeTransaction, t *StakeTransaction) error {
 	}
 	r.BlsKey = make([]byte, len(t.BlsKey))
 	copy(r.BlsKey, t.BlsKey)
-	r.Value = t.Value
 	r.ExpirationHeight = t.ExpirationHeight
 	return nil
 }
@@ -39,7 +50,6 @@ func UStake(r *rusk.StakeTransaction, t *StakeTransaction) error {
 	}
 	t.BlsKey = make([]byte, len(r.BlsKey))
 	copy(t.BlsKey, r.BlsKey)
-	t.Value = r.Value
 	t.ExpirationHeight = r.ExpirationHeight
 	return nil
 }
@@ -69,10 +79,6 @@ func MarshalStake(r *bytes.Buffer, s StakeTransaction) error {
 		return err
 	}
 
-	if err := encoding.WriteUint64LE(r, s.Value); err != nil {
-		return err
-	}
-
 	if err := encoding.WriteUint64LE(r, s.ExpirationHeight); err != nil {
 		return err
 	}
@@ -89,10 +95,6 @@ func UnmarshalStake(r *bytes.Buffer, s *StakeTransaction) error {
 	}
 
 	if err := encoding.ReadVarBytes(r, &s.BlsKey); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint64LE(r, &s.Value); err != nil {
 		return err
 	}
 

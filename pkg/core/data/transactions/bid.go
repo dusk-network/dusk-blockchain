@@ -14,12 +14,17 @@ type BidTransaction struct {
 	*ContractTx
 	M                []byte `json:"m"`
 	Commitment       []byte `json:"commitment"`
-	EncryptedValue   []byte `json:"encrypted_value"`
-	EncryptedBlinder []byte `json:"encrypted_blinder"`
 	Pk               []byte `json:"pk"`
 	R                []byte `json:"r"`
 	Seed             []byte `json:"seed"`
 	ExpirationHeight uint64 `json:"expiration_height"`
+}
+
+func newBid() *BidTransaction {
+	bt := new(BidTransaction)
+	bt.ContractTx = new(ContractTx)
+	bt.ContractTx.Tx = new(Transaction)
+	return bt
 }
 
 // MBid copies the Bid rusk struct into the transaction datastruct
@@ -33,10 +38,6 @@ func MBid(r *rusk.BidTransaction, t *BidTransaction) error {
 	copy(r.M, t.M)
 	r.Commitment = make([]byte, len(t.Commitment))
 	copy(r.Commitment, t.Commitment)
-	r.EncryptedValue = make([]byte, len(t.EncryptedValue))
-	copy(r.EncryptedValue, t.EncryptedValue)
-	r.EncryptedBlinder = make([]byte, len(t.EncryptedBlinder))
-	copy(r.EncryptedBlinder, t.EncryptedBlinder)
 	r.Pk = make([]byte, len(t.Pk))
 	copy(r.Pk, r.Pk)
 	r.R = make([]byte, len(t.R))
@@ -59,10 +60,6 @@ func UBid(r *rusk.BidTransaction, t *BidTransaction) error {
 	copy(t.M, r.M)
 	t.Commitment = make([]byte, len(r.Commitment))
 	copy(t.Commitment, r.Commitment)
-	t.EncryptedValue = make([]byte, len(r.EncryptedValue))
-	copy(t.EncryptedValue, r.EncryptedValue)
-	t.EncryptedBlinder = make([]byte, len(r.EncryptedBlinder))
-	copy(t.EncryptedBlinder, r.EncryptedBlinder)
 	t.Pk = make([]byte, len(r.Pk))
 	copy(t.Pk, r.Pk)
 	t.R = make([]byte, len(r.R))
@@ -94,14 +91,6 @@ func MarshalBid(r *bytes.Buffer, s BidTransaction) error {
 	}
 
 	if err := encoding.WriteVarBytes(r, s.Commitment); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarBytes(r, s.EncryptedValue); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarBytes(r, s.EncryptedBlinder); err != nil {
 		return err
 	}
 
@@ -139,14 +128,6 @@ func UnmarshalBid(r *bytes.Buffer, s *BidTransaction) error {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &s.EncryptedValue); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadVarBytes(r, &s.EncryptedBlinder); err != nil {
-		return err
-	}
-
 	if err := encoding.ReadUint64LE(r, &s.ExpirationHeight); err != nil {
 		return err
 	}
@@ -175,11 +156,9 @@ func (t *BidTransaction) Type() TxType {
 // withdraw their stake (bid)
 type WithdrawBidTransaction struct {
 	*ContractTx
-	Commitment       []byte `json:"commitment"`
-	EncryptedValue   []byte `json:"encrypted_value"`
-	EncryptedBlinder []byte `json:"encrypted_blinder"`
-	Sig              []byte `json:"sig"`
-	EdPk             []byte `json:"ed_pk"`
+	Commitment []byte `json:"commitment"`
+	Sig        []byte `json:"sig"`
+	EdPk       []byte `json:"ed_pk"`
 }
 
 // CalculateHash complies with merkletree.Payload interface
@@ -201,10 +180,6 @@ func MWithdrawBid(r *rusk.WithdrawBidTransaction, t *WithdrawBidTransaction) err
 
 	r.Commitment = make([]byte, len(t.Commitment))
 	copy(r.Commitment, t.Commitment)
-	r.EncryptedValue = make([]byte, len(t.EncryptedValue))
-	copy(r.EncryptedValue, t.EncryptedValue)
-	r.EncryptedBlinder = make([]byte, len(t.EncryptedBlinder))
-	copy(r.EncryptedBlinder, t.EncryptedBlinder)
 	r.Sig = make([]byte, len(t.Sig))
 	copy(r.Sig, t.Sig)
 	r.EdPk = make([]byte, len(t.EdPk))
@@ -221,10 +196,6 @@ func UWithdrawBid(r *rusk.WithdrawBidTransaction, t *WithdrawBidTransaction) err
 	}
 	t.Commitment = make([]byte, len(r.Commitment))
 	copy(t.Commitment, r.Commitment)
-	t.EncryptedValue = make([]byte, len(r.EncryptedValue))
-	copy(t.EncryptedValue, r.EncryptedValue)
-	t.EncryptedBlinder = make([]byte, len(r.EncryptedBlinder))
-	copy(t.EncryptedBlinder, r.EncryptedBlinder)
 	t.EdPk = make([]byte, len(r.EdPk))
 	copy(t.EdPk, r.EdPk)
 	t.Sig = make([]byte, len(r.Sig))
@@ -239,14 +210,6 @@ func MarshalWithdrawBid(r *bytes.Buffer, s WithdrawBidTransaction) error {
 	}
 
 	if err := encoding.WriteVarBytes(r, s.Commitment); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarBytes(r, s.EncryptedValue); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarBytes(r, s.EncryptedBlinder); err != nil {
 		return err
 	}
 
@@ -270,14 +233,6 @@ func UnmarshalWithdrawBid(r *bytes.Buffer, s *WithdrawBidTransaction) error {
 	}
 
 	if err := encoding.ReadVarBytes(r, &s.Commitment); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadVarBytes(r, &s.EncryptedValue); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadVarBytes(r, &s.EncryptedBlinder); err != nil {
 		return err
 	}
 

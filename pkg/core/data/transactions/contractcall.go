@@ -119,35 +119,44 @@ func Marshal(buf *bytes.Buffer, c ContractCall) error {
 }
 
 // Unmarshal the binary buffer into a ContractCall interface
-func Unmarshal(buf *bytes.Buffer, c ContractCall) error {
+func Unmarshal(buf *bytes.Buffer) (ContractCall, error) {
+	var c ContractCall
 	var txPrefix uint8
 	if err := encoding.ReadUint8(buf, &txPrefix); err != nil {
-		return err
+		return nil, err
 	}
 
 	var err error
 	switch TxType(txPrefix) {
 	case Tx:
+		c = new(Transaction)
 		err = UnmarshalTransaction(buf, c.(*Transaction))
 	case WithdrawFees:
+		c = new(WithdrawFeesTransaction)
 		err = UnmarshalFees(buf, c.(*WithdrawFeesTransaction))
 	case Stake:
+		c = new(StakeTransaction)
 		err = UnmarshalStake(buf, c.(*StakeTransaction))
 	case Bid:
+		c = new(BidTransaction)
 		err = UnmarshalBid(buf, c.(*BidTransaction))
 	case Slash:
+		c = new(SlashTransaction)
 		err = UnmarshalSlash(buf, c.(*SlashTransaction))
 	case Distribute:
+		c = new(DistributeTransaction)
 		err = UnmarshalDistribute(buf, c.(*DistributeTransaction))
 	case WithdrawStake:
+		c = new(WithdrawStakeTransaction)
 		err = UnmarshalWithdrawStake(buf, c.(*WithdrawStakeTransaction))
 	case WithdrawBid:
+		c = new(WithdrawBidTransaction)
 		err = UnmarshalWithdrawBid(buf, c.(*WithdrawBidTransaction))
 	default:
-		return errors.New("Unknown transaction type")
+		return nil, errors.New("Unknown transaction type")
 	}
 
-	return err
+	return c, err
 }
 
 // DecodeContractCall turns the protobuf message into a ContractCall

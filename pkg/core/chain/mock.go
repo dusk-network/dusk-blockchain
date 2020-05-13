@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 )
@@ -76,7 +77,7 @@ func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, er
 	blk.Header.Timestamp = 1570000000
 	blk.SetPrevBlock(prevBlockHeader)
 
-	tx := mockDeterministicCoinbase()
+	tx := transactions.IntermediateCoinbase(config.GeneratorReward)
 	blk.AddTx(tx)
 	root, err := blk.CalculateRoot()
 	if err != nil {
@@ -91,25 +92,4 @@ func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, er
 	blk.Header.Hash = hash
 
 	return blk, nil
-}
-
-func mockDeterministicCoinbase() transactions.ContractCall {
-	// FIXME: 494 - update for phoenix
-	/*
-		seed := make([]byte, 32)
-
-		keyPair := key.NewKeyPair(seed)
-		tx := transactions.NewCoinbase(make([]byte, 32), make([]byte, 32), 2)
-		var r ristretto.Scalar
-		r.SetZero()
-		tx.SetTxPubKey(r)
-
-		var reward ristretto.Scalar
-		reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
-
-		_ = tx.AddReward(*keyPair.PublicKey(), reward)
-		return tx
-	*/
-
-	return nil
 }

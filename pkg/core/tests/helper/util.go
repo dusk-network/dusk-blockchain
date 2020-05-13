@@ -6,32 +6,30 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
 // TxsToBuffer converts a slice of transactions to a bytes.Buffer.
 func TxsToBuffer(t *testing.T, txs []transactions.ContractCall) *bytes.Buffer {
+	assert := assert.New(t)
 	whole := new(bytes.Buffer)
 
 	for _, tx := range txs {
 		buf := new(bytes.Buffer)
-		err := transactions.Marshal(buf, tx)
-		if err != nil {
-			assert.Nil(t, err)
-		}
-
-		if _, err := whole.ReadFrom(buf); err != nil {
-			assert.Nil(t, err)
-		}
+		assert.NoError(transactions.Marshal(buf, tx))
+		_, err := whole.ReadFrom(buf)
+		assert.NoError(err)
 	}
 
 	return whole
 }
 
 // RandomSlice returns a random slice of size `size`
-func RandomSlice(t *testing.T, size uint32) []byte {
+func RandomSlice(size uint32) []byte {
 	randSlice := make([]byte, size)
 	_, err := rand.Read(randSlice)
-	assert.Nil(t, err)
+	if err != nil {
+		panic(err)
+	}
 	return randSlice
 }
