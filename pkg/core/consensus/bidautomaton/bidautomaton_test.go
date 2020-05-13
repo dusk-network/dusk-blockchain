@@ -64,7 +64,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, *rpcbus.RPCBus) {
 	rpcBus := rpcbus.New()
 
 	m := bidautomaton.New(bus, rpcBus, nil)
-	_, err := m.AutomateConsensusTxs(context.Background(), &node.EmptyRequest{})
+	_, err := m.AutomateBids(context.Background(), &node.EmptyRequest{})
 	require.Nil(t, err)
 
 	return bus, rpcBus
