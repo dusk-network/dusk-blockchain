@@ -1,4 +1,4 @@
-package message_test
+package transactions_test
 
 import (
 	"bytes"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	assert "github.com/stretchr/testify/require"
 )
 
@@ -20,11 +19,11 @@ func TestEncodeDecodeStandard(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err := message.MarshalTx(buf, tx)
+	err := transactions.Marshal(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a standard TX struct
-	decTX, err := message.UnmarshalTx(buf)
+	decTX, err := transactions.Unmarshal(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -44,19 +43,15 @@ func TestEncodeDecodeStandard(t *testing.T) {
 }
 
 func TestEqualsMethodStandard(t *testing.T) {
-	// TODO: add equals method for RUSK/phoenix transactions
+	assert := assert.New(t)
 
-	/*
-		assert := assert.New(t)
+	a := transactions.RandContractCall()
+	b := transactions.RandContractCall()
+	c := a
 
-		a := helper.RandomStandardTx(t, false)
-		b := helper.RandomStandardTx(t, false)
-		c := a
-
-		assert.False(a.Equals(b))
-		assert.False(b.Equals(c))
-		assert.True(a.Equals(c))
-	*/
+	assert.False(transactions.Equal(a, b))
+	assert.False(transactions.Equal(b, c))
+	assert.True(transactions.Equal(a, c))
 }
 
 func TestEncodeDecodeBid(t *testing.T) {
@@ -68,10 +63,10 @@ func TestEncodeDecodeBid(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	assert.Nil(message.MarshalTx(buf, tx))
+	assert.Nil(transactions.Marshal(buf, tx))
 
 	// Decode buffer into a bid TX struct
-	decTX, err := message.UnmarshalTx(buf)
+	decTX, err := transactions.Unmarshal(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -101,10 +96,10 @@ func TestEncodeDecodeStake(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	assert.NoError(message.MarshalTx(buf, tx))
+	assert.NoError(transactions.Marshal(buf, tx))
 
 	// Decode buffer into a Stake TX struct
-	decTX, err := message.UnmarshalTx(buf)
+	decTX, err := transactions.Unmarshal(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -134,11 +129,11 @@ func TestEncodeDecodeCoinbase(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err := message.MarshalTx(buf, tx)
+	err := transactions.Marshal(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a coinbase TX struct
-	decTX, err := message.UnmarshalTx(buf)
+	decTX, err := transactions.Unmarshal(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -164,7 +159,7 @@ func TestDecodeTransactions(t *testing.T) {
 
 	decTxs := make([]transactions.ContractCall, len(txs))
 	for i := 0; i < len(txs); i++ {
-		tx, err := message.UnmarshalTx(r)
+		tx, err := transactions.Unmarshal(r)
 		assert.NoError(err)
 		decTxs[i] = tx
 	}
