@@ -505,7 +505,7 @@ func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{
 func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, error) {
 	tx := r.Params.(transactions.ContractCall)
 	buf := new(bytes.Buffer)
-	if err := message.MarshalTx(buf, tx); err != nil {
+	if err := transactions.Marshal(buf, tx); err != nil {
 		return nil, err
 	}
 

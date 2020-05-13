@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"math"
 	"os"
 	"strings"
 	"sync"
@@ -15,7 +14,6 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -306,6 +304,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 }
 
 func TestSendMempoolTx(t *testing.T) {
+	assert := assert.New(t)
 
 	c.reset()
 
@@ -314,29 +313,19 @@ func TestSendMempoolTx(t *testing.T) {
 	var totalSize uint32
 	for _, tx := range txs {
 		buf := new(bytes.Buffer)
-		err := message.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(transactions.Marshal(buf, tx))
 
 		totalSize += uint32(buf.Len())
 
 		resp, err := c.rpcBus.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 0)
-		if err != nil {
-			t.Fatal(err.Error())
-		}
+		assert.NoError(err)
 		txidBytes := resp.([]byte)
 
 		txid, _ := tx.CalculateHash()
-		if !bytes.Equal(txidBytes, txid) {
-			t.Fatal("unexpected txid retrieved")
-		}
+		assert.Equal(txidBytes, txid)
 	}
 
-	if c.m.verified.Size() != totalSize {
-		t.Fatal("unexpected tx total size")
-	}
-
+	assert.Equal(c.m.verified.Size(), totalSize)
 }
 
 func TestMempoolView(t *testing.T) {

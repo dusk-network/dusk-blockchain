@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -297,7 +298,7 @@ func TestFetchBlockTxs(test *testing.T) {
 				// Get bytes of the fetched transactions.Transaction
 				fblockTx := fblockTxs[index]
 				fetchedBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(fetchedBuf, fblockTx)
+				_ = transactions.Marshal(fetchedBuf, fblockTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
@@ -305,7 +306,7 @@ func TestFetchBlockTxs(test *testing.T) {
 
 				// Get bytes of the origin transactions.Transaction to compare with
 				originBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(originBuf, oBlockTx)
+				_ = transactions.Marshal(originBuf, oBlockTx)
 
 				if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
 					return errors.New("transactions.Transaction not retrieved properly from storage")
@@ -578,14 +579,14 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 
 				fetchedBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(fetchedBuf, fetchedTx)
+				_ = transactions.Marshal(fetchedBuf, fetchedTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
 				}
 
 				originBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(originBuf, originTx)
+				_ = transactions.Marshal(originBuf, originTx)
 
 				if !bytes.Equal(fetchedBuf.Bytes(), originBuf.Bytes()) {
 					test.Fatal("Invalid tx fetched")
