@@ -1,6 +1,7 @@
 package query
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
@@ -40,9 +41,6 @@ type (
 		// non-StandardTx data fields
 		BlockHash []byte
 		Size      int
-
-		// Coinbase Tx fields
-		Score []byte
 	}
 )
 
@@ -61,38 +59,27 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	qd.TxID = txID
 	qd.TxType = tx.Type()
 
-	// TODO: adjust this for Phoenix transactions
-	/*
-		qd.Outputs = make([]queryOutput, 0)
-		for _, output := range tx.StandardTx().Outputs {
-			pubkey := output.PubKey.P.Bytes()
-			qd.Outputs = append(qd.Outputs, queryOutput{pubkey})
-		}
+	qd.Outputs = make([]queryOutput, 0)
+	for _, output := range tx.StandardTx().Outputs {
+		pubkey := append(output.Pk.AG.Y, output.Pk.BG.Y...)
+		qd.Outputs = append(qd.Outputs, queryOutput{pubkey})
+	}
 
-		qd.Inputs = make([]queryInput, 0)
-		for _, input := range tx.StandardTx().Inputs {
-			keyimage := input.KeyImage.Bytes()
-			qd.Inputs = append(qd.Inputs, queryInput{keyimage})
-		}
+	qd.Inputs = make([]queryInput, 0)
+	for _, input := range tx.StandardTx().Inputs {
+		keyimage := input.Nullifier.H.Data
+		qd.Inputs = append(qd.Inputs, queryInput{keyimage})
+	}
 
-		qd.BlockHash = blockHash
+	qd.BlockHash = blockHash
 
-		// Populate Score value if available
-		if tx.Type() == core.CoinbaseType {
-			x, ok := tx.(*core.Coinbase)
-			if ok {
-				qd.Score = x.Score
-			}
-		}
+	// Populate marshaling size
+	buf := new(bytes.Buffer)
+	if err := core.Marshal(buf, tx); err != nil {
+		return queryTx{}, err
+	}
 
-		// Populate marshaling size
-		buf := new(bytes.Buffer)
-		if err := message.MarshalTx(buf, tx); err != nil {
-			return queryTx{}, err
-		}
-
-		qd.Size = buf.Len()
-	*/
+	qd.Size = buf.Len()
 
 	return qd, nil
 }

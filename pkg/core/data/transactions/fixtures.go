@@ -306,7 +306,7 @@ func RandBidTx(expiration uint64) *BidTransaction {
 	return MockBidTx(RandUint64(), expiration, Rand32Bytes(), Rand32Bytes())
 }
 
-// MockBidTx creates a DistributeTransaction
+// MockBidTx creates a BidTransaction
 func MockBidTx(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
 	stx := newBid()
 	// amount is set directly in the underlying ContractCallTx
@@ -316,6 +316,20 @@ func MockBidTx(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
 	}
 	stx.Pk = edPk
 	stx.R = Rand32Bytes()
+	stx.Seed = seed
+	stx.ExpirationHeight = expiration
+	return stx
+}
+
+func MockDeterministicBid(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
+	stx := newBid()
+	// amount is set directly in the underlying ContractCallTx
+	rtx := mockRuskTx(amount, 100, true, make([]byte, 32))
+	if err := UTx(rtx, stx.Tx); err != nil {
+		panic(err)
+	}
+	stx.Pk = edPk
+	stx.R = make([]byte, 32)
 	stx.Seed = seed
 	stx.ExpirationHeight = expiration
 	return stx
