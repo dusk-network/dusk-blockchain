@@ -19,24 +19,29 @@ func (t *Transactor) createWallet(seedBytes []byte, password string) error {
 		return err
 	}
 
+	seed, err := wallet.GenerateNewSeed(nil)
+	if err != nil {
+		return err
+	}
+
+	sk, pk, vk, err := t.keyMaster.GenerateSecretKey(context.Background(), seed)
+	if err != nil {
+		return err
+	}
+
+	t.secretKey = sk
+
 	skBuf := new(bytes.Buffer)
 	if err = transactions.MarshalSecretKey(skBuf, t.secretKey); err != nil {
 		_ = db.Close()
 		return err
 	}
 
-	ctx := context.Background()
-	pubkey, viewkey, err := t.keyMaster.Keys(ctx, t.secretKey)
-	if err != nil {
-		_ = db.Close()
-		return err
-	}
-
 	keysJSON := wallet.KeysJSON{
-		Seed:      seedBytes,
+		Seed:      seed,
 		SecretKey: skBuf.Bytes(),
-		PublicKey: pubkey,
-		ViewKey:   viewkey,
+		PublicKey: pk,
+		ViewKey:   vk,
 	}
 
 	// Then create the wallet with seed and password
