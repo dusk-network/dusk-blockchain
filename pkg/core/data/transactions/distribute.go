@@ -29,10 +29,18 @@ func (t *DistributeTransaction) Fees() uint64 {
 	return uint64(0)
 }
 
-func newDistribute() *DistributeTransaction {
+// NewDistribute creates a DistributeTransaction. We can instantiate a
+// DistributeTransaction directly because it only carries a uint64 value
+// without the need for a Fee, Inputs, CompressedPoiints or Scalar quantities
+func NewDistribute(reward uint64, provisioners [][]byte, bgPk PublicKey) *DistributeTransaction {
 	dt := new(DistributeTransaction)
 	dt.ContractTx = new(ContractTx)
 	dt.ContractTx.Tx = new(Transaction)
+	dt.ContractTx.Tx.Outputs = make([]*TransactionOutput, 1)
+	dt.ContractTx.Tx.Outputs[0].Note = new(Note)
+	dt.ContractTx.Tx.Outputs[0].Note.TransparentValue = reward
+	dt.ProvisionersAddresses = provisioners
+	dt.BgPk = &bgPk
 	return dt
 }
 
@@ -55,38 +63,22 @@ func (t *DistributeTransaction) CalculateHash() ([]byte, error) {
 // MDistribute copies the Distribute struct into the rusk  datastruct
 func MDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error {
 	r.Tx = new(rusk.Transaction)
-	if err := MTx(r.Tx, t.Tx); err != nil {
-		return err
+	r.Tx.Outputs = make([]*rusk.TransactionOutput, 1)
+	r.Tx.Outputs[0] = new(rusk.TransactionOutput)
+	r.Tx.Outputs[0].Note = new(rusk.Note)
+	r.Tx.Outputs[0].Note.Value = &rusk.Note_TransparentValue{
+		TransparentValue: t.TotalReward(),
 	}
-	r.ProvisionersAddresses = make([][]byte, len(t.ProvisionersAddresses))
-	for i, p := range t.ProvisionersAddresses {
-		r.ProvisionersAddresses[i] = make([]byte, len(p))
-		copy(r.ProvisionersAddresses[i], p)
-	}
-	copy(r.ProvisionersAddresses, t.ProvisionersAddresses)
-	UPublicKey(r.BgPk, t.BgPk)
-	return nil
-}
-
-// UDistribute copies the Distribute rusk struct into the transaction datastruct
-func UDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error {
-	var err error
-	t.ContractTx, err = UContractTx(r.Tx)
-	if err != nil {
-		return err
-	}
-	t.ProvisionersAddresses = make([][]byte, len(r.ProvisionersAddresses))
-	for i, p := range r.ProvisionersAddresses {
-		t.ProvisionersAddresses[i] = make([]byte, len(p))
-		copy(t.ProvisionersAddresses[i], p)
-	}
-	UPublicKey(r.BgPk, t.BgPk)
+	r.ProvisionersAddresses = t.ProvisionersAddresses
+	r.BgPk = new(rusk.PublicKey)
+	MPublicKey(r.BgPk, t.BgPk)
 	return nil
 }
 
 //MarshalDistribute into a buffer
 func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
-	if err := MarshalContractTx(r, *s.ContractTx); err != nil {
+	reward := s.Tx.Outputs[0].Note.TransparentValue
+	if err := encoding.WriteUint64LE(r, reward); err != nil {
 		return err
 	}
 
@@ -114,8 +106,11 @@ func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
 //UnmarshalDistribute into a buffer
 func UnmarshalDistribute(r *bytes.Buffer, s *DistributeTransaction) error {
 	s.ContractTx = new(ContractTx)
+	s.ContractTx.Tx = new(Transaction)
+	s.ContractTx.Tx.Outputs = make([]*TransactionOutput, 1)
+	s.ContractTx.Tx.Outputs[0] = &TransactionOutput{Note: new(Note)}
 
-	if err := UnmarshalContractTx(r, s.ContractTx); err != nil {
+	if err := encoding.ReadUint64LE(r, &s.ContractTx.Tx.Outputs[0].Note.TransparentValue); err != nil {
 		return err
 	}
 

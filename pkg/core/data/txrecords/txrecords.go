@@ -20,6 +20,8 @@ const (
 	Out
 )
 
+// TxMeta is a convenience structure which groups fields common to the TxView
+// and the TxRecord
 type TxMeta struct {
 	Height    uint64
 	Direction Direction
@@ -39,18 +41,13 @@ type TxRecord struct {
 // TxView is the UX-friendly structure to be served to the UI requesting them
 type TxView struct {
 	TxMeta
-	Type       string
+	Type       transactions.TxType
 	Amount     uint64
 	Fee        uint64
 	Timelock   uint64
 	Hash       []byte
 	Data       []byte
 	Obfuscated bool
-}
-
-// String returns a human-readable representation of this transaction
-func (v TxView) String() string {
-	return ""
 }
 
 // New creates a TxRecord
@@ -74,7 +71,7 @@ func (t TxRecord) View() TxView {
 
 	view := TxView{
 		TxMeta:     t.TxMeta,
-		Type:       string(t.Transaction.Type()),
+		Type:       t.Transaction.Type(),
 		Hash:       h,
 		Obfuscated: t.Transaction.Obfuscated(),
 		Fee:        t.Transaction.Fees(),
@@ -82,10 +79,10 @@ func (t TxRecord) View() TxView {
 
 	switch tx := t.Transaction.(type) {
 	case *transactions.BidTransaction:
-		// view.LockTime = tx.ExpirationHeight
+		view.Timelock = tx.ExpirationHeight
 	case *transactions.StakeTransaction:
 		view.Amount = tx.Amount()
-		// view.LockTime = tx.ExpirationHeight
+		view.Timelock = tx.ExpirationHeight
 	case *transactions.Transaction:
 		if !tx.Obfuscated() {
 			// loop on the Outputs
@@ -98,11 +95,6 @@ func (t TxRecord) View() TxView {
 		view.Amount = tx.TotalReward()
 	}
 
-	// view.Data = tx.Data
-
-	// FIXME: 459 - calculate amount
-	// FIXME: 459 - fill locktime
-	// FIXME: 459 - add Data
 	return view
 }
 

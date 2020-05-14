@@ -28,8 +28,7 @@ type ConsensusFactory struct {
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 
-	privKey *transactions.SecretKey
-	pubKey  *transactions.PublicKey
+	pubKey *transactions.PublicKey
 	key.Keys
 	timerLength time.Duration
 
@@ -38,11 +37,10 @@ type ConsensusFactory struct {
 }
 
 // New returns an initialized ConsensusFactory.
-func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, privKey *transactions.SecretKey, pubKey *transactions.PublicKey, keys key.Keys, proxy transactions.Proxy) *ConsensusFactory {
+func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, pubKey *transactions.PublicKey, keys key.Keys, proxy transactions.Proxy) *ConsensusFactory {
 	return &ConsensusFactory{
 		eventBus:    eventBus,
 		rpcBus:      rpcBus,
-		privKey:     privKey,
 		pubKey:      pubKey,
 		Keys:        keys,
 		timerLength: timerLength,
@@ -56,7 +54,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	gen := generation.NewFactory()
-	cgen := candidate.NewFactory(c.ctx, c.eventBus, c.rpcBus, c.privKey, c.pubKey, c.proxy)
+	cgen := candidate.NewFactory(c.ctx, c.eventBus, c.rpcBus, c.pubKey)
 	sgen := score.NewFactory(c.ctx, c.eventBus, c.Keys, nil, c.proxy)
 	sel := selection.NewFactory(c.ctx, c.eventBus, c.timerLength, c.proxy)
 	redFirstStep := firststep.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)

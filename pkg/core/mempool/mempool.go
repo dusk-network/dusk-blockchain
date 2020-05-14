@@ -392,20 +392,24 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 // uType translates the node.TxType into transactions.TxType
 func uType(t node.TxType) (transactions.TxType, error) {
 	switch t {
-	case node.TxType_COINBASE:
+	case node.TxType_STANDARD:
+		return transactions.Tx, nil
+	case node.TxType_DISTRIBUTE:
 		return transactions.Distribute, nil
 	case node.TxType_BID:
 		return transactions.Bid, nil
 	case node.TxType_STAKE:
 		return transactions.Stake, nil
-	case node.TxType_STANDARD:
-		return transactions.Tx, nil
-	case node.TxType_TIMELOCK:
-		return transactions.Tx, errors.New("Unsupported type")
-	case node.TxType_CONTRACT:
-		return transactions.Tx, nil
+	case node.TxType_WITHDRAWFEES:
+		return transactions.WithdrawFees, nil
+	case node.TxType_WITHDRAWSTAKE:
+		return transactions.WithdrawStake, nil
+	case node.TxType_WITHDRAWBID:
+		return transactions.WithdrawBid, nil
+	case node.TxType_SLASH:
+		return transactions.Slash, nil
 	default:
-		return transactions.Tx, nil
+		return transactions.Tx, errors.New("unknown transaction type")
 	}
 }
 

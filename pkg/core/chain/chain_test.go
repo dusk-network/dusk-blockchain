@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -20,6 +22,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	assert "github.com/stretchr/testify/require"
 )
 
@@ -173,16 +176,16 @@ func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 	}()
 }
 
-//func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user.Provisioners) *block.Certificate {
-//	votes := message.GenVotes(hash, round, 3, keys, p)
-//	return &block.Certificate{
-//		StepOneBatchedSig: votes[0].Signature.Compress(),
-//		StepTwoBatchedSig: votes[1].Signature.Compress(),
-//		Step:              1,
-//		StepOneCommittee:  votes[0].BitSet,
-//		StepTwoCommittee:  votes[1].BitSet,
-//	}
-//}
+func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user.Provisioners) *block.Certificate {
+	votes := message.GenVotes(hash, round, 3, keys, p)
+	return &block.Certificate{
+		StepOneBatchedSig: votes[0].Signature.Compress(),
+		StepTwoBatchedSig: votes[1].Signature.Compress(),
+		Step:              1,
+		StepOneCommittee:  votes[0].BitSet,
+		StepTwoCommittee:  votes[1].BitSet,
+	}
+}
 
 func createLoader() *DBLoader {
 	_, db := heavy.CreateDBConnection()
@@ -213,66 +216,43 @@ func TestFetchTip(t *testing.T) {
 }
 
 func TestRebuildChain(t *testing.T) {
-	// FIXME: 417 - rework this as soon as we have a viable block to mock Genesis
-	/*
-		eb, rb, c := setupChainTest(t, true)
-		catchClearWalletDatabaseRequest(rb)
-		go c.Listen()
+	eb, rb, c := setupChainTest(0, true)
+	go c.Listen()
+	catchClearWalletDatabaseRequest(rb)
 
-		// Listen for `StopConsensus` messages
-		stopConsensusChan := make(chan message.Message, 1)
-		eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
+	// Listen for `StopConsensus` messages
+	stopConsensusChan := make(chan message.Message, 1)
+	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
 
-		// Add a block so that we have a bit of chain state
-		// to check against.
-		blk := mockAcceptableBlock(t, c.prevBlock)
+	// Add a block so that we have a bit of chain state
+	// to check against.
+	blk := mockAcceptableBlock(c.prevBlock)
 
-		assert.NoError(t, c.AcceptBlock(*blk))
+	assert.NoError(t, c.AcceptBlock(context.Background(), *blk))
 
-		// Chain prevBlock should now no longer be genesis
-		genesis := c.loader.(*DBLoader).genesis
-		//genesis := cfg.DecodeGenesis()
-		assert.False(t, genesis.Equals(&c.prevBlock))
+	// Chain prevBlock should now no longer be genesis
+	genesis := c.loader.(*DBLoader).genesis
+	//genesis := cfg.DecodeGenesis()
+	assert.False(t, genesis.Equals(&c.prevBlock))
 
-		// Let's manually update some of the in-memory state, as it is
-		// difficult to do this through mocked blocks in a test.
-		p, ks := consensus.MockProvisioners(5)
-		for _, k := range ks {
-			assert.NoError(t, c.addProvisioner(k.BLSPubKeyBytes, 50000, 1, 2000))
-		}
+	p, ks := consensus.MockProvisioners(10)
+	c.lastCertificate = createMockedCertificate(c.intermediateBlock.Header.Hash, 2, ks, p)
+	c.intermediateBlock = helper.RandomBlock(2, 2)
 
-		c.lastCertificate = createMockedCertificate(c.intermediateBlock.Header.Hash, 2, ks, p)
-		c.intermediateBlock = helper.RandomBlock(t, 2, 2)
-		bids := make(user.BidList, 0)
-		for i := 0; i < 3; i++ {
-			bid := createBid(t)
-			bids = append(bids, bid)
-			*c.bidList = append(*c.bidList, bid)
-		}
+	// Now, send a request to rebuild the chain
+	_, err := c.RebuildChain(context.Background(), &node.EmptyRequest{})
+	assert.NoError(t, err)
 
-		// Now, send a request to rebuild the chain
-		_, err := c.RebuildChain(context.Background(), &node.EmptyRequest{})
-		assert.NoError(t, err)
+	// We should be back at the genesis chain state
+	assert.True(t, genesis.Equals(&c.prevBlock))
 
-		// We should be back at the genesis chain state
-		assert.True(t, genesis.Equals(&c.prevBlock))
-		for _, k := range ks {
-			assert.Nil(t, c.p.GetMember(k.BLSPubKeyBytes))
-		}
+	assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
+	intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
+	assert.NoError(t, err)
+	assert.True(t, c.intermediateBlock.Equals(intermediateBlock))
 
-		assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
-		intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
-		assert.NoError(t, err)
-		assert.True(t, c.intermediateBlock.Equals(intermediateBlock))
-
-		for _, bid := range bids {
-			assert.False(t, c.bidList.Contains(bid))
-		}
-
-		// Ensure we got a `StopConsensus` message
-		<-stopConsensusChan
-	*/
-
+	// Ensure we got a `StopConsensus` message
+	<-stopConsensusChan
 }
 
 // mock a block which can be accepted by the chain.
@@ -282,12 +262,6 @@ func TestRebuildChain(t *testing.T) {
 func mockAcceptableBlock(prevBlock block.Block) *block.Block {
 	// Create block 1
 	blk := helper.RandomBlock(1, 1)
-	// Remove all txs except coinbase, as the helper transactions do not pass verification
-	blk.Txs = blk.Txs[0:1]
-	root, _ := blk.CalculateRoot()
-	blk.Header.TxRoot = root
-	hash, _ := blk.CalculateHash()
-	blk.Header.Hash = hash
 	// Add cert and prev hash
 	blk.Header.Certificate = block.EmptyCertificate()
 	blk.Header.PrevBlockHash = prevBlock.Header.Hash
@@ -310,4 +284,16 @@ func setupChainTest(startAtHeight uint64, includeGenesis bool) (*eventbus.EventB
 	}
 
 	return eb, rpc, c
+}
+
+func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
+	c := make(chan rpcbus.Request, 1)
+	if err := rb.Register(topics.ClearWalletDatabase, c); err != nil {
+		panic(err)
+	}
+
+	go func() {
+		r := <-c
+		r.RespChan <- rpcbus.NewResponse(nil, nil)
+	}()
 }

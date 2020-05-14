@@ -18,6 +18,7 @@ import (
 
 var l = log.WithField("process", "BidAutomaton")
 
+// BidAutomaton is used to automate renewal of bids
 type BidAutomaton struct {
 	eventBroker eventbus.Broker
 	rpcBus      *rpcbus.RPCBus

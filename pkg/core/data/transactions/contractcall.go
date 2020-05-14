@@ -94,6 +94,11 @@ func (c *ContractTx) Fees() uint64 {
 	return c.Tx.Fees()
 }
 
+// StandardTx returns the underlying phoenix transaction
+func (c *ContractTx) StandardTx() *Transaction {
+	return c.Tx
+}
+
 // UContractTx is embedded by the ContractCall structs to facilitate copying
 // the transaction fields from rusk.Transaction into Transaction data
 func UContractTx(r *rusk.Transaction) (*ContractTx, error) {
@@ -114,11 +119,6 @@ func MarshalContractTx(r *bytes.Buffer, c ContractTx) error {
 func UnmarshalContractTx(r *bytes.Buffer, c *ContractTx) error {
 	c.Tx = new(Transaction)
 	return UnmarshalTransaction(r, c.Tx)
-}
-
-// StandardTx returns the underlying phoenix transaction
-func (t *ContractTx) StandardTx() *Transaction {
-	return t.Tx
 }
 
 // Equal tests two contract calls for equality
@@ -234,11 +234,7 @@ func DecodeContractCall(contractCall *rusk.ContractCallTx) (ContractCall, error)
 		}
 		return call, nil
 	case *rusk.ContractCallTx_Distribute:
-		call := new(DistributeTransaction)
-		if err := UDistribute(c.Distribute, call); err != nil {
-			return nil, err
-		}
-		return call, nil
+		return nil, errors.New("Distribute Transactions should be created within the node and not coming from RUSK")
 	case *rusk.ContractCallTx_WithdrawStake:
 		call := new(WithdrawStakeTransaction)
 		if err := UWithdrawStake(c.WithdrawStake, call); err != nil {

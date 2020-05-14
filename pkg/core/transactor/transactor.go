@@ -73,7 +73,10 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 	return t, nil
 }
 
+// Listen to the stake and bid channels and trigger a stake and bid transaction
+// requests
 func (t *Transactor) Listen() {
+	l := log.WithField("action", "listen")
 	for {
 		select {
 		case r := <-t.stakeChan:
@@ -82,14 +85,21 @@ func (t *Transactor) Listen() {
 				continue
 			}
 
-			t.Stake(context.Background(), req)
+			// QUESTION: should we return the hash of the transaction back to
+			// the client?
+			if _, err := t.Stake(context.Background(), req); err != nil {
+				l.WithError(err).Errorln("error in creating a stake transaction")
+			}
+
 		case r := <-t.bidChan:
 			req, ok := r.Params.(*node.BidRequest)
 			if !ok {
 				continue
 			}
 
-			t.Bid(context.Background(), req)
+			if _, err := t.Bid(context.Background(), req); err != nil {
+				l.WithError(err).Errorln("error in creating a bid transaction")
+			}
 		}
 	}
 }
