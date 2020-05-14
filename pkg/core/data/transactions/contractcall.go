@@ -35,6 +35,30 @@ const (
 	WithdrawBid
 )
 
+// String returns a human readable format for the transaction type
+func (t TxType) String() string {
+	switch t {
+	case Tx:
+		return "standard"
+	case Distribute:
+		return "coinbase"
+	case WithdrawFees:
+		return "fee-withdrawal"
+	case Bid:
+		return "bid"
+	case Stake:
+		return "stake"
+	case Slash:
+		return "slash"
+	case WithdrawStake:
+		return "stake-withdrawal"
+	case WithdrawBid:
+		return "bid-withdrawal"
+	default:
+		return "unknown"
+	}
+}
+
 // ContractCall is the transaction that embodies the execution parameter for a
 // smart contract method invocation
 type ContractCall interface {
@@ -44,6 +68,13 @@ type ContractCall interface {
 	// StandardTx is the underlying phoenix transaction carrying the
 	// transaction outputs and inputs
 	StandardTx() *Transaction
+
+	// Obfuscated return true if the TransactionOutputs consist of Obfuscated
+	// Notes, false if they are transparent
+	Obfuscated() bool
+
+	// Fees returns the fee for this transaction
+	Fees() uint64
 }
 
 // ContractTx is the embedded struct utilized to group operations on the
@@ -51,6 +82,16 @@ type ContractCall interface {
 // It is NOT a ContractCall implementation as Transaction is a type apart
 type ContractTx struct {
 	Tx *Transaction `protobuf:"bytes,1,opt,name=tx,proto3" json:"tx,omitempty"`
+}
+
+// Obfuscated returns true if the embedded standard transaction is confidential
+func (c *ContractTx) Obfuscated() bool {
+	return c.Tx.Obfuscated()
+}
+
+// Fees delegate the fee calculation to the embedded Standard Transaction
+func (c *ContractTx) Fees() uint64 {
+	return c.Tx.Fees()
 }
 
 // UContractTx is embedded by the ContractCall structs to facilitate copying

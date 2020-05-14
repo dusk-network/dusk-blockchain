@@ -308,6 +308,7 @@ func MockBidTx(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
 	return stx
 }
 
+// MockDeterministicBid creates a deterministic bid
 func MockDeterministicBid(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
 	stx := newBid()
 	// amount is set directly in the underlying ContractCallTx

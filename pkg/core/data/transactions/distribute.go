@@ -16,6 +16,19 @@ type DistributeTransaction struct {
 	BgPk                  *PublicKey `json:"bg_pk"`
 }
 
+// Obfuscated returns false for DistributeTransaction. We do not rely on the
+// embedded ContractTx.Obfuscated method since it is unclear whether a
+// (Transparent) Note will keep being available for coinbase transactions, as
+// they are the only ones created outside of RUSK
+func (t *DistributeTransaction) Obfuscated() bool {
+	return false
+}
+
+// Fees is zero for coinbase (it is the only transaction that carries 0 fees)
+func (t *DistributeTransaction) Fees() uint64 {
+	return uint64(0)
+}
+
 func newDistribute() *DistributeTransaction {
 	dt := new(DistributeTransaction)
 	dt.ContractTx = new(ContractTx)

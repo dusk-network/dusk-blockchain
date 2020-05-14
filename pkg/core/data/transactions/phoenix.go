@@ -14,7 +14,13 @@ type Transaction struct {
 	Outputs []*TransactionOutput `json:"outputs"`
 	Fee     *TransactionOutput   `json:"fee"`
 	Proof   []byte               `json:"proof"`
+	Data    []byte               `json:"data"`
 	hash    []byte
+}
+
+// Fees calculates the fees for this transaction
+func (t *Transaction) Fees() uint64 {
+	return t.Fee.Note.TransparentValue
 }
 
 // CalculateHash complies with merkletree.Payload interface
@@ -25,6 +31,11 @@ func (t *Transaction) CalculateHash() ([]byte, error) {
 	}
 
 	return hash.Sha3256(b.Bytes())
+}
+
+// Obfuscated returns whether this transaction is transparent or otherwise
+func (t *Transaction) Obfuscated() bool {
+	return t.Outputs[0].Note.NoteType == OBFUSCATED
 }
 
 // Type complies with ContractCall interface. Returns "Tx"
@@ -61,6 +72,8 @@ func MTx(r *rusk.Transaction, t *Transaction) error {
 
 	r.Proof = make([]byte, len(t.Proof))
 	copy(r.Proof, t.Proof)
+	r.Data = make([]byte, len(t.Data))
+	copy(r.Data, t.Data)
 	return nil
 }
 
@@ -87,6 +100,8 @@ func UTx(r *rusk.Transaction, t *Transaction) error {
 
 	t.Proof = make([]byte, len(r.Proof))
 	copy(t.Proof, r.Proof)
+	t.Data = make([]byte, len(r.Data))
+	copy(t.Data, r.Data)
 	return nil
 }
 
@@ -121,12 +136,15 @@ func MarshalTransaction(r *bytes.Buffer, t Transaction) error {
 	if err := encoding.WriteVarBytes(r, t.hash); err != nil {
 		return err
 	}
+
+	if err := encoding.WriteVarBytes(r, t.Data); err != nil {
+		return err
+	}
 	return nil
 }
 
 // UnmarshalTransaction from a buffer
 func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
-
 	nIn, eerr := encoding.ReadVarInt(r)
 	if eerr != nil {
 		return eerr
@@ -165,6 +183,9 @@ func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
 	}
 
 	if err := encoding.ReadVarBytes(r, &t.hash); err != nil {
+		return err
+	}
+	if err := encoding.ReadVarBytes(r, &t.Data); err != nil {
 		return err
 	}
 	return nil
