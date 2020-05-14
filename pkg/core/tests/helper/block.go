@@ -90,13 +90,6 @@ func RandomHeader(height uint64) *block.Header {
 	return h
 }
 
-// GenesisMock should mock a valid genesis block. For now, it just creates a
-// random block, but this should change to a more sophisticated Genesis
-// FIXME: 417 - create a believable Genesis block
-func GenesisMock(t *testing.T, txNr uint16) *block.Block {
-	return RandomBlock(0, txNr)
-}
-
 // RandomBLSSignature returns a valid BLS Signature of a bogus message
 func RandomBLSSignature() []byte {
 	msg := "this is a test"
