@@ -64,6 +64,17 @@ func (p PermissiveProvisioner) NewWithdrawFeesTx(context.Context, []byte, []byte
 	return WithdrawFeesTransaction{}, nil
 }
 
+type MockBlockGenerator struct{}
+
+func (b MockBlockGenerator) GenerateScore(context.Context, ScoreRequest) (Score, error) {
+	return Score{}, nil
+}
+
+func (b MockBlockGenerator) NewDistributeTx(context.Context, uint64, [][]byte, TxRequest) (DistributeTransaction, error) {
+	_, pk := MockKeys()
+	return *MockDistributeTx(2000000, [][]byte{[]byte{1, 2, 3}}, *pk), nil
+}
+
 // MockProxy mocks a proxy for ease of testing
 type MockProxy struct {
 	P  Provisioner
@@ -245,8 +256,8 @@ func RandDistributeTx(reward uint64, provisionerNr int) *DistributeTransaction {
 
 // MockDistributeTx creates a DistributeTransaction
 func MockDistributeTx(reward uint64, provisioners [][]byte, bgPk PublicKey) *DistributeTransaction {
-	dtx := newDistribute()
-	rtx := mockRuskTx(reward, RandUint64(), false, Rand32Bytes())
+	dtx := NewDistribute()
+	rtx := mockRuskTx(reward, 0, false, make([]byte, 24))
 	if err := UTx(rtx, dtx.Tx); err != nil {
 		panic(err)
 	}

@@ -29,27 +29,24 @@ const MaxTxSetSize = 150000
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator struct {
-	publisher  eventbus.Publisher
-	genPrivKey *transactions.SecretKey
-	genPubKey  *transactions.PublicKey
-	rpcBus     *rpcbus.RPCBus
-	signer     consensus.Signer
+	publisher eventbus.Publisher
+	genPubKey *transactions.PublicKey
+	rpcBus    *rpcbus.RPCBus
+	signer    consensus.Signer
 
 	roundInfo    consensus.RoundUpdate
 	scoreEventID uint32
 
-	gen transactions.BlockGenerator
 	ctx context.Context
 }
 
 // NewComponent returns an uninitialized candidate generator.
-func NewComponent(ctx context.Context, publisher eventbus.Publisher, genPrivKey *transactions.SecretKey, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus, gen transactions.BlockGenerator) *Generator {
+func NewComponent(ctx context.Context, publisher eventbus.Publisher, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
 	return &Generator{
-		publisher:  publisher,
-		rpcBus:     rpcBus,
-		genPrivKey: genPrivKey,
-		genPubKey:  genPubKey,
-		gen:        gen,
+		publisher: publisher,
+		rpcBus:    rpcBus,
+		genPubKey: genPubKey,
+		ctx:       ctx,
 	}
 }
 
@@ -226,18 +223,17 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
 func (bg *Generator) constructCoinbaseTx(keys [][]byte) (*transactions.DistributeTransaction, error) {
-	ctx, cancel := context.WithDeadline(bg.ctx, time.Now().Add(500*time.Millisecond))
-	defer cancel()
-
 	// TODO: what do we set as reward?
 	// TODO: should the reward be a matter of configuration or should it be
 	// dynamic?
-	txReq := transactions.MakeGenesisTxRequest(*bg.genPrivKey, config.GeneratorReward, 100, false)
-	// FIXME: fetch reward somehow
-	dTx, err := bg.gen.NewDistributeTx(ctx, 100000000000, keys, txReq)
-	if err != nil {
-		return nil, err
-	}
+	dtx := transactions.NewDistribute()
+	output := transactions.MockTransparentOutput(config.GeneratorReward, make([]byte, 24))
+	dtx.Tx.Outputs = []*transactions.TransactionOutput{&output}
+	dtx.Tx.Inputs = make([]*transactions.TransactionInput, 0)
+	fee := transactions.MockTransparentOutput(0, make([]byte, 24))
+	dtx.Tx.Fee = &fee
 
-	return &dTx, nil
+	dtx.ProvisionersAddresses = keys
+	dtx.BgPk = bg.genPubKey
+	return dtx, nil
 }

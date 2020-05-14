@@ -277,7 +277,6 @@ func TestFetchBlockTxs(test *testing.T) {
 
 			// Fetch all transactions that belong to this block
 			fblockTxs, err := t.FetchBlockTxs(block.Header.Hash)
-
 			if err != nil {
 				test.Fatalf(err.Error())
 			}
