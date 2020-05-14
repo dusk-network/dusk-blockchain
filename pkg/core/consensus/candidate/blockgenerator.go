@@ -227,18 +227,22 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
 func (bg *Generator) constructCoinbaseTx(keys [][]byte) (*transactions.DistributeTransaction, error) {
-	ctx, cancel := context.WithDeadline(bg.ctx, time.Now().Add(500*time.Millisecond))
-	defer cancel()
-
 	// TODO: what do we set as reward?
 	// TODO: should the reward be a matter of configuration or should it be
 	// dynamic?
-	txReq := transactions.MakeGenesisTxRequest(*bg.genPrivKey, config.GeneratorReward, 100, false)
-	// FIXME: fetch reward somehow
-	dTx, err := bg.gen.NewDistributeTx(ctx, 100000000000, keys, txReq)
-	if err != nil {
-		return nil, err
-	}
-
-	return &dTx, nil
+	return &transactions.DistributeTransaction{
+		ContractTx: &transactions.ContractTx{
+			Tx: &transactions.Transaction{
+				Outputs: []*transactions.TransactionOutput{
+					&transactions.TransactionOutput{
+						Note: &transactions.Note{
+							TransparentValue: config.GeneratorReward,
+						},
+					},
+				},
+			},
+		},
+		ProvisionersAddresses: keys,
+		BgPk:                  bg.genPubKey,
+	}, nil
 }
