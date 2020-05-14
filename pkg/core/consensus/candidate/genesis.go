@@ -14,12 +14,11 @@ import (
 // GenerateGenesisBlock is a developer utility for regenerating the genesis block
 // as they would be different per network type. Once a genesis block is
 // approved, its hex blob should be copied into config.TestNetGenesisBlob
-func GenerateGenesisBlock(rb *rpcbus.RPCBus, genPrivKey *transactions.SecretKey, generatorPubKey *transactions.PublicKey) (string, error) {
+func GenerateGenesisBlock(rb *rpcbus.RPCBus, generatorPubKey *transactions.PublicKey) (string, error) {
 	g := &Generator{
-		rpcBus:     rb,
-		genPrivKey: genPrivKey,
-		genPubKey:  generatorPubKey,
-		ctx:        context.Background(),
+		rpcBus:    rb,
+		genPubKey: generatorPubKey,
+		ctx:       context.Background(),
 	}
 
 	// TODO: do we need to generate correct proof and score

@@ -28,18 +28,6 @@ func TestGenerateGenesis(t *testing.T) {
 	if _, err := rand.Read(seed); err != nil {
 		t.Fatal(err.Error())
 	}
-	sk := "b201b3b64c30f5cf6980f50c30b73e6d1352f08846fe5546282d84a827509409e83d98da3509ec2f7985e3899e575509101ec4b1db1f898be9c73868e4c8a107"
-	skBytes, err := hex.DecodeString(sk)
-	require.Nil(t, err)
-
-	secretKey := &transactions.SecretKey{
-		A: &transactions.Scalar{
-			Data: skBytes[0:32],
-		},
-		B: &transactions.Scalar{
-			Data: skBytes[32:64],
-		},
-	}
 
 	pk := "61c36e407ac91f20174572eec95f692f5cff1c40bacd1b9f86c7fa7202e93bb6753c2f424caf3c9220876e8cfe0afdff7ffd7c984d5c7d95fa0b46cf3781d883"
 	pkBytes, err := hex.DecodeString(pk)
@@ -55,7 +43,7 @@ func TestGenerateGenesis(t *testing.T) {
 	}
 
 	// Generate a new genesis block with new wallet pubkey
-	genesisHex, err := GenerateGenesisBlock(rpcBus, secretKey, publicKey)
+	genesisHex, err := GenerateGenesisBlock(rpcBus, publicKey)
 	if err != nil {
 		fmt.Println(err)
 		t.Fatalf("expecting valid genesis block")

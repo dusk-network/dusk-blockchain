@@ -29,28 +29,24 @@ const MaxTxSetSize = 150000
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator struct {
-	publisher  eventbus.Publisher
-	genPrivKey *transactions.SecretKey
-	genPubKey  *transactions.PublicKey
-	rpcBus     *rpcbus.RPCBus
-	signer     consensus.Signer
+	publisher eventbus.Publisher
+	genPubKey *transactions.PublicKey
+	rpcBus    *rpcbus.RPCBus
+	signer    consensus.Signer
 
 	roundInfo    consensus.RoundUpdate
 	scoreEventID uint32
 
-	gen transactions.BlockGenerator
 	ctx context.Context
 }
 
 // NewComponent returns an uninitialized candidate generator.
-func NewComponent(ctx context.Context, publisher eventbus.Publisher, genPrivKey *transactions.SecretKey, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus, gen transactions.BlockGenerator) *Generator {
+func NewComponent(ctx context.Context, publisher eventbus.Publisher, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
 	return &Generator{
-		publisher:  publisher,
-		rpcBus:     rpcBus,
-		genPrivKey: genPrivKey,
-		genPubKey:  genPubKey,
-		gen:        gen,
-		ctx:        ctx,
+		publisher: publisher,
+		rpcBus:    rpcBus,
+		genPubKey: genPubKey,
+		ctx:       ctx,
 	}
 }
 
