@@ -11,7 +11,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
 	assert "github.com/stretchr/testify/require"
 )
 
