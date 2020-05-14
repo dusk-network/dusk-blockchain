@@ -42,8 +42,7 @@ func TestGenerateGenesis(t *testing.T) {
 	// Generate a new genesis block with new wallet pubkey
 	genesisHex, err := GenerateGenesisBlock(rpcBus, publicKey)
 	if err != nil {
-		fmt.Println(err)
-		t.Fatalf("expecting valid genesis block")
+		t.Fatalf("expecting valid genesis block: %s", err.Error())
 	}
 
 	// Decode the result hex value to ensure it's a valid block
