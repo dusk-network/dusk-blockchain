@@ -17,9 +17,6 @@ import (
 )
 
 func TestGenerateGenesis(t *testing.T) {
-	// FIXME: 417 - KEYS the key generation from the SEED uses rusk atm. Also, the
-	// genesis needs to be regenerated accordingly. This test should be
-	// adjusted to become an integration test
 	rpcBus := rpcbus.New()
 
 	go provideMempoolTxs(rpcBus)
