@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -19,6 +20,11 @@ func RandomBlock(height uint64, txBatchCount uint16) *block.Block {
 		Header: RandomHeader(height),
 		Txs:    transactions.RandContractCalls(int(txBatchCount), 0, true),
 	}
+
+	// Append a coinbase to the end, like a valid block should
+	dist := transactions.RandDistributeTx(config.GeneratorReward, 2)
+	b.Txs = append(b.Txs, dist)
+
 	hash, err := b.CalculateHash()
 	if err != nil {
 		panic(err)
