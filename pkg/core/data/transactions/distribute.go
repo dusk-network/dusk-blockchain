@@ -16,7 +16,7 @@ type DistributeTransaction struct {
 	BgPk                  *PublicKey `json:"bg_pk"`
 }
 
-func newDistribute() *DistributeTransaction {
+func NewDistribute() *DistributeTransaction {
 	dt := new(DistributeTransaction)
 	dt.ContractTx = new(ContractTx)
 	dt.ContractTx.Tx = new(Transaction)

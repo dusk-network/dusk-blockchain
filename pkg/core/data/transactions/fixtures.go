@@ -258,7 +258,7 @@ func RandDistributeTx(reward uint64, provisionerNr int) *DistributeTransaction {
 
 // MockDistributeTx creates a DistributeTransaction
 func MockDistributeTx(reward uint64, provisioners [][]byte, bgPk PublicKey) *DistributeTransaction {
-	dtx := newDistribute()
+	dtx := NewDistribute()
 	rtx := mockRuskTx(reward, RandUint64(), false, Rand32Bytes())
 	if err := UTx(rtx, dtx.Tx); err != nil {
 		panic(err)

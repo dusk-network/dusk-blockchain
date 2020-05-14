@@ -226,19 +226,14 @@ func (bg *Generator) constructCoinbaseTx(keys [][]byte) (*transactions.Distribut
 	// TODO: what do we set as reward?
 	// TODO: should the reward be a matter of configuration or should it be
 	// dynamic?
-	return &transactions.DistributeTransaction{
-		ContractTx: &transactions.ContractTx{
-			Tx: &transactions.Transaction{
-				Outputs: []*transactions.TransactionOutput{
-					&transactions.TransactionOutput{
-						Note: &transactions.Note{
-							TransparentValue: config.GeneratorReward,
-						},
-					},
-				},
-			},
-		},
-		ProvisionersAddresses: keys,
-		BgPk:                  bg.genPubKey,
-	}, nil
+	dtx := transactions.NewDistribute()
+	output := transactions.MockTransparentOutput(config.GeneratorReward, make([]byte, 24))
+	dtx.Tx.Outputs = []*transactions.TransactionOutput{&output}
+	dtx.Tx.Inputs = make([]*transactions.TransactionInput, 0)
+	fee := transactions.MockTransparentOutput(0, make([]byte, 24))
+	dtx.Tx.Fee = &fee
+
+	dtx.ProvisionersAddresses = keys
+	dtx.BgPk = bg.genPubKey
+	return dtx, nil
 }
