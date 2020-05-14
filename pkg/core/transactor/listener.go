@@ -29,7 +29,7 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	}
 
 	//create wallet with seed and pass
-	err := t.createWallet(req.Seed, req.Password)
+	err := t.createWallet(nil, req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -100,16 +100,12 @@ func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadRe
 		return nil, errWalletAlreadyLoaded
 	}
 
-	ctx := context.Background()
-	records, err := t.walletClient.CreateFromSeed(ctx, &node.CreateRequest{Password: req.Password, Seed: req.Seed})
-	if err != nil {
-		return nil, err
-	}
+	err := t.createWallet(req.Seed, req.Password)
 
 	// TODO: will this still make sense after migration?
 	// t.launchConsensus()
 
-	return records, nil
+	return loadResponseFromPub(t.w.PublicKey), err
 }
 
 func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionResponse, error) {
@@ -213,14 +209,14 @@ func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
 	// NOTE: maybe we will separate the locked and unlocked balances
 	// This call should be updated in that case
 	ctx := context.Background()
-	balanceResponse, err := t.walletClient.GetBalance(ctx, &node.EmptyRequest{})
+	balance, err := t.provider.GetBalance(ctx, t.w.ViewKey)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Tracef("wallet balance: %d, mempool balance: %d", balanceResponse.UnlockedBalance, balanceResponse.LockedBalance)
+	log.Tracef("wallet balance: %d, mempool balance: %d", balance, 0)
 
-	return &node.BalanceResponse{UnlockedBalance: balanceResponse.UnlockedBalance, LockedBalance: balanceResponse.LockedBalance}, nil
+	return &node.BalanceResponse{UnlockedBalance: balance, LockedBalance: 0}, nil
 }
 
 func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) {
