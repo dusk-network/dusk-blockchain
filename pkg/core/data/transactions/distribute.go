@@ -37,6 +37,7 @@ func NewDistribute(reward uint64, provisioners [][]byte, bgPk PublicKey) *Distri
 	dt.ContractTx = new(ContractTx)
 	dt.ContractTx.Tx = new(Transaction)
 	dt.ContractTx.Tx.Outputs = make([]*TransactionOutput, 1)
+	dt.ContractTx.Tx.Outputs[0] = new(TransactionOutput)
 	dt.ContractTx.Tx.Outputs[0].Note = new(Note)
 	dt.ContractTx.Tx.Outputs[0].Note.TransparentValue = reward
 	dt.ProvisionersAddresses = provisioners
@@ -108,7 +109,8 @@ func UnmarshalDistribute(r *bytes.Buffer, s *DistributeTransaction) error {
 	s.ContractTx = new(ContractTx)
 	s.ContractTx.Tx = new(Transaction)
 	s.ContractTx.Tx.Outputs = make([]*TransactionOutput, 1)
-	s.ContractTx.Tx.Outputs[0] = &TransactionOutput{Note: new(Note)}
+	s.ContractTx.Tx.Outputs[0] = new(TransactionOutput)
+	s.ContractTx.Tx.Outputs[0].Note = new(Note)
 
 	if err := encoding.ReadUint64LE(r, &s.ContractTx.Tx.Outputs[0].Note.TransparentValue); err != nil {
 		return err
