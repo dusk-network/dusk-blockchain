@@ -12,16 +12,18 @@ import (
 
 var testnet = byte(2)
 
-func (t *Transactor) createWallet(seedBytes []byte, password string) error {
+func (t *Transactor) createWallet(seed []byte, password string) error {
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
 		return err
 	}
 
-	seed, err := wallet.GenerateNewSeed(nil)
-	if err != nil {
-		return err
+	if seed == nil {
+		seed, err = wallet.GenerateNewSeed(nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	sk, pk, vk, err := t.keyMaster.GenerateSecretKey(context.Background(), seed)

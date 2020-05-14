@@ -6,7 +6,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -32,17 +31,14 @@ type Transactor struct { // TODO: rename
 
 	secretKey transactions.SecretKey
 
-	//ruskClient       rusk.RuskClient
-	provider         transactions.Provider
-	keyMaster        transactions.KeyMaster
-	walletClient     node.WalletClient
-	transactorClient node.TransactorClient
+	provider  transactions.Provider
+	keyMaster transactions.KeyMaster
 
 	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, client *rpc.Client, provider transactions.Provider, keyMaster transactions.KeyMaster) (*Transactor, error) {
+func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, provider transactions.Provider, keyMaster transactions.KeyMaster) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -56,11 +52,8 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 		rb:        rb,
 		stakeChan: stakeChan,
 		bidChan:   bidChan,
-		//ruskClient:       client.RuskClient,
-		walletClient:     client.WalletClient,
-		transactorClient: client.TransactorClient,
-		keyMaster:        keyMaster,
-		provider:         provider,
+		keyMaster: keyMaster,
+		provider:  provider,
 	}
 
 	if srv != nil {
