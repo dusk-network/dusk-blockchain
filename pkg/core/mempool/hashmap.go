@@ -54,7 +54,7 @@ func (m *HashMap) Put(t TxDesc) error {
 	// sort keys by Fee
 	// Bulk sort like (sort.Slice) performs a few times slower than
 	// a simple binarysearch&shift algorithm.
-	fee := t.tx.StandardTx().Fee.Value
+	_, fee := t.tx.Values()
 
 	index := sort.Search(len(m.sorted), func(i int) bool {
 		return m.sorted[i].f < fee
