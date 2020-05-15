@@ -74,25 +74,17 @@ func (t TxRecord) View() TxView {
 		Type:       t.Transaction.Type(),
 		Hash:       h,
 		Obfuscated: t.Transaction.Obfuscated(),
-		Fee:        t.Transaction.Fees(),
 	}
+
+	view.Amount, view.Fee = t.Transaction.Values()
 
 	switch tx := t.Transaction.(type) {
 	case *transactions.BidTransaction:
 		view.Timelock = tx.ExpirationHeight
 	case *transactions.StakeTransaction:
-		view.Amount = tx.Amount()
 		view.Timelock = tx.ExpirationHeight
 	case *transactions.Transaction:
-		if !tx.Obfuscated() {
-			// loop on the Outputs
-			for _, out := range tx.Outputs {
-				view.Amount += out.Note.TransparentValue
-			}
-		}
 		view.Data = tx.Data
-	case *transactions.DistributeTransaction:
-		view.Amount = tx.TotalReward()
 	}
 
 	return view

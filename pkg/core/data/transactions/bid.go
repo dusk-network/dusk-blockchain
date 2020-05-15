@@ -24,15 +24,17 @@ type BidTransaction struct {
 // MarshalJSON provides a json-encoded readable representation of a
 // BidTransaction
 func (t *BidTransaction) MarshalJSON() ([]byte, error) {
+	// type aliasing allows to work around stack overflow of recursive JSON
+	// marshaling
+	type Alias BidTransaction
+
 	h, _ := t.CalculateHash()
 	return json.Marshal(struct {
-		*BidTransaction
-		Type string `json:"tx-type"`
-		Hash string `json:"hash"`
+		*Alias
+		jsonMarshalable
 	}{
-		BidTransaction: t,
-		Type:           string(t.Type()),
-		Hash:           string(h),
+		Alias:           (*Alias)(t),
+		jsonMarshalable: newJSONMarshalable(t.Type(), h),
 	})
 }
 
@@ -180,15 +182,17 @@ type WithdrawBidTransaction struct {
 // MarshalJSON provides a json-encoded readable representation of a
 // WithdrawBidTransaction
 func (t *WithdrawBidTransaction) MarshalJSON() ([]byte, error) {
+	// type aliasing allows to work around stack overflow of recursive JSON
+	// marshaling
+	type Alias WithdrawBidTransaction
+
 	h, _ := t.CalculateHash()
 	return json.Marshal(struct {
-		*WithdrawBidTransaction
-		Type string `json:"tx-type"`
-		Hash string `json:"hash"`
+		*Alias
+		jsonMarshalable
 	}{
-		WithdrawBidTransaction: t,
-		Type:                   string(t.Type()),
-		Hash:                   string(h),
+		Alias:           (*Alias)(t),
+		jsonMarshalable: newJSONMarshalable(t.Type(), h),
 	})
 }
 

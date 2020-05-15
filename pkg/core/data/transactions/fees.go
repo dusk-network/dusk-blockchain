@@ -20,17 +20,19 @@ type WithdrawFeesTransaction struct {
 }
 
 // MarshalJSON provides a json-encoded readable representation of a
-// WithdrawFees
+// WithdrawFeesTransaction
 func (t *WithdrawFeesTransaction) MarshalJSON() ([]byte, error) {
+	// type aliasing allows to work around stack overflow of recursive JSON
+	// marshaling
+	type Alias WithdrawFeesTransaction
+
 	h, _ := t.CalculateHash()
 	return json.Marshal(struct {
-		*WithdrawFeesTransaction
-		Type string `json:"tx-type"`
-		Hash string `json:"hash"`
+		*Alias
+		jsonMarshalable
 	}{
-		WithdrawFeesTransaction: t,
-		Type:                    string(t.Type()),
-		Hash:                    string(h),
+		Alias:           (*Alias)(t),
+		jsonMarshalable: newJSONMarshalable(t.Type(), h),
 	})
 }
 

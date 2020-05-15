@@ -35,6 +35,24 @@ const (
 	WithdrawBid
 )
 
+// MarshalJSON representation of a TxType
+func (t TxType) MarshalJSON() ([]byte, error) {
+	return []byte(string(t)), nil
+}
+
+// StringToTxType is a conversion map from string representation of TxType to
+// its actual type
+var StringToTxType = map[string]TxType{
+	"standard":         Tx,
+	"coinbase":         Distribute,
+	"fee-withdrawal":   WithdrawFees,
+	"bid":              Bid,
+	"stake":            Stake,
+	"slash":            Slash,
+	"stake-withdrawal": WithdrawStake,
+	"bid-withdrawal":   WithdrawBid,
+}
+
 // String returns a human readable format for the transaction type
 func (t TxType) String() string {
 	switch t {
@@ -73,8 +91,22 @@ type ContractCall interface {
 	// Notes, false if they are transparent
 	Obfuscated() bool
 
-	// Fees returns the fee for this transaction
-	Fees() uint64
+	// Values returns a tuple where the first element is the sum of all transparent
+	// outputs' note values and the second is the fee
+	Values() (amount uint64, fee uint64)
+}
+
+// jsonMarshalable reduce code duplication for JSON Marshaling
+type jsonMarshalable struct {
+	Type string `json:"tx-type"`
+	Hash string `json:"hash"`
+}
+
+func newJSONMarshalable(t TxType, hash []byte) jsonMarshalable {
+	return jsonMarshalable{
+		Type: string(t),
+		Hash: string(hash),
+	}
 }
 
 // ContractTx is the embedded struct utilized to group operations on the
@@ -89,9 +121,9 @@ func (c *ContractTx) Obfuscated() bool {
 	return c.Tx.Obfuscated()
 }
 
-// Fees delegate the fee calculation to the embedded Standard Transaction
-func (c *ContractTx) Fees() uint64 {
-	return c.Tx.Fees()
+// Values returns the transparent amount and the fee for this transaction
+func (c *ContractTx) Values() (uint64, uint64) {
+	return c.Tx.Values()
 }
 
 // StandardTx returns the underlying phoenix transaction
