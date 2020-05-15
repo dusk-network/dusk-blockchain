@@ -499,7 +499,7 @@ func (t transaction) FetchCurrentHeight() (uint64, error) {
 	return header.Height, nil
 }
 
-func (t transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
+func (t transaction) StoreBidValues(d, k, edPk []byte, lockTime uint64) error {
 	// First, delete the old values (if any)
 	heightBytes := make([]byte, 8)
 	currentHeight, err := t.FetchCurrentHeight()
@@ -512,11 +512,11 @@ func (t transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
 	// we can not know beforehand when a bid transaction is accepted.
 	binary.LittleEndian.PutUint64(heightBytes, lockTime+currentHeight)
 	key := append(BidValuesPrefix, heightBytes...)
-	t.put(key, append(d, k...))
+	t.put(key, append(d, append(k, edPk...)...))
 	return nil
 }
 
-func (t transaction) FetchBidValues() ([]byte, []byte, error) {
+func (t transaction) FetchBidValues() ([]byte, []byte, []byte, error) {
 	key := BidValuesPrefix
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
 	defer iterator.Release()
@@ -546,15 +546,19 @@ func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 	}
 
 	if err := iterator.Error(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Let's avoid any runtime panics by doing a sanity check on the value length before
-	if len(value) != 64 {
-		return nil, nil, errors.New("bid values non-existent or incorrectly encoded")
+	if len(value) != 96 {
+		return nil, nil, nil, errors.New("bid values non-existent or incorrectly encoded")
 	}
 
-	return value[0:32], value[32:64], nil
+	D := value[0:32]
+	K := value[32:64]
+	EdPk := value[64:96]
+
+	return D, K, EdPk, nil
 }
 
 // FetchBlockHeightSince uses binary search to find a block height

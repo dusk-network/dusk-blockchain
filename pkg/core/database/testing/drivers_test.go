@@ -667,27 +667,31 @@ func TestStoreFetchBidValues(test *testing.T) {
 
 	d1, _ := crypto.RandEntropy(32)
 	k1, _ := crypto.RandEntropy(32)
+	edPk1, _ := crypto.RandEntropy(32)
+
 	d2, _ := crypto.RandEntropy(32)
 	k2, _ := crypto.RandEntropy(32)
+	edPk2, _ := crypto.RandEntropy(32)
 
 	// Store bid values at different heights
 	assert.NoError(test, db.Update(func(t database.Transaction) error {
-		if err := t.StoreBidValues(d1, k1, 1000); err != nil {
+		if err := t.StoreBidValues(d1, k1, edPk1, 1000); err != nil {
 			return err
 		}
 
-		return t.StoreBidValues(d2, k2, 2000)
+		return t.StoreBidValues(d2, k2, edPk2, 2000)
 	}))
 
 	// Fetching bid values should give us d1 and k1 right now
 	assert.NoError(test, db.View(func(t database.Transaction) error {
-		d, k, err := t.FetchBidValues()
+		d, k, EdPk, err := t.FetchBidValues()
 		if err != nil {
 			return err
 		}
 
 		assert.Equal(test, d1, d)
 		assert.Equal(test, k1, k)
+		assert.Equal(test, edPk1, EdPk)
 		return nil
 	}))
 
@@ -699,13 +703,14 @@ func TestStoreFetchBidValues(test *testing.T) {
 
 	// Fetching bid values now should give us d2 and k2
 	assert.NoError(test, db.View(func(t database.Transaction) error {
-		d, k, err := t.FetchBidValues()
+		d, k, EdPk, err := t.FetchBidValues()
 		if err != nil {
 			return err
 		}
 
 		assert.Equal(test, d2, d)
 		assert.Equal(test, k2, k)
+		assert.Equal(test, edPk2, EdPk)
 		return nil
 	}))
 }

@@ -43,9 +43,7 @@ func (f *Factory) Instantiate() consensus.Component {
 	var d, k, edPk []byte
 	err := f.db.View(func(t database.Transaction) error {
 		var err error
-		// FIXME: 476 - change the FetchBidValues to return EdPK as well
-		// d, k, edPk, err = t.FetchBidValues()
-		d, k, err = t.FetchBidValues()
+		d, k, edPk, err = t.FetchBidValues()
 		return err
 	})
 

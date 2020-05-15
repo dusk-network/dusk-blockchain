@@ -122,8 +122,7 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 
 	txReq := transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, true)
 	// FIXME: 476 - here we need to create K, EdPk; retrieve seed somehow and decide
-	// an ExpirationHeight (most likely the last 2 should be retrieved from he
-	// DB)
+	// an ExpirationHeight (most likely the last 2 should be retrieved from he DB)
 	// Create the Ed25519 Keypair
 	tx, err := t.provider.NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
 	if err != nil {
