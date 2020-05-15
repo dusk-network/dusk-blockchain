@@ -65,9 +65,8 @@ var genBlock = `
 }
 `
 
-
 // Action prints a genesis
 func Action(c *cli.Context) error {
-
+	fmt.Println(genBlock)
 	return nil
 }
