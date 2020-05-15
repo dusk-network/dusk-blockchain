@@ -15,10 +15,10 @@ type NodeClient struct {
 	dialTimeout      int64
 	WalletClient     node.WalletClient
 	TransactorClient node.TransactorClient
-	MaintainerClient node.MaintainerClient
-	ChainClient      node.ChainClient
-	MempoolClient    node.MempoolClient
-	conn             *grpc.ClientConn
+	//MaintainerClient node.MaintainerClient
+	ChainClient   node.ChainClient
+	MempoolClient node.MempoolClient
+	conn          *grpc.ClientConn
 }
 
 // NewNodeClient returns a nodeClient with fixed dialTimeout of 5s
@@ -91,7 +91,7 @@ func (c *NodeClient) Connect(conf rpcConfiguration) error {
 	c.conn = conn
 	c.WalletClient = node.NewWalletClient(conn)
 	c.TransactorClient = node.NewTransactorClient(conn)
-	c.MaintainerClient = node.NewMaintainerClient(conn)
+	//c.MaintainerClient = node.NewMaintainerClient(conn)
 	c.ChainClient = node.NewChainClient(conn)
 	c.MempoolClient = node.NewMempoolClient(conn)
 

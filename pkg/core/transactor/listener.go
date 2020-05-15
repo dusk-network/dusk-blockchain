@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	log = logger.WithFields(logger.Fields{"prefix": "transactor"}) //nolint
+	log = logger.WithField("prefix", "transactor") //nolint
 
 	errWalletNotLoaded     = errors.New("wallet is not loaded yet") //nolint
 	errWalletAlreadyLoaded = errors.New("wallet is already loaded") //nolint
@@ -62,17 +62,18 @@ func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
 	resp := &node.TxHistoryResponse{Records: []*node.TxRecord{}}
 
 	for i, record := range records {
-		var amount uint64
-		for _, v := range record.StandardTx().Outputs {
-			amount += v.Value
-		}
-		// FIXME: 459 lockheight is included in the TxRecord struct
+		view := record.View()
 		resp.Records[i] = &node.TxRecord{
-			Direction: node.Direction(record.Direction),
-			Timestamp: record.Timestamp,
-			Height:    record.Height,
-			Type:      node.TxType(record.TxType),
-			Amount:    amount,
+			Height:       view.Height,
+			Timestamp:    view.Timestamp,
+			Direction:    node.Direction(view.Direction),
+			Type:         node.TxType(int32(view.Type)),
+			Amount:       view.Amount,
+			Fee:          view.Fee,
+			UnlockHeight: view.Timelock,
+			Hash:         view.Hash,
+			Data:         view.Data,
+			Obfuscated:   view.Obfuscated,
 		}
 	}
 

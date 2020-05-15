@@ -211,29 +211,8 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 	}
 
 	// Construct and append coinbase Tx to reward the generator
-	coinbaseTx, err := bg.constructCoinbaseTx(keys)
-	if err != nil {
-		return nil, err
-	}
-
+	coinbaseTx := transactions.NewDistribute(config.GeneratorReward, keys, *bg.genPubKey)
 	txs = append(txs, coinbaseTx)
 
 	return txs, nil
-}
-
-// ConstructCoinbaseTx forges the transaction to reward the block generator.
-func (bg *Generator) constructCoinbaseTx(keys [][]byte) (*transactions.DistributeTransaction, error) {
-	// TODO: what do we set as reward?
-	// TODO: should the reward be a matter of configuration or should it be
-	// dynamic?
-	dtx := transactions.NewDistribute()
-	output := transactions.MockTransparentOutput(config.GeneratorReward, make([]byte, 24))
-	dtx.Tx.Outputs = []*transactions.TransactionOutput{&output}
-	dtx.Tx.Inputs = make([]*transactions.TransactionInput, 0)
-	fee := transactions.MockTransparentOutput(0, make([]byte, 24))
-	dtx.Tx.Fee = &fee
-
-	dtx.ProvisionersAddresses = keys
-	dtx.BgPk = bg.genPubKey
-	return dtx, nil
 }

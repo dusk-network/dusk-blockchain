@@ -138,9 +138,6 @@ type Provisioner interface {
 type BlockGenerator interface {
 	// GenerateScore to participate in the block generation lottery
 	GenerateScore(context.Context, ScoreRequest) (Score, error)
-
-	// NewDistributeTx creates a new Distribute transaction
-	NewDistributeTx(ctx context.Context, reward uint64, provisionerAddresses [][]byte, tx TxRequest) (DistributeTransaction, error)
 }
 
 // Proxy toward the rusk client
@@ -549,31 +546,6 @@ func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Sco
 		Seed:     score.Seed,
 		Identity: score.Identity,
 	}, nil
-}
-
-// NewDistributeTx creates a new Distribute transaction
-func (b *blockgenerator) NewDistributeTx(ctx context.Context, reward uint64, provisionerAddresses [][]byte, tx TxRequest) (DistributeTransaction, error) {
-	dTx := new(DistributeTransaction)
-	tr := new(rusk.NewTransactionRequest)
-	MTxRequest(tr, tx)
-
-	dt := new(rusk.DistributeTransactionRequest)
-	dt.Tx = tr
-	dt.TotalReward = reward
-	dt.ProvisionersAddresses = make([][]byte, len(provisionerAddresses))
-	for i, p := range provisionerAddresses {
-		dt.ProvisionersAddresses[i] = make([]byte, len(p))
-		copy(dt.ProvisionersAddresses[i], p)
-	}
-	res, err := b.client.NewDistribute(ctx, dt)
-	if err != nil {
-		return *dTx, err
-	}
-
-	if err := UDistribute(res, dTx); err != nil {
-		return *dTx, err
-	}
-	return *dTx, nil
 }
 
 // UMember deep copies from the rusk.Provisioner

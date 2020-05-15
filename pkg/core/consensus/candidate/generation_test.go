@@ -56,10 +56,10 @@ func TestGeneration(t *testing.T) {
 
 func provideCommittee(t *testing.T, rb *rpcbus.RPCBus) {
 	c := make(chan rpcbus.Request, 1)
-	require.Nil(t, rb.Register(topics.GetLastCommittee, c))
+	assert.Nil(t, rb.Register(topics.GetLastCommittee, c))
 
 	r := <-c
 	com := make([][]byte, 0)
-	com = append(com, []byte{1, 2, 3})
+	com = append(com, []byte{1, 2, 3}) //nolint
 	r.RespChan <- rpcbus.NewResponse(make([][]byte, 0), nil)
 }

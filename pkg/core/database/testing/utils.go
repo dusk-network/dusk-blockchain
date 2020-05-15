@@ -3,7 +3,6 @@ package test
 import (
 	"fmt"
 	"sync/atomic"
-	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -62,7 +61,7 @@ func generateChainBlocks(blocksCount int) ([]*block.Block, error) {
 	return newBlocks, nil
 }
 
-func generateRandomBlocks(test *testing.T, blocksCount int) []*block.Block {
+func generateRandomBlocks(blocksCount int) []*block.Block {
 	newBlocks := make([]*block.Block, blocksCount)
 	for i := 0; i < blocksCount; i++ {
 		newBlocks[i] = helper.RandomBlock(uint64(i+1), sampleTxsBatchCount)

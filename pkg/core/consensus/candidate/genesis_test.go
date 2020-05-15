@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"

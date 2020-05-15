@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	log "github.com/sirupsen/logrus"
 )
 
 // Direction is an enum which tells us whether a transaction is
@@ -19,31 +20,82 @@ const (
 	Out
 )
 
-// TxRecord encapsulates the data stored on the DB related to a transaction such as block
-// height, direction, amount, etc
-// FIXME: 459
-type TxRecord struct {
-	Direction
-	Timestamp int64
+// TxMeta is a convenience structure which groups fields common to the TxView
+// and the TxRecord
+type TxMeta struct {
 	Height    uint64
-	transactions.TxType
-	Amount   uint64 // can be zero for smart contract calls not related to transfer of value
-	Fee      uint64 // is essentially gas
-	Data     []byte // binary  representation of the smart contract call inputs
-	LockTime uint64 // expressed in blockheight terms
-	transactions.ContractCall
+	Direction Direction
+	Timestamp int64
+}
+
+// TxRecord encapsulates the data stored on the DB related to a transaction such as block
+// height, direction, etc. The fields related to the ContractCall are embedded
+// inside the Transaction carrying the information about the `Fee` (gas) and the
+// `Amount` (which can be zero for smart contract calls not related to transfer
+// o value).
+type TxRecord struct {
+	TxMeta
+	Transaction transactions.ContractCall
+}
+
+// TxView is the UX-friendly structure to be served to the UI requesting them
+type TxView struct {
+	TxMeta
+	Type       transactions.TxType
+	Amount     uint64
+	Fee        uint64
+	Timelock   uint64
+	Hash       []byte
+	Data       []byte
+	Obfuscated bool
 }
 
 // New creates a TxRecord
-func New(tx transactions.ContractCall, height uint64, direction Direction) *TxRecord {
-	// FIXME: 459 translate the ContractCall into the above struct
+func New(call transactions.ContractCall, height uint64, direction Direction) *TxRecord {
 	return &TxRecord{
-		Direction:    direction,
-		Timestamp:    time.Now().Unix(),
-		Height:       height,
-		TxType:       tx.Type(),
-		ContractCall: tx,
+		Transaction: call,
+		TxMeta: TxMeta{
+			Direction: direction,
+			Timestamp: time.Now().Unix(),
+			Height:    height,
+		},
 	}
+}
+
+// View returns a UI consumable representation of a TXRecord
+func (t TxRecord) View() TxView {
+	h, err := t.Transaction.CalculateHash()
+	if err != nil {
+		log.Panic(err)
+	}
+
+	view := TxView{
+		TxMeta:     t.TxMeta,
+		Type:       t.Transaction.Type(),
+		Hash:       h,
+		Obfuscated: t.Transaction.Obfuscated(),
+		Fee:        t.Transaction.Fees(),
+	}
+
+	switch tx := t.Transaction.(type) {
+	case *transactions.BidTransaction:
+		view.Timelock = tx.ExpirationHeight
+	case *transactions.StakeTransaction:
+		view.Amount = tx.Amount()
+		view.Timelock = tx.ExpirationHeight
+	case *transactions.Transaction:
+		if !tx.Obfuscated() {
+			// loop on the Outputs
+			for _, out := range tx.Outputs {
+				view.Amount += out.Note.TransparentValue
+			}
+		}
+		view.Data = tx.Data
+	case *transactions.DistributeTransaction:
+		view.Amount = tx.TotalReward()
+	}
+
+	return view
 }
 
 // Encode the TxRecord into a buffer
@@ -60,11 +112,7 @@ func Encode(b *bytes.Buffer, t *TxRecord) error {
 		return err
 	}
 
-	if err := binary.Write(b, binary.LittleEndian, t.TxType); err != nil {
-		return err
-	}
-
-	if err := transactions.Marshal(b, t.ContractCall); err != nil {
+	if err := transactions.Marshal(b, t.Transaction); err != nil {
 		return err
 	}
 
@@ -85,15 +133,11 @@ func Decode(b *bytes.Buffer, t *TxRecord) error {
 		return err
 	}
 
-	if err := binary.Read(b, binary.LittleEndian, &t.TxType); err != nil {
-		return err
-	}
-
 	call, err := transactions.Unmarshal(b)
 	if err != nil {
 		return err
 	}
 
-	t.ContractCall = call
+	t.Transaction = call
 	return nil
 }

@@ -42,8 +42,10 @@ github.com/dusk-network/bn256 v0.5.1-lattices h1:HMi7Dbs/MDRgH+xJHuhlByTG18IDlB5
 github.com/dusk-network/bn256 v0.5.1-lattices/go.mod h1:ddVn3p/nch27uVwd+3QGreudmSKfbAVr39LvBaSUEGg=
 github.com/dusk-network/dusk-crypto v0.1.1 h1:o9CIDb/YrcMAmGQVfdNfets0hJrIsEQbka6LMjTAWdA=
 github.com/dusk-network/dusk-crypto v0.1.1/go.mod h1:XEU09/mHLIAg9cS0m/6Hu2+wvJPxybfoXYSCrveHh3U=
-github.com/dusk-network/dusk-protobuf v0.2.4 h1:PK4kJBHON5oKvTBgnQkKaz/v5joyRetq9PyxfAUAiu0=
-github.com/dusk-network/dusk-protobuf v0.2.4/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
+github.com/dusk-network/dusk-protobuf v0.2.6 h1:ejqyYWnZD314ddlbeuTqsJXelOgHyPBp3bly65Y6vK4=
+github.com/dusk-network/dusk-protobuf v0.2.6/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
+github.com/dusk-network/dusk-protobuf v0.2.7-0.20200514181023-bfed2020a337 h1:XfTB+vB0Ousq+jKr8wmVYjW8tD3mNOR2gimoEemLMrU=
+github.com/dusk-network/dusk-protobuf v0.2.7-0.20200514181023-bfed2020a337/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee/go.mod h1:PpPxJzdlQ023fALM5AGWeFrIaIU2igVmxr3QiRaf+ks=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=

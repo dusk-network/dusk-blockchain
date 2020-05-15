@@ -115,13 +115,13 @@ func WalletMenu(client *conf.NodeClient) error {
 
 			s := formatRecords(resp)
 			res = s.String()
-		case "Automate Consensus Participation":
-			resp, err := client.MaintainerClient.AutomateConsensusTxs(context.Background(), &node.EmptyRequest{})
-			if err != nil {
-				return err
-			}
+		//case "Automate Consensus Participation":
+		//	resp, err := client.MaintainerClient.AutomateConsensusTxs(context.Background(), &node.EmptyRequest{})
+		//	if err != nil {
+		//		return err
+		//	}
 
-			res = resp.Response
+		//	res = resp.Response
 		case "Exit":
 			os.Exit(0)
 		}

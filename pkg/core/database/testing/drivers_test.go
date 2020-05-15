@@ -362,7 +362,7 @@ func TestAtomicUpdates(test *testing.T) {
 	// That said, no parallelism should be applied.
 	// test.Parallel()
 
-	genBlocks := generateRandomBlocks(test, 2)
+	genBlocks := generateRandomBlocks(2)
 
 	// Save current storage state to compare later
 	// Supported only in heavy.DB for now

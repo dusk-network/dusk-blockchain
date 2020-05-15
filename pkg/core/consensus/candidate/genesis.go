@@ -26,7 +26,7 @@ func GenerateGenesisBlock(rb *rpcbus.RPCBus, generatorPubKey *transactions.Publi
 	proof, _ := crypto.RandEntropy(32)
 	score, _ := crypto.RandEntropy(32)
 
-	b, err := g.GenerateBlock(0, seed, proof, score, make([]byte, 32), [][]byte{[]byte{0}})
+	b, err := g.GenerateBlock(0, seed, proof, score, make([]byte, 32), [][]byte{{0}})
 	if err != nil {
 		return "", err
 	}
