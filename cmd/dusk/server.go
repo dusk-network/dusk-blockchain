@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"github.com/dusk-network/dusk-blockchain/pkg/api"
 	"net"
 
 	"github.com/sirupsen/logrus"
@@ -160,6 +161,10 @@ func Setup() *Server {
 	}
 	srv.cancelMonitor = stopFunc
 
+	// if API is enabled, start it
+	if cfg.Get().API.Address != "" {
+		api.StartAPI()
+	}
 	return srv
 }
 

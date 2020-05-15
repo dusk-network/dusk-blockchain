@@ -85,6 +85,12 @@ type rpcConfiguration struct {
 	Pass string
 }
 
+// pkg/api package configs
+type apiConfiguration struct {
+	Address    string
+	Prometheus bool
+}
+
 type gqlConfiguration struct {
 	// TODO: Keep 'Enabled' option?
 	Enabled bool

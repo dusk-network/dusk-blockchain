@@ -58,6 +58,7 @@ type Registry struct {
 	Performance performanceConfiguration
 	Logger      loggerConfiguration
 	Profile     []profileConfiguration
+	API         apiConfiguration
 }
 
 // Load makes an attempt to read and unmarshal any configs from flag, env and

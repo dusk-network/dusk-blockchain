@@ -3,6 +3,8 @@ package kadcast
 import (
 	"bytes"
 	"fmt"
+	"github.com/dusk-network/dusk-blockchain/pkg/api"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
@@ -75,6 +77,11 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message, height byte) 
 		header := []byte{height}
 		msg := message.NewWithHeader(topics.Block, *blk, header)
 		m.publisher.Publish(category, msg)
+
+		if cfg.Get().API.Prometheus {
+			// track processed msg with Prometheus
+			api.MsgProcessed.Inc()
+		}
 	}
 
 	return nil
