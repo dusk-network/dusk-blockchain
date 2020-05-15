@@ -13,7 +13,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	lg "github.com/sirupsen/logrus"
 )
+
+var log = lg.WithField("process", "candidate-broker")
 
 // Broker is the entry point for the candidate component. It manages
 // an in-memory store of `Candidate` messages, and allows for the

@@ -142,7 +142,7 @@ func TestBlocksTxs(t *testing.T) {
 						},
 						"transactions": [
 							{
-								"txid": "a12ae441edf18f6c4f8a38492bdd6905e07a8cd4e29b2a2ccf42b30234608dcf",
+								"txid": "1295fbb89ad4a6dcabd7d64651ce7b4f8ca1229c5824fdbb3e5343a52d478817",
 								"txtype": "bid"
 							}
 						]
@@ -240,7 +240,7 @@ func TestBlocksTxsQuery(t *testing.T) {
 									"pubkey": "33443344"
 								}
 							],
-							"txid": "a12ae441edf18f6c4f8a38492bdd6905e07a8cd4e29b2a2ccf42b30234608dcf",
+							"txid": "1295fbb89ad4a6dcabd7d64651ce7b4f8ca1229c5824fdbb3e5343a52d478817",
 							"txtype": "bid"
 						}
 					]

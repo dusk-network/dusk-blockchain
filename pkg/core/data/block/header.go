@@ -16,16 +16,16 @@ const (
 
 // Header defines a block header on a Dusk block.
 type Header struct {
-	Version   uint8  // Block version byte
-	Height    uint64 // Block height
-	Timestamp int64  // Block timestamp
+	Version   uint8  `json:"version"`   // Block version byte
+	Height    uint64 `json:"height"`    // Block height
+	Timestamp int64  `json:"timestamp"` // Block timestamp
 
-	PrevBlockHash []byte // Hash of previous block (32 bytes)
-	Seed          []byte // Marshaled BLS signature or hash of the previous block seed (32 bytes)
-	TxRoot        []byte // Root hash of the merkle tree containing all txes (32 bytes)
+	PrevBlockHash []byte `json:"prev-hash"` // Hash of previous block (32 bytes)
+	Seed          []byte `json:"seed"`      // Marshaled BLS signature or hash of the previous block seed (32 bytes)
+	TxRoot        []byte `json:"tx-root"`   // Root hash of the merkle tree containing all txes (32 bytes)
 
-	*Certificate        // Block certificate
-	Hash         []byte // Hash of all previous fields
+	*Certificate `json:"certificate"` // Block certificate
+	Hash         []byte               `json:"hash"` // Hash of all previous fields
 }
 
 // NewHeader creates a new Block Header
