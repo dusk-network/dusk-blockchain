@@ -7,10 +7,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -22,6 +23,7 @@ func init() {
 // is not tested.
 func TestGeneration(t *testing.T) {
 	bus, rBus := eventbus.New(), rpcbus.New()
+	go provideCommittee(t, rBus)
 	// txBatchCount * 4 will be the amount of non-coinbase transactions in a block.
 	// see: helper.RandomSliceOfTxs
 	txBatchCount := uint16(2)
@@ -49,5 +51,15 @@ func TestGeneration(t *testing.T) {
 	}
 
 	// Should contain correct amount of txs
-	assert.Equal(t, int((txBatchCount*4)+1), len(c.Txs))
+	assert.Equal(t, int((txBatchCount)+1), len(c.Txs))
+}
+
+func provideCommittee(t *testing.T, rb *rpcbus.RPCBus) {
+	c := make(chan rpcbus.Request, 1)
+	assert.Nil(t, rb.Register(topics.GetLastCommittee, c))
+
+	r := <-c
+	com := make([][]byte, 0)
+	com = append(com, []byte{1, 2, 3}) //nolint
+	r.RespChan <- rpcbus.NewResponse(make([][]byte, 0), nil)
 }

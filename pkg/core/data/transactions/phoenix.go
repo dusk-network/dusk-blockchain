@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -10,11 +11,46 @@ import (
 
 // Transaction according to the Phoenix model
 type Transaction struct {
-	Inputs  []*TransactionInput  `json:"inputs"`
+	Inputs  []*TransactionInput  `json:"inputs,omitempty"`
 	Outputs []*TransactionOutput `json:"outputs"`
-	Fee     *TransactionOutput   `json:"fee"`
-	Proof   []byte               `json:"proof"`
-	hash    []byte
+	Fee     *TransactionOutput   `json:"fee,omitempty"`
+	Proof   []byte               `json:"proof,omitempty"`
+	Data    []byte               `json:"data,omitempty"`
+}
+
+// Values returns a tuple where the first element is the sum of all transparent
+// outputs' note values and the second is the fee
+func (t *Transaction) Values() (amount uint64, fee uint64) {
+	for _, o := range t.Outputs {
+		if o.Note.NoteType == TRANSPARENT {
+			amount += o.Value()
+		}
+	}
+
+	fee = t.Fee.Value()
+	return
+}
+
+// MarshalJSON provides a json-encoded readable representation of a
+// Transaction
+func (t *Transaction) MarshalJSON() ([]byte, error) {
+	// type aliasing allows to work around stack overflow of recursive JSON
+	// marshaling
+	type Alias Transaction
+
+	h, _ := t.CalculateHash()
+	return json.Marshal(struct {
+		*Alias
+		jsonMarshalable
+	}{
+		Alias:           (*Alias)(t),
+		jsonMarshalable: newJSONMarshalable(t.Type(), h),
+	})
+}
+
+// Fees calculates the fees for this transaction
+func (t *Transaction) Fees() uint64 {
+	return t.Fee.Note.TransparentValue
 }
 
 // CalculateHash complies with merkletree.Payload interface
@@ -25,6 +61,11 @@ func (t *Transaction) CalculateHash() ([]byte, error) {
 	}
 
 	return hash.Sha3256(b.Bytes())
+}
+
+// Obfuscated returns whether this transaction is transparent or otherwise
+func (t *Transaction) Obfuscated() bool {
+	return t.Outputs[0].Note.NoteType == OBFUSCATED
 }
 
 // Type complies with ContractCall interface. Returns "Tx"
@@ -61,6 +102,8 @@ func MTx(r *rusk.Transaction, t *Transaction) error {
 
 	r.Proof = make([]byte, len(t.Proof))
 	copy(r.Proof, t.Proof)
+	r.Data = make([]byte, len(t.Data))
+	copy(r.Data, t.Data)
 	return nil
 }
 
@@ -87,6 +130,8 @@ func UTx(r *rusk.Transaction, t *Transaction) error {
 
 	t.Proof = make([]byte, len(r.Proof))
 	copy(t.Proof, r.Proof)
+	t.Data = make([]byte, len(r.Data))
+	copy(t.Data, r.Data)
 	return nil
 }
 
@@ -118,7 +163,7 @@ func MarshalTransaction(r *bytes.Buffer, t Transaction) error {
 		return err
 	}
 
-	if err := encoding.WriteVarBytes(r, t.hash); err != nil {
+	if err := encoding.WriteVarBytes(r, t.Data); err != nil {
 		return err
 	}
 	return nil
@@ -126,7 +171,6 @@ func MarshalTransaction(r *bytes.Buffer, t Transaction) error {
 
 // UnmarshalTransaction from a buffer
 func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
-
 	nIn, eerr := encoding.ReadVarInt(r)
 	if eerr != nil {
 		return eerr
@@ -164,7 +208,7 @@ func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &t.hash); err != nil {
+	if err := encoding.ReadVarBytes(r, &t.Data); err != nil {
 		return err
 	}
 	return nil
@@ -221,9 +265,14 @@ func UnmarshalTransactionInput(r *bytes.Buffer, t *TransactionInput) error {
 // TransactionOutput is the spendable output of the transaction
 type TransactionOutput struct {
 	Note           *Note      `json:"note"`
-	Pk             *PublicKey `json:"pk"`
-	Value          uint64     `json:"value"`
-	BlindingFactor *Scalar    `json:"blinding_factor"`
+	Pk             *PublicKey `json:"pk,omitempty"`
+	BlindingFactor *Scalar    `json:"blinding_factor,omitempty"`
+}
+
+// Value returns the amount for this transaction output if Note is not
+// obfuscated, otherwise returns 0
+func (t *TransactionOutput) Value() uint64 {
+	return t.Note.TransparentValue
 }
 
 // MTxOut copies from transactions.TransactionOutput to rusk.TransactionOutput
@@ -236,7 +285,6 @@ func MTxOut(r *rusk.TransactionOutput, t *TransactionOutput) error {
 		return err
 	}
 
-	r.Value = t.Value
 	MPublicKey(r.Pk, t.Pk)
 	MScalar(r.BlindingFactor, t.BlindingFactor)
 	return nil
@@ -252,7 +300,6 @@ func UTxOut(r *rusk.TransactionOutput, t *TransactionOutput) error {
 		return err
 	}
 
-	t.Value = r.Value
 	UPublicKey(r.Pk, t.Pk)
 	UScalar(r.BlindingFactor, t.BlindingFactor)
 	return nil
@@ -264,9 +311,6 @@ func MarshalTransactionOutput(r *bytes.Buffer, t TransactionOutput) error {
 		return err
 	}
 	if err := MarshalPublicKey(r, *t.Pk); err != nil {
-		return err
-	}
-	if err := encoding.WriteUint64LE(r, t.Value); err != nil {
 		return err
 	}
 	if err := MarshalScalar(r, *t.BlindingFactor); err != nil {
@@ -283,9 +327,6 @@ func UnmarshalTransactionOutput(r *bytes.Buffer, t *TransactionOutput) error {
 	}
 	t.Pk = &PublicKey{}
 	if err := UnmarshalPublicKey(r, t.Pk); err != nil {
-		return err
-	}
-	if err := encoding.ReadUint64LE(r, &t.Value); err != nil {
 		return err
 	}
 	t.BlindingFactor = &Scalar{}

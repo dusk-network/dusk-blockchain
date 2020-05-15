@@ -89,6 +89,13 @@ func (bus *RPCBus) Register(t topics.Topic, req chan<- Request) error {
 	return nil
 }
 
+// Deregister removes a handler channel from a method.
+func (bus *RPCBus) Deregister(t topics.Topic) {
+	bus.mu.Lock()
+	defer bus.mu.Unlock()
+	delete(bus.registry, t)
+}
+
 // Call runs a long-polling technique to request from the method Consumer to
 // run the corresponding procedure and return a result or timeout
 func (bus *RPCBus) Call(t topics.Topic, req Request, timeOut time.Duration) (interface{}, error) {

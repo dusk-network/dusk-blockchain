@@ -48,11 +48,16 @@ func initializeDB(db database.DB) {
 	// comparison easier
 
 	// block height 0
-	t := &testing.T{}
 	b1 := helper.RandomBlock(0, 1)
 	b1.Header.Hash, _ = hex.DecodeString("194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620")
 	b1.Txs = make([]core.ContractCall, 0)
-	b1.Txs = append(b1.Txs, helper.FixedStandardTx(t, 0))
+	b1.Txs = append(b1.Txs, core.MockDeterministicBid(100, 100000, make([]byte, 32), make([]byte, 33)))
+	hash, err := b1.Txs[0].CalculateHash()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(hex.EncodeToString(hash))
 	b1.Header.Timestamp = 10
 	chain = append(chain, b1)
 
@@ -60,7 +65,7 @@ func initializeDB(db database.DB) {
 	b2 := helper.RandomBlock(1, 1)
 	b2.Header.Hash, _ = hex.DecodeString("9bf50e394bb81346f8b8db42bddd285ac344260c024a0df808baf7601417d748")
 	b2.Txs = make([]core.ContractCall, 0)
-	b2.Txs = append(b2.Txs, helper.FixedStandardTx(t, 1))
+	b2.Txs = append(b2.Txs, core.MockDeterministicBid(350, 1239013, make([]byte, 32), make([]byte, 32)))
 	b2.Header.Timestamp = 20
 	chain = append(chain, b2)
 
@@ -68,7 +73,7 @@ func initializeDB(db database.DB) {
 	b3 := helper.RandomBlock(2, 1)
 	b3.Header.Hash, _ = hex.DecodeString("9467c5e774eb1b4825d08c0599a0b0815fca5dac16d9690026854ed8d1f229c9")
 	b3.Txs = make([]core.ContractCall, 0)
-	b3.Txs = append(b3.Txs, helper.FixedStandardTx(t, 22))
+	b3.Txs = append(b3.Txs, core.MockDeterministicBid(200, 100002, make([]byte, 32), make([]byte, 33)))
 	b3.Header.Timestamp = 30
 	chain = append(chain, b3)
 

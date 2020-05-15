@@ -31,18 +31,16 @@ func TestSortedKeys(t *testing.T) {
 
 	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
 
-		val := t.tx.StandardTx().Fee.Value
-		if prevVal < val {
+		_, fee := t.tx.Values()
+		if prevVal < fee {
 			return false, errors.New("keys not in a descending order")
 		}
 
-		prevVal = val
+		prevVal = fee
 		return false, nil
 	})
 
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	assert.NoError(err)
 }
 
 func TestStableSortedKeys(t *testing.T) {

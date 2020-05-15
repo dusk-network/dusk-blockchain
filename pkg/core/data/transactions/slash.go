@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -19,6 +20,23 @@ type SlashTransaction struct {
 	FirstSig  []byte `json:"first_sig"`
 	SecondMsg []byte `json:"second_msg"`
 	SecondSig []byte `json:"second_sig"`
+}
+
+// MarshalJSON provides a json-encoded readable representation of a
+// SlashTransaction
+func (t *SlashTransaction) MarshalJSON() ([]byte, error) {
+	// type aliasing allows to work around stack overflow of recursive JSON
+	// marshaling
+	type Alias SlashTransaction
+
+	h, _ := t.CalculateHash()
+	return json.Marshal(struct {
+		*Alias
+		jsonMarshalable
+	}{
+		Alias:           (*Alias)(t),
+		jsonMarshalable: newJSONMarshalable(t.Type(), h),
+	})
 }
 
 // MSlash copies the Slash transaction data to the rusk Slash

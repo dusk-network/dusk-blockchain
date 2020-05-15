@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -16,17 +17,34 @@ type StakeTransaction struct {
 	ExpirationHeight uint64 `json:"expiration_height"`
 }
 
+func newStake() *StakeTransaction {
+	stake := new(StakeTransaction)
+	stake.ContractTx = new(ContractTx)
+	stake.ContractTx.Tx = new(Transaction)
+	return stake
+}
+
 // Amount returns the amount staked through this transaction. The amount is the
 // tranparent value of the note of the first of the transaction's outputs
 func (t *StakeTransaction) Amount() uint64 {
 	return t.Tx.Outputs[0].Note.TransparentValue
 }
 
-func newStake() *StakeTransaction {
-	stake := new(StakeTransaction)
-	stake.ContractTx = new(ContractTx)
-	stake.ContractTx.Tx = new(Transaction)
-	return stake
+// MarshalJSON provides a json-encoded readable representation of a
+// StakeTransaction
+func (t *StakeTransaction) MarshalJSON() ([]byte, error) {
+	// type aliasing allows to work around stack overflow of recursive JSON
+	// marshaling
+	type Alias StakeTransaction
+
+	h, _ := t.CalculateHash()
+	return json.Marshal(struct {
+		*Alias
+		jsonMarshalable
+	}{
+		Alias:           (*Alias)(t),
+		jsonMarshalable: newJSONMarshalable(t.Type(), h),
+	})
 }
 
 // MStake copies the Stake struct into the rusk datastruct
@@ -111,6 +129,23 @@ type WithdrawStakeTransaction struct {
 	*ContractTx
 	BlsKey []byte `json:"bls_key"`
 	Sig    []byte `json:"sig"`
+}
+
+// MarshalJSON provides a json-encoded readable representation of a
+// WithdrawStakeTransaction
+func (t *WithdrawStakeTransaction) MarshalJSON() ([]byte, error) {
+	// type aliasing allows to work around stack overflow of recursive JSON
+	// marshaling
+	type Alias WithdrawStakeTransaction
+
+	h, _ := t.CalculateHash()
+	return json.Marshal(struct {
+		*Alias
+		jsonMarshalable
+	}{
+		Alias:           (*Alias)(t),
+		jsonMarshalable: newJSONMarshalable(t.Type(), h),
+	})
 }
 
 // MWithdrawStake copies the WithdrawStake rusk struct into the transaction datastruct

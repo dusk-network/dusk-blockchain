@@ -35,6 +35,48 @@ const (
 	WithdrawBid
 )
 
+// MarshalJSON representation of a TxType
+func (t TxType) MarshalJSON() ([]byte, error) {
+	return []byte(string(t)), nil
+}
+
+// StringToTxType is a conversion map from string representation of TxType to
+// its actual type
+var StringToTxType = map[string]TxType{
+	"standard":         Tx,
+	"coinbase":         Distribute,
+	"fee-withdrawal":   WithdrawFees,
+	"bid":              Bid,
+	"stake":            Stake,
+	"slash":            Slash,
+	"stake-withdrawal": WithdrawStake,
+	"bid-withdrawal":   WithdrawBid,
+}
+
+// String returns a human readable format for the transaction type
+func (t TxType) String() string {
+	switch t {
+	case Tx:
+		return "standard"
+	case Distribute:
+		return "coinbase"
+	case WithdrawFees:
+		return "fee-withdrawal"
+	case Bid:
+		return "bid"
+	case Stake:
+		return "stake"
+	case Slash:
+		return "slash"
+	case WithdrawStake:
+		return "stake-withdrawal"
+	case WithdrawBid:
+		return "bid-withdrawal"
+	default:
+		return "unknown"
+	}
+}
+
 // ContractCall is the transaction that embodies the execution parameter for a
 // smart contract method invocation
 type ContractCall interface {
@@ -44,6 +86,27 @@ type ContractCall interface {
 	// StandardTx is the underlying phoenix transaction carrying the
 	// transaction outputs and inputs
 	StandardTx() *Transaction
+
+	// Obfuscated return true if the TransactionOutputs consist of Obfuscated
+	// Notes, false if they are transparent
+	Obfuscated() bool
+
+	// Values returns a tuple where the first element is the sum of all transparent
+	// outputs' note values and the second is the fee
+	Values() (amount uint64, fee uint64)
+}
+
+// jsonMarshalable reduce code duplication for JSON Marshaling
+type jsonMarshalable struct {
+	Type string `json:"tx-type"`
+	Hash []byte `json:"hash"`
+}
+
+func newJSONMarshalable(t TxType, hash []byte) jsonMarshalable {
+	return jsonMarshalable{
+		Type: t.String(),
+		Hash: hash,
+	}
 }
 
 // ContractTx is the embedded struct utilized to group operations on the
@@ -51,6 +114,21 @@ type ContractCall interface {
 // It is NOT a ContractCall implementation as Transaction is a type apart
 type ContractTx struct {
 	Tx *Transaction `protobuf:"bytes,1,opt,name=tx,proto3" json:"tx,omitempty"`
+}
+
+// Obfuscated returns true if the embedded standard transaction is confidential
+func (c *ContractTx) Obfuscated() bool {
+	return c.Tx.Obfuscated()
+}
+
+// Values returns the transparent amount and the fee for this transaction
+func (c *ContractTx) Values() (uint64, uint64) {
+	return c.Tx.Values()
+}
+
+// StandardTx returns the underlying phoenix transaction
+func (c *ContractTx) StandardTx() *Transaction {
+	return c.Tx
 }
 
 // UContractTx is embedded by the ContractCall structs to facilitate copying
@@ -73,11 +151,6 @@ func MarshalContractTx(r *bytes.Buffer, c ContractTx) error {
 func UnmarshalContractTx(r *bytes.Buffer, c *ContractTx) error {
 	c.Tx = new(Transaction)
 	return UnmarshalTransaction(r, c.Tx)
-}
-
-// StandardTx returns the underlying phoenix transaction
-func (t *ContractTx) StandardTx() *Transaction {
-	return t.Tx
 }
 
 // Equal tests two contract calls for equality
@@ -193,11 +266,7 @@ func DecodeContractCall(contractCall *rusk.ContractCallTx) (ContractCall, error)
 		}
 		return call, nil
 	case *rusk.ContractCallTx_Distribute:
-		call := new(DistributeTransaction)
-		if err := UDistribute(c.Distribute, call); err != nil {
-			return nil, err
-		}
-		return call, nil
+		return nil, errors.New("Distribute Transactions should be created within the node and not coming from RUSK")
 	case *rusk.ContractCallTx_WithdrawStake:
 		call := new(WithdrawStakeTransaction)
 		if err := UWithdrawStake(c.WithdrawStake, call); err != nil {

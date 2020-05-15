@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -16,10 +17,66 @@ type DistributeTransaction struct {
 	BgPk                  *PublicKey `json:"bg_pk"`
 }
 
-func newDistribute() *DistributeTransaction {
+// MarshalJSON provides a json-encoded readable representation of a
+// DistributeTransaction
+func (t *DistributeTransaction) MarshalJSON() ([]byte, error) {
+
+	type NullableTx struct {
+		Outputs []*TransactionOutput `json:"outputs"`
+	}
+
+	h, _ := t.CalculateHash()
+	btx := NullableTx{
+		Outputs: []*TransactionOutput{t.Tx.Outputs[0]},
+	}
+
+	return json.Marshal(struct {
+		jsonMarshalable
+		ProvisionersAddresses [][]byte   `json:"provisioners_addresses"`
+		BgPk                  *PublicKey `json:"bg_pk"`
+		Tx                    NullableTx `json:"tx"`
+	}{
+		jsonMarshalable:       newJSONMarshalable(t.Type(), h),
+		ProvisionersAddresses: t.ProvisionersAddresses,
+		BgPk:                  t.BgPk,
+		Tx:                    btx,
+	})
+}
+
+// Values returns a tuple where the first element is the sum of all transparent
+// outputs' note values and the second is the fee
+func (t *DistributeTransaction) Values() (amount uint64, fee uint64) {
+	amount = t.TotalReward()
+	fee = 0
+	return
+}
+
+// Obfuscated returns false for DistributeTransaction. We do not rely on the
+// embedded ContractTx.Obfuscated method since it is unclear whether a
+// (Transparent) Note will keep being available for coinbase transactions, as
+// they are the only ones created outside of RUSK
+func (t *DistributeTransaction) Obfuscated() bool {
+	return false
+}
+
+// Fees is zero for coinbase (it is the only transaction that carries 0 fees)
+func (t *DistributeTransaction) Fees() uint64 {
+	return uint64(0)
+}
+
+// NewDistribute creates a DistributeTransaction. We can instantiate a
+// DistributeTransaction directly because it only carries a uint64 value
+// without the need for a Fee, Inputs, CompressedPoiints or Scalar quantities
+func NewDistribute(reward uint64, provisioners [][]byte, bgPk PublicKey) *DistributeTransaction {
 	dt := new(DistributeTransaction)
 	dt.ContractTx = new(ContractTx)
 	dt.ContractTx.Tx = new(Transaction)
+	dt.ContractTx.Tx.Outputs = make([]*TransactionOutput, 1)
+	dt.ContractTx.Tx.Outputs[0] = new(TransactionOutput)
+	dt.ContractTx.Tx.Outputs[0].Note = new(Note)
+	dt.ContractTx.Tx.Outputs[0].Note.TransparentValue = reward
+	dt.ProvisionersAddresses = provisioners
+	dt.BgPk = &bgPk
 	return dt
 }
 
@@ -42,38 +99,22 @@ func (t *DistributeTransaction) CalculateHash() ([]byte, error) {
 // MDistribute copies the Distribute struct into the rusk  datastruct
 func MDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error {
 	r.Tx = new(rusk.Transaction)
-	if err := MTx(r.Tx, t.Tx); err != nil {
-		return err
+	r.Tx.Outputs = make([]*rusk.TransactionOutput, 1)
+	r.Tx.Outputs[0] = new(rusk.TransactionOutput)
+	r.Tx.Outputs[0].Note = new(rusk.Note)
+	r.Tx.Outputs[0].Note.Value = &rusk.Note_TransparentValue{
+		TransparentValue: t.TotalReward(),
 	}
-	r.ProvisionersAddresses = make([][]byte, len(t.ProvisionersAddresses))
-	for i, p := range t.ProvisionersAddresses {
-		r.ProvisionersAddresses[i] = make([]byte, len(p))
-		copy(r.ProvisionersAddresses[i], p)
-	}
-	copy(r.ProvisionersAddresses, t.ProvisionersAddresses)
-	UPublicKey(r.BgPk, t.BgPk)
-	return nil
-}
-
-// UDistribute copies the Distribute rusk struct into the transaction datastruct
-func UDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error {
-	var err error
-	t.ContractTx, err = UContractTx(r.Tx)
-	if err != nil {
-		return err
-	}
-	t.ProvisionersAddresses = make([][]byte, len(r.ProvisionersAddresses))
-	for i, p := range r.ProvisionersAddresses {
-		t.ProvisionersAddresses[i] = make([]byte, len(p))
-		copy(t.ProvisionersAddresses[i], p)
-	}
-	UPublicKey(r.BgPk, t.BgPk)
+	r.ProvisionersAddresses = t.ProvisionersAddresses
+	r.BgPk = new(rusk.PublicKey)
+	MPublicKey(r.BgPk, t.BgPk)
 	return nil
 }
 
 //MarshalDistribute into a buffer
 func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
-	if err := MarshalContractTx(r, *s.ContractTx); err != nil {
+	reward := s.Tx.Outputs[0].Note.TransparentValue
+	if err := encoding.WriteUint64LE(r, reward); err != nil {
 		return err
 	}
 
@@ -101,8 +142,12 @@ func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
 //UnmarshalDistribute into a buffer
 func UnmarshalDistribute(r *bytes.Buffer, s *DistributeTransaction) error {
 	s.ContractTx = new(ContractTx)
+	s.ContractTx.Tx = new(Transaction)
+	s.ContractTx.Tx.Outputs = make([]*TransactionOutput, 1)
+	s.ContractTx.Tx.Outputs[0] = new(TransactionOutput)
+	s.ContractTx.Tx.Outputs[0].Note = new(Note)
 
-	if err := UnmarshalContractTx(r, s.ContractTx); err != nil {
+	if err := encoding.ReadUint64LE(r, &s.ContractTx.Tx.Outputs[0].Note.TransparentValue); err != nil {
 		return err
 	}
 

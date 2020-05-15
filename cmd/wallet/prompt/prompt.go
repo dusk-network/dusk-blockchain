@@ -61,7 +61,7 @@ func WalletMenu(client *conf.NodeClient) error {
 
 		prompt := promptui.Select{
 			Label: "Select action",
-			Items: []string{"Transfer DUSK", "Stake DUSK", "Bid DUSK", "Show Balance", "Show Address", "Show Transaction History", "Automate Consensus Participation", "Exit"},
+			Items: []string{"Transfer DUSK", "Stake DUSK", "Bid DUSK", "Show Balance", "Show Address", "Show Transaction History", "Automate Provisioner Participation", "Automate Block Generator Participation", "Exit"},
 			Size:  8,
 		}
 
@@ -115,8 +115,15 @@ func WalletMenu(client *conf.NodeClient) error {
 
 			s := formatRecords(resp)
 			res = s.String()
-		case "Automate Consensus Participation":
-			resp, err := client.MaintainerClient.AutomateConsensusTxs(context.Background(), &node.EmptyRequest{})
+		case "Automate Provisioner Participation":
+			resp, err := client.ProvisionerClient.AutomateStakes(context.Background(), &node.EmptyRequest{})
+			if err != nil {
+				return err
+			}
+
+			res = resp.Response
+		case "Automate Block Generator Participation":
+			resp, err := client.BlockGeneratorClient.AutomateBids(context.Background(), &node.EmptyRequest{})
 			if err != nil {
 				return err
 			}
@@ -133,19 +140,33 @@ func WalletMenu(client *conf.NodeClient) error {
 func formatRecords(resp *node.TxHistoryResponse) strings.Builder {
 	s := strings.Builder{}
 	for _, record := range resp.Records {
+		// Type
+		_, _ = s.WriteString(node.TxType_name[int32(record.Type)])
+		// Height
+		_, _ = s.WriteString(strconv.FormatUint(record.Height, 10) + " / ")
 		if record.Direction == node.Direction_IN {
 			_, _ = s.WriteString("IN / ")
 		} else {
 			_, _ = s.WriteString("OUT / ")
 		}
-		// Height
-		_, _ = s.WriteString(strconv.FormatUint(record.Height, 10) + " / ")
 		// Time
 		_, _ = s.WriteString(time.Unix(record.Timestamp, 0).Format(time.UnixDate) + " / ")
 		// Amount
 		_, _ = s.WriteString(fmt.Sprintf("%.8f DUSK", float64(record.Amount)/float64(wallet.DUSK)) + " / ")
+		// Fee
+		_, _ = s.WriteString(fmt.Sprintf("%.8f DUSK", float64(record.Fee)/float64(wallet.DUSK)) + " / ")
 		// Unlock height
 		_, _ = s.WriteString("Unlocks at " + strconv.FormatUint(record.UnlockHeight, 10) + " / ")
+		// Hash
+		_, _ = s.WriteString("Hash: " + hex.EncodeToString(record.Hash) + " / ")
+		// Data
+		_, _ = s.WriteString("Call data: " + hex.EncodeToString(record.Data) + " / ")
+		// Obfuscated
+		if record.Obfuscated {
+			_, _ = s.WriteString("Obfuscated")
+		} else {
+			_, _ = s.WriteString("Transparent")
+		}
 
 		_, _ = s.WriteString("\n")
 	}

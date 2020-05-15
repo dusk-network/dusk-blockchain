@@ -5,11 +5,12 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"google.golang.org/grpc"
 )
@@ -18,6 +19,11 @@ import (
 type Transactor struct { // TODO: rename
 	db database.DB
 	eb *eventbus.EventBus
+	rb *rpcbus.RPCBus
+
+	// RPCBus channels
+	stakeChan <-chan rpcbus.Request
+	bidChan   <-chan rpcbus.Request
 
 	// Passed to the consensus component startup
 	// c                 *chainsync.Counter
@@ -25,36 +31,77 @@ type Transactor struct { // TODO: rename
 
 	secretKey transactions.SecretKey
 
-	//ruskClient       rusk.RuskClient
-	provider         transactions.Provider
-	keyMaster        transactions.KeyMaster
-	walletClient     node.WalletClient
-	transactorClient node.TransactorClient
+	provider  transactions.Provider
+	keyMaster transactions.KeyMaster
 
 	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, db database.DB, srv *grpc.Server, client *rpc.Client, provider transactions.Provider, keyMaster transactions.KeyMaster) *Transactor {
+func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, provider transactions.Provider, keyMaster transactions.KeyMaster) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
 
+	stakeChan := make(chan rpcbus.Request, 1)
+	bidChan := make(chan rpcbus.Request, 1)
+
 	t := &Transactor{
-		db: db,
-		eb: eb,
-		//ruskClient:       client.RuskClient,
-		walletClient:     client.WalletClient,
-		transactorClient: client.TransactorClient,
-		keyMaster:        keyMaster,
-		provider:         provider,
+		db:        db,
+		eb:        eb,
+		rb:        rb,
+		stakeChan: stakeChan,
+		bidChan:   bidChan,
+		keyMaster: keyMaster,
+		provider:  provider,
 	}
 
 	if srv != nil {
 		node.RegisterWalletServer(srv, t)
 		node.RegisterTransactorServer(srv, t)
 	}
-	return t
+
+	if err := rb.Register(topics.SendStakeTx, stakeChan); err != nil {
+		return nil, err
+	}
+
+	if err := rb.Register(topics.SendBidTx, bidChan); err != nil {
+		return nil, err
+	}
+
+	go t.Listen()
+	return t, nil
+}
+
+// Listen to the stake and bid channels and trigger a stake and bid transaction
+// requests
+func (t *Transactor) Listen() {
+	l := log.WithField("action", "listen")
+	for {
+		select {
+		case r := <-t.stakeChan:
+			req, ok := r.Params.(*node.StakeRequest)
+			if !ok {
+				continue
+			}
+
+			// QUESTION: should we return the hash of the transaction back to
+			// the client?
+			if _, err := t.Stake(context.Background(), req); err != nil {
+				l.WithError(err).Errorln("error in creating a stake transaction")
+			}
+
+		case r := <-t.bidChan:
+			req, ok := r.Params.(*node.BidRequest)
+			if !ok {
+				continue
+			}
+
+			if _, err := t.Bid(context.Background(), req); err != nil {
+				l.WithError(err).Errorln("error in creating a bid transaction")
+			}
+		}
+	}
 }
 
 // GetTxHistory will return a subset of the transactions that were sent and received.

@@ -6,7 +6,7 @@ func TestTxByTxID(t *testing.T) {
 
 	query := `
 		{
-		   transactions(txid: "05300b8d9904a31241520bb2961ef2516401884b8f6fc3862542b13baa4089cc") {
+		   transactions(txid: "529086a45bdf1efa27c7291b838018543061cf8aec2632fbbc4856052c4e88aa") {
 			  txid
 			  txtype
 			  blockhash
@@ -19,8 +19,8 @@ func TestTxByTxID(t *testing.T) {
 				"transactions": [
 					{
 						"blockhash": "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620",
-						"txid": "05300b8d9904a31241520bb2961ef2516401884b8f6fc3862542b13baa4089cc",
-						"txtype": "3"
+						"txid": "529086a45bdf1efa27c7291b838018543061cf8aec2632fbbc4856052c4e88aa",
+						"txtype": "bid"
 					}
 				]
 			}
@@ -33,8 +33,8 @@ func TestTxByTxIDs(t *testing.T) {
 
 	query := `
 		{
-		   transactions(txids: ["6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
-		   "c1ecbbaab214ae2dc230c5adf57b0a13349cb1d1eb8fdfbc7722a5baa6276de8"]) {
+		   transactions(txids: ["1295fbb89ad4a6dcabd7d64651ce7b4f8ca1229c5824fdbb3e5343a52d478817",
+		   "9a24a67f4ca71d716e467674293ab33df0629c9e66b47c1cf4df787e250632a8"]) {
 			  txid
 			  txtype
 			  blockhash
@@ -47,13 +47,13 @@ func TestTxByTxIDs(t *testing.T) {
 				"transactions": [
 					{
 						"blockhash": "9467c5e774eb1b4825d08c0599a0b0815fca5dac16d9690026854ed8d1f229c9",
-						"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
-						"txtype": "3"
+						"txid": "1295fbb89ad4a6dcabd7d64651ce7b4f8ca1229c5824fdbb3e5343a52d478817",
+						"txtype": "bid"
 					},
 					{
 						"blockhash": "9bf50e394bb81346f8b8db42bddd285ac344260c024a0df808baf7601417d748",
-						"txid": "c1ecbbaab214ae2dc230c5adf57b0a13349cb1d1eb8fdfbc7722a5baa6276de8",
-						"txtype": "3"
+						"txid": "9a24a67f4ca71d716e467674293ab33df0629c9e66b47c1cf4df787e250632a8",
+						"txtype": "bid"
 					}
 				]
 			}
@@ -78,12 +78,12 @@ func TestLastTxs(t *testing.T) {
 			"data": {
 				"transactions": [
 					{
-						"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
-						"txtype": "3"
+						"txid": "1295fbb89ad4a6dcabd7d64651ce7b4f8ca1229c5824fdbb3e5343a52d478817",
+						"txtype": "bid"
 					},
 					{
-						"txid": "c1ecbbaab214ae2dc230c5adf57b0a13349cb1d1eb8fdfbc7722a5baa6276de8",
-						"txtype": "3"
+						"txid": "9a24a67f4ca71d716e467674293ab33df0629c9e66b47c1cf4df787e250632a8",
+						"txtype": "bid"
 					}
 				]
 			}
@@ -112,10 +112,10 @@ func TestTxOutput(t *testing.T) {
 				{
 					"output": [
 						{
-							"pubkey": "ea2c58c43d2ac9783a25dae2399b227fc1fd2a8bca41ca34aef74c9a3f7b435f"
+							"pubkey": "33443344"
 						}
 					],
-					"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955"
+					"txid": "1295fbb89ad4a6dcabd7d64651ce7b4f8ca1229c5824fdbb3e5343a52d478817"
 				}
 			]
 		}
@@ -145,10 +145,10 @@ func TestTxInput(t *testing.T) {
 				{
 					"input": [
 						{
-							"keyimage": "d886641e16a1165d70fa89413c4129d56b15d5f44d2dd2b09823cd723487656a"
+							"keyimage": "5566"
 						}
 					],
-					"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955"
+					"txid": "1295fbb89ad4a6dcabd7d64651ce7b4f8ca1229c5824fdbb3e5343a52d478817"
 				}
 			]
 		}
@@ -174,8 +174,8 @@ func TestTxSize(t *testing.T) {
 			"data": {
 				"transactions": [
 					{
-						"size": 766,
-						"txtype": "3"
+						"size": 258,
+						"txtype": "bid"
 					}
 				]
 			}

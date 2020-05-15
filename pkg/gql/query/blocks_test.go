@@ -142,8 +142,8 @@ func TestBlocksTxs(t *testing.T) {
 						},
 						"transactions": [
 							{
-								"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
-								"txtype": "3"
+								"txid": "1295fbb89ad4a6dcabd7d64651ce7b4f8ca1229c5824fdbb3e5343a52d478817",
+								"txtype": "bid"
 							}
 						]
 					}
@@ -232,16 +232,16 @@ func TestBlocksTxsQuery(t *testing.T) {
 						{
 							"input": [
 								{
-									"keyimage": "d886641e16a1165d70fa89413c4129d56b15d5f44d2dd2b09823cd723487656a"
+									"keyimage": "5566"
 								}
 							],
 							"output": [
 								{
-									"pubkey": "ea2c58c43d2ac9783a25dae2399b227fc1fd2a8bca41ca34aef74c9a3f7b435f"
+									"pubkey": "33443344"
 								}
 							],
-							"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
-							"txtype": "3"
+							"txid": "1295fbb89ad4a6dcabd7d64651ce7b4f8ca1229c5824fdbb3e5343a52d478817",
+							"txtype": "bid"
 						}
 					]
 				}

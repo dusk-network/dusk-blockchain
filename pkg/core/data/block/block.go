@@ -7,8 +7,8 @@ import (
 
 // Block defines a block on the Dusk blockchain.
 type Block struct {
-	Header *Header
-	Txs    []transactions.ContractCall
+	Header *Header                     `json:"header"`
+	Txs    []transactions.ContractCall `json:"transactions"`
 }
 
 // NewBlock will return an empty Block with an empty BlockHeader.
