@@ -3,7 +3,7 @@ module github.com/dusk-network/dusk-blockchain
 require (
 	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/dusk-network/dusk-crypto v0.1.1
-	github.com/dusk-network/dusk-protobuf v0.2.4
+	github.com/dusk-network/dusk-protobuf v0.2.7-0.20200514181023-bfed2020a337
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/go-chi/render v1.0.1
 	github.com/gorilla/websocket v1.4.0

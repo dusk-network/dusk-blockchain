@@ -11,10 +11,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	assert "github.com/stretchr/testify/require"
 )
 
 // Test the behavior of the block hash broker, upon receiving a GetBlocks message.
 func TestAdvertiseBlocks(t *testing.T) {
+	assert := assert.New(t)
 	// Set up db
 	_, db := lite.CreateDBConnection()
 	defer func() {
@@ -22,10 +24,8 @@ func TestAdvertiseBlocks(t *testing.T) {
 	}()
 
 	// Generate 5 blocks and store them in the db. Save the hashes for later checking.
-	hashes, blocks := generateBlocks(t, 5)
-	if err := storeBlocks(db, blocks); err != nil {
-		t.Fatal(err)
-	}
+	hashes, blocks := generateBlocks(5)
+	assert.NoError(storeBlocks(db, blocks))
 
 	// Set up the BlockHashBroker
 	responseChan := make(chan *bytes.Buffer, 100)
@@ -33,35 +33,27 @@ func TestAdvertiseBlocks(t *testing.T) {
 
 	// Make a GetBlocks, with the genesis block as the locator.
 	msg := createGetBlocksBuffer(hashes[0])
-	if err := blockHashBroker.AdvertiseMissingBlocks(msg); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(blockHashBroker.AdvertiseMissingBlocks(msg))
 
 	// The BlockHashBroker's response should be put on the responseChan.
 	response := <-responseChan
 
 	// Check for correctness of topic
 	topic, _ := topics.Extract(response)
-	if topic != topics.Inv {
-		t.Fatalf("unexpected topic %s, expected Inv", topic)
-	}
+	assert.Equal(topics.Inv, topic)
 
 	// Decode inv
 	inv := &peermsg.Inv{}
-	if err := inv.Decode(response); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(inv.Decode(response))
 
 	// Check that block hashes match up with those we generated
 	for i, item := range inv.InvList {
-		if !bytes.Equal(hashes[i+1], item.Hash) {
-			t.Fatal("received inv vector has mismatched hash")
-		}
+		assert.Equal(item.Hash, hashes[i+1])
 	}
 }
 
 // Generate a set of random blocks, which follow each other up in the chain.
-func generateBlocks(t *testing.T, amount int) ([][]byte, []*block.Block) {
+func generateBlocks(amount int) ([][]byte, []*block.Block) {
 	var hashes [][]byte
 	var blocks []*block.Block
 	for i := 0; i < amount; i++ {

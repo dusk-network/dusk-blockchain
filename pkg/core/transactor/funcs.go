@@ -12,12 +12,26 @@ import (
 
 var testnet = byte(2)
 
-func (t *Transactor) createWallet(seedBytes []byte, password string) error {
+func (t *Transactor) createWallet(seed []byte, password string) error {
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
 		return err
 	}
+
+	if seed == nil {
+		seed, err = wallet.GenerateNewSeed(nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	sk, pk, vk, err := t.keyMaster.GenerateSecretKey(context.Background(), seed)
+	if err != nil {
+		return err
+	}
+
+	t.secretKey = sk
 
 	skBuf := new(bytes.Buffer)
 	if err = transactions.MarshalSecretKey(skBuf, t.secretKey); err != nil {
@@ -25,18 +39,11 @@ func (t *Transactor) createWallet(seedBytes []byte, password string) error {
 		return err
 	}
 
-	ctx := context.Background()
-	pubkey, viewkey, err := t.keyMaster.Keys(ctx, t.secretKey)
-	if err != nil {
-		_ = db.Close()
-		return err
-	}
-
 	keysJSON := wallet.KeysJSON{
-		Seed:      seedBytes,
+		Seed:      seed,
 		SecretKey: skBuf.Bytes(),
-		PublicKey: pubkey,
-		ViewKey:   viewkey,
+		PublicKey: pk,
+		ViewKey:   vk,
 	}
 
 	// Then create the wallet with seed and password

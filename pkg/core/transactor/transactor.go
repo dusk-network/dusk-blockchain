@@ -6,7 +6,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -32,17 +31,14 @@ type Transactor struct { // TODO: rename
 
 	secretKey transactions.SecretKey
 
-	//ruskClient       rusk.RuskClient
-	provider         transactions.Provider
-	keyMaster        transactions.KeyMaster
-	walletClient     node.WalletClient
-	transactorClient node.TransactorClient
+	provider  transactions.Provider
+	keyMaster transactions.KeyMaster
 
 	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, client *rpc.Client, provider transactions.Provider, keyMaster transactions.KeyMaster) (*Transactor, error) {
+func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, provider transactions.Provider, keyMaster transactions.KeyMaster) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -56,11 +52,8 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 		rb:        rb,
 		stakeChan: stakeChan,
 		bidChan:   bidChan,
-		//ruskClient:       client.RuskClient,
-		walletClient:     client.WalletClient,
-		transactorClient: client.TransactorClient,
-		keyMaster:        keyMaster,
-		provider:         provider,
+		keyMaster: keyMaster,
+		provider:  provider,
 	}
 
 	if srv != nil {
@@ -80,7 +73,10 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 	return t, nil
 }
 
+// Listen to the stake and bid channels and trigger a stake and bid transaction
+// requests
 func (t *Transactor) Listen() {
+	l := log.WithField("action", "listen")
 	for {
 		select {
 		case r := <-t.stakeChan:
@@ -89,14 +85,21 @@ func (t *Transactor) Listen() {
 				continue
 			}
 
-			t.Stake(context.Background(), req)
+			// QUESTION: should we return the hash of the transaction back to
+			// the client?
+			if _, err := t.Stake(context.Background(), req); err != nil {
+				l.WithError(err).Errorln("error in creating a stake transaction")
+			}
+
 		case r := <-t.bidChan:
 			req, ok := r.Params.(*node.BidRequest)
 			if !ok {
 				continue
 			}
 
-			t.Bid(context.Background(), req)
+			if _, err := t.Bid(context.Background(), req); err != nil {
+				l.WithError(err).Errorln("error in creating a bid transaction")
+			}
 		}
 	}
 }

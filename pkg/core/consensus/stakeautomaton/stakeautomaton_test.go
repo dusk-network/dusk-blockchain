@@ -16,8 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const pass = "password"
-
 // Test that the maintainer will properly send new stake transactions, when
 // one is about to expire, or if none exist.
 func TestMaintainStakes(t *testing.T) {

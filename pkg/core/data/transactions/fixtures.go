@@ -64,6 +64,14 @@ func (p PermissiveProvisioner) NewWithdrawFeesTx(context.Context, []byte, []byte
 	return WithdrawFeesTransaction{}, nil
 }
 
+// MockBlockGenerator mocks a blockgenerator
+type MockBlockGenerator struct{}
+
+// GenerateScore obeys the BlockGenerator interface
+func (b MockBlockGenerator) GenerateScore(context.Context, ScoreRequest) (Score, error) {
+	return Score{}, nil
+}
+
 // MockProxy mocks a proxy for ease of testing
 type MockProxy struct {
 	P  Provisioner
@@ -220,7 +228,7 @@ func IntermediateCoinbase(reward uint64) *DistributeTransaction {
 	pk.AG.Y = startingPk[:len(startingPk)/2]
 	pk.BG.Y = startingPk[len(startingPk)/2:]
 
-	return MockDistributeTx(reward, [][]byte{}, *pk)
+	return NewDistribute(reward, [][]byte{}, *pk)
 }
 
 // RandDistributeTx creates a random distribute transaction
@@ -236,23 +244,11 @@ func RandDistributeTx(reward uint64, provisionerNr int) *DistributeTransaction {
 	}
 
 	_, pk := RandKeys()
-	return MockDistributeTx(
+	return NewDistribute(
 		rew,
 		ps,
 		pk,
 	)
-}
-
-// MockDistributeTx creates a DistributeTransaction
-func MockDistributeTx(reward uint64, provisioners [][]byte, bgPk PublicKey) *DistributeTransaction {
-	dtx := newDistribute()
-	rtx := mockRuskTx(reward, RandUint64(), false, Rand32Bytes())
-	if err := UTx(rtx, dtx.Tx); err != nil {
-		panic(err)
-	}
-	dtx.ProvisionersAddresses = provisioners
-	dtx.BgPk = &bgPk
-	return dtx
 }
 
 /************/
@@ -308,6 +304,7 @@ func MockBidTx(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
 	return stx
 }
 
+// MockDeterministicBid creates a deterministic bid
 func MockDeterministicBid(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
 	stx := newBid()
 	// amount is set directly in the underlying ContractCallTx

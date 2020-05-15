@@ -277,7 +277,6 @@ func TestFetchBlockTxs(test *testing.T) {
 
 			// Fetch all transactions that belong to this block
 			fblockTxs, err := t.FetchBlockTxs(block.Header.Hash)
-
 			if err != nil {
 				test.Fatalf(err.Error())
 			}
@@ -363,7 +362,7 @@ func TestAtomicUpdates(test *testing.T) {
 	// That said, no parallelism should be applied.
 	// test.Parallel()
 
-	genBlocks := generateRandomBlocks(test, 2)
+	genBlocks := generateRandomBlocks(2)
 
 	// Save current storage state to compare later
 	// Supported only in heavy.DB for now
