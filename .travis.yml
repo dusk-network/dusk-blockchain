@@ -29,7 +29,7 @@ matrix:
         - bash <(curl -s https://raw.githubusercontent.com/dusk-network/tools/master/bash/telegram_ci_notifications.sh)
 
       script:
-        - go test -v -p 1 -race -coverprofile=coverage.txt -covermode=atomic ./... # Run all the tests with the race detector enabled
+        - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./... # Run all the tests with the race detector enabled
 
       after_success:
         - bash <(curl -s https://codecov.io/bash)

@@ -9,7 +9,7 @@ all: build
 lint: ## Lint the files
 	GOBIN=$(PWD)/bin go run scripts/build.go lint
 test: ## Run unittests
-	@go test $(TFLAGS) -p 1 -short ${PKG_LIST}
+	@go test $(TFLAGS) -short ${PKG_LIST}
 test-harness: ## Run harness tests
 	@go test -v --count=1 --test.timeout=0 ./harness/tests/... -args -enable
 get-blindbid: ## download dusk-blindbidproof
