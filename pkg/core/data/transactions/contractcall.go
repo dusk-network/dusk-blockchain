@@ -99,13 +99,13 @@ type ContractCall interface {
 // jsonMarshalable reduce code duplication for JSON Marshaling
 type jsonMarshalable struct {
 	Type string `json:"tx-type"`
-	Hash string `json:"hash"`
+	Hash []byte `json:"hash"`
 }
 
 func newJSONMarshalable(t TxType, hash []byte) jsonMarshalable {
 	return jsonMarshalable{
-		Type: string(t),
-		Hash: string(hash),
+		Type: t.String(),
+		Hash: hash,
 	}
 }
 

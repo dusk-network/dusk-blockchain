@@ -22,15 +22,15 @@ const (
 // Note is the spendable output
 type Note struct {
 	NoteType                  NoteType         `json:"note_type"`
-	Pos                       uint64           `json:"pos"`
-	Nonce                     *Nonce           `json:"nonce"`
-	RG                        *CompressedPoint `json:"r_g"`
-	PkR                       *CompressedPoint `json:"pk_r"`
-	ValueCommitment           *Scalar          `json:"value_commitment"`
-	TransparentBlindingFactor *Scalar          `json:"transparent_blinding_factor"`
-	EncryptedBlindingFactor   []byte           `json:"encrypted_blinding_factor"`
-	TransparentValue          uint64           `json:"transparent_value"`
-	EncryptedValue            []byte           `json:"encrypted_value"`
+	Pos                       uint64           `json:"pos,omitempty"`
+	Nonce                     *Nonce           `json:"nonce,omitempty"`
+	RG                        *CompressedPoint `json:"r_g,omitempty"`
+	PkR                       *CompressedPoint `json:"pk_r,omitempty"`
+	ValueCommitment           *Scalar          `json:"value_commitment,omitempty"`
+	TransparentBlindingFactor *Scalar          `json:"transparent_blinding_factor,omitempty"`
+	EncryptedBlindingFactor   []byte           `json:"encrypted_blinding_factor,omitempty"`
+	TransparentValue          uint64           `json:"transparent_value,omitempty"`
+	EncryptedValue            []byte           `json:"encrypted_value,omitempty"`
 }
 
 //MNote to rusk

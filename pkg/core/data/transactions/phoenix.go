@@ -264,7 +264,7 @@ func UnmarshalTransactionInput(r *bytes.Buffer, t *TransactionInput) error {
 
 // TransactionOutput is the spendable output of the transaction
 type TransactionOutput struct {
-	Note           *Note      `json:"note,omitempty"`
+	Note           *Note      `json:"note"`
 	Pk             *PublicKey `json:"pk,omitempty"`
 	BlindingFactor *Scalar    `json:"blinding_factor,omitempty"`
 }

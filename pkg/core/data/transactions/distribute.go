@@ -20,17 +20,26 @@ type DistributeTransaction struct {
 // MarshalJSON provides a json-encoded readable representation of a
 // DistributeTransaction
 func (t *DistributeTransaction) MarshalJSON() ([]byte, error) {
-	// type aliasing allows to work around stack overflow of recursive JSON
-	// marshaling
-	type Alias DistributeTransaction
+
+	type NullableTx struct {
+		Outputs []*TransactionOutput `json:"outputs"`
+	}
 
 	h, _ := t.CalculateHash()
+	btx := NullableTx{
+		Outputs: []*TransactionOutput{t.Tx.Outputs[0]},
+	}
+
 	return json.Marshal(struct {
-		*Alias
 		jsonMarshalable
+		ProvisionersAddresses [][]byte   `json:"provisioners_addresses"`
+		BgPk                  *PublicKey `json:"bg_pk"`
+		Tx                    NullableTx `json:"tx"`
 	}{
-		Alias:           (*Alias)(t),
-		jsonMarshalable: newJSONMarshalable(t.Type(), h),
+		jsonMarshalable:       newJSONMarshalable(t.Type(), h),
+		ProvisionersAddresses: t.ProvisionersAddresses,
+		BgPk:                  t.BgPk,
+		Tx:                    btx,
 	})
 }
 
