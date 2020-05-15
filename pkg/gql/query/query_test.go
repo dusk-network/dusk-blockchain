@@ -52,6 +52,12 @@ func initializeDB(db database.DB) {
 	b1.Header.Hash, _ = hex.DecodeString("194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620")
 	b1.Txs = make([]core.ContractCall, 0)
 	b1.Txs = append(b1.Txs, core.MockDeterministicBid(100, 100000, make([]byte, 32), make([]byte, 33)))
+	hash, err := b1.Txs[0].CalculateHash()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(hex.EncodeToString(hash))
 	b1.Header.Timestamp = 10
 	chain = append(chain, b1)
 
