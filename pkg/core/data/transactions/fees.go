@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -16,6 +17,21 @@ type WithdrawFeesTransaction struct {
 	BlsKey []byte `json:"bls_key"`
 	Sig    []byte `json:"sig"`
 	Msg    []byte `json:"msg"`
+}
+
+// MarshalJSON provides a json-encoded readable representation of a
+// WithdrawFees
+func (t *WithdrawFeesTransaction) MarshalJSON() ([]byte, error) {
+	h, _ := t.CalculateHash()
+	return json.Marshal(struct {
+		*WithdrawFeesTransaction
+		Type string `json:"tx-type"`
+		Hash string `json:"hash"`
+	}{
+		WithdrawFeesTransaction: t,
+		Type:                    string(t.Type()),
+		Hash:                    string(h),
+	})
 }
 
 // MWithdrawFees copies the WithdrawFeesTransaction into the rusk equivalent

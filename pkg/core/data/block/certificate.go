@@ -6,11 +6,11 @@ import (
 
 // Certificate defines a block certificate made as a result from the consensus.
 type Certificate struct {
-	StepOneBatchedSig []byte // Batched BLS signature of the block reduction phase (33 bytes)
-	StepTwoBatchedSig []byte
-	Step              uint8  // Step the agreement terminated at (1 byte)
-	StepOneCommittee  uint64 // Binary representation of the committee members who voted in favor of this block (8 bytes)
-	StepTwoCommittee  uint64
+	StepOneBatchedSig []byte `json:"step-one-batched-sig"` // Batched BLS signature of the block reduction phase (33 bytes)
+	StepTwoBatchedSig []byte `json:"step-two-batched-sig"`
+	Step              uint8  `json:"step"`               // Step the agreement terminated at (1 byte)
+	StepOneCommittee  uint64 `json:"step-one-committee"` // Binary representation of the committee members who voted in favor of this block (8 bytes)
+	StepTwoCommittee  uint64 `json:"step-two-committee"`
 }
 
 // EmptyCertificate returns an empty Certificate instance

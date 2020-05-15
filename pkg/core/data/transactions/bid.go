@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -18,6 +19,21 @@ type BidTransaction struct {
 	R                []byte `json:"r"`
 	Seed             []byte `json:"seed"`
 	ExpirationHeight uint64 `json:"expiration_height"`
+}
+
+// MarshalJSON provides a json-encoded readable representation of a
+// BidTransaction
+func (t *BidTransaction) MarshalJSON() ([]byte, error) {
+	h, _ := t.CalculateHash()
+	return json.Marshal(struct {
+		*BidTransaction
+		Type string `json:"tx-type"`
+		Hash string `json:"hash"`
+	}{
+		BidTransaction: t,
+		Type:           string(t.Type()),
+		Hash:           string(h),
+	})
 }
 
 func newBid() *BidTransaction {
@@ -159,6 +175,21 @@ type WithdrawBidTransaction struct {
 	Commitment []byte `json:"commitment"`
 	Sig        []byte `json:"sig"`
 	EdPk       []byte `json:"ed_pk"`
+}
+
+// MarshalJSON provides a json-encoded readable representation of a
+// WithdrawBidTransaction
+func (t *WithdrawBidTransaction) MarshalJSON() ([]byte, error) {
+	h, _ := t.CalculateHash()
+	return json.Marshal(struct {
+		*WithdrawBidTransaction
+		Type string `json:"tx-type"`
+		Hash string `json:"hash"`
+	}{
+		WithdrawBidTransaction: t,
+		Type:                   string(t.Type()),
+		Hash:                   string(h),
+	})
 }
 
 // CalculateHash complies with merkletree.Payload interface

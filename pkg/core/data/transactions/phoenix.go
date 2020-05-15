@@ -10,11 +10,11 @@ import (
 
 // Transaction according to the Phoenix model
 type Transaction struct {
-	Inputs  []*TransactionInput  `json:"inputs"`
+	Inputs  []*TransactionInput  `json:"inputs,omitempty"`
 	Outputs []*TransactionOutput `json:"outputs"`
-	Fee     *TransactionOutput   `json:"fee"`
-	Proof   []byte               `json:"proof"`
-	Data    []byte               `json:"data"`
+	Fee     *TransactionOutput   `json:"fee,omitempty"`
+	Proof   []byte               `json:"proof,omitempty"`
+	Data    []byte               `json:"data,omitempty"`
 	hash    []byte
 }
 
@@ -241,10 +241,10 @@ func UnmarshalTransactionInput(r *bytes.Buffer, t *TransactionInput) error {
 
 // TransactionOutput is the spendable output of the transaction
 type TransactionOutput struct {
-	Note           *Note      `json:"note"`
-	Pk             *PublicKey `json:"pk"`
-	Value          uint64     `json:"value"`
-	BlindingFactor *Scalar    `json:"blinding_factor"`
+	Note           *Note      `json:"note,omitempty"`
+	Pk             *PublicKey `json:"pk,omitempty"`
+	Value          uint64     `json:"value,omitempty"`
+	BlindingFactor *Scalar    `json:"blinding_factor,omitempty"`
 }
 
 // MTxOut copies from transactions.TransactionOutput to rusk.TransactionOutput

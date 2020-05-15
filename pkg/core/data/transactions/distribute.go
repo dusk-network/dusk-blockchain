@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -14,6 +15,21 @@ type DistributeTransaction struct {
 	*ContractTx
 	ProvisionersAddresses [][]byte   `json:"provisioners_addresses"`
 	BgPk                  *PublicKey `json:"bg_pk"`
+}
+
+// MarshalJSON provides a json-encoded readable representation of a
+// DistributeTransaction
+func (t *DistributeTransaction) MarshalJSON() ([]byte, error) {
+	h, _ := t.CalculateHash()
+	return json.Marshal(struct {
+		*DistributeTransaction
+		Type string `json:"tx-type"`
+		Hash string `json:"hash"`
+	}{
+		DistributeTransaction: t,
+		Type:                  string(t.Type()),
+		Hash:                  string(h),
+	})
 }
 
 // Obfuscated returns false for DistributeTransaction. We do not rely on the

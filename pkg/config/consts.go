@@ -3,6 +3,8 @@ package config
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -43,9 +45,31 @@ func DecodeGenesis() *block.Block {
 
 		var buf bytes.Buffer
 		_, _ = buf.Write(blob)
-		if err := message.UnmarshalBlock(&buf, b); err != nil {
+		if uerr := message.UnmarshalBlock(&buf, b); uerr != nil {
+			log.Panic(uerr)
+		}
+
+		bin, err := json.MarshalIndent(b, "", "  ")
+		if err != nil {
 			log.Panic(err)
 		}
+
+		fmt.Println(string(bin))
+
+		//sanityCheck(TestNetGenesisBlob, b)
 	}
 	return b
+}
+
+// nolint
+func sanityCheck(genesis string, b *block.Block) {
+	// sanity check the genesis block
+	r := new(bytes.Buffer)
+	if err := message.MarshalBlock(r, b); err != nil {
+		log.Panic(err)
+	}
+	hgen := hex.EncodeToString(r.Bytes())
+	if hgen != TestNetGenesisBlob {
+		log.Panic("genesis blob is malformed")
+	}
 }
