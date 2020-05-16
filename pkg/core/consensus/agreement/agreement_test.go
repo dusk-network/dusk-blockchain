@@ -37,6 +37,10 @@ func TestAgreement(t *testing.T) {
 	for i := 0; i < nr; i++ {
 		a := message.MockAgreement(hash, 1, 3, hlp.Keys, hlp.P, i)
 		msg := message.New(topics.Agreement, a)
+		// marshaling will populate the cache and prevent race-conditions
+		// within the Republisher
+		message.Marshal(msg)
+
 		hlp.Bus.Publish(topics.Agreement, msg)
 	}
 
