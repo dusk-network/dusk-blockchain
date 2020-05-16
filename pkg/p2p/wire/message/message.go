@@ -15,7 +15,6 @@ import (
 // nodes as well as internal components. The Message transits inside of the
 // eventbus and is de- serialized through the Gossip procedure
 type Message interface {
-	//fmt.Stringer
 	Category() topics.Topic
 	Payload() interface{}
 	Equal(Message) bool
@@ -105,10 +104,6 @@ func (m simple) Equal(other Message) bool {
 func New(t topics.Topic, payload interface{}) Message {
 	return &simple{category: t, payload: payload}
 }
-
-//func newMsg(t topics.Topic) *simple {
-//	return &simple{category: t}
-//}
 
 func (m *simple) initPayloadBuffer(b bytes.Buffer) {
 	if m.marshaled == nil {

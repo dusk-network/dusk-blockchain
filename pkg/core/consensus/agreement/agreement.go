@@ -78,7 +78,7 @@ func (a *agreement) CollectAgreementEvent(packet consensus.InternalPacket) error
 		"id":        a.agreementID,
 	}).Debugln("received event")
 
-	// FIXME: republish here to avoid race conditions for faster but less safe
+	// FIXME: republish here to avoid race conditions for faster but safer
 	// repropagation
 	a.accumulator.Process(aggro)
 	return nil
