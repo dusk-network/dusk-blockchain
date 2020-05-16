@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
+// TODO:
 type (
 	// Validator is a function used by the Republisher to establish if the
 	// message should be forwarded to the network or otherwise. For instance,
@@ -54,25 +55,24 @@ func New(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
 		tpc:        tpc,
 		validators: v,
 	}
-	r.id = r.Activate()
 	return r
 }
 
 // Stop a Republisher
 func (r *Republisher) Stop() {
-	r.broker.Unsubscribe(r.tpc, r.id)
+	if r.id != 0 {
+		r.broker.Unsubscribe(r.tpc, r.id)
+	}
 }
 
-// Activate the Republisher by listening to topic through a
-// callback listener
-func (r *Republisher) Activate() uint32 {
+// Go launches the Republisher in asynchronous mode by subscribing it to the
+// broker and handle republishing by itself.
+// Note: race conditions could arise since `message.Message` is not threadsafe
+func (r *Republisher) Go() {
 	if r.id != 0 {
-		return r.id
+		l := eventbus.NewCallbackListener(r.Republish)
+		r.id = r.broker.Subscribe(r.tpc, l)
 	}
-
-	l := eventbus.NewCallbackListener(r.Republish)
-	r.id = r.broker.Subscribe(r.tpc, l)
-	return r.id
 }
 
 // Republish intercepts a topic and repropagates it immediately

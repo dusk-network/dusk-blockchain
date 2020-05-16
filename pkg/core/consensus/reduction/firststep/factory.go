@@ -24,6 +24,7 @@ type Factory struct {
 // NewFactory instantiates a Factory
 func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Keys, timeout time.Duration) *Factory {
 	r := republisher.New(broker, topics.Reduction)
+	r.Go()
 	return &Factory{
 		broker,
 		rpcBus,

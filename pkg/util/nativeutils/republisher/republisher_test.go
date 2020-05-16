@@ -19,7 +19,8 @@ func TestRepublisher(t *testing.T) {
 	gl := eventbus.NewChanListener(gossipChan)
 	eb.Subscribe(topics.Gossip, gl)
 
-	republisher.New(eb, topics.Agreement)
+	r := republisher.New(eb, topics.Agreement)
+	r.Go()
 
 	mockAggro := bytes.NewBuffer([]byte{1})
 	msg := message.New(topics.Agreement, *mockAggro)

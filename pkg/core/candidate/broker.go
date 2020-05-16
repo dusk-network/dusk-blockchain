@@ -64,6 +64,7 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 
 	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.AddValidHash))
 	b.republisher = republisher.New(broker, topics.Candidate, Validate, b.Validate)
+	b.republisher.Go()
 	return b
 }
 

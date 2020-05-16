@@ -21,6 +21,7 @@ type Factory struct {
 func NewFactory(broker eventbus.Broker, keys key.Keys) *Factory {
 	amount := cfg.Get().Performance.AccumulatorWorkers
 	r := republisher.New(broker, topics.Agreement)
+	r.Go()
 
 	return &Factory{
 		broker:       broker,
