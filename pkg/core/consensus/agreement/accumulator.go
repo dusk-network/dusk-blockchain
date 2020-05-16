@@ -38,7 +38,7 @@ func newAccumulator(handler Handler, workerAmount int) *Accumulator {
 func (a *Accumulator) Process(ev message.Agreement) {
 	defer func() {
 		// we recover from panic in case of a late Process call which would attempt to write to the closed verificationChan
-		// the alternative would be to never close the verificationChan and either use a multitude of channels to  stop the workers or a shared boolean set in the Accumulator.Stop
+		// the alternative would be to never close the verificationChan and either use a multitude of channels to stop the workers or a shared boolean set in the Accumulator.Stop
 		if r := recover(); r != nil {
 			lg.Traceln("attempting to forward to a closed Accumulator")
 		}
@@ -50,6 +50,8 @@ func (a *Accumulator) Process(ev message.Agreement) {
 // Accumulate agreements per block hash until a quorum is reached or a stop is detected (by closing the internal event channel). Supposed to run in a goroutine
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
+		// FIXME: republish here to avoid race conditions for slower but safer
+		// repropagation
 		hdr := ev.State()
 		collected := a.store.Get(hdr.Step)
 		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
