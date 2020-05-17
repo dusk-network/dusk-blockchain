@@ -92,7 +92,7 @@ func Setup() *Server {
 	client := rpc.InitRPCClients(ctx, "127.0.0.1:8080")
 	proxy := transactions.NewProxy(client.RuskClient)
 
-	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Verifier(), grpcServer)
+	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Verifier(), proxy.Provider(), grpcServer)
 	m.Run()
 
 	chainDBLoader, err := LaunchChain(ctx, proxy, eventBus, rpcBus, counter, grpcServer)
