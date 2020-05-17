@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"bytes"
 	"context"
 	"errors"
 
@@ -77,6 +78,8 @@ type Provider interface {
 	// GetBalance returns the balance of the client expressed in (unit?) of
 	// DUSK. It accepts the ViewKey as parameter
 	GetBalance(context.Context, ViewKey) (uint64, error)
+
+	CalculateMempoolBalance(context.Context, []byte, []ContractCall) (uint64, error)
 
 	NewContractCall(context.Context, []byte, TxRequest) (ContractCall, error)
 
@@ -219,6 +222,38 @@ func (p *provider) GetBalance(ctx context.Context, vk ViewKey) (uint64, error) {
 	rvk := new(rusk.ViewKey)
 	MViewKey(rvk, &vk)
 	res, err := p.client.GetBalance(ctx, &rusk.GetBalanceRequest{Vk: rvk})
+	if err != nil {
+		return 0, err
+	}
+
+	return res.Balance, nil
+}
+
+func (p *provider) CalculateMempoolBalance(ctx context.Context, vkBytes []byte, txs []ContractCall) (uint64, error) {
+	vkBuf := bytes.NewBuffer(vkBytes)
+	vk := new(ViewKey)
+	if err := UnmarshalViewKey(vkBuf, vk); err != nil {
+		return 0, err
+	}
+
+	rvk := new(rusk.ViewKey)
+	MViewKey(rvk, vk)
+
+	ruskTxs := make([]*rusk.ContractCallTx, len(txs))
+	for i, tx := range txs {
+		var err error
+		ruskTxs[i], err = EncodeContractCall(tx)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	req := &rusk.CalculateMempoolBalanceRequest{
+		Vk:  rvk,
+		Txs: ruskTxs,
+	}
+
+	res, err := p.client.CalculateMempoolBalance(ctx, req)
 	if err != nil {
 		return 0, err
 	}
