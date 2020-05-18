@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -121,16 +120,13 @@ func (g *Generator) Collect(e consensus.InternalPacket) error {
 }
 
 func (g *Generator) generateScore() error {
-	ctx, cancel := context.WithDeadline(g.ctx, time.Now().Add(500*time.Millisecond))
-	defer cancel()
-
 	sr := transactions.ScoreRequest{
 		D:    g.d,
 		K:    g.k,
 		Seed: g.seed,
 		EdPk: g.edPk,
 	}
-	scoreTx, err := g.bg.GenerateScore(ctx, sr)
+	scoreTx, err := g.bg.GenerateScore(g.ctx, sr)
 	// GenerateScore would return error if we are not in this round bidlist, or
 	// if the BidTransaction expired or is malformed
 	// TODO: check the error and, if we are not in the bidlist, finalize the

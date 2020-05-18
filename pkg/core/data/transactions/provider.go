@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -157,12 +158,16 @@ type Proxy interface {
 }
 
 type proxy struct {
-	client rusk.RuskClient
+	client  rusk.RuskClient
+	timeout time.Duration
 }
 
 // NewProxy creates a new Proxy
-func NewProxy(client rusk.RuskClient) Proxy {
-	return &proxy{client: client}
+func NewProxy(client rusk.RuskClient, timeout time.Duration) Proxy {
+	return &proxy{
+		client:  client,
+		timeout: timeout,
+	}
 }
 
 // Prober returned by the Proxy
@@ -206,6 +211,8 @@ func (v *verifier) VerifyTransaction(ctx context.Context, cc ContractCall) error
 		return err
 	}
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(v.timeout))
+	defer cancel()
 	if res, err := v.client.VerifyTransaction(ctx, ccTx); err != nil {
 		return err
 	} else if !res.Verified {
@@ -239,6 +246,8 @@ func (v *verifier) CalculateBalance(ctx context.Context, vkBytes []byte, txs []C
 		Txs: ruskTxs,
 	}
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(v.timeout))
+	defer cancel()
 	res, err := v.client.CalculateMempoolBalance(ctx, req)
 	if err != nil {
 		return 0, err
@@ -256,6 +265,8 @@ type provider struct {
 func (p *provider) GetBalance(ctx context.Context, vk ViewKey) (uint64, error) {
 	rvk := new(rusk.ViewKey)
 	MViewKey(rvk, &vk)
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	defer cancel()
 	res, err := p.client.GetBalance(ctx, &rusk.GetBalanceRequest{Vk: rvk})
 	if err != nil {
 		return 0, err
@@ -283,6 +294,8 @@ func (p *provider) NewTransactionTx(ctx context.Context, tx TxRequest) (Transact
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	defer cancel()
 	res, err := p.client.NewTransaction(ctx, tr)
 	if err != nil {
 		return *trans, err
@@ -304,6 +317,8 @@ func (p *provider) NewStakeTx(ctx context.Context, pubKeyBLS []byte, expirationH
 	str.BlsKey = make([]byte, len(pubKeyBLS))
 	copy(str.BlsKey, pubKeyBLS)
 	str.ExpirationHeight = expirationHeight
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	defer cancel()
 	res, err := p.client.NewStake(ctx, str)
 	if err != nil {
 		return *stakeTx, err
@@ -322,6 +337,8 @@ func (p *provider) NewWithdrawStakeTx(ctx context.Context, blsKey, sig []byte, t
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	defer cancel()
 	res, err := p.client.NewWithdrawStake(ctx, &rusk.WithdrawStakeTransactionRequest{
 		Tx:     tr,
 		BlsKey: blsKey,
@@ -351,6 +368,8 @@ func (p *provider) NewBidTx(ctx context.Context, k, edPk, seed []byte, expiratio
 	str.Seed = seed
 	str.ExpirationHeight = expirationHeight
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	defer cancel()
 	res, err := p.client.NewBid(ctx, str)
 	if err != nil {
 		return *bidTx, err
@@ -369,6 +388,8 @@ func (p *provider) NewWithdrawBidTx(ctx context.Context, edPk []byte, sig []byte
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	defer cancel()
 	res, err := p.client.NewWithdrawBid(ctx, &rusk.WithdrawBidTransactionRequest{
 		Tx:   tr,
 		EdPk: edPk,
@@ -395,6 +416,8 @@ func (k *keymaster) GenerateSecretKey(ctx context.Context, seed []byte) (SecretK
 	vk := new(ViewKey)
 	gskr := new(rusk.GenerateSecretKeyRequest)
 	gskr.B = seed
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(k.timeout))
+	defer cancel()
 	res, err := k.client.GenerateSecretKey(ctx, gskr)
 	if err != nil {
 		return *sk, *pk, *vk, err
@@ -411,6 +434,8 @@ func (k *keymaster) Keys(ctx context.Context, sk SecretKey) (PublicKey, ViewKey,
 	ruskSk := new(rusk.SecretKey)
 	pk, vk := new(PublicKey), new(ViewKey)
 	MSecretKey(ruskSk, &sk)
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(k.timeout))
+	defer cancel()
 	res, err := k.client.Keys(ctx, ruskSk)
 	if err != nil {
 		return PublicKey{}, ViewKey{}, err
@@ -442,6 +467,8 @@ func (e *executor) ValidateStateTransition(ctx context.Context, calls []Contract
 	}
 	vstr.CurrentHeight = height
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.timeout))
+	defer cancel()
 	res, err := e.client.ValidateStateTransition(ctx, vstr)
 	if err != nil {
 		return nil, err
@@ -468,6 +495,8 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 		}
 	}
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.timeout))
+	defer cancel()
 	res, err := e.client.ExecuteStateTransition(ctx, vstr)
 	if err != nil {
 		return 0, user.Provisioners{}, err
@@ -510,6 +539,8 @@ func (p *provisioner) NewSlashTx(ctx context.Context, str SlashTxRequest, tx TxR
 	st.SecondMsg = str.SecondMsg
 	st.SecondSig = str.SecondSig
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	defer cancel()
 	res, err := p.client.NewSlash(ctx, st)
 	if err != nil {
 		return *slashTx, err
@@ -532,6 +563,8 @@ func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, blsKey, sig, msg []
 		Msg:    msg,
 	}
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	defer cancel()
 	wf, err := p.client.NewWithdrawFees(ctx, wftr)
 	if err != nil {
 		return *feeTx, err
@@ -554,6 +587,8 @@ func (p *provisioner) VerifyScore(ctx context.Context, round uint64, step uint8,
 		Round:    round,
 		Step:     uint32(step),
 	}
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	defer cancel()
 	if _, err := p.client.VerifyScore(ctx, gsr); err != nil {
 		return err
 	}
@@ -574,6 +609,8 @@ func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Sco
 		Round: s.Round,
 		Step:  uint32(s.Step),
 	}
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(b.timeout))
+	defer cancel()
 	score, err := b.client.GenerateScore(ctx, gsr)
 	if err != nil {
 		return Score{}, err

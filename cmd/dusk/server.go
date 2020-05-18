@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"net"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -90,7 +91,9 @@ func Setup() *Server {
 	// Instantiate gRPC client
 	// TODO: get address from config
 	client := rpc.InitRPCClients(ctx, "127.0.0.1:8080")
-	proxy := transactions.NewProxy(client.RuskClient)
+
+	ruskTimeout := time.Duration(cfg.Get().RPC.Rusk.Timeout) * time.Millisecond
+	proxy := transactions.NewProxy(client.RuskClient, ruskTimeout)
 
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()

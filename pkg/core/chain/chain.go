@@ -370,10 +370,7 @@ func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(500*time.Millisecond))
-	defer cancel()
-
-	calls, err := c.executor.ValidateStateTransition(ctx, c.intermediateBlock.Txs, c.intermediateBlock.Header.Height)
+	calls, err := c.executor.ValidateStateTransition(c.ctx, c.intermediateBlock.Txs, c.intermediateBlock.Header.Height)
 	if err != nil {
 		res.Err = err
 		r.RespChan <- res
@@ -408,8 +405,6 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 
 func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 
-	ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(1*time.Second))
-	defer cancel()
 	// Set latest certificate and committee
 	c.lastCertificate = cMsg.cert
 	c.lastCommittee = cMsg.committee
@@ -431,7 +426,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 		return
 	}
 
-	if err := c.finalizeIntermediateBlock(ctx, cm.Certificate); err != nil {
+	if err := c.finalizeIntermediateBlock(c.ctx, cm.Certificate); err != nil {
 		log.WithError(err).Warnln("could not accept intermediate block")
 		return
 	}
@@ -488,9 +483,7 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 				continue
 			}
 
-			ctx, cancel := context.WithDeadline(c.ctx, time.Now().Add(500*time.Millisecond))
-			defer cancel()
-			calls, err := c.executor.ValidateStateTransition(ctx, c.prevBlock.Txs, c.prevBlock.Header.Height)
+			calls, err := c.executor.ValidateStateTransition(c.ctx, c.prevBlock.Txs, c.prevBlock.Header.Height)
 			if err != nil {
 				continue
 			}
