@@ -8,7 +8,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/stretchr/testify/assert"
+	"github.com/sirupsen/logrus"
+	assert "github.com/stretchr/testify/require"
 )
 
 //*****************
@@ -64,10 +65,7 @@ func TestStreamer(t *testing.T) {
 	bus.Publish(topic, msg)
 
 	packet, err := streamer.(*SimpleStreamer).Read()
-	if !assert.NoError(t, err) {
-		assert.FailNow(t, "error in reading from the subscribed stream")
-	}
-
+	assert.NoError(t, err)
 	// first 4 bytes of packet are the checksum
 	assert.Equal(t, "pluto", string(packet[4:]))
 }
@@ -134,6 +132,8 @@ func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 
 // Test that a streaming goroutine is killed when the exit signal is sent
 func TestExitChan(t *testing.T) {
+	// suppressing annoying logging of expected errors
+	logrus.SetLevel(logrus.FatalLevel)
 	eb := New()
 	topic := topics.Test
 	sl := NewStreamListener(&mockWriteCloser{})
@@ -151,12 +151,11 @@ func TestExitChan(t *testing.T) {
 	l := eb.listeners.Load(topic)
 	for _, listener := range l {
 		if streamer, ok := listener.Listener.(*StreamListener); ok {
-			if !assert.True(t, streamer.ringbuffer.Closed()) {
-				assert.FailNow(t, "ringbuffer not closed")
-			}
+			assert.True(t, streamer.ringbuffer.Closed())
 			return
 		}
 	}
+
 	assert.FailNow(t, "stream listener not found")
 }
 

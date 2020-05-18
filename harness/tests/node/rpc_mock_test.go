@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	assert "github.com/stretchr/testify/require"
 
 	"net"
 	"testing"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestSayHello(t *testing.T) {
+	assert := assert.New(t)
 	s := grpc.NewServer()
 	node.RegisterWalletServer(s, &node.WalletMock{})
 
@@ -28,9 +30,7 @@ func TestSayHello(t *testing.T) {
 	defer cancel()
 
 	conn, err := grpc.DialContext(dialCtx, "127.0.0.1:5051", grpc.WithInsecure())
-	if err != nil {
-		t.Fatalf("Failed to dial bufnet: %v", err)
-	}
+	assert.NoError(err)
 	defer conn.Close()
 
 	client := node.NewWalletClient(conn)
@@ -39,8 +39,7 @@ func TestSayHello(t *testing.T) {
 	defer cancelCtx()
 
 	resp, err := client.GetTxHistory(callCtx, &node.EmptyRequest{})
-	if err != nil {
-		t.Fatalf("SayHello failed: %v", err)
-	}
-	t.Logf("Response: %+v", resp)
+	assert.NoError(err)
+
+	assert.Equal(8, len(resp.Records))
 }

@@ -2,7 +2,6 @@ package transactions_test
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -168,7 +167,6 @@ func TestDecodeTransactions(t *testing.T) {
 	for i := range txs {
 		tx := txs[i]
 		decTx := decTxs[i]
-		fmt.Println(decTx)
 		assert.True(transactions.Equal(tx, decTx))
 	}
 }
