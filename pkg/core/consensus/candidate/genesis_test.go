@@ -18,7 +18,7 @@ import (
 func TestGenerateGenesis(t *testing.T) {
 	rpcBus := rpcbus.New()
 
-	go provideMempoolTxs(rpcBus)
+	provideMempoolTxs(rpcBus)
 
 	seed := make([]byte, 64)
 	if _, err := rand.Read(seed); err != nil {
@@ -98,6 +98,8 @@ func provideMempoolTxs(rpcBus *rpcbus.RPCBus) {
 		panic(err)
 	}
 
-	r := <-c
-	r.RespChan <- rpcbus.NewResponse([]transactions.ContractCall{}, nil)
+	go func() {
+		r := <-c
+		r.RespChan <- rpcbus.NewResponse([]transactions.ContractCall{}, nil)
+	}()
 }
