@@ -68,6 +68,15 @@ type rpcConfiguration struct {
 
 	User string
 	Pass string
+
+	Rusk ruskConfiguration
+}
+
+// rpc/rusk related configurations
+type ruskConfiguration struct {
+	// timeout for rusk calls
+	ContractTimeout uint
+	DefaultTimeout  uint
 }
 
 type gqlConfiguration struct {
