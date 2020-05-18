@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"google.golang.org/grpc"
 )
 
@@ -68,8 +69,29 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 }
 
 // GenerateScore returns a mocked Score.
+// TODO: investigate if we should instead, launch a blindbid process and do this properly.
 func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreRequest) (*rusk.GenerateScoreResponse, error) {
-	return nil, nil
+	proof, err := crypto.RandEntropy(400)
+	if err != nil {
+		return nil, err
+	}
+
+	score, err := crypto.RandEntropy(32)
+	if err != nil {
+		return nil, err
+	}
+
+	identity, err := crypto.RandEntropy(32)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rusk.GenerateScoreResponse{
+		Proof:    proof,
+		Score:    score,
+		Seed:     req.Seed,
+		Identity: identity,
+	}, nil
 }
 
 // VerifyScore will return either true or false, depending on the server configuration.
