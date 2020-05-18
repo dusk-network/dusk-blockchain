@@ -3,8 +3,8 @@ package ruskmock
 import (
 	"context"
 
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"google.golang.org/grpc"
 )
 
