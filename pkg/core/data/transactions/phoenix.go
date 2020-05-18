@@ -19,9 +19,9 @@ type Transaction struct {
 	Data    []byte               `json:"data,omitempty"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (t *Transaction) Copy() payload.SafePayload {
+func (t *Transaction) Copy() payload.Safe {
 	cpy := &Transaction{
 		Fee: t.Fee.Copy(),
 	}
@@ -243,7 +243,7 @@ type TransactionInput struct {
 	MerkleRoot *Scalar    `json:"merkle_root"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (t *TransactionInput) Copy() *TransactionInput {
 	cpy := &TransactionInput{
@@ -302,7 +302,7 @@ type TransactionOutput struct {
 	BlindingFactor *Scalar    `json:"blinding_factor,omitempty"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (t *TransactionOutput) Copy() *TransactionOutput {
 	cpy := &TransactionOutput{

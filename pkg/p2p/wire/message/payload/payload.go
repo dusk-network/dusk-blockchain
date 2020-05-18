@@ -1,7 +1,7 @@
 package payload
 
-// SafePayload is used for protection from race conditions
-type SafePayload interface {
+// Safe is used for protection from race conditions
+type Safe interface {
 	// Copy performs a deep copy of an object
-	Copy() SafePayload
+	Copy() Safe
 }

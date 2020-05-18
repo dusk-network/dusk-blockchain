@@ -22,9 +22,9 @@ type BidTransaction struct {
 	ExpirationHeight uint64 `json:"expiration_height"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (t *BidTransaction) Copy() payload.SafePayload {
+func (t *BidTransaction) Copy() payload.Safe {
 	b := new(BidTransaction)
 	b.ContractTx = t.ContractTx.Copy()
 	b.M = make([]byte, len(t.M))
@@ -199,9 +199,9 @@ type WithdrawBidTransaction struct {
 	EdPk       []byte `json:"ed_pk"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (t *WithdrawBidTransaction) Copy() payload.SafePayload {
+func (t *WithdrawBidTransaction) Copy() payload.Safe {
 	cpy := &WithdrawBidTransaction{
 		ContractTx: t.ContractTx.Copy(),
 		Commitment: make([]byte, len(t.Commitment)),

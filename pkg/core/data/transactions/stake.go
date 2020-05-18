@@ -18,9 +18,9 @@ type StakeTransaction struct {
 	ExpirationHeight uint64 `json:"expiration_height"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (t *StakeTransaction) Copy() payload.SafePayload {
+func (t *StakeTransaction) Copy() payload.Safe {
 	cpy := &StakeTransaction{
 		ContractTx:       t.ContractTx.Copy(),
 		BlsKey:           make([]byte, len(t.BlsKey)),
@@ -145,9 +145,9 @@ type WithdrawStakeTransaction struct {
 	Sig    []byte `json:"sig"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (t *WithdrawStakeTransaction) Copy() payload.SafePayload {
+func (t *WithdrawStakeTransaction) Copy() payload.Safe {
 	cpy := &WithdrawStakeTransaction{
 		ContractTx: t.ContractTx.Copy(),
 		BlsKey:     make([]byte, len(t.BlsKey)),

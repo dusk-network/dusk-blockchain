@@ -30,8 +30,8 @@ func NewReduction(hdr header.Header) *Reduction {
 	}
 }
 
-// Copy complies with the SafePayload interface
-func (r Reduction) Copy() payload.SafePayload {
+// Copy complies with the Safe interface
+func (r Reduction) Copy() payload.Safe {
 	cpy := Reduction{}
 	cpy.hdr = r.hdr.Copy().(header.Header)
 	cpy.SignedHash = make([]byte, 33)

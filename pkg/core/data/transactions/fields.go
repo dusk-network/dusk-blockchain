@@ -33,7 +33,7 @@ type Note struct {
 	EncryptedValue            []byte           `json:"encrypted_value,omitempty"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (n *Note) Copy() *Note {
 	cpy := &Note{
@@ -279,7 +279,7 @@ type Nullifier struct {
 	H *Scalar `json:"h"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (s *Nullifier) Copy() *Nullifier {
 	cpy := &Nullifier{
@@ -317,7 +317,7 @@ type SecretKey struct {
 	B *Scalar `json:"b"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (sk *SecretKey) Copy() *SecretKey {
 	cpy := &SecretKey{
@@ -375,7 +375,7 @@ type ViewKey struct {
 	BG *CompressedPoint `json:"b_g"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (vk *ViewKey) Copy() *ViewKey {
 	cpy := &ViewKey{
@@ -425,7 +425,7 @@ type PublicKey struct {
 	BG *CompressedPoint `json:"b_g"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (pk *PublicKey) Copy() *PublicKey {
 	cpy := &PublicKey{
@@ -491,7 +491,7 @@ type Scalar struct {
 	Data []byte `json:"data"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (s *Scalar) Copy() *Scalar {
 	cpy := &Scalar{
@@ -528,7 +528,7 @@ type CompressedPoint struct {
 	Y []byte `json:"y"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (s *CompressedPoint) Copy() *CompressedPoint {
 	cpy := &CompressedPoint{
@@ -565,7 +565,7 @@ type Nonce struct {
 	Bs []byte `json:"bs"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (s *Nonce) Copy() *Nonce {
 	cpy := &Nonce{

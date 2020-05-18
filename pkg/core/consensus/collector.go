@@ -31,9 +31,9 @@ type (
 	}
 )
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (r RoundUpdate) Copy() payload.SafePayload {
+func (r RoundUpdate) Copy() payload.Safe {
 	ru := RoundUpdate{
 		Round: r.Round,
 		P:     r.P.Copy(),

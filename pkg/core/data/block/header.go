@@ -35,7 +35,7 @@ func NewHeader() *Header {
 	}
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (b *Header) Copy() *Header {
 	h := &Header{

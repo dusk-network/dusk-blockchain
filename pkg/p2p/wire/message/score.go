@@ -52,9 +52,9 @@ func NewScoreProposal(hdr header.Header, seed []byte, score transactions.Score) 
 	}
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (e ScoreProposal) Copy() payload.SafePayload {
+func (e ScoreProposal) Copy() payload.Safe {
 	cpy := ScoreProposal{
 		hdr:      e.hdr.Copy().(header.Header),
 		Score:    make([]byte, len(e.Score)),
@@ -108,9 +108,9 @@ func NewScore(proposal ScoreProposal, pubkey, prevHash, voteHash []byte) *Score 
 	return score
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (e Score) Copy() payload.SafePayload {
+func (e Score) Copy() payload.Safe {
 	cpy := Score{
 		ScoreProposal: e.ScoreProposal.Copy().(ScoreProposal),
 		PrevHash:      make([]byte, len(e.PrevHash)),

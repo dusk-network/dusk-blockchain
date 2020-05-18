@@ -81,7 +81,7 @@ func (t TxType) String() string {
 // ContractCall is the transaction that embodies the execution parameter for a
 // smart contract method invocation
 type ContractCall interface {
-	payload.SafePayload
+	payload.Safe
 	merkletree.Payload
 
 	// Type indicates the transaction
@@ -119,7 +119,7 @@ type ContractTx struct {
 	Tx *Transaction `protobuf:"bytes,1,opt,name=tx,proto3" json:"tx,omitempty"`
 }
 
-// Copy complies with message.SafePayload interface (sorta). It returns a deep copy of
+// Copy complies with message.Safe interface (sorta). It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (c *ContractTx) Copy() *ContractTx {
 	cpy := &ContractTx{

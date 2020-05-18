@@ -39,10 +39,10 @@ func MakeCandidate(blk *block.Block, cert *block.Certificate) Candidate {
 	return *c
 }
 
-// Copy complies with the message.SafePayload interface. It performs a DeepCopy
+// Copy complies with the message.Safe interface. It performs a DeepCopy
 // that can be handy when publishing this Payload for multiple subscribers to
 // consume
-func (c Candidate) Copy() payload.SafePayload {
+func (c Candidate) Copy() payload.Safe {
 	blk := c.Block.Copy().(block.Block)
 	return Candidate{
 		Block:       &blk,

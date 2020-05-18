@@ -24,7 +24,7 @@ func NewCertificate(ag Agreement, keys [][]byte) Certificate {
 }
 
 // Copy deeply a Certificate
-func (c Certificate) Copy() payload.SafePayload {
+func (c Certificate) Copy() payload.Safe {
 	cpy := Certificate{
 		Ag:   c.Ag.Copy().(Agreement),
 		Keys: make([][]byte, len(c.Keys)),

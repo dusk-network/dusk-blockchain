@@ -56,8 +56,8 @@ func New() Header {
 	}
 }
 
-// Copy complies with the SafePayload interface
-func (h Header) Copy() payload.SafePayload {
+// Copy complies with the Safe interface
+func (h Header) Copy() payload.Safe {
 	hdr := Header{
 		Round: h.Round,
 		Step:  h.Step,

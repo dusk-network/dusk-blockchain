@@ -11,7 +11,7 @@ var emptyHash [32]byte
 // unify messages used by the consensus, which need to carry the header.Header
 // for consensus specific operations
 type InternalPacket interface {
-	payload.SafePayload
+	payload.Safe
 	State() header.Header
 }
 
@@ -28,7 +28,7 @@ func EmptyPacket() InternalPacket {
 }
 
 // Copy is a noop
-func (e empty) Copy() payload.SafePayload {
+func (e empty) Copy() payload.Safe {
 	return empty{}
 }
 
@@ -48,7 +48,7 @@ type PacketFactory interface {
 // Reduction
 type Restarter struct{}
 
-func (r Restarter) Copy() payload.SafePayload {
+func (r Restarter) Copy() payload.Safe {
 	return Restarter{}
 }
 

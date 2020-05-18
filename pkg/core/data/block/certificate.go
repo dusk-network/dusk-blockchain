@@ -13,7 +13,7 @@ type Certificate struct {
 	StepTwoCommittee  uint64 `json:"step-two-committee"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (c *Certificate) Copy() *Certificate {
 	cert := EmptyCertificate()

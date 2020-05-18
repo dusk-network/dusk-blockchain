@@ -20,7 +20,7 @@ func NewBlock() *Block {
 }
 
 // Copy returns a deep copy of the Block safe to publish to multiple subscribers
-func (b Block) Copy() payload.SafePayload {
+func (b Block) Copy() payload.Safe {
 	cpy := Block{}
 	cpy.Header = b.Header.Copy()
 	cpy.Txs = make([]transactions.ContractCall, len(b.Txs))

@@ -64,7 +64,7 @@ func (a Agreement) String() string {
 // Copy the Agreement is somewhat more expensive than the other structures
 // since it involves Marshaling and Unmarshaling. This is necessary since we do
 // not have access to the underlying BLS structs
-func (a Agreement) Copy() payload.SafePayload {
+func (a Agreement) Copy() payload.Safe {
 	b := new(bytes.Buffer)
 	// NOTE: we ignore the error here. Since we deal with a well formed agreement we
 	// assume that the marshaling cannot fail
@@ -94,7 +94,7 @@ func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) Ste
 }
 
 // Copy deeply the StepVotesMsg
-func (s StepVotesMsg) Copy() payload.SafePayload {
+func (s StepVotesMsg) Copy() payload.Safe {
 	b := new(bytes.Buffer)
 	_ = MarshalStepVotes(b, &s.StepVotes)
 	sv, _ := UnmarshalStepVotes(b)

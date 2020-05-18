@@ -12,14 +12,14 @@ import (
 )
 
 // SafeBuffer is a byte.Buffer wrapper that let the Buffer implement
-// SafePayload
+// Safe
 type SafeBuffer struct {
 	bytes.Buffer
 }
 
-// Copy complies with payload.SafePayload interface. It returns a deep copy of
+// Copy complies with payload.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (s SafeBuffer) Copy() payload.SafePayload {
+func (s SafeBuffer) Copy() payload.Safe {
 	b := bytes.NewBuffer(s.Buffer.Bytes())
 	return SafeBuffer{*b}
 }
@@ -31,7 +31,7 @@ func (s SafeBuffer) Copy() payload.SafePayload {
 // eventbus and is de- serialized through the Gossip procedure
 type Message interface {
 	Category() topics.Topic
-	Payload() payload.SafePayload
+	Payload() payload.Safe
 	Equal(Message) bool
 	Id() []byte
 
@@ -43,7 +43,7 @@ type Message interface {
 
 // Serializable allows to set a payload
 type Serializable interface {
-	SetPayload(payload.SafePayload)
+	SetPayload(payload.Safe)
 }
 
 // SerializableMessage is a Serializable and a Message
@@ -63,7 +63,7 @@ type simple struct {
 	category topics.Topic
 	// Payload carries the payload of the message, if it can be parsed at
 	// protocol level
-	payload payload.SafePayload
+	payload payload.Safe
 	// cached marshaled form with Category
 	marshaled *bytes.Buffer
 }
@@ -117,11 +117,11 @@ func (m simple) Category() topics.Topic {
 	return m.category
 }
 
-func (m simple) Payload() payload.SafePayload {
+func (m simple) Payload() payload.Safe {
 	return m.payload
 }
 
-func (m *simple) SetPayload(payload payload.SafePayload) {
+func (m *simple) SetPayload(payload payload.Safe) {
 	m.payload = payload
 }
 
@@ -132,7 +132,7 @@ func (m simple) Equal(other Message) bool {
 
 // New creates a new Message
 func New(top topics.Topic, p interface{}) Message {
-	var safePayload payload.SafePayload
+	var safePayload payload.Safe
 	switch t := p.(type) {
 	case uint:
 		safePayload = uwrap(t)
@@ -162,7 +162,7 @@ func New(top topics.Topic, p interface{}) Message {
 		safePayload = SafeBuffer{*t}
 	case bytes.Buffer:
 		safePayload = SafeBuffer{t}
-	case payload.SafePayload:
+	case payload.Safe:
 		safePayload = t
 	}
 
@@ -297,78 +297,78 @@ func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) 
 
 type uwrap uint
 
-// ConvU converts a SafePayload into a uint
-func ConvU(p payload.SafePayload) (uint, error) {
+// ConvU converts a Safe into a uint
+func ConvU(p payload.Safe) (uint, error) {
 	s, ok := p.(uwrap)
 	if !ok {
 		return 0, errors.New("payload is not uint")
 	}
 	return uint(s), nil
 }
-func (u uwrap) Copy() payload.SafePayload {
+func (u uwrap) Copy() payload.Safe {
 	return u
 }
 
 type uwrap8 uint8
 
-// ConvU8 converts a SafePayload into a uint8
-func ConvU8(p payload.SafePayload) (uint8, error) {
+// ConvU8 converts a Safe into a uint8
+func ConvU8(p payload.Safe) (uint8, error) {
 	s, ok := p.(uwrap8)
 	if !ok {
 		return 0, errors.New("payload is not a uint8")
 	}
 	return uint8(s), nil
 }
-func (u uwrap8) Copy() payload.SafePayload {
+func (u uwrap8) Copy() payload.Safe {
 	return u
 }
 
 type uwrap16 uint16
 
-// ConvU16 converts a SafePayload into a uint16
-func ConvU16(p payload.SafePayload) (uint16, error) {
+// ConvU16 converts a Safe into a uint16
+func ConvU16(p payload.Safe) (uint16, error) {
 	s, ok := p.(uwrap16)
 	if !ok {
 		return 0, errors.New("payload is not a uint16")
 	}
 	return uint16(s), nil
 }
-func (u uwrap16) Copy() payload.SafePayload {
+func (u uwrap16) Copy() payload.Safe {
 	return u
 }
 
 type uwrap32 uint32
 
-// ConvU32 converts a SafePayload into a uint32
-func ConvU32(p payload.SafePayload) (uint32, error) {
+// ConvU32 converts a Safe into a uint32
+func ConvU32(p payload.Safe) (uint32, error) {
 	s, ok := p.(uwrap32)
 	if !ok {
 		return 0, errors.New("payload is not a uint32")
 	}
 	return uint32(s), nil
 }
-func (u uwrap32) Copy() payload.SafePayload {
+func (u uwrap32) Copy() payload.Safe {
 	return u
 }
 
 type uwrap64 uint64
 
-// ConvU64 converts a SafePayload into a uint64
-func ConvU64(p payload.SafePayload) (uint64, error) {
+// ConvU64 converts a Safe into a uint64
+func ConvU64(p payload.Safe) (uint64, error) {
 	s, ok := p.(uwrap64)
 	if !ok {
 		return 0, errors.New("payload is not a uint64")
 	}
 	return uint64(s), nil
 }
-func (u uwrap64) Copy() payload.SafePayload {
+func (u uwrap64) Copy() payload.Safe {
 	return u
 }
 
 type iwrap int
 
-// ConvI converts a SafePayload into an int
-func ConvI(p payload.SafePayload) (int, error) {
+// ConvI converts a Safe into an int
+func ConvI(p payload.Safe) (int, error) {
 	s, ok := p.(iwrap)
 	if !ok {
 		return 0, errors.New("payload is not a int")
@@ -376,84 +376,84 @@ func ConvI(p payload.SafePayload) (int, error) {
 	return int(s), nil
 }
 
-func (u iwrap) Copy() payload.SafePayload {
+func (u iwrap) Copy() payload.Safe {
 	return u
 }
 
 type iwrap8 int8
 
-// ConvI8 converts a SafePayload into an int8
-func ConvI8(p payload.SafePayload) (int8, error) {
+// ConvI8 converts a Safe into an int8
+func ConvI8(p payload.Safe) (int8, error) {
 	s, ok := p.(iwrap8)
 	if !ok {
 		return 0, errors.New("payload is not a int8")
 	}
 	return int8(s), nil
 }
-func (u iwrap8) Copy() payload.SafePayload {
+func (u iwrap8) Copy() payload.Safe {
 	return u
 }
 
 type iwrap16 int16
 
-// ConvI16 converts a SafePayload into an int16
-func ConvI16(p payload.SafePayload) (int16, error) {
+// ConvI16 converts a Safe into an int16
+func ConvI16(p payload.Safe) (int16, error) {
 	s, ok := p.(iwrap16)
 	if !ok {
 		return 0, errors.New("payload is not a int16")
 	}
 	return int16(s), nil
 }
-func (u iwrap16) Copy() payload.SafePayload {
+func (u iwrap16) Copy() payload.Safe {
 	return u
 }
 
 type iwrap32 int32
 
-// ConvI32 converts a SafePayload into an int32
-func ConvI32(p payload.SafePayload) (int32, error) {
+// ConvI32 converts a Safe into an int32
+func ConvI32(p payload.Safe) (int32, error) {
 	s, ok := p.(iwrap32)
 	if !ok {
 		return 0, errors.New("payload is not a int32")
 	}
 	return int32(s), nil
 }
-func (u iwrap32) Copy() payload.SafePayload {
+func (u iwrap32) Copy() payload.Safe {
 	return u
 }
 
 type iwrap64 int64
 
-// ConvI64 converts a SafePayload into an int64
-func ConvI64(p payload.SafePayload) (int64, error) {
+// ConvI64 converts a Safe into an int64
+func ConvI64(p payload.Safe) (int64, error) {
 	s, ok := p.(iwrap64)
 	if !ok {
 		return 0, errors.New("payload is not a int64")
 	}
 	return int64(s), nil
 }
-func (u iwrap64) Copy() payload.SafePayload {
+func (u iwrap64) Copy() payload.Safe {
 	return u
 }
 
 type bwrap bool
 
-// ConvBool converts a SafePayload into a bool
-func ConvBool(p payload.SafePayload) (bool, error) {
+// ConvBool converts a Safe into a bool
+func ConvBool(p payload.Safe) (bool, error) {
 	s, ok := p.(bwrap)
 	if !ok {
 		return false, errors.New("payload is not a string")
 	}
 	return bool(s), nil
 }
-func (u bwrap) Copy() payload.SafePayload {
+func (u bwrap) Copy() payload.Safe {
 	return u
 }
 
 type swrap string
 
-// ConvStr converts a SafePayload into an int8
-func ConvStr(p payload.SafePayload) (string, error) {
+// ConvStr converts a Safe into an int8
+func ConvStr(p payload.Safe) (string, error) {
 	s, ok := p.(swrap)
 	if !ok {
 		return "", errors.New("payload is not a string")
@@ -461,6 +461,6 @@ func ConvStr(p payload.SafePayload) (string, error) {
 	return string(s), nil
 }
 
-func (u swrap) Copy() payload.SafePayload {
+func (u swrap) Copy() payload.Safe {
 	return u
 }

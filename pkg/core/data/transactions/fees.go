@@ -20,9 +20,9 @@ type WithdrawFeesTransaction struct {
 	Msg    []byte `json:"msg"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (t *WithdrawFeesTransaction) Copy() payload.SafePayload {
+func (t *WithdrawFeesTransaction) Copy() payload.Safe {
 	cpy := &WithdrawFeesTransaction{
 		ContractTx: t.ContractTx.Copy(),
 		BlsKey:     make([]byte, len(t.BlsKey)),

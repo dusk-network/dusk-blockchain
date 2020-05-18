@@ -23,9 +23,9 @@ type SlashTransaction struct {
 	SecondSig []byte `json:"second_sig"`
 }
 
-// Copy complies with message.SafePayload interface. It returns a deep copy of
+// Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
-func (t *SlashTransaction) Copy() payload.SafePayload {
+func (t *SlashTransaction) Copy() payload.Safe {
 	cpy := &SlashTransaction{
 		ContractTx: t.ContractTx.Copy(),
 		Step:       t.Step,
