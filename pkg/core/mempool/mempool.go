@@ -65,8 +65,7 @@ type Mempool struct {
 	eventBus *eventbus.EventBus
 
 	// the magic function that knows best what is valid chain Tx
-	verifier transactions.Verifier
-	provider transactions.Provider
+	verifier transactions.UnconfirmedTxProber
 	quitChan chan struct{}
 
 	// ID of subscription to the TX topic on the EventBus
@@ -89,7 +88,7 @@ func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 }
 
 // NewMempool instantiates and initializes node mempool
-func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.Verifier, provider transactions.Provider, srv *grpc.Server) *Mempool {
+func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
 
 	log.Infof("Create instance")
 
@@ -122,7 +121,6 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
 		sendTxChan:              sendTxChan,
 		verifier:                verifier,
-		provider:                provider,
 	}
 
 	// Setting the pool where to cache verified transactions.
@@ -465,10 +463,9 @@ func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.S
 
 // GetUnconfirmedBalance will return the amount of DUSK that is in the mempool
 // for a given key.
-// TODO: implement
 func (m Mempool) GetUnconfirmedBalance(ctx context.Context, req *node.GetUnconfirmedBalanceRequest) (*node.BalanceResponse, error) {
 	txs := m.verified.Clone()
-	balance, err := m.provider.CalculateMempoolBalance(ctx, req.Vk, txs)
+	balance, err := m.verifier.CalculateBalance(ctx, req.Vk, txs)
 	if err != nil {
 		return nil, err
 	}
