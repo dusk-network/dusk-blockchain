@@ -103,7 +103,9 @@ func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*
 
 // VerifyTransaction will return true or false, depending on the server configuration.
 func (s *Server) VerifyTransaction(ctx context.Context, req *rusk.ContractCallTx) (*rusk.VerifyTransactionResponse, error) {
-	return nil, nil
+	return &rusk.VerifyTransactionResponse{
+		Verified: s.cfg.PassTransactionValidation,
+	}, nil
 }
 
 // CalculateMempoolBalance will return the amount of DUSK that is pending in the mempool
