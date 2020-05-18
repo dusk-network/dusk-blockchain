@@ -42,7 +42,7 @@ func New(cfg *Config) (*Server, error) {
 
 // Echo the rusk server to see if it's still running.
 func (s *Server) Echo(ctx context.Context, req *rusk.EchoRequest) (*rusk.EchoResponse, error) {
-	return nil, nil
+	return &rusk.EchoResponse{}, nil
 }
 
 // ValidateStateTransition simulates a state transition validation. The outcome is dictated
