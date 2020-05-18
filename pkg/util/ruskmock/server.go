@@ -9,11 +9,17 @@ import (
 
 // Config contains a list of settings that determine the behavior
 // of the `Server`.
-type Config struct{}
+type Config struct {
+	PassScoreValidation       bool
+	PassTransactionValidation bool
+}
 
 // DefaultConfig returns the default configuration for the Rusk mock server.
 func DefaultConfig() *Config {
-	return &Config{}
+	return &Config{
+		PassScoreValidation:       true,
+		PassTransactionValidation: true,
+	}
 }
 
 // Server is a stand-in Rusk server, which can be used during any kind of
@@ -64,7 +70,9 @@ func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreReque
 
 // VerifyScore will return either true or false, depending on the server configuration.
 func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) (*rusk.VerifyScoreResponse, error) {
-	return nil, nil
+	return &rusk.VerifyScoreResponse{
+		Success: s.cfg.PassScoreValidation,
+	}, nil
 }
 
 // GenerateSecretKey returns a set of randomly generated keys. They will contain Ristretto points
