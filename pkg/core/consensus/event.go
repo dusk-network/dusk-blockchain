@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 )
 
 var emptyHash [32]byte
@@ -10,6 +11,7 @@ var emptyHash [32]byte
 // unify messages used by the consensus, which need to carry the header.Header
 // for consensus specific operations
 type InternalPacket interface {
+	payload.SafePayload
 	State() header.Header
 }
 
@@ -22,6 +24,11 @@ func (e empty) State() header.Header {
 
 // EmptyPacket returns an empty InternalPacket
 func EmptyPacket() InternalPacket {
+	return empty{}
+}
+
+// Copy is a noop
+func (e empty) Copy() payload.SafePayload {
 	return empty{}
 }
 
@@ -40,6 +47,10 @@ type PacketFactory interface {
 // Restarter creates the Restart message used by the Generator and the
 // Reduction
 type Restarter struct{}
+
+func (r Restarter) Copy() payload.SafePayload {
+	return Restarter{}
+}
 
 // Create a Restart message to restart the consensus
 func (r Restarter) Create(sender []byte, round uint64, step uint8) InternalPacket {

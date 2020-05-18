@@ -12,6 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
@@ -60,6 +61,25 @@ func (a Agreement) String() string {
 	return sb.String()
 }
 
+// Copy the Agreement is somewhat more expensive than the other structures
+// since it involves Marshaling and Unmarshaling. This is necessary since we do
+// not have access to the underlying BLS structs
+func (a Agreement) Copy() payload.SafePayload {
+	b := new(bytes.Buffer)
+	// NOTE: we ignore the error here. Since we deal with a well formed agreement we
+	// assume that the marshaling cannot fail
+	cpy := new(Agreement)
+	cpy.hdr = a.hdr.Copy().(header.Header)
+	cpy.signedVotes = make([]byte, len(a.signedVotes))
+	copy(cpy.signedVotes, a.signedVotes)
+	cpy.Repr = new(big.Int)
+	cpy.Repr.Set(a.Repr)
+	cpy.VotesPerStep = make([]*StepVotes, len(a.VotesPerStep))
+	_ = MarshalVotes(b, a.VotesPerStep)
+	_ = UnmarshalVotes(b, cpy.VotesPerStep)
+	return *cpy
+}
+
 // NewStepVotesMsg creates a StepVotesMsg
 func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) StepVotesMsg {
 	return StepVotesMsg{
@@ -71,6 +91,20 @@ func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) Ste
 		},
 		StepVotes: sv,
 	}
+}
+
+// Copy deeply the StepVotesMsg
+func (s StepVotesMsg) Copy() payload.SafePayload {
+	b := new(bytes.Buffer)
+	_ = MarshalStepVotes(b, &s.StepVotes)
+	sv, _ := UnmarshalStepVotes(b)
+
+	cpy := StepVotesMsg{
+		hdr:       s.hdr.Copy().(header.Header),
+		StepVotes: *sv,
+	}
+
+	return cpy
 }
 
 // State returns the Header without information about Sender (as this is only

@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-crypto/bls"
 )
@@ -27,6 +28,15 @@ func NewReduction(hdr header.Header) *Reduction {
 		hdr:        hdr,
 		SignedHash: make([]byte, 33),
 	}
+}
+
+// Copy complies with the SafePayload interface
+func (r Reduction) Copy() payload.SafePayload {
+	cpy := Reduction{}
+	cpy.hdr = r.hdr.Copy().(header.Header)
+	cpy.SignedHash = make([]byte, 33)
+	copy(cpy.SignedHash, r.SignedHash)
+	return cpy
 }
 
 func (r Reduction) String() string {

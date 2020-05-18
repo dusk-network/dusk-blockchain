@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -19,6 +20,25 @@ type BidTransaction struct {
 	R                []byte `json:"r"`
 	Seed             []byte `json:"seed"`
 	ExpirationHeight uint64 `json:"expiration_height"`
+}
+
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *BidTransaction) Copy() payload.SafePayload {
+	b := new(BidTransaction)
+	b.ContractTx = t.ContractTx.Copy()
+	b.M = make([]byte, len(t.M))
+	copy(b.M, t.M)
+	b.Commitment = make([]byte, len(t.Commitment))
+	copy(b.Commitment, t.Commitment)
+	b.Pk = make([]byte, len(t.Pk))
+	copy(b.Pk, t.Pk)
+	b.R = make([]byte, len(t.R))
+	copy(b.R, t.R)
+	b.Seed = make([]byte, len(t.Seed))
+	copy(b.Seed, t.Seed)
+	b.ExpirationHeight = t.ExpirationHeight
+	return b
 }
 
 // MarshalJSON provides a json-encoded readable representation of a
@@ -177,6 +197,23 @@ type WithdrawBidTransaction struct {
 	Commitment []byte `json:"commitment"`
 	Sig        []byte `json:"sig"`
 	EdPk       []byte `json:"ed_pk"`
+}
+
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *WithdrawBidTransaction) Copy() payload.SafePayload {
+	cpy := &WithdrawBidTransaction{
+		ContractTx: t.ContractTx.Copy(),
+		Commitment: make([]byte, len(t.Commitment)),
+		Sig:        make([]byte, len(t.Sig)),
+		EdPk:       make([]byte, len(t.EdPk)),
+	}
+
+	copy(cpy.Commitment, t.Commitment)
+	copy(cpy.Sig, t.Sig)
+	copy(cpy.EdPk, t.EdPk)
+
+	return cpy
 }
 
 // MarshalJSON provides a json-encoded readable representation of a

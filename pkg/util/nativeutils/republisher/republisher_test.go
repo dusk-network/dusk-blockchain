@@ -26,7 +26,7 @@ func TestRepublisher(t *testing.T) {
 	eb.Publish(topics.Agreement, msg)
 
 	mPack := <-gossipChan
-	packet := mPack.Payload().(bytes.Buffer)
+	packet := mPack.Payload().(message.SafeBuffer)
 
 	tpc, err := topics.Extract(&packet)
 	assert.NoError(t, err)

@@ -55,8 +55,8 @@ func TestCorrectHeader(t *testing.T) {
 	// Collect two outgoing reduction messages. The first one should have step 1
 	// in it's header, and the second should have step 2.
 	r1 := <-gossipChan
-	p1 := r1.Payload().(bytes.Buffer)
-	hdr1 := retrieveHeader(t, p1)
+	p1 := r1.Payload().(message.SafeBuffer)
+	hdr1 := retrieveHeader(t, p1.Buffer)
 	if !assert.Equal(t, uint8(1), hdr1.Step) {
 		t.FailNow()
 	}
@@ -67,8 +67,8 @@ func TestCorrectHeader(t *testing.T) {
 	r2 := <-gossipChan
 
 	// Retrieve headers from both reduction messages
-	p2 := r2.Payload().(bytes.Buffer)
-	hdr2 := retrieveHeader(t, p2)
+	p2 := r2.Payload().(message.SafeBuffer)
+	hdr2 := retrieveHeader(t, p2.Buffer)
 
 	// Check correctness
 	assert.Equal(t, uint8(2), hdr2.Step)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -16,6 +17,28 @@ type Transaction struct {
 	Fee     *TransactionOutput   `json:"fee,omitempty"`
 	Proof   []byte               `json:"proof,omitempty"`
 	Data    []byte               `json:"data,omitempty"`
+}
+
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *Transaction) Copy() payload.SafePayload {
+	cpy := &Transaction{
+		Fee: t.Fee.Copy(),
+	}
+
+	cpy.Inputs = make([]*TransactionInput, len(t.Inputs))
+	for i, tx := range t.Inputs {
+		cpy.Inputs[i] = tx.Copy()
+	}
+	cpy.Outputs = make([]*TransactionOutput, len(t.Outputs))
+	for i, tx := range t.Outputs {
+		cpy.Outputs[i] = tx.Copy()
+	}
+	cpy.Proof = make([]byte, len(t.Proof))
+	copy(cpy.Proof, t.Proof)
+	cpy.Data = make([]byte, len(t.Data))
+	copy(cpy.Data, t.Data)
+	return cpy
 }
 
 // Values returns a tuple where the first element is the sum of all transparent
@@ -220,6 +243,16 @@ type TransactionInput struct {
 	MerkleRoot *Scalar    `json:"merkle_root"`
 }
 
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *TransactionInput) Copy() *TransactionInput {
+	cpy := &TransactionInput{
+		Nullifier:  t.Nullifier.Copy(),
+		MerkleRoot: t.MerkleRoot.Copy(),
+	}
+	return cpy
+}
+
 // MTxIn copies from rusk.TransactionInput to transactions.TransactionInput
 func MTxIn(r *rusk.TransactionInput, t *TransactionInput) error {
 	r.Nullifier = new(rusk.Nullifier)
@@ -267,6 +300,17 @@ type TransactionOutput struct {
 	Note           *Note      `json:"note"`
 	Pk             *PublicKey `json:"pk,omitempty"`
 	BlindingFactor *Scalar    `json:"blinding_factor,omitempty"`
+}
+
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *TransactionOutput) Copy() *TransactionOutput {
+	cpy := &TransactionOutput{
+		Note:           t.Note.Copy(),
+		Pk:             t.Pk.Copy(),
+		BlindingFactor: t.BlindingFactor.Copy(),
+	}
+	return cpy
 }
 
 // Value returns the amount for this transaction output if Note is not

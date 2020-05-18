@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -80,7 +81,9 @@ func (t TxType) String() string {
 // ContractCall is the transaction that embodies the execution parameter for a
 // smart contract method invocation
 type ContractCall interface {
+	payload.SafePayload
 	merkletree.Payload
+
 	// Type indicates the transaction
 	Type() TxType
 	// StandardTx is the underlying phoenix transaction carrying the
@@ -114,6 +117,15 @@ func newJSONMarshalable(t TxType, hash []byte) jsonMarshalable {
 // It is NOT a ContractCall implementation as Transaction is a type apart
 type ContractTx struct {
 	Tx *Transaction `protobuf:"bytes,1,opt,name=tx,proto3" json:"tx,omitempty"`
+}
+
+// Copy complies with message.SafePayload interface (sorta). It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (c *ContractTx) Copy() *ContractTx {
+	cpy := &ContractTx{
+		Tx: c.Tx.Copy().(*Transaction),
+	}
+	return cpy
 }
 
 // Obfuscated returns true if the embedded standard transaction is confidential

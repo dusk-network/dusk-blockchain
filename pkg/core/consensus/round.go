@@ -300,13 +300,12 @@ func (c *Coordinator) reinstantiateStore() {
 // It is the callback passed to the eventbus.Multicaster
 func (c *Coordinator) CollectEvent(m message.Message) error {
 	var msg InternalPacket
-	switch m.Payload().(type) {
-	case bytes.Buffer:
-		p := m.Payload().(bytes.Buffer)
+	switch p := m.Payload().(type) {
+	case message.SafeBuffer: // TODO: we should actually panic here
 		_, _ = topics.Extract(&p)
 		return fmt.Errorf("trying to feed the Coordinator a bytes.Buffer for message: %s", m.Category())
 	case InternalPacket:
-		msg = m.Payload().(InternalPacket)
+		msg = p
 	default:
 		return errors.New("trying to feed the Coordinator a screwed up message from the EventBus")
 	}

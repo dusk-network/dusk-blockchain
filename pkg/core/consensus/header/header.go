@@ -13,6 +13,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-crypto/bls"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -53,6 +54,20 @@ func New() Header {
 		Step:      uint8(0),
 		BlockHash: make([]byte, 32),
 	}
+}
+
+// Copy complies with the SafePayload interface
+func (h Header) Copy() payload.SafePayload {
+	hdr := Header{
+		Round: h.Round,
+		Step:  h.Step,
+	}
+
+	hdr.BlockHash = make([]byte, 32)
+	hdr.PubKeyBLS = make([]byte, 33)
+	copy(hdr.BlockHash, h.BlockHash)
+	copy(hdr.PubKeyBLS, h.PubKeyBLS)
+	return hdr
 }
 
 // State returns the Header struct itself. It is mandate by the

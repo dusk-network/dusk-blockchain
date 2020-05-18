@@ -1,6 +1,10 @@
 package message
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
+)
 
 // Certificate is the event created upon finalizing a block in the Agreement phase.
 // It will contain one of the received Agreement messages, to be used for creating
@@ -17,6 +21,21 @@ func NewCertificate(ag Agreement, keys [][]byte) Certificate {
 		Ag:   ag,
 		Keys: keys,
 	}
+}
+
+// Copy deeply a Certificate
+func (c Certificate) Copy() payload.SafePayload {
+	cpy := Certificate{
+		Ag:   c.Ag.Copy().(Agreement),
+		Keys: make([][]byte, len(c.Keys)),
+	}
+
+	for i, k := range c.Keys {
+		cpy.Keys[i] = make([]byte, len(k))
+		copy(cpy.Keys[i], k)
+	}
+	return cpy
+
 }
 
 // String returns a string representation of a Certificate message.

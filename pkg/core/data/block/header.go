@@ -35,6 +35,27 @@ func NewHeader() *Header {
 	}
 }
 
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (b *Header) Copy() *Header {
+	h := &Header{
+		Certificate: b.Certificate.Copy(),
+		Version:     b.Version,
+		Height:      b.Height,
+		Timestamp:   b.Timestamp,
+	}
+
+	h.PrevBlockHash = make([]byte, len(b.PrevBlockHash))
+	copy(h.PrevBlockHash, b.PrevBlockHash)
+	h.Seed = make([]byte, len(b.Seed))
+	copy(h.Seed, b.Seed)
+	h.TxRoot = make([]byte, len(b.TxRoot))
+	copy(h.TxRoot, b.TxRoot)
+	h.Hash = make([]byte, len(b.Hash))
+	copy(h.Hash, b.Hash)
+	return h
+}
+
 // CalculateHash will calculate and return this block header's hash by encoding all the relevant
 // fields and then hashing the result.
 func (b *Header) CalculateHash() ([]byte, error) {

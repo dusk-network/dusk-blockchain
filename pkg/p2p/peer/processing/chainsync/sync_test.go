@@ -42,8 +42,9 @@ func TestSynchronizeBehind(t *testing.T) {
 
 	// Check highest seen
 	highestSeenHeightMsg := <-highestSeenChan
-	highestSeenHeight := highestSeenHeightMsg.Payload().(uint64)
+	highestSeenHeight, err := message.ConvU64(highestSeenHeightMsg.Payload())
 
+	assert.NoError(err)
 	assert.Equal(highestSeenHeight, height)
 }
 

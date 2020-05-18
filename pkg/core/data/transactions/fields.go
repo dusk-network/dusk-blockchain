@@ -33,6 +33,26 @@ type Note struct {
 	EncryptedValue            []byte           `json:"encrypted_value,omitempty"`
 }
 
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (n *Note) Copy() *Note {
+	cpy := &Note{
+		NoteType:                  n.NoteType,
+		Pos:                       n.Pos,
+		Nonce:                     n.Nonce.Copy(),
+		RG:                        n.RG.Copy(),
+		PkR:                       n.PkR.Copy(),
+		ValueCommitment:           n.ValueCommitment.Copy(),
+		TransparentBlindingFactor: n.TransparentBlindingFactor.Copy(),
+		TransparentValue:          n.TransparentValue,
+	}
+	cpy.EncryptedValue = make([]byte, len(n.EncryptedValue))
+	copy(cpy.EncryptedValue, n.EncryptedValue)
+	cpy.EncryptedBlindingFactor = make([]byte, len(n.EncryptedBlindingFactor))
+	copy(cpy.EncryptedBlindingFactor, n.EncryptedBlindingFactor)
+	return cpy
+}
+
 //MNote to rusk
 func MNote(r *rusk.Note, n *Note) error {
 	switch n.NoteType {
@@ -259,6 +279,15 @@ type Nullifier struct {
 	H *Scalar `json:"h"`
 }
 
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (s *Nullifier) Copy() *Nullifier {
+	cpy := &Nullifier{
+		H: s.H.Copy(),
+	}
+	return cpy
+}
+
 // MNullifier copy the Nullifier from rusk to transactions datastruct
 func MNullifier(r *rusk.Nullifier, n *Nullifier) {
 	r.H = new(rusk.Scalar)
@@ -288,9 +317,19 @@ type SecretKey struct {
 	B *Scalar `json:"b"`
 }
 
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (sk *SecretKey) Copy() *SecretKey {
+	cpy := &SecretKey{
+		A: sk.A.Copy(),
+		B: sk.B.Copy(),
+	}
+	return cpy
+}
+
 // IsEmpty is used when passing the SecretKey by value
-func (s SecretKey) IsEmpty() bool {
-	return s.A == nil && s.B == nil
+func (sk SecretKey) IsEmpty() bool {
+	return sk.A == nil && sk.B == nil
 }
 
 // MSecretKey copy the SecretKey from transactions datastruct to rusk.SecretKey
@@ -336,6 +375,16 @@ type ViewKey struct {
 	BG *CompressedPoint `json:"b_g"`
 }
 
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (vk *ViewKey) Copy() *ViewKey {
+	cpy := &ViewKey{
+		A:  vk.A.Copy(),
+		BG: vk.BG.Copy(),
+	}
+	return cpy
+}
+
 // MViewKey copies the ViewKey from rusk to transactions datastructs
 func MViewKey(r *rusk.ViewKey, n *ViewKey) {
 	r.A = new(rusk.Scalar)
@@ -374,6 +423,16 @@ func UnmarshalViewKey(r *bytes.Buffer, n *ViewKey) error {
 type PublicKey struct {
 	AG *CompressedPoint `json:"a_g"`
 	BG *CompressedPoint `json:"b_g"`
+}
+
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (pk *PublicKey) Copy() *PublicKey {
+	cpy := &PublicKey{
+		AG: pk.AG.Copy(),
+		BG: pk.BG.Copy(),
+	}
+	return cpy
 }
 
 // IsEmpty is used to check whether the public key is empty
@@ -432,6 +491,16 @@ type Scalar struct {
 	Data []byte `json:"data"`
 }
 
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (s *Scalar) Copy() *Scalar {
+	cpy := &Scalar{
+		Data: make([]byte, len(s.Data)),
+	}
+	copy(cpy.Data, s.Data)
+	return cpy
+}
+
 // MScalar serializes Nonce from transaction to rusk
 func MScalar(r *rusk.Scalar, n *Scalar) {
 	r.Data = make([]byte, len(n.Data))
@@ -459,6 +528,16 @@ type CompressedPoint struct {
 	Y []byte `json:"y"`
 }
 
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (s *CompressedPoint) Copy() *CompressedPoint {
+	cpy := &CompressedPoint{
+		Y: make([]byte, len(s.Y)),
+	}
+	copy(cpy.Y, s.Y)
+	return cpy
+}
+
 // MarshalCompressedPoint to the wire encoding
 func MarshalCompressedPoint(r *bytes.Buffer, n CompressedPoint) error {
 	return encoding.WriteVarBytes(r, n.Y)
@@ -484,6 +563,16 @@ func MCompressedPoint(r *rusk.CompressedPoint, n *CompressedPoint) {
 // Nonce is the distributed atomic increment used to prevent double spending
 type Nonce struct {
 	Bs []byte `json:"bs"`
+}
+
+// Copy complies with message.SafePayload interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (s *Nonce) Copy() *Nonce {
+	cpy := &Nonce{
+		Bs: make([]byte, len(s.Bs)),
+	}
+	copy(cpy.Bs, s.Bs)
+	return cpy
 }
 
 // MarshalNonce to the wire encoding

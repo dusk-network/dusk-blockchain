@@ -8,7 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
 var collectEventTable = []struct {
@@ -25,14 +25,15 @@ var collectEventTable = []struct {
 
 // Test that the coordinator redirects events correctly, according to their header
 func TestCollectEvent(t *testing.T) {
+	assert := assert.New(t)
 	c, cmps := initCoordinatorTest(t, topics.Reduction)
 	comp := cmps[0].(*mockComponent)
 
 	for _, tt := range collectEventTable {
 		ev := mockMessage(topics.Reduction, tt.eventRound, tt.eventStep)
 		c.CollectEvent(ev)
-		assert.Equal(t, tt.receivedEventsLen, len(comp.receivedEvents))
-		assert.Equal(t, tt.queuedEventsLen, len(c.eventqueue.entries[tt.eventRound][tt.eventStep]))
+		assert.Equal(tt.receivedEventsLen, len(comp.receivedEvents))
+		assert.Equal(tt.queuedEventsLen, len(c.eventqueue.entries[tt.eventRound][tt.eventStep]))
 	}
 }
 

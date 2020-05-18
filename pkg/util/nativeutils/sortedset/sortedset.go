@@ -40,6 +40,16 @@ func (v Set) Equal(other Set) bool {
 	return true
 }
 
+// Copy deeply a set
+func (v Set) Copy() Set {
+	all := make([]*big.Int, len(v))
+	for i, elem := range v {
+		all[i] = new(big.Int)
+		all[i].Set(elem)
+	}
+	return Set(all)
+}
+
 // IndexOf returns the index at which a byte slice should be inserted and
 // whether the element is actually found or otherwise. Internally uses big.Int
 // representation

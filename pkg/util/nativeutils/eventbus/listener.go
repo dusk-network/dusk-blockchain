@@ -1,7 +1,6 @@
 package eventbus
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"math/rand"
@@ -68,7 +67,7 @@ func (s *StreamListener) Notify(m message.Message) error {
 	// TODO: interface - the ring buffer should be able to handle interface
 	// payloads rather than restricting solely to buffers
 	// TODO: interface - This panics in case payload is not a buffer
-	buf := m.Payload().(bytes.Buffer)
+	buf := m.Payload().(message.SafeBuffer)
 	s.ringbuffer.Put(buf.Bytes())
 	return nil
 }

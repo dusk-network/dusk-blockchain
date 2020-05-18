@@ -130,7 +130,6 @@ func (s *ChainSynchronizer) setHighestSeen(height uint64) {
 	s.lock.Unlock()
 }
 
-// TODO: interface - get rid of the marshaling
 func (s *ChainSynchronizer) publishHighestSeen(height uint64) {
 	msg := message.New(topics.HighestSeen, height)
 	s.publisher.Publish(topics.HighestSeen, msg)
