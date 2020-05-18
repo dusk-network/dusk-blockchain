@@ -76,7 +76,7 @@ func (b MockBlockGenerator) GenerateScore(context.Context, ScoreRequest) (Score,
 type MockProxy struct {
 	P  Provisioner
 	Pr Provider
-	V  Verifier
+	V  UnconfirmedTxProber
 	KM KeyMaster
 	E  Executor
 	BG BlockGenerator
@@ -97,8 +97,12 @@ func (v *mockVerifier) VerifyTransaction(ctx context.Context, cc ContractCall) e
 	return nil
 }
 
-// Verifier returns a Verifier that is capable of checking invalid mocked up transactions
-func (m MockProxy) Verifier() Verifier {
+func (v *mockVerifier) CalculateBalance(ctx context.Context, vkBytes []byte, txs []ContractCall) (uint64, error) {
+	return uint64(0), nil
+}
+
+// Prober returns a UnconfirmedTxProber that is capable of checking invalid mocked up transactions
+func (m MockProxy) Prober() UnconfirmedTxProber {
 	return &mockVerifier{}
 }
 

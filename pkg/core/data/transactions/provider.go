@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"bytes"
 	"context"
 	"errors"
 
@@ -66,10 +67,14 @@ type Score struct {
 	Identity []byte
 }
 
-// Verifier performs verification of contract calls (transactions)
-type Verifier interface {
+// UnconfirmedTxProber performs verification of contract calls (transactions)
+type UnconfirmedTxProber interface {
 	// VerifyTransaction verifies a contract call transaction
 	VerifyTransaction(context.Context, ContractCall) error
+	// CalculateBalance for transactions on demand. This functionality is used
+	// primarily by the mempool which can order RUSK to calculate balance for
+	// transactions even if they are unconfirmed
+	CalculateBalance(context.Context, []byte, []ContractCall) (uint64, error)
 }
 
 // Provider encapsulates the common Wallet and transaction operations
@@ -78,6 +83,7 @@ type Provider interface {
 	// DUSK. It accepts the ViewKey as parameter
 	GetBalance(context.Context, ViewKey) (uint64, error)
 
+	// NewContractCall creates a non-genesis smart contract related transaction
 	NewContractCall(context.Context, []byte, TxRequest) (ContractCall, error)
 
 	// NewTransaction creates a new transaction using the user's PrivateKey
@@ -144,7 +150,7 @@ type BlockGenerator interface {
 type Proxy interface {
 	Provisioner() Provisioner
 	Provider() Provider
-	Verifier() Verifier
+	Prober() UnconfirmedTxProber
 	KeyMaster() KeyMaster
 	Executor() Executor
 	BlockGenerator() BlockGenerator
@@ -159,8 +165,8 @@ func NewProxy(client rusk.RuskClient) Proxy {
 	return &proxy{client: client}
 }
 
-// Verifier returned by the Proxy
-func (p *proxy) Verifier() Verifier {
+// Prober returned by the Proxy
+func (p *proxy) Prober() UnconfirmedTxProber {
 	return &verifier{p}
 }
 
@@ -207,6 +213,38 @@ func (v *verifier) VerifyTransaction(ctx context.Context, cc ContractCall) error
 	}
 
 	return nil
+}
+
+func (v *verifier) CalculateBalance(ctx context.Context, vkBytes []byte, txs []ContractCall) (uint64, error) {
+	vkBuf := bytes.NewBuffer(vkBytes)
+	vk := new(ViewKey)
+	if err := UnmarshalViewKey(vkBuf, vk); err != nil {
+		return 0, err
+	}
+
+	rvk := new(rusk.ViewKey)
+	MViewKey(rvk, vk)
+
+	ruskTxs := make([]*rusk.ContractCallTx, len(txs))
+	for i, tx := range txs {
+		var err error
+		ruskTxs[i], err = EncodeContractCall(tx)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	req := &rusk.CalculateMempoolBalanceRequest{
+		Vk:  rvk,
+		Txs: ruskTxs,
+	}
+
+	res, err := v.client.CalculateMempoolBalance(ctx, req)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.Balance, nil
 }
 
 type provider struct {
