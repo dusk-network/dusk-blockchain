@@ -15,11 +15,18 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
+func init() {
+	// suppressing logging due to expected errors
+	logrus.SetLevel(logrus.FatalLevel)
+}
+
 // Test that the 'ping' message is sent correctly, and that a 'pong' message will result.
 func TestPingLoop(t *testing.T) {
+	// suppressing expected error message about method not registered
 	bus := eventbus.New()
 	client, srv := net.Pipe()
 	keepAliveTime = 1 * time.Second

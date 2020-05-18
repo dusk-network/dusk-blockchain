@@ -23,6 +23,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/sirupsen/logrus"
 	assert "github.com/stretchr/testify/require"
 )
 
@@ -136,6 +137,9 @@ func TestAcceptIntermediate(t *testing.T) {
 }
 
 func TestReturnOnNilIntermediateBlock(t *testing.T) {
+	// suppressing expected warning related to not finding a winning block
+	// candidate
+	logrus.SetLevel(logrus.ErrorLevel)
 	assert := assert.New(t)
 	startingHeight := uint64(2)
 

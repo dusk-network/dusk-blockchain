@@ -14,7 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	assert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -94,10 +94,7 @@ func TestRequestCandidate(t *testing.T) {
 
 	// Make sure we receive a GetCandidate message
 	bin, err := streamer.Read()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	require.NoError(err)
 	require.Equal(topics.GetCandidate, topics.Topic(bin[0]))
 
 	// Make sure we got a request for the genesis block

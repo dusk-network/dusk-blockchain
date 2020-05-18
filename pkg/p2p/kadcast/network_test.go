@@ -6,8 +6,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -36,7 +34,7 @@ func TestBroadcastChunksMsg(t *testing.T) {
 	for i := 0; i < len(nodes); i++ {
 
 		payload, _ := crypto.RandEntropy(128)
-		log.WithField("from_node", i).Infof("Broadcasting a message")
+		//log.WithField("from_node", i).Infof("Broadcasting a message")
 
 		// Node at position i tries to broadcast a chunk message with a random
 		// payload to the network. Expected here is all nodes to receive the
@@ -54,8 +52,7 @@ func TestBroadcastChunksMsg(t *testing.T) {
 
 		time.Sleep(2 * time.Second)
 		kadcast.TestReceivedChunckOnce(t, nodes, i, payload)
-
-		log.Infof("Each network node received the message once")
+		//log.Infof("Each network node received the message once")
 	}
 }
 
