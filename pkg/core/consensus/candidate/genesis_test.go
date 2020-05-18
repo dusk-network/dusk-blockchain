@@ -59,7 +59,7 @@ func TestGenerateGenesis(t *testing.T) {
 	}
 
 	// Print blob
-	t.Logf("genesis: %s", genesisHex)
+	// t.Logf("genesis: %s", genesisHex)
 }
 
 func TestGenesisBlock(t *testing.T) {

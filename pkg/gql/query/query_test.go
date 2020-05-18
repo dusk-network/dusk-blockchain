@@ -15,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/graphql-go/graphql"
+	assert "github.com/stretchr/testify/require"
 )
 
 var sc graphql.Schema
@@ -28,7 +29,9 @@ func TestMain(m *testing.M) {
 		_ = db.Close()
 	}()
 
-	initializeDB(db)
+	if err := initializeDB(db); err != nil {
+		panic(err)
+	}
 
 	// Setup graphql Schema
 	rootQuery := NewRoot(nil)
@@ -39,7 +42,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func initializeDB(db database.DB) {
+func initializeDB(db database.DB) error {
 
 	// Generate a dummy chain with a few blocks to test against
 	chain := make([]*block.Block, 0)
@@ -52,12 +55,11 @@ func initializeDB(db database.DB) {
 	b1.Header.Hash, _ = hex.DecodeString("194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620")
 	b1.Txs = make([]core.ContractCall, 0)
 	b1.Txs = append(b1.Txs, core.MockDeterministicBid(100, 100000, make([]byte, 32), make([]byte, 33)))
-	hash, err := b1.Txs[0].CalculateHash()
+	_, err := b1.Txs[0].CalculateHash()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	fmt.Println(hex.EncodeToString(hash))
 	b1.Header.Timestamp = 10
 	chain = append(chain, b1)
 
@@ -77,12 +79,11 @@ func initializeDB(db database.DB) {
 	b3.Header.Timestamp = 30
 	chain = append(chain, b3)
 
-	_ = db.Update(func(t database.Transaction) error {
+	return db.Update(func(t database.Transaction) error {
 
 		for _, block := range chain {
 			err := t.StoreBlock(block)
 			if err != nil {
-				fmt.Print(err.Error())
 				return err
 			}
 		}
@@ -106,20 +107,13 @@ func execute(query string, schema graphql.Schema, db database.DB) *graphql.Resul
 }
 
 func assertQuery(t *testing.T, query, response string) {
+	assert := assert.New(t)
 	result, err := json.MarshalIndent(execute(query, sc, db), "", "\t")
-	if err != nil {
-		t.Errorf("marshal response: %v", err)
-	}
+	assert.NoError(err)
 
 	equal, err := assertJSONs(result, []byte(response))
-	if err != nil {
-		t.Error(err)
-	}
-
-	t.Logf("Result:\n%s", result)
-	if !equal {
-		t.Error("expecting other response from this query")
-	}
+	assert.NoError(err)
+	assert.True(equal)
 }
 
 func assertJSONs(result, expected []byte) (bool, error) {

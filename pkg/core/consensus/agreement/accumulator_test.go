@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -104,6 +105,7 @@ func TestStop(t *testing.T) {
 
 // Test that events which fail verification are not stored.
 func TestFailedVerification(t *testing.T) {
+	logrus.SetLevel(logrus.FatalLevel)
 	// Make an accumulator that has a quorum of 2 and fails verification
 	hdlr := &MockHandler{true, true, user.VotingCommittee{}, 3, false}
 	accumulator := newAccumulator(hdlr, 4)
@@ -125,7 +127,8 @@ func TestFailedVerification(t *testing.T) {
 
 // Test that events which fail verification are not stored.
 func TestNotInCommittee(t *testing.T) {
-	// Make an accumulator that has a quorum of 1 and is not in the committee
+	logrus.SetLevel(logrus.FatalLevel)
+	// Make an accumulator that has a quorum of 2 and is not in the committee
 	hdlr := &MockHandler{true, false, user.VotingCommittee{}, 1, false}
 	accumulator := newAccumulator(hdlr, 4)
 	go accumulator.Accumulate()

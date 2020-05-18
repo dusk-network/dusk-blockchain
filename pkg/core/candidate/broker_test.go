@@ -13,12 +13,13 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/stretchr/testify/assert"
+	assert "github.com/stretchr/testify/require"
 )
 
 // Ensures that candidate blocks are only let through if
 // a `ValidCandidateHash` message for that block was seen.
 func TestValidHashes(t *testing.T) {
+	assert := assert.New(t)
 	eb, rb := eventbus.New(), rpcbus.New()
 	b := candidate.NewBroker(eb, rb)
 	go b.Listen()
@@ -56,14 +57,12 @@ func TestValidHashes(t *testing.T) {
 
 	// Broker should now be able to provide us with `blk`
 	resp, err := rb.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(blk.Header.Hash)), 5*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 	cm = resp.(message.Candidate)
 
-	assert.True(t, blk.Equals(cm.Block))
+	assert.True(blk.Equals(cm.Block))
 
 	// When requesting blk2, we should get an error.
 	_, err = rb.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(blk2.Header.Hash)), 5*time.Second)
-	assert.Equal(t, "request timeout", err.Error())
+	assert.Equal("request timeout", err.Error())
 }
