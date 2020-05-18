@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"sync"
 
@@ -205,7 +204,6 @@ func (ms *GossipStreamer) Read() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(topic)
 
 	ms.lock.Lock()
 	ms.seenTopics = append(ms.seenTopics, topic)

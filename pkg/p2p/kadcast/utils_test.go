@@ -8,6 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPOW(t *testing.T) {
@@ -17,7 +18,7 @@ func TestPOW(t *testing.T) {
 		id:   [16]byte{22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22},
 	}
 
-	println(a.computePeerNonce())
+	assert.NotNil(t, a.computePeerNonce())
 }
 
 func TestWriteTCPFrame(t *testing.T) {

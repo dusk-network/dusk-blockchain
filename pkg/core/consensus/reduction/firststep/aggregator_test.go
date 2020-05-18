@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,6 +37,7 @@ func TestSuccessfulAggro(t *testing.T) {
 
 // TestInvalidBlock tests that upon collection of a quorum of events, a valid StepVotes get produced
 func TestInvalidBlock(t *testing.T) {
+	logrus.SetLevel(logrus.FatalLevel)
 	eb, rbus := eventbus.New(), rpcbus.New()
 	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second)
 	hlp.FailOnVerification(true)

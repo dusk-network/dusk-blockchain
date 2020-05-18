@@ -6,6 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -18,6 +19,8 @@ const (
 // TestBroadcastChunksMsg boostrap a kadcast network and make an attempt to
 // broadcast a message to all network peers
 func TestBroadcastChunksMsg(t *testing.T) {
+	// suppressing annoying INFO messages
+	logrus.SetLevel(logrus.ErrorLevel)
 
 	nodes, err := kadcast.TestNetwork(networkSize, basePort)
 	if err != nil {

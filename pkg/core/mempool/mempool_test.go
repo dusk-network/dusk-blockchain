@@ -13,6 +13,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
@@ -52,7 +53,7 @@ func (c *ctx) reset() {
 }
 
 func TestMain(m *testing.M) {
-
+	logrus.SetLevel(logrus.FatalLevel)
 	c = &ctx{}
 
 	// config
@@ -152,6 +153,7 @@ func prepTx(tx transactions.ContractCall) message.Message {
 
 // QUESTION: What does this test actually do?
 func TestProcessPendingTxs(t *testing.T) {
+
 	c.reset()
 
 	cc := transactions.RandContractCalls(10, 0, false)
