@@ -10,15 +10,19 @@ import (
 // Config contains a list of settings that determine the behavior
 // of the `Server`.
 type Config struct {
-	PassScoreValidation       bool
-	PassTransactionValidation bool
+	PassScoreValidation           bool
+	PassTransactionValidation     bool
+	PassStateTransition           bool
+	PassStateTransitionValidation bool
 }
 
 // DefaultConfig returns the default configuration for the Rusk mock server.
 func DefaultConfig() *Config {
 	return &Config{
-		PassScoreValidation:       true,
-		PassTransactionValidation: true,
+		PassScoreValidation:           true,
+		PassTransactionValidation:     true,
+		PassStateTransition:           true,
+		PassStateTransitionValidation: true,
 	}
 }
 
@@ -75,8 +79,8 @@ func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) 
 	}, nil
 }
 
-// GenerateSecretKey returns a set of randomly generated keys. They will contain Ristretto points
-// under the hood.
+// GenerateSecretKey returns a set of randomly generated keys. They will contain Ristretto
+// points under the hood.
 func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecretKeyRequest) (*rusk.GenerateSecretKeyResponse, error) {
 	return nil, nil
 }
@@ -119,7 +123,7 @@ func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest
 	return nil, nil
 }
 
-// VerifyStake will
+// VerifyStake will verify a staking transaction.
 // TODO: is this method really necessary?
 func (s *Server) VerifyStake(ctx context.Context, req *rusk.StakeTransaction) (*rusk.VerifyTransactionResponse, error) {
 	return nil, nil
