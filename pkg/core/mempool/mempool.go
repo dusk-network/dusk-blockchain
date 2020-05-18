@@ -65,7 +65,7 @@ type Mempool struct {
 	eventBus *eventbus.EventBus
 
 	// the magic function that knows best what is valid chain Tx
-	verifier transactions.Verifier
+	verifier transactions.UnconfirmedTxProber
 	quitChan chan struct{}
 
 	// ID of subscription to the TX topic on the EventBus
@@ -88,7 +88,7 @@ func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 }
 
 // NewMempool instantiates and initializes node mempool
-func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.Verifier, srv *grpc.Server) *Mempool {
+func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
 
 	log.Infof("Create instance")
 
@@ -463,9 +463,14 @@ func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.S
 
 // GetUnconfirmedBalance will return the amount of DUSK that is in the mempool
 // for a given key.
-// TODO: implement
-func (m Mempool) GetUnconfirmedBalance(ctx context.Context, req *node.EmptyRequest) (*node.BalanceResponse, error) {
-	return nil, nil
+func (m Mempool) GetUnconfirmedBalance(ctx context.Context, req *node.GetUnconfirmedBalanceRequest) (*node.BalanceResponse, error) {
+	txs := m.verified.Clone()
+	balance, err := m.verifier.CalculateBalance(ctx, req.Vk, txs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &node.BalanceResponse{LockedBalance: balance}, nil
 }
 
 // processGetMempoolTxsBySizeRequest returns a subset of verified mempool txs which
@@ -473,7 +478,6 @@ func (m Mempool) GetUnconfirmedBalance(ctx context.Context, req *node.EmptyReque
 // 2. has total txs size not bigger than maxTxsSize (request param)
 // Called by BlockGenerator on generating a new candidate block
 func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{}, error) {
-
 	// Read maxTxsSize param
 	var maxTxsSize uint32
 	params := r.Params.(bytes.Buffer)

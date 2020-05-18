@@ -19,12 +19,8 @@ import (
 func TestGeneration(t *testing.T) {
 	assert := assert.New(t)
 	bus, rBus := eventbus.New(), rpcbus.New()
-	go func() {
-		if err := provideCommittee(rBus); err != nil {
-			panic(err)
-		}
-	}()
 
+	assert.NoError(provideCommittee(rBus))
 	// txBatchCount * 4 will be the amount of non-coinbase transactions in a block.
 	// see: helper.RandomSliceOfTxs
 	txBatchCount := uint16(2)
@@ -61,9 +57,11 @@ func provideCommittee(rb *rpcbus.RPCBus) error {
 		return err
 	}
 
-	r := <-c
-	com := make([][]byte, 0)
-	com = append(com, []byte{1, 2, 3}) //nolint
-	r.RespChan <- rpcbus.NewResponse(make([][]byte, 0), nil)
+	go func() {
+		r := <-c
+		com := make([][]byte, 0)
+		com = append(com, []byte{1, 2, 3}) //nolint
+		r.RespChan <- rpcbus.NewResponse(make([][]byte, 0), nil)
+	}()
 	return nil
 }

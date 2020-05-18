@@ -81,7 +81,7 @@ func TestMain(m *testing.M) {
 
 	// initiate a mempool with custom verification function
 	v := &transactions.MockProxy{}
-	c.m = NewMempool(context.Background(), c.bus, c.rpcBus, v.Verifier(), nil)
+	c.m = NewMempool(context.Background(), c.bus, c.rpcBus, v.Prober(), nil)
 	c.m.Run()
 
 	code := m.Run()
