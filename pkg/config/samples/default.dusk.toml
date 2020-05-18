@@ -96,7 +96,8 @@ keyFile=""
 [rpc.rusk]
 
 # timeout for internal GRPC calls expressed in milliseconds
-timeout= 100
+contractTimeout=6000
+defaultTimeout=200
 
 # GraphQL API service
 [gql]

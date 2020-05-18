@@ -92,8 +92,9 @@ func Setup() *Server {
 	// TODO: get address from config
 	client := rpc.InitRPCClients(ctx, "127.0.0.1:8080")
 
-	ruskTimeout := time.Duration(cfg.Get().RPC.Rusk.Timeout) * time.Millisecond
-	proxy := transactions.NewProxy(client.RuskClient, ruskTimeout)
+	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
+	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
+	proxy := transactions.NewProxy(client.RuskClient, txTimeout, defaultTimeout)
 
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()

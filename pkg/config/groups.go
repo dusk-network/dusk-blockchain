@@ -75,7 +75,8 @@ type rpcConfiguration struct {
 // rpc/rusk related configurations
 type ruskConfiguration struct {
 	// timeout for rusk calls
-	Timeout uint
+	ContractTimeout uint
+	DefaultTimeout  uint
 }
 
 type gqlConfiguration struct {

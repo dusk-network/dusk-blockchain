@@ -158,15 +158,17 @@ type Proxy interface {
 }
 
 type proxy struct {
-	client  rusk.RuskClient
-	timeout time.Duration
+	client    rusk.RuskClient
+	txTimeout time.Duration
+	timeout   time.Duration
 }
 
 // NewProxy creates a new Proxy
-func NewProxy(client rusk.RuskClient, timeout time.Duration) Proxy {
+func NewProxy(client rusk.RuskClient, txTimeout, defaultTimeout time.Duration) Proxy {
 	return &proxy{
-		client:  client,
-		timeout: timeout,
+		client:    client,
+		txTimeout: txTimeout,
+		timeout:   defaultTimeout,
 	}
 }
 
@@ -294,7 +296,7 @@ func (p *provider) NewTransactionTx(ctx context.Context, tx TxRequest) (Transact
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
 	defer cancel()
 	res, err := p.client.NewTransaction(ctx, tr)
 	if err != nil {
@@ -317,7 +319,7 @@ func (p *provider) NewStakeTx(ctx context.Context, pubKeyBLS []byte, expirationH
 	str.BlsKey = make([]byte, len(pubKeyBLS))
 	copy(str.BlsKey, pubKeyBLS)
 	str.ExpirationHeight = expirationHeight
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
 	defer cancel()
 	res, err := p.client.NewStake(ctx, str)
 	if err != nil {
@@ -337,7 +339,7 @@ func (p *provider) NewWithdrawStakeTx(ctx context.Context, blsKey, sig []byte, t
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
 	defer cancel()
 	res, err := p.client.NewWithdrawStake(ctx, &rusk.WithdrawStakeTransactionRequest{
 		Tx:     tr,
@@ -368,7 +370,7 @@ func (p *provider) NewBidTx(ctx context.Context, k, edPk, seed []byte, expiratio
 	str.Seed = seed
 	str.ExpirationHeight = expirationHeight
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
 	defer cancel()
 	res, err := p.client.NewBid(ctx, str)
 	if err != nil {
@@ -388,7 +390,7 @@ func (p *provider) NewWithdrawBidTx(ctx context.Context, edPk []byte, sig []byte
 	tr := new(rusk.NewTransactionRequest)
 	MTxRequest(tr, tx)
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
 	defer cancel()
 	res, err := p.client.NewWithdrawBid(ctx, &rusk.WithdrawBidTransactionRequest{
 		Tx:   tr,
@@ -467,7 +469,7 @@ func (e *executor) ValidateStateTransition(ctx context.Context, calls []Contract
 	}
 	vstr.CurrentHeight = height
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 	res, err := e.client.ValidateStateTransition(ctx, vstr)
 	if err != nil {
@@ -495,7 +497,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 		}
 	}
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 	res, err := e.client.ExecuteStateTransition(ctx, vstr)
 	if err != nil {
@@ -539,7 +541,7 @@ func (p *provisioner) NewSlashTx(ctx context.Context, str SlashTxRequest, tx TxR
 	st.SecondMsg = str.SecondMsg
 	st.SecondSig = str.SecondSig
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
 	defer cancel()
 	res, err := p.client.NewSlash(ctx, st)
 	if err != nil {
@@ -563,7 +565,7 @@ func (p *provisioner) NewWithdrawFeesTx(ctx context.Context, blsKey, sig, msg []
 		Msg:    msg,
 	}
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
 	defer cancel()
 	wf, err := p.client.NewWithdrawFees(ctx, wftr)
 	if err != nil {
@@ -609,7 +611,7 @@ func (b *blockgenerator) GenerateScore(ctx context.Context, s ScoreRequest) (Sco
 		Round: s.Round,
 		Step:  uint32(s.Step),
 	}
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(b.timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(b.txTimeout))
 	defer cancel()
 	score, err := b.client.GenerateScore(ctx, gsr)
 	if err != nil {
