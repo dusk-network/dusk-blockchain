@@ -37,15 +37,24 @@ type Note struct {
 // the message safe to publish to multiple subscribers
 func (n *Note) Copy() *Note {
 	cpy := &Note{
-		NoteType:                  n.NoteType,
-		Pos:                       n.Pos,
-		Nonce:                     n.Nonce.Copy(),
-		RG:                        n.RG.Copy(),
-		PkR:                       n.PkR.Copy(),
-		ValueCommitment:           n.ValueCommitment.Copy(),
-		TransparentBlindingFactor: n.TransparentBlindingFactor.Copy(),
-		TransparentValue:          n.TransparentValue,
+		NoteType:         n.NoteType,
+		Pos:              n.Pos,
+		Nonce:            n.Nonce.Copy(),
+		RG:               n.RG.Copy(),
+		PkR:              n.PkR.Copy(),
+		TransparentValue: n.TransparentValue,
 	}
+
+	if n.ValueCommitment != nil {
+		cpy.ValueCommitment = n.ValueCommitment.Copy()
+	}
+
+	if n.NoteType == TRANSPARENT {
+		cpy.TransparentBlindingFactor = n.TransparentBlindingFactor.Copy()
+		return cpy
+	}
+
+	// OBFUSCATED NOTES
 	cpy.EncryptedValue = make([]byte, len(n.EncryptedValue))
 	copy(cpy.EncryptedValue, n.EncryptedValue)
 	cpy.EncryptedBlindingFactor = make([]byte, len(n.EncryptedBlindingFactor))

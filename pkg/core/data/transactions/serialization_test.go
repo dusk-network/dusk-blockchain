@@ -2,15 +2,39 @@ package transactions_test
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	assert "github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestEncodeDecodeStandard(t *testing.T) {
+func TestContractCallTxCopy(t *testing.T) {
+	assert := require.New(t)
+	bid := transactions.RandBidTx(0)
+	cpy := bid.ContractTx.Copy()
+	assert.True(reflect.DeepEqual(cpy, bid.ContractTx))
+	c := bid.Copy().(*transactions.BidTransaction)
+	assert.Equal(bid.M, c.M)
+	assert.Equal(bid.Commitment, c.Commitment)
+	assert.Equal(bid.Pk, c.Pk)
+	assert.Equal(bid.R, c.R)
+	assert.Equal(bid.Seed, c.Seed)
+}
+
+func TestContractCallCopy(t *testing.T) {
 	assert := assert.New(t)
+	for _, cc := range transactions.RandContractCalls(20, 0, true) {
+		if !assert.True(reflect.DeepEqual(cc, cc.Copy())) {
+			t.Fatalf("copy is broken for %s", reflect.TypeOf(cc).String())
+		}
+	}
+}
+
+func TestEncodeDecodeStandard(t *testing.T) {
+	assert := require.New(t)
 
 	// random standard tx
 	tx := transactions.RandTx()
@@ -41,7 +65,7 @@ func TestEncodeDecodeStandard(t *testing.T) {
 }
 
 func TestEqualsMethodStandard(t *testing.T) {
-	assert := assert.New(t)
+	assert := require.New(t)
 
 	a := transactions.RandContractCall()
 	b := transactions.RandContractCall()
@@ -54,7 +78,7 @@ func TestEqualsMethodStandard(t *testing.T) {
 
 func TestEncodeDecodeBid(t *testing.T) {
 
-	assert := assert.New(t)
+	assert := require.New(t)
 
 	// random bid tx
 	tx := transactions.RandBidTx(0)
@@ -75,7 +99,7 @@ func TestEncodeDecodeBid(t *testing.T) {
 }
 
 func TestEqualsMethodBid(t *testing.T) {
-	assert := assert.New(t)
+	assert := require.New(t)
 
 	a := transactions.RandBidTx(0)
 	b := transactions.RandBidTx(0)
@@ -87,7 +111,7 @@ func TestEqualsMethodBid(t *testing.T) {
 }
 
 func TestEncodeDecodeStake(t *testing.T) {
-	assert := assert.New(t)
+	assert := require.New(t)
 
 	// random Stake tx
 	tx := transactions.RandStakeTx(0)
@@ -107,7 +131,7 @@ func TestEncodeDecodeStake(t *testing.T) {
 }
 
 func TestEqualsMethodStake(t *testing.T) {
-	assert := assert.New(t)
+	assert := require.New(t)
 
 	a := transactions.RandStakeTx(0)
 	b := transactions.RandStakeTx(0)
@@ -120,7 +144,7 @@ func TestEqualsMethodStake(t *testing.T) {
 
 func TestEncodeDecodeCoinbase(t *testing.T) {
 
-	assert := assert.New(t)
+	assert := require.New(t)
 
 	// random coinbase tx
 	tx := transactions.RandDistributeTx(0, 35)
@@ -139,7 +163,7 @@ func TestEncodeDecodeCoinbase(t *testing.T) {
 }
 
 func TestEqualsMethodCoinBase(t *testing.T) {
-	assert := assert.New(t)
+	assert := require.New(t)
 
 	a := transactions.RandDistributeTx(0, 35)
 	b := transactions.RandDistributeTx(0, 35)
@@ -151,7 +175,7 @@ func TestEqualsMethodCoinBase(t *testing.T) {
 }
 
 func TestDecodeTransactions(t *testing.T) {
-	assert := assert.New(t)
+	assert := require.New(t)
 	txs := transactions.RandContractCalls(2, 0, false)
 	r := helper.TxsToBuffer(t, txs)
 
