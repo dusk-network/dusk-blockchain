@@ -27,6 +27,64 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
+// TestConcurrentAcceptBlock tests that there is no race condition triggered on
+// publishing an AcceptedBlock
+func TestConcurrentAcceptBlock(t *testing.T) {
+	assert := assert.New(t)
+	startingHeight := uint64(1)
+	eb, _, c := setupChainTest(startingHeight, true)
+	go c.Listen()
+
+	// Run two subscribers expecting acceptedBlock message
+	acceptedBlock1Chan := make(chan message.Message, 1)
+	acceptedBlock2Chan := make(chan message.Message, 1)
+	propagatedHeight := uint64(333)
+
+	// First test that we have a concurrent mutation
+	first := eb.Subscribe(topics.AcceptedBlock, eventbus.NewChanListener(acceptedBlock1Chan))
+	second := eb.Subscribe(topics.AcceptedBlock, eventbus.NewChanListener(acceptedBlock2Chan))
+
+	// testing that unsafe listeners are prone to mutations
+	secondBlock := mutateFirstChan(propagatedHeight, eb, acceptedBlock1Chan, acceptedBlock2Chan)
+	assert.NotEqual(secondBlock.Header.Height, propagatedHeight)
+
+	// unsubscribing unsafe listeners
+	eb.Unsubscribe(topics.AcceptedBlock, first)
+	eb.Unsubscribe(topics.AcceptedBlock, second)
+
+	// Now test that the second Block is unaffected by mutations in the first
+	first = eb.Subscribe(topics.AcceptedBlock, eventbus.NewSafeChanListener(acceptedBlock1Chan))
+	second = eb.Subscribe(topics.AcceptedBlock, eventbus.NewSafeChanListener(acceptedBlock2Chan))
+
+	// testing that unsafe listeners are prone to mutations
+	secondBlock = mutateFirstChan(propagatedHeight, eb, acceptedBlock1Chan, acceptedBlock2Chan)
+	assert.Equal(secondBlock.Header.Height, propagatedHeight)
+
+	// unsubscribing unsafe listeners
+	eb.Unsubscribe(topics.AcceptedBlock, first)
+	eb.Unsubscribe(topics.AcceptedBlock, second)
+}
+
+func mutateFirstChan(propagatedHeight uint64, eb eventbus.Publisher, acceptedBlock1Chan, acceptedBlock2Chan chan message.Message) block.Block {
+	// Propagate accepted block
+	propagatedBlock := helper.RandomBlock(propagatedHeight, 3)
+
+	// shadow copy here as block.Header is a reference
+	msg := message.New(topics.AcceptedBlock, *propagatedBlock)
+	eb.Publish(topics.AcceptedBlock, msg)
+
+	// subscriber_1 collecting propagated block
+	blkMsg1 := <-acceptedBlock1Chan
+	decodedBlk1 := blkMsg1.Payload().(block.Block)
+
+	// subscriber_1 altering the payload
+	decodedBlk1.Header.Height = 999
+
+	// subscriber_2 collecting propagated block
+	blkMsg2 := <-acceptedBlock2Chan
+	return blkMsg2.Payload().(block.Block)
+}
+
 // This test ensures the correct behavior from the Chain, when
 // accepting a block from a peer.
 func TestAcceptFromPeer(t *testing.T) {
@@ -97,6 +155,7 @@ func TestAcceptIntermediate(t *testing.T) {
 
 	eb, rpc, c := setupChainTest(startingHeight, false)
 	go c.Listen()
+
 	intermediateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
 	roundUpdateChan := make(chan message.Message, 1)
