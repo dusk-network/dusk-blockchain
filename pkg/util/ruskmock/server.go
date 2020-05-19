@@ -123,10 +123,12 @@ func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecret
 	return &rusk.GenerateSecretKeyResponse{
 		Sk: &rusk.SecretKey{
 			A: &rusk.Scalar{
-				Data: pView.Bytes(),
+				// We return the seed, since we need it to regenerate the private key
+				// whenever we do any wallet operations.
+				Data: req.B,
 			},
 			B: &rusk.Scalar{
-				Data: pSpend.Bytes(),
+				Data: append(pSpend.Bytes(), pView.Bytes()...),
 			},
 		},
 		Vk: &rusk.ViewKey{
@@ -150,7 +152,28 @@ func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecret
 
 // Keys returns the public key for a given secret key.
 func (s *Server) Keys(ctx context.Context, req *rusk.SecretKey) (*rusk.KeysResponse, error) {
-	return nil, nil
+	keys := key.NewKeyPair(req.A.Data)
+	var r ristretto.Scalar
+	r.Rand()
+	addr := keys.PublicKey().StealthAddress(r, 0)
+	return &rusk.KeysResponse{
+		Vk: &rusk.ViewKey{
+			A: &rusk.Scalar{
+				Data: make([]byte, 0),
+			},
+			BG: &rusk.CompressedPoint{
+				Y: make([]byte, 0),
+			},
+		},
+		Pk: &rusk.PublicKey{
+			AG: &rusk.CompressedPoint{
+				Y: addr.P.Bytes(),
+			},
+			BG: &rusk.CompressedPoint{
+				Y: make([]byte, 0),
+			},
+		},
+	}, nil
 }
 
 // FullScanOwnedNotes returns the inputs belonging to the given view key.
