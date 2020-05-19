@@ -48,6 +48,7 @@ type PacketFactory interface {
 // Reduction
 type Restarter struct{}
 
+// Copy is a no-op on the Restarter since it does not carry any content
 func (r Restarter) Copy() payload.Safe {
 	return Restarter{}
 }
