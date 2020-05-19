@@ -47,7 +47,7 @@ func initHighestSeenCollector(sub eventbus.Subscriber) <-chan uint64 {
 }
 
 func (h *highestSeenCollector) Collect(m message.Message) error {
-	height := m.Payload().(uint64)
+	height, _ := message.ConvU64(m.Payload())
 	h.highestSeenChan <- height
 	return nil
 }

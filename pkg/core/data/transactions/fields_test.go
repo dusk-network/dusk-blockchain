@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -35,6 +36,14 @@ func table(t *testing.T) (*assert.Assertions, []noteTable) {
 				assert.Equal([]byte{0x12, 0x02}, tNote.EncryptedValue)
 			},
 		},
+	}
+}
+
+func TestCopyNote(t *testing.T) {
+	assert := assert.New(t)
+	outs := RandTx().Outputs
+	for _, out := range outs {
+		assert.True(reflect.DeepEqual(out.Note, out.Note.Copy()))
 	}
 }
 

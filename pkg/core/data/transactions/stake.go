@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -15,6 +16,19 @@ type StakeTransaction struct {
 	*ContractTx
 	BlsKey           []byte `json:"bls_key"`
 	ExpirationHeight uint64 `json:"expiration_height"`
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *StakeTransaction) Copy() payload.Safe {
+	cpy := &StakeTransaction{
+		ContractTx:       t.ContractTx.Copy(),
+		BlsKey:           make([]byte, len(t.BlsKey)),
+		ExpirationHeight: t.ExpirationHeight,
+	}
+
+	copy(cpy.BlsKey, t.BlsKey)
+	return cpy
 }
 
 func newStake() *StakeTransaction {
@@ -129,6 +143,21 @@ type WithdrawStakeTransaction struct {
 	*ContractTx
 	BlsKey []byte `json:"bls_key"`
 	Sig    []byte `json:"sig"`
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *WithdrawStakeTransaction) Copy() payload.Safe {
+	cpy := &WithdrawStakeTransaction{
+		ContractTx: t.ContractTx.Copy(),
+		BlsKey:     make([]byte, len(t.BlsKey)),
+		Sig:        make([]byte, len(t.Sig)),
+	}
+
+	copy(cpy.BlsKey, t.BlsKey)
+	copy(cpy.Sig, t.Sig)
+
+	return cpy
 }
 
 // MarshalJSON provides a json-encoded readable representation of a

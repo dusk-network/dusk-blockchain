@@ -44,7 +44,7 @@ func TestSubscribe(t *testing.T) {
 func TestUnsubscribe(t *testing.T) {
 	eb, myChan, id := newEB(t)
 	eb.Unsubscribe(topics.Test, id)
-	msg := message.New(topics.Test, *(bytes.NewBufferString("whatever2")))
+	msg := message.New(topics.Test, bytes.NewBufferString("whatever2"))
 	eb.Publish(topics.Test, msg)
 
 	select {
@@ -61,7 +61,7 @@ func TestUnsubscribe(t *testing.T) {
 func TestStreamer(t *testing.T) {
 	topic := topics.Gossip
 	bus, streamer := CreateFrameStreamer(topic)
-	msg := message.New(topics.Test, *(bytes.NewBufferString("pluto")))
+	msg := message.New(topics.Test, bytes.NewBufferString("pluto")) //nolint
 	bus.Publish(topic, msg)
 
 	packet, err := streamer.(*SimpleStreamer).Read()
@@ -81,22 +81,22 @@ func TestDefaultListener(t *testing.T) {
 	eb.AddDefaultTopic(topics.Unknown)
 	eb.SubscribeDefault(NewChanListener(msgChan))
 
-	m := message.New(topics.Reject, *(bytes.NewBufferString("pluto")))
+	m := message.New(topics.Reject, *bytes.NewBufferString("pluto")) //nolint
 	eb.Publish(topics.Reject, m)
 	msg := <-msgChan
 	assert.Equal(t, topics.Reject, msg.Category())
 
-	payload := msg.Payload().(bytes.Buffer)
+	payload := msg.Payload().(message.SafeBuffer)
 	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
 
-	m = message.New(topics.Unknown, *(bytes.NewBufferString("pluto")))
+	m = message.New(topics.Unknown, bytes.NewBufferString("pluto")) //nolint
 	eb.Publish(topics.Unknown, m)
 	msg = <-msgChan
 	assert.Equal(t, topics.Unknown, msg.Category())
-	payload = msg.Payload().(bytes.Buffer)
+	payload = msg.Payload().(message.SafeBuffer)
 	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
 
-	m = message.New(topics.Gossip, *(bytes.NewBufferString("pluto")))
+	m = message.New(topics.Gossip, bytes.NewBufferString("pluto")) //nolint
 	eb.Publish(topics.Gossip, m)
 	select {
 	case <-msgChan:
@@ -109,6 +109,7 @@ func TestDefaultListener(t *testing.T) {
 //****************
 // SETUP FUNCTIONS
 //****************
+//nolint
 func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 	eb := New()
 	myChan := make(chan message.Message, 10)
@@ -121,7 +122,7 @@ func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 
 	select {
 	case received := <-myChan:
-		payload := received.Payload().(bytes.Buffer)
+		payload := received.Payload().(message.SafeBuffer)
 		assert.Equal(t, "whatever", (&payload).String())
 	case <-time.After(50 * time.Millisecond):
 		assert.FailNow(t, "We should have received a message by now")
@@ -131,6 +132,7 @@ func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 }
 
 // Test that a streaming goroutine is killed when the exit signal is sent
+// nolint
 func TestExitChan(t *testing.T) {
 	// suppressing annoying logging of expected errors
 	logrus.SetLevel(logrus.FatalLevel)

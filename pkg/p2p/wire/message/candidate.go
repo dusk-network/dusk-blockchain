@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 )
 
@@ -36,6 +37,17 @@ func MakeCandidate(blk *block.Block, cert *block.Certificate) Candidate {
 	c.Block = blk
 	c.Certificate = cert
 	return *c
+}
+
+// Copy complies with the message.Safe interface. It performs a DeepCopy
+// that can be handy when publishing this Payload for multiple subscribers to
+// consume
+func (c Candidate) Copy() payload.Safe {
+	blk := c.Block.Copy().(block.Block)
+	return Candidate{
+		Block:       &blk,
+		Certificate: c.Certificate.Copy(),
+	}
 }
 
 // State is for complying to the consensus.Message interface. In the case of

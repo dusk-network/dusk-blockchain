@@ -1,11 +1,20 @@
 package transactions
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	assert "github.com/stretchr/testify/require"
 )
+
+func TestTransactionCopy(t *testing.T) {
+	assert := assert.New(t)
+
+	tx := RandTx()
+	cpy := tx.Copy().(*Transaction)
+	assert.True(reflect.DeepEqual(tx, cpy))
+}
 
 func TestRuskTxInputUnMarshal(t *testing.T) {
 	assert := assert.New(t)
