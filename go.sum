@@ -51,6 +51,8 @@ github.com/dusk-network/bn256 v0.5.1-lattices h1:HMi7Dbs/MDRgH+xJHuhlByTG18IDlB5
 github.com/dusk-network/bn256 v0.5.1-lattices/go.mod h1:ddVn3p/nch27uVwd+3QGreudmSKfbAVr39LvBaSUEGg=
 github.com/dusk-network/dusk-crypto v0.1.1 h1:o9CIDb/YrcMAmGQVfdNfets0hJrIsEQbka6LMjTAWdA=
 github.com/dusk-network/dusk-crypto v0.1.1/go.mod h1:XEU09/mHLIAg9cS0m/6Hu2+wvJPxybfoXYSCrveHh3U=
+github.com/dusk-network/dusk-crypto v0.1.2 h1:JjhB+S6YzynKX0yEfqUaVjMgFLhtVv18PNa/ZD1/vns=
+github.com/dusk-network/dusk-crypto v0.1.2/go.mod h1:XEU09/mHLIAg9cS0m/6Hu2+wvJPxybfoXYSCrveHh3U=
 github.com/dusk-network/dusk-protobuf v0.2.7 h1:ozqcGX9WDOMBZu7lXYEVtnEAP5En2nGiwCikZyHNFhE=
 github.com/dusk-network/dusk-protobuf v0.2.7/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
