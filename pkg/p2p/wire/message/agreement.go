@@ -50,6 +50,16 @@ type (
 	}
 )
 
+// Copy deeply the StepVotes
+func (s *StepVotes) Copy() *StepVotes {
+	return &StepVotes{
+		BitSet:    s.BitSet,
+		Step:      s.Step,
+		Apk:       s.Apk.Copy(),
+		Signature: s.Signature.Copy(),
+	}
+}
+
 // String representation of the Agreement
 func (a Agreement) String() string {
 	var sb strings.Builder
@@ -65,18 +75,25 @@ func (a Agreement) String() string {
 // since it involves Marshaling and Unmarshaling. This is necessary since we do
 // not have access to the underlying BLS structs
 func (a Agreement) Copy() payload.Safe {
-	b := new(bytes.Buffer)
 	// NOTE: we ignore the error here. Since we deal with a well formed agreement we
 	// assume that the marshaling cannot fail
 	cpy := new(Agreement)
 	cpy.hdr = a.hdr.Copy().(header.Header)
-	cpy.signedVotes = make([]byte, len(a.signedVotes))
-	copy(cpy.signedVotes, a.signedVotes)
+	if a.signedVotes != nil {
+		cpy.signedVotes = make([]byte, len(a.signedVotes))
+		copy(cpy.signedVotes, a.signedVotes)
+	}
+
 	cpy.Repr = new(big.Int)
 	cpy.Repr.Set(a.Repr)
-	cpy.VotesPerStep = make([]*StepVotes, len(a.VotesPerStep))
-	_ = MarshalVotes(b, a.VotesPerStep)
-	_ = UnmarshalVotes(b, cpy.VotesPerStep)
+
+	if a.VotesPerStep != nil {
+		// Un-Marshaling the StepVotes for equality
+		cpy.VotesPerStep = make([]*StepVotes, len(a.VotesPerStep))
+		for i, vps := range a.VotesPerStep {
+			cpy.VotesPerStep[i] = vps.Copy()
+		}
+	}
 	return *cpy
 }
 

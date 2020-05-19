@@ -34,8 +34,10 @@ func NewReduction(hdr header.Header) *Reduction {
 func (r Reduction) Copy() payload.Safe {
 	cpy := Reduction{}
 	cpy.hdr = r.hdr.Copy().(header.Header)
-	cpy.SignedHash = make([]byte, 33)
-	copy(cpy.SignedHash, r.SignedHash)
+	if r.SignedHash != nil {
+		cpy.SignedHash = make([]byte, 33)
+		copy(cpy.SignedHash, r.SignedHash)
+	}
 	return cpy
 }
 

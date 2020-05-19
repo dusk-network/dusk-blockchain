@@ -18,8 +18,12 @@ type Certificate struct {
 func (c *Certificate) Copy() *Certificate {
 	cert := EmptyCertificate()
 
-	copy(cert.StepOneBatchedSig, c.StepOneBatchedSig)
-	copy(cert.StepTwoBatchedSig, c.StepTwoBatchedSig)
+	if c.StepOneBatchedSig != nil {
+		copy(cert.StepOneBatchedSig, c.StepOneBatchedSig)
+	}
+	if c.StepTwoBatchedSig != nil {
+		copy(cert.StepTwoBatchedSig, c.StepTwoBatchedSig)
+	}
 	cert.Step = c.Step
 	cert.StepOneCommittee = c.StepOneCommittee
 	cert.StepTwoCommittee = c.StepTwoCommittee

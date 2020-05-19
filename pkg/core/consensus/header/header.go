@@ -63,10 +63,15 @@ func (h Header) Copy() payload.Safe {
 		Step:  h.Step,
 	}
 
-	hdr.BlockHash = make([]byte, 32)
-	hdr.PubKeyBLS = make([]byte, 33)
-	copy(hdr.BlockHash, h.BlockHash)
-	copy(hdr.PubKeyBLS, h.PubKeyBLS)
+	if h.BlockHash != nil {
+		hdr.BlockHash = make([]byte, len(h.BlockHash))
+		copy(hdr.BlockHash, h.BlockHash)
+	}
+
+	if h.PubKeyBLS != nil {
+		hdr.PubKeyBLS = make([]byte, len(h.PubKeyBLS))
+		copy(hdr.PubKeyBLS, h.PubKeyBLS)
+	}
 	return hdr
 }
 

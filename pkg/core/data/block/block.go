@@ -23,9 +23,11 @@ func NewBlock() *Block {
 func (b Block) Copy() payload.Safe {
 	cpy := Block{}
 	cpy.Header = b.Header.Copy()
-	cpy.Txs = make([]transactions.ContractCall, len(b.Txs))
-	for i, tx := range b.Txs {
-		cpy.Txs[i] = tx.Copy().(transactions.ContractCall)
+	if b.Txs != nil {
+		cpy.Txs = make([]transactions.ContractCall, len(b.Txs))
+		for i, tx := range b.Txs {
+			cpy.Txs[i] = tx.Copy().(transactions.ContractCall)
+		}
 	}
 
 	return cpy

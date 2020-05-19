@@ -56,17 +56,25 @@ func NewScoreProposal(hdr header.Header, seed []byte, score transactions.Score) 
 // the message safe to publish to multiple subscribers
 func (e ScoreProposal) Copy() payload.Safe {
 	cpy := ScoreProposal{
-		hdr:      e.hdr.Copy().(header.Header),
-		Score:    make([]byte, len(e.Score)),
-		Proof:    make([]byte, len(e.Proof)),
-		Seed:     make([]byte, len(e.Seed)),
-		Identity: make([]byte, len(e.Identity)),
+		hdr: e.hdr.Copy().(header.Header),
 	}
 
-	copy(cpy.Score, e.Score)
-	copy(cpy.Proof, e.Proof)
-	copy(cpy.Seed, e.Seed)
-	copy(cpy.Identity, e.Identity)
+	if e.Score != nil {
+		cpy.Score = make([]byte, len(e.Score))
+		copy(cpy.Score, e.Score)
+	}
+	if e.Proof != nil {
+		cpy.Proof = make([]byte, len(e.Proof))
+		copy(cpy.Proof, e.Proof)
+	}
+	if e.Seed != nil {
+		cpy.Seed = make([]byte, len(e.Seed))
+		copy(cpy.Seed, e.Seed)
+	}
+	if e.Identity != nil {
+		cpy.Identity = make([]byte, len(e.Identity))
+		copy(cpy.Identity, e.Identity)
+	}
 	return cpy
 }
 

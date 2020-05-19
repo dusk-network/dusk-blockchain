@@ -626,13 +626,19 @@ func RandUint64() uint64 {
 // Rand32Bytes)
 var RandBlind = Rand32Bytes
 
-// Rand32Bytes returns random 32 bytes
-func Rand32Bytes() []byte {
+// RandBytes returns a random byte slice of the desired size
+func RandBytes(size int) []byte {
 	blind := make([]byte, 32)
 	if _, err := rand.Read(blind); err != nil {
 		panic(err)
 	}
 	return blind
+
+}
+
+// Rand32Bytes returns random 32 bytes
+func Rand32Bytes() []byte {
+	return RandBytes(32)
 }
 
 // RandBool returns a random boolean
