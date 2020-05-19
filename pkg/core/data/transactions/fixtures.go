@@ -318,8 +318,8 @@ func MockDeterministicBid(amount, expiration uint64, edPk, seed []byte) *BidTran
 	if err := UTx(rtx, stx.Tx); err != nil {
 		panic(err)
 	}
-	stx.M = Rand32Bytes()
-	stx.Commitment = Rand32Bytes()
+	stx.M = make([]byte, 32)
+	stx.Commitment = make([]byte, 32)
 	stx.Pk = edPk
 	stx.R = make([]byte, 32)
 	stx.Seed = seed
