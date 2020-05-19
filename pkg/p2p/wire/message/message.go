@@ -18,9 +18,11 @@ type SafeBuffer struct {
 }
 
 // Copy complies with payload.Safe interface. It returns a deep copy of
-// the message safe to publish to multiple subscribers
+// the buffer safe to publish to multiple subscribers
 func (s SafeBuffer) Copy() payload.Safe {
-	b := bytes.NewBuffer(s.Buffer.Bytes())
+	bin := make([]byte, s.Len())
+	copy(bin, s.Bytes())
+	b := bytes.NewBuffer(bin)
 	return SafeBuffer{*b}
 }
 
@@ -66,6 +68,16 @@ type simple struct {
 	payload payload.Safe
 	// cached marshaled form with Category
 	marshaled *bytes.Buffer
+}
+
+// Clone creates a new Message which carries a copy of the payload
+func Clone(m Message) Message {
+	b := m.CachedBinary()
+	return simple{
+		category:  m.Category(),
+		marshaled: &b,
+		payload:   m.Payload().Copy(),
+	}
 }
 
 // CachCachedBinary complies with the Message method for returning the

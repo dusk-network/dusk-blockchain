@@ -23,16 +23,27 @@ type Listener interface {
 // CallbackListener subscribes using callbacks
 type CallbackListener struct {
 	callback func(message.Message) error
+	safe     bool
 }
 
 // Notify the copy of a message as a parameter to a callback
 func (c *CallbackListener) Notify(m message.Message) error {
-	return c.callback(m)
+	if !c.safe {
+		return c.callback(m)
+	}
+
+	clone := message.Clone(m)
+	return c.callback(clone)
+}
+
+// NewSafeCallbackListener creates a callback based dispatcher
+func NewSafeCallbackListener(callback func(message.Message) error) Listener {
+	return &CallbackListener{callback, true}
 }
 
 // NewCallbackListener creates a callback based dispatcher
 func NewCallbackListener(callback func(message.Message) error) Listener {
-	return &CallbackListener{callback}
+	return &CallbackListener{callback, false}
 }
 
 // Close as part of the Listener method
@@ -41,7 +52,8 @@ func (c *CallbackListener) Close() {
 
 var ringBufferLength = 2000
 
-// StreamListener uses a ring buffer to dispatch messages
+// StreamListener uses a ring buffer to dispatch messages. It is inherently
+// thread-safe
 type StreamListener struct {
 	ringbuffer *ring.Buffer
 }
@@ -94,17 +106,35 @@ func Consume(items [][]byte, w io.WriteCloser) bool {
 // ChanListener dispatches a message using a channel
 type ChanListener struct {
 	messageChannel chan<- message.Message
+	safe           bool
 }
 
-// NewChanListener creates a channel based dispatcher
+// NewChanListener creates a channel based dispatcher. Although the message is
+// passed by value, this is not enough to enforce thread-safety when the
+// listener tries to read/change slices or arrays carried by the message.
 func NewChanListener(msgChan chan<- message.Message) Listener {
-	return &ChanListener{msgChan}
+	return &ChanListener{msgChan, false}
 }
 
-// Notify sends a message to the internal dispatcher channel
+// NewSafeChanListener creates a channel based dispatcher which is thread-safe
+func NewSafeChanListener(msgChan chan<- message.Message) Listener {
+	return &ChanListener{msgChan, true}
+}
+
+// Notify sends a message to the internal dispatcher channel. It forwards the
+// message if the listener is unsafe. Otherwise, it forwards a message clone
 func (c *ChanListener) Notify(m message.Message) error {
+	if !c.safe {
+		return forward(c.messageChannel, m)
+	}
+	clone := message.Clone(m)
+	return forward(c.messageChannel, clone)
+}
+
+// forward avoids code duplication in the ChanListener method
+func forward(msgChan chan<- message.Message, msg message.Message) error {
 	select {
-	case c.messageChannel <- m:
+	case msgChan <- msg:
 	default:
 		return errors.New("message channel buffer is full")
 	}
@@ -116,8 +146,10 @@ func (c *ChanListener) Notify(m message.Message) error {
 func (c *ChanListener) Close() {
 }
 
-// multilistener does not implement the Listener interface since the topic and
-// the message category will likely differ
+// multilistener does not implement the Listener interface itself since the topic and
+// the message category will likely differ. It delegates to the Notify method
+// specified by the internal listener
+//
 type multiListener struct {
 	sync.RWMutex
 	*hashset.Set

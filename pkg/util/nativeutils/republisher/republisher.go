@@ -1,6 +1,7 @@
 package republisher
 
 import (
+	"bytes"
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -23,6 +24,7 @@ type (
 		broker     eventbus.Broker
 		id         uint32
 		validators []Validator
+		safe       bool
 	}
 
 	repuberr              struct{ err error }
@@ -46,15 +48,36 @@ var EncodingError = &encodingError{&repuberr{errors.New("encoding failed")}}
 // InvalidError is returned when the payload is invalid
 var InvalidError = &invalidError{&repuberr{errors.New("invalid payload")}}
 
-// New creates a Republisher for a given topic. Multiple Validator functions
-// can be specified for the Republisher to run before forwarding the message
-func New(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
-	r := &Republisher{
+func newR(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
+	return &Republisher{
 		broker:     eb,
 		tpc:        tpc,
 		validators: v,
+		safe:       true,
 	}
-	r.id = r.Activate()
+}
+
+// New creates a Republisher for a given topic. Multiple Validator functions
+// can be specified for the Republisher to run before forwarding the message.
+// The republisher created with New is not thread-safe. Validators need to
+// implement their own synchronization. The republisher will reuse the
+// CachedBinary whenever possible, without trying to Marshal the message.
+// However, if the buffer is empty, it will attempt to Marshal the message,
+// which might lead to race-conditions if the Message is accessed by other
+// components. In those cases where CachedBinary is not guaranteed to be filled
+// (i.e. a message created by this node), or the message payload includes
+// references (therefore slices) it is better to create the Republisher through NewSafe
+func New(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
+	r := newR(eb, tpc, v...)
+	r.safe = false
+	r.Activate()
+	return r
+}
+
+// NewSafe creates a safe Republisher which gets a deep copy of the message
+func NewSafe(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
+	r := newR(eb, tpc, v...)
+	r.Activate()
 	return r
 }
 
@@ -64,13 +87,18 @@ func (r *Republisher) Stop() {
 }
 
 // Activate the Republisher by listening to topic through a
-// callback listener
+// callback listener. It saves the ID in the Republisher before returning
 func (r *Republisher) Activate() uint32 {
 	if r.id != 0 {
 		return r.id
 	}
 
-	l := eventbus.NewCallbackListener(r.Republish)
+	var l eventbus.Listener
+	if !r.safe {
+		l = eventbus.NewCallbackListener(r.Republish)
+	} else {
+		l = eventbus.NewSafeCallbackListener(r.Republish)
+	}
 	r.id = r.broker.Subscribe(r.tpc, l)
 	return r.id
 }
@@ -92,16 +120,22 @@ func (r *Republisher) Republish(m message.Message) error {
 		}
 	}
 
-	// message.Marshal takes care of prepending the topic, marshaling the
-	// header, etc
-	buf, err := message.Marshal(m)
-	if err != nil {
-		return err
+	var marshaled bytes.Buffer
+	var err error
+
+	marshaled = m.CachedBinary()
+	if marshaled.Len() <= 0 {
+		// message.Marshal takes care of prepending the topic, marshaling the
+		// header, etc
+		marshaled, err = message.Marshal(m)
+		if err != nil {
+			return err
+		}
 	}
 
 	// TODO: interface - setting the payload to a buffer will go away as soon as the Marshaling
 	// is performed where it is supposed to (i.e. after the Gossip)
-	serialized := message.New(m.Category(), buf)
+	serialized := message.New(m.Category(), marshaled)
 
 	// gossip away
 	r.broker.Publish(topics.Gossip, serialized)

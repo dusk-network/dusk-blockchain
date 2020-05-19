@@ -7,7 +7,7 @@ import (
 
 // Subscriber subscribes a channel to Event notifications on a specific topic
 type Subscriber interface {
-	Subscribe(topics.Topic, Listener) uint32
+	Subscribe(topic topics.Topic, listener Listener) uint32
 	Unsubscribe(topics.Topic, uint32)
 }
 
