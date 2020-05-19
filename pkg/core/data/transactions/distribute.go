@@ -21,16 +21,12 @@ type DistributeTransaction struct {
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers
 func (t *DistributeTransaction) Copy() payload.Safe {
-	cpy := &DistributeTransaction{
-		BgPk: t.BgPk.Copy(),
-	}
-
-	cpy.ProvisionersAddresses = make([][]byte, len(t.ProvisionersAddresses))
+	pa := make([][]byte, len(t.ProvisionersAddresses))
 	for i, b := range t.ProvisionersAddresses {
-		cpy.ProvisionersAddresses[i] = make([]byte, len(b))
-		copy(cpy.ProvisionersAddresses[i], b)
+		pa[i] = make([]byte, len(b))
+		copy(pa[i], b)
 	}
-	return cpy
+	return NewDistribute(t.TotalReward(), pa, *t.BgPk.Copy())
 }
 
 // MarshalJSON provides a json-encoded readable representation of a
