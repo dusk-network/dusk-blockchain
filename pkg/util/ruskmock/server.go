@@ -3,8 +3,10 @@ package ruskmock
 import (
 	"context"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	"google.golang.org/grpc"
 )
 
@@ -104,7 +106,46 @@ func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) 
 // GenerateSecretKey returns a set of randomly generated keys. They will contain Ristretto
 // points under the hood.
 func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecretKeyRequest) (*rusk.GenerateSecretKeyResponse, error) {
-	return nil, nil
+	keys := key.NewKeyPair(req.B)
+	var r ristretto.Scalar
+	r.Rand()
+	addr := keys.PublicKey().StealthAddress(r, 0)
+	pView, err := keys.PrivateView()
+	if err != nil {
+		return nil, err
+	}
+
+	pSpend, err := keys.PrivateSpend()
+	if err != nil {
+		return nil, err
+	}
+
+	return &rusk.GenerateSecretKeyResponse{
+		Sk: &rusk.SecretKey{
+			A: &rusk.Scalar{
+				Data: pView.Bytes(),
+			},
+			B: &rusk.Scalar{
+				Data: pSpend.Bytes(),
+			},
+		},
+		Vk: &rusk.ViewKey{
+			A: &rusk.Scalar{
+				Data: make([]byte, 0),
+			},
+			BG: &rusk.CompressedPoint{
+				Y: make([]byte, 0),
+			},
+		},
+		Pk: &rusk.PublicKey{
+			AG: &rusk.CompressedPoint{
+				Y: addr.P.Bytes(),
+			},
+			BG: &rusk.CompressedPoint{
+				Y: make([]byte, 0),
+			},
+		},
+	}, nil
 }
 
 // Keys returns the public key for a given secret key.
