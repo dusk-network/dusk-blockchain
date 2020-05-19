@@ -69,7 +69,7 @@ func (s *Server) ValidateStateTransition(ctx context.Context, req *rusk.Validate
 	if s.cfg.PassStateTransitionValidation {
 		indices := make([]int32, len(req.Calls))
 		for i, index := range indices {
-			index = i
+			index = int32(i)
 		}
 
 		return &rusk.ValidateStateTransitionResponse{
@@ -143,7 +143,8 @@ func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecret
 
 	var r ristretto.Scalar
 	r.Rand()
-	addr := w.keyPair.PublicKey().StealthAddress(r, 0)
+	pk := w.PublicKey()
+	addr := pk.StealthAddress(r, 0)
 	pView, err := w.keyPair.PrivateView()
 	if err != nil {
 		return nil, err
