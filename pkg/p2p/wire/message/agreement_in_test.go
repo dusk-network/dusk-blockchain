@@ -10,10 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAgreementCopy(t *testing.T) {
-
-}
-
 func TestStepVotes(t *testing.T) {
 	set := sortedset.New()
 
