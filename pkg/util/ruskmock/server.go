@@ -4,9 +4,12 @@ import (
 	"context"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"github.com/dusk-network/dusk-wallet/v2/database"
 	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	"google.golang.org/grpc"
 )
 
@@ -35,6 +38,8 @@ func DefaultConfig() *Config {
 // of scenarios on demand.
 type Server struct {
 	cfg *Config
+
+	w *wallet.Wallet
 }
 
 // New returns a new Rusk mock server with the given config. If no config is
@@ -80,7 +85,12 @@ func (s *Server) ValidateStateTransition(ctx context.Context, req *rusk.Validate
 // ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
 // configuration.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
-	return nil, nil
+	return &rusk.ExecuteStateTransitionResponse{
+		// TODO: return correct height
+		Success: s.cfg.PassStateTransition,
+		// TODO: manage committee
+		Committee: nil,
+	}, nil
 }
 
 // GenerateScore returns a mocked Score.
@@ -119,16 +129,22 @@ func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) 
 // GenerateSecretKey returns a set of randomly generated keys. They will contain Ristretto
 // points under the hood.
 func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecretKeyRequest) (*rusk.GenerateSecretKeyResponse, error) {
-	keys := key.NewKeyPair(req.B)
-	var r ristretto.Scalar
-	r.Rand()
-	addr := keys.PublicKey().StealthAddress(r, 0)
-	pView, err := keys.PrivateView()
+	w, err := wallet.LoadFromSeed(req.B, byte(2), database.New(config.Get().Wallet.Store), fetchDecoys, fetchInputs, "password", config.Get().Wallet.File)
 	if err != nil {
 		return nil, err
 	}
 
-	pSpend, err := keys.PrivateSpend()
+	s.w = w
+
+	var r ristretto.Scalar
+	r.Rand()
+	addr := w.keyPair.PublicKey().StealthAddress(r, 0)
+	pView, err := w.keyPair.PrivateView()
+	if err != nil {
+		return nil, err
+	}
+
+	pSpend, err := w.keyPair.PrivateSpend()
 	if err != nil {
 		return nil, err
 	}
