@@ -61,7 +61,20 @@ func (s *Server) Echo(ctx context.Context, req *rusk.EchoRequest) (*rusk.EchoRes
 // ValidateStateTransition simulates a state transition validation. The outcome is dictated
 // by the server configuration.
 func (s *Server) ValidateStateTransition(ctx context.Context, req *rusk.ValidateStateTransitionRequest) (*rusk.ValidateStateTransitionResponse, error) {
-	return nil, nil
+	if s.cfg.PassStateTransitionValidation {
+		indices := make([]int32, len(req.Calls))
+		for i, index := range indices {
+			index = i
+		}
+
+		return &rusk.ValidateStateTransitionResponse{
+			SuccessfulCalls: indices,
+		}, nil
+	}
+
+	return &rusk.ValidateStateTransitionResponse{
+		SuccessfulCalls: make([]int32, 0),
+	}, nil
 }
 
 // ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
