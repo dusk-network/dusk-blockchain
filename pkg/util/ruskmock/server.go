@@ -129,7 +129,12 @@ func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) 
 // GenerateSecretKey returns a set of randomly generated keys. They will contain Ristretto
 // points under the hood.
 func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecretKeyRequest) (*rusk.GenerateSecretKeyResponse, error) {
-	w, err := wallet.LoadFromSeed(req.B, byte(2), database.New(config.Get().Wallet.Store), fetchDecoys, fetchInputs, "password", config.Get().Wallet.File)
+	db, err := database.New(config.Get().Wallet.Store)
+	if err != nil {
+		return nil, err
+	}
+
+	w, err := wallet.LoadFromSeed(req.B, byte(2), db, fetchDecoys, fetchInputs, "password", config.Get().Wallet.File)
 	if err != nil {
 		return nil, err
 	}
