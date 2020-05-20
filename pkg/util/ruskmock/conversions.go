@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
@@ -124,22 +125,80 @@ func ruskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 
 }
 
-func inputsToRuskInputs(inputs transactions.Inputs) []*rusk.TransactionInput {
+func inputsToRuskInputs(inputs transactions.Inputs) ([]*rusk.TransactionInput, error) {
+	rInputs := make([]*rusk.TransactionInput, len(inputs))
 
-	return nil
+	for i, input := range inputs {
+		buf := new(bytes.Buffer)
+		if err := encoding.Write256(buf, input.KeyImage.Bytes()); err != nil {
+			return nil, err
+		}
+
+		if err := encoding.Write256(buf, input.PubKey.P.Bytes()); err != nil {
+			return nil, err
+		}
+
+		if err := encoding.Write256(buf, input.PseudoCommitment.Bytes()); err != nil {
+			return nil, err
+		}
+
+		sigBuf := new(bytes.Buffer)
+		if err := input.Signature.Encode(sigBuf, true); err != nil {
+			return nil, err
+		}
+
+		rInputs[i] = &rusk.TransactionInput{
+			Nullifier: &rusk.Nullifier{
+				H: &rusk.Scalar{
+					Data: buf.Bytes(),
+				},
+			},
+			MerkleRoot: &rusk.Scalar{
+				Data: sigBuf.Bytes(),
+			},
+		}
+	}
+
+	return rInputs, nil
 }
 
-func ruskInputsToInputs(inputs []*rusk.TransactionInput) transactions.Inputs {
+func ruskInputsToInputs(inputs []*rusk.TransactionInput) (transactions.Inputs, error) {
+	sInputs := make(transactions.Inputs, len(inputs))
+
+	for _, input := range inputs {
+		buf := bytes.NewBuffer(input.Nullifier.H.Data)
+		keyImageBytes := make([]byte, 32)
+		if err := encoding.Read256(buf, keyImageBytes); err != nil {
+			return nil, err
+		}
+		_ = input.KeyImage.UnmarshalBinary(keyImageBytes)
+
+		pubKeyBytes := make([]byte, 32)
+		if err := encoding.Read256(buf, pubKeyBytes); err != nil {
+			return nil, err
+		}
+		_ = input.PubKey.P.UnmarshalBinary(pubKeyBytes)
+
+		pseudoCommBytes := make([]byte, 32)
+		if err := encoding.Read256(buf, pseudoCommBytes); err != nil {
+			return nil, err
+		}
+		_ = input.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
+
+		sigBuf := bytes.NewBuffer(input.MerkleRoot.Data)
+		if err := input.Signature.Decode(sigBuf, true); err != nil {
+			return nil, err
+		}
+	}
+
+	return sInputs, nil
+}
+
+func outputsToRuskOutputs(outputs transactions.Outputs) ([]*rusk.TransactionOutput, error) {
 	return nil
 
 }
 
-func outputsToRuskOutputs(outputs transactions.Outputs) []*rusk.TransactionOutput {
+func ruskOutputsToOutputs(outputs []*rusk.TransactionOutput) (transactions.Outputs, error) {
 	return nil
-
-}
-
-func ruskOutputsToOutputs(outputs []*rusk.TransactionOutput) transactions.Outputs {
-	return nil
-
 }
