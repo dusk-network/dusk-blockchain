@@ -139,7 +139,7 @@ func BenchmarkProto(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		buf, _ := proto.Marshal(r.ContractCall)
+		buf, _ := proto.Marshal(r)
 		_ = proto.Unmarshal(buf, unr)
 	}
 }
