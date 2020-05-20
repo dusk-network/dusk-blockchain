@@ -223,7 +223,20 @@ func (s *Server) FullScanOwnedNotes(ctx context.Context, req *rusk.ViewKey) (*ru
 
 // NewTransaction creates a transaction and returns it to the caller.
 func (s *Server) NewTransaction(ctx context.Context, req *rusk.NewTransactionRequest) (*rusk.Transaction, error) {
-	return nil, nil
+	tx, err := transactions.NewStandard(0, byte(2), int64(req.Fee))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.AddOutput(addr, req.Value); err != nil {
+		return nil, err
+	}
+
+	if err := s.w.Sign(tx); err != nil {
+		return nil, err
+	}
+
+	return standardToRuskTx(tx)
 }
 
 // GetBalance calculates and returns the balance of the caller.
