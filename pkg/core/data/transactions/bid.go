@@ -72,14 +72,14 @@ func MBid(r *rusk.BidTransaction, t *BidTransaction) error {
 		return err
 	}
 
-	r.M = make([]byte, len(r.M))
+	r.M = make([]byte, len(t.M))
 	copy(r.M, t.M)
 	r.Commitment = make([]byte, len(t.Commitment))
 	copy(r.Commitment, t.Commitment)
 	r.Pk = make([]byte, len(t.Pk))
-	copy(r.Pk, r.Pk)
+	copy(r.Pk, t.Pk)
 	r.R = make([]byte, len(t.R))
-	copy(r.R, r.R)
+	copy(r.R, t.R)
 	r.Seed = make([]byte, len(t.Seed))
 	copy(r.Seed, t.Seed)
 	r.ExpirationHeight = t.ExpirationHeight
