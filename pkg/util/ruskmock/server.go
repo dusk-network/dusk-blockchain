@@ -6,9 +6,11 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/database"
 	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	"google.golang.org/grpc"
 )
@@ -68,8 +70,8 @@ func (s *Server) Echo(ctx context.Context, req *rusk.EchoRequest) (*rusk.EchoRes
 func (s *Server) ValidateStateTransition(ctx context.Context, req *rusk.ValidateStateTransitionRequest) (*rusk.ValidateStateTransitionResponse, error) {
 	if s.cfg.PassStateTransitionValidation {
 		indices := make([]int32, len(req.Calls))
-		for i, index := range indices {
-			index = int32(i)
+		for i := range indices {
+			indices[i] = int32(i)
 		}
 
 		return &rusk.ValidateStateTransitionResponse{
@@ -85,6 +87,16 @@ func (s *Server) ValidateStateTransition(ctx context.Context, req *rusk.Validate
 // ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
 // configuration.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
+	blk, err := contractCallsToBlock(req.Calls)
+	if err != nil {
+		return nil, err
+	}
+
+	_, _, err = s.w.CheckWireBlock(*blk)
+	if err != nil {
+		return nil, err
+	}
+
 	return &rusk.ExecuteStateTransitionResponse{
 		// TODO: return correct height
 		Success: s.cfg.PassStateTransition,
@@ -145,12 +157,7 @@ func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecret
 	r.Rand()
 	pk := w.PublicKey()
 	addr := pk.StealthAddress(r, 0)
-	pView, err := w.keyPair.PrivateView()
-	if err != nil {
-		return nil, err
-	}
-
-	pSpend, err := w.keyPair.PrivateSpend()
+	pSpend, err := w.PrivateSpend()
 	if err != nil {
 		return nil, err
 	}
@@ -158,12 +165,10 @@ func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecret
 	return &rusk.GenerateSecretKeyResponse{
 		Sk: &rusk.SecretKey{
 			A: &rusk.Scalar{
-				// We return the seed, since we need it to regenerate the private key
-				// whenever we do any wallet operations.
-				Data: req.B,
+				Data: pSpend,
 			},
 			B: &rusk.Scalar{
-				Data: append(pSpend.Bytes(), pView.Bytes()...),
+				Data: make([]byte, 0),
 			},
 		},
 		Vk: &rusk.ViewKey{
@@ -187,10 +192,10 @@ func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecret
 
 // Keys returns the public key for a given secret key.
 func (s *Server) Keys(ctx context.Context, req *rusk.SecretKey) (*rusk.KeysResponse, error) {
-	keys := key.NewKeyPair(req.A.Data)
 	var r ristretto.Scalar
 	r.Rand()
-	addr := keys.PublicKey().StealthAddress(r, 0)
+	pk := s.w.PublicKey()
+	addr := pk.StealthAddress(r, 0)
 	return &rusk.KeysResponse{
 		Vk: &rusk.ViewKey{
 			A: &rusk.Scalar{
@@ -273,4 +278,18 @@ func (s *Server) NewWithdrawFees(ctx context.Context, req *rusk.WithdrawFeesTran
 // NewSlash creates a slashing transaction and returns it to the caller.
 func (s *Server) NewSlash(ctx context.Context, req *rusk.SlashTransactionRequest) (*rusk.SlashTransaction, error) {
 	return nil, nil
+}
+
+func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
+	// Fetch all inputs from database that are >= totalAmount
+	// returns error if inputs do not add up to total amount
+	privSpend, err := key.PrivateSpend()
+	if err != nil {
+		return nil, 0, err
+	}
+	return db.FetchInputs(privSpend.Bytes(), totalAmount)
+}
+
+func fetchDecoys(numMixins int) []mlsag.PubKeys {
+	return nil
 }
