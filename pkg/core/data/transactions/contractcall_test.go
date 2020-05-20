@@ -2,6 +2,8 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,24 +11,24 @@ import (
 )
 
 var tt = []struct {
-	name string
-	c    ContractCall
+	c   ContractCall
+	typ reflect.Type
 }{
 	{
-		"standard tx",
 		RandTx(),
+		reflect.TypeOf((*Transaction)(nil)),
 	},
 	{
-		"stake",
 		RandStakeTx(0),
+		reflect.TypeOf((*StakeTransaction)(nil)),
 	},
 	{
-		"bid",
 		RandBidTx(0),
+		reflect.TypeOf((*BidTransaction)(nil)),
 	},
 	{
-		"coinbase",
 		RandDistributeTx(400, 12),
+		reflect.TypeOf((*DistributeTransaction)(nil)),
 	},
 }
 
@@ -34,22 +36,62 @@ func TestContractCallDecodeEncode(t *testing.T) {
 	assert := assert.New(t)
 	for _, test := range tt {
 		// we do not encode DistributeTransaction, so we skip it in this test
-		if test.name == "coinbase" {
+		if test.typ.String() == "*transactions.DistributeTransaction" {
 			continue
 		}
 		ruskTx, err := EncodeContractCall(test.c)
 		if !assert.NoError(err) {
-			t.Fatalf("encoding of %s failed: %v", test.name, err)
+			t.Fatalf("encoding of %s failed: %v", test.typ.Name(), err)
 		}
 
 		cc, err := DecodeContractCall(ruskTx)
 		assert.NoError(err)
 		if !assert.NoError(err) {
-			t.Fatalf("decoding of %s failed: %v", test.name, err)
+			t.Fatalf("decoding of %s failed: %v", test.typ.Name(), err)
 		}
 
 		if !assert.Equal(test.c, cc) {
-			t.Fatalf("equality violated after encoding/decoding of %s transaction", test.name)
+			t.Fatalf("equality violated after encoding/decoding of %s transaction", test.typ.Name())
+		}
+	}
+}
+
+func TestContractCallUnMarshal(t *testing.T) {
+	assert := assert.New(t)
+	for _, test := range tt {
+		b := new(bytes.Buffer)
+
+		if !assert.NoError(Marshal(b, test.c)) {
+			t.Fatalf("marshaling of %s failed", test.typ.Name())
+		}
+
+		cc, err := Unmarshal(b)
+		if !assert.NoError(err) {
+			t.Fatalf("unmarshaling of %s failed", test.typ.Name())
+		}
+
+		if !assert.Equal(test.c, cc) {
+			t.Fatalf("equality violated after marshaling/unmarshaling of %s transaction", test.typ.Name())
+		}
+	}
+}
+
+func TestContractCallJSONUnMarshal(t *testing.T) {
+	assert := assert.New(t)
+	for _, test := range tt {
+		b, err := json.Marshal(test.c)
+		if !assert.NoError(err) {
+			t.Fatalf("marshaling of %s failed", test.typ.Name())
+		}
+
+		cc := reflect.New(test.typ.Elem())
+		ccIntrf := cc.Interface()
+		if !assert.NoError(json.Unmarshal(b, ccIntrf)) { //nolint
+			t.Fatalf("unmarshaling of %s failed", test.typ.Name())
+		}
+
+		if !assert.Equal(test.c, ccIntrf) {
+			t.Fatalf("equality violated after marshaling/unmarshaling of %s transaction", test.typ.Name())
 		}
 	}
 }
