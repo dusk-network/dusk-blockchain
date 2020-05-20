@@ -6,8 +6,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 var tt = []struct {
@@ -96,47 +97,49 @@ func TestContractCallJSONUnMarshal(t *testing.T) {
 	}
 }
 
-func TestUnMarshal(t *testing.T) {
-	assert := require.New(t)
-	cc, _ := DecodeContractCall(RuskTx())
-	assert.Equal(Tx, cc.Type())
-
-	b := new(bytes.Buffer)
-	err := Marshal(b, cc)
-	assert.NoError(err)
-
-	ccOther, uerr := Unmarshal(b)
-	assert.NoError(uerr)
-
-	assert.True(Equal(cc, ccOther))
-}
-
-func BenchmarkEncode(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_, _ = DecodeContractCall(RuskTx())
-	}
-}
-
-func BenchmarkDecode(b *testing.B) {
-	c, _ := DecodeContractCall(RuskTx())
+func BenchmarkJSON(b *testing.B) {
+	tx := RandTx()
+	t := new(Transaction)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, _ = EncodeContractCall(c)
+		buf, _ := json.Marshal(tx)
+		_ = json.Unmarshal(buf, t)
 	}
 }
 
-/*
-func encodeDecode(tx *rusk.ContractCallTx) error {
-	c, err := DecodeContractCall(tx)
-	if err != nil {
-		return err
-	}
+func BenchmarkWire(b *testing.B) {
+	tx := RandTx()
+	t := new(Transaction)
+	buf := new(bytes.Buffer)
+	b.ResetTimer()
 
-	_, err = EncodeContractCall(c)
-	if err != nil {
-		return err
+	for i := 0; i < b.N; i++ {
+		_ = MarshalTransaction(buf, *tx)
+		_ = UnmarshalTransaction(buf, t)
 	}
-	return nil
 }
-*/
+
+func BenchmarkCopy(b *testing.B) {
+	tx := RandTx()
+	t := new(Transaction)
+	r := new(rusk.Transaction)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = MTx(r, tx)
+		_ = UTx(r, t)
+	}
+}
+
+func BenchmarkProto(b *testing.B) {
+	tx := RandTx()
+	r, _ := EncodeContractCall(tx)
+	unr := new(rusk.ContractCallTx)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		buf, _ := proto.Marshal(r.ContractCall)
+		_ = proto.Unmarshal(buf, unr)
+	}
+}
