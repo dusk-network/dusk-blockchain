@@ -4,16 +4,58 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	assert "github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+var tt = []struct {
+	name string
+	c    ContractCall
+}{
+	{
+		"standard tx",
+		RandTx(),
+	},
+	{
+		"stake",
+		RandStakeTx(0),
+	},
+	{
+		"bid",
+		RandBidTx(0),
+	},
+	{
+		"coinbase",
+		RandDistributeTx(400, 12),
+	},
+}
+
 func TestContractCallDecodeEncode(t *testing.T) {
-	assert.NoError(t, encodeDecode(RuskTx()))
+	assert := assert.New(t)
+	for _, test := range tt {
+		// we do not encode DistributeTransaction, so we skip it in this test
+		if test.name == "coinbase" {
+			continue
+		}
+		ruskTx, err := EncodeContractCall(test.c)
+		if !assert.NoError(err) {
+			t.Fatalf("encoding of %s failed: %v", test.name, err)
+		}
+
+		cc, err := DecodeContractCall(ruskTx)
+		assert.NoError(err)
+		if !assert.NoError(err) {
+			t.Fatalf("decoding of %s failed: %v", test.name, err)
+		}
+
+		if !assert.Equal(test.c, cc) {
+			t.Fatalf("equality violated after encoding/decoding of %s transaction", test.name)
+		}
+	}
 }
 
 func TestUnMarshal(t *testing.T) {
-	assert := assert.New(t)
+	assert := require.New(t)
 	cc, _ := DecodeContractCall(RuskTx())
 	assert.Equal(Tx, cc.Type())
 
@@ -42,6 +84,7 @@ func BenchmarkDecode(b *testing.B) {
 	}
 }
 
+/*
 func encodeDecode(tx *rusk.ContractCallTx) error {
 	c, err := DecodeContractCall(tx)
 	if err != nil {
@@ -54,3 +97,4 @@ func encodeDecode(tx *rusk.ContractCallTx) error {
 	}
 	return nil
 }
+*/
