@@ -165,28 +165,28 @@ func inputsToRuskInputs(inputs transactions.Inputs) ([]*rusk.TransactionInput, e
 func ruskInputsToInputs(inputs []*rusk.TransactionInput) (transactions.Inputs, error) {
 	sInputs := make(transactions.Inputs, len(inputs))
 
-	for _, input := range inputs {
+	for i, input := range inputs {
 		buf := bytes.NewBuffer(input.Nullifier.H.Data)
 		keyImageBytes := make([]byte, 32)
 		if err := encoding.Read256(buf, keyImageBytes); err != nil {
 			return nil, err
 		}
-		_ = input.KeyImage.UnmarshalBinary(keyImageBytes)
+		_ = sInputs[i].KeyImage.UnmarshalBinary(keyImageBytes)
 
 		pubKeyBytes := make([]byte, 32)
 		if err := encoding.Read256(buf, pubKeyBytes); err != nil {
 			return nil, err
 		}
-		_ = input.PubKey.P.UnmarshalBinary(pubKeyBytes)
+		_ = sInputs[i].PubKey.P.UnmarshalBinary(pubKeyBytes)
 
 		pseudoCommBytes := make([]byte, 32)
 		if err := encoding.Read256(buf, pseudoCommBytes); err != nil {
 			return nil, err
 		}
-		_ = input.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
+		_ = sInputs[i].PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
 
 		sigBuf := bytes.NewBuffer(input.MerkleRoot.Data)
-		if err := input.Signature.Decode(sigBuf, true); err != nil {
+		if err := sInputs[i].Signature.Decode(sigBuf, true); err != nil {
 			return nil, err
 		}
 	}
@@ -194,11 +194,41 @@ func ruskInputsToInputs(inputs []*rusk.TransactionInput) (transactions.Inputs, e
 	return sInputs, nil
 }
 
-func outputsToRuskOutputs(outputs transactions.Outputs) ([]*rusk.TransactionOutput, error) {
-	return nil
+func outputsToRuskOutputs(outputs transactions.Outputs) []*rusk.TransactionOutput {
+	rOutputs := make([]*rusk.TransactionOutput, len(outputs))
 
+	for i, output := range outputs {
+		rOutputs[i] = &rusk.TransactionOutput{
+			BlindingFactor: &rusk.Scalar{
+				Data: output.Commitment.Bytes(),
+			},
+			Pk: &rusk.PublicKey{
+				AG: &rusk.CompressedPoint{
+					Y: output.PubKey.P.Bytes(),
+				},
+			},
+			Note: &rusk.Note{
+				ValueCommitment: &rusk.Scalar{
+					Data: output.EncryptedAmount.Bytes(),
+				},
+				RG: &rusk.CompressedPoint{
+					Y: output.EncryptedMask.Bytes(),
+				},
+			},
+		}
+	}
+
+	return rOutputs, nil
 }
 
-func ruskOutputsToOutputs(outputs []*rusk.TransactionOutput) (transactions.Outputs, error) {
-	return nil
+func ruskOutputsToOutputs(outputs []*rusk.TransactionOutput) transactions.Outputs {
+	sOutputs := make(transactions.Outputs, len(outputs))
+
+	for i, output := range outputs {
+		_ = sOutputs[i].Commitment.UnmarshalBinary(output.BlindingFactor.Data)
+		_ = sOutputs[i].PubKey.P.UnmarshalBinary(output.Pk.AG.Y)
+		_ = sOutputs[i].EncryptedAmount.UnmarshalBinary(output.Note.ValueCommitment.Data)
+		_ = sOutputs[i].EncryptedMask.UnmarshalBinary(output.Note.RG.Y)
+	}
+	return sOutputs, nil
 }
