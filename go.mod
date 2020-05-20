@@ -6,6 +6,7 @@ require (
 	github.com/dusk-network/dusk-protobuf v0.2.7
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/go-chi/render v1.0.1
+	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/gorilla/websocket v1.4.0
 	github.com/graphql-go/graphql v0.7.8
