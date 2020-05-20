@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/proto"
 )
 
 var tt = []struct {
@@ -142,4 +142,5 @@ func BenchmarkProto(b *testing.B) {
 		buf, _ := proto.Marshal(r)
 		_ = proto.Unmarshal(buf, unr)
 	}
+
 }
