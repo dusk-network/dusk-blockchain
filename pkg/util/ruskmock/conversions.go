@@ -13,7 +13,7 @@ import (
 )
 
 func provisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
-	ruskProvisioners := make([]*rusk.Provisioner, len(p))
+	ruskProvisioners := make([]*rusk.Provisioner, len(p.Members))
 	i := 0
 	for _, n := range p.Members {
 		ruskProvisioners[i].BlsKey = n.PublicKeyBLS
