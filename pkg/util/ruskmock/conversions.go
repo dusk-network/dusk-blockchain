@@ -21,17 +21,21 @@ func standardToRuskTx(tx *transactions.Standard) (*rusk.Transaction, error) {
 		return nil, err
 	}
 
-	rtx := &rusk.Transaction{
-		Inputs:  inputsToRuskInputs(tx.Inputs),
-		Outputs: outputsToRuskOutputs(tx.Outputs),
+	inputs, err := inputsToRuskInputs(tx.Inputs)
+	if err != nil {
+		return nil, err
+	}
+	outputs := outputsToRuskOutputs(tx.Outputs)
+
+	return &rusk.Transaction{
+		Inputs:  inputs,
+		Outputs: outputs,
 		Fee: &rusk.TransactionOutput{
 			Value: tx.Fee.BigInt().Uint64(),
 		},
 		Proof: buf.Bytes(),
 		Data:  tx.R.Bytes(),
-	}
-
-	return rtx, nil
+	}, nil
 }
 
 func ruskTxToStandard(tx *rusk.Transaction) (*transactions.Standard, error) {
@@ -43,11 +47,17 @@ func ruskTxToStandard(tx *rusk.Transaction) (*transactions.Standard, error) {
 	copy(dataArr[:], tx.Data[0:32])
 	rPoint.SetBytes(&dataArr)
 
+	inputs, err := ruskInputsToInputs(tx.Inputs)
+	if err != nil {
+		return nil, err
+	}
+	outputs := ruskOutputsToOutputs(tx.Outputs)
+
 	stx := &transactions.Standard{
 		TxType:  transactions.StandardType,
 		R:       rPoint,
-		Inputs:  ruskInputsToInputs(tx.Inputs),
-		Outputs: ruskOutputsToOutputs(tx.Outputs),
+		Inputs:  inputs,
+		Outputs: outputs,
 		Version: 0,
 		Fee:     feeScalar,
 	}
@@ -65,13 +75,11 @@ func stakeToRuskStake(tx *transactions.Stake) (*rusk.StakeTransaction, error) {
 		return nil, err
 	}
 
-	rStake := &rusk.StakeTransaction{
+	return &rusk.StakeTransaction{
 		BlsKey:           tx.PubKeyBLS,
 		ExpirationHeight: tx.LockTime(),
 		Tx:               rtx,
-	}
-	return rStake, nil
-
+	}, nil
 }
 
 func ruskStakeToStake(tx *rusk.StakeTransaction) (*transactions.Stake, error) {
@@ -80,15 +88,13 @@ func ruskStakeToStake(tx *rusk.StakeTransaction) (*transactions.Stake, error) {
 		return nil, err
 	}
 
-	stake := &transactions.Stake{
+	return &transactions.Stake{
 		Timelock: &transactions.Timelock{
 			Standard: stx,
 			Lock:     tx.ExpirationHeight,
 		},
 		PubKeyBLS: tx.BlsKey,
-	}
-
-	return stake, nil
+	}, nil
 }
 
 func bidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
@@ -97,14 +103,11 @@ func bidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
 		return nil, err
 	}
 
-	rBid := &rusk.BidTransaction{
+	return &rusk.BidTransaction{
 		Tx:               rtx,
 		M:                tx.M,
 		ExpirationHeight: tx.LockTime(),
-	}
-
-	return rBid, nil
-
+	}, nil
 }
 
 func ruskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
@@ -113,16 +116,13 @@ func ruskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 		return nil, err
 	}
 
-	bid := &transactions.Bid{
+	return &transactions.Bid{
 		Timelock: &transactions.Timelock{
 			Standard: stx,
 			Lock:     tx.ExpirationHeight,
 		},
 		M: tx.M,
-	}
-
-	return bid, nil
-
+	}, nil
 }
 
 func inputsToRuskInputs(inputs transactions.Inputs) ([]*rusk.TransactionInput, error) {
@@ -218,7 +218,7 @@ func outputsToRuskOutputs(outputs transactions.Outputs) []*rusk.TransactionOutpu
 		}
 	}
 
-	return rOutputs, nil
+	return rOutputs
 }
 
 func ruskOutputsToOutputs(outputs []*rusk.TransactionOutput) transactions.Outputs {
@@ -230,5 +230,5 @@ func ruskOutputsToOutputs(outputs []*rusk.TransactionOutput) transactions.Output
 		_ = sOutputs[i].EncryptedAmount.UnmarshalBinary(output.Note.ValueCommitment.Data)
 		_ = sOutputs[i].EncryptedMask.UnmarshalBinary(output.Note.RG.Y)
 	}
-	return sOutputs, nil
+	return sOutputs
 }
