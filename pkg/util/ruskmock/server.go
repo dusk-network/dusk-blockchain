@@ -2,9 +2,12 @@ package ruskmock
 
 import (
 	"context"
+	"fmt"
+	"math/big"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -12,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 	"google.golang.org/grpc"
 )
 
@@ -42,6 +46,7 @@ type Server struct {
 	cfg *Config
 
 	w *wallet.Wallet
+	p *user.Provisioners
 }
 
 // New returns a new Rusk mock server with the given config. If no config is
@@ -97,12 +102,56 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 		return nil, err
 	}
 
+	if err := s.addConsensusNodes(blk.Txs /*req.CurrentHeight*/, 0); err != nil {
+		return nil, err
+	}
+
 	return &rusk.ExecuteStateTransitionResponse{
 		// TODO: return correct height
 		Success: s.cfg.PassStateTransition,
 		// TODO: manage committee
 		Committee: nil,
 	}, nil
+}
+func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight uint64) error {
+	for _, tx := range txs {
+		if tx.Type() == transactions.StakeType {
+			stake := tx.(*transactions.Stake)
+			if err := s.addProvisioner(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
+func (s *Server) addProvisioner(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
+	if len(pubKeyBLS) != 129 {
+		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
+	}
+
+	i := string(pubKeyBLS)
+	stake := user.Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
+
+	// Check for duplicates
+	_, inserted := s.p.Set.IndexOf(pubKeyBLS)
+	if inserted {
+		// If they already exist, just add their new stake
+		s.p.Members[i].AddStake(stake)
+		return nil
+	}
+
+	// This is a new provisioner, so let's initialize the Member struct and add them to the list
+	s.p.Set.Insert(pubKeyBLS)
+	m := &user.Member{}
+
+	m.PublicKeyBLS = pubKeyBLS
+	m.AddStake(stake)
+
+	s.p.Members[i] = m
+	return nil
 }
 
 // GenerateScore returns a mocked Score.
@@ -228,7 +277,26 @@ func (s *Server) NewTransaction(ctx context.Context, req *rusk.NewTransactionReq
 		return nil, err
 	}
 
-	if err := tx.AddOutput(addr, req.Value); err != nil {
+	var spend ristretto.Point
+	_ = spend.UnmarshalBinary(req.Recipient.AG.Y)
+	var view ristretto.Point
+	_ = view.UnmarshalBinary(req.Recipient.BG.Y)
+	sp := key.PublicSpend(spend)
+	v := key.PublicView(view)
+
+	pk := &key.PublicKey{
+		PubSpend: &sp,
+		PubView:  &v,
+	}
+
+	addr, err := pk.PublicAddress(byte(2))
+	if err != nil {
+		return nil, err
+	}
+
+	var value ristretto.Scalar
+	value.SetBigInt(big.NewInt(int64(req.Value)))
+	if err := tx.AddOutput(*addr, value); err != nil {
 		return nil, err
 	}
 
@@ -259,7 +327,16 @@ func (s *Server) CalculateMempoolBalance(ctx context.Context, req *rusk.Calculat
 
 // NewStake creates a staking transaction and returns it to the caller.
 func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.StakeTransaction, error) {
-	return nil, nil
+	stake, err := transactions.NewStake(0, byte(2), int64(req.Tx.Fee), req.ExpirationHeight, s.w.ConsensusKeys().EdPubKeyBytes, s.w.ConsensusKeys().BLSPubKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.w.Sign(stake); err != nil {
+		return nil, err
+	}
+
+	return stakeToRuskStake(stake)
 }
 
 // VerifyStake will verify a staking transaction.
@@ -275,7 +352,19 @@ func (s *Server) NewWithdrawStake(ctx context.Context, req *rusk.WithdrawStakeTr
 
 // NewBid creates a bidding transaction and returns it to the caller.
 func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*rusk.BidTransaction, error) {
-	return nil, nil
+	var k ristretto.Scalar
+	_ = k.UnmarshalBinary(req.K)
+	m := zkproof.CalculateM(k)
+	bid, err := transactions.NewBid(0, byte(2), int64(req.Tx.Fee), req.ExpirationHeight, m.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.w.Sign(bid); err != nil {
+		return nil, err
+	}
+
+	return bidToRuskBid(bid)
 }
 
 // NewWithdrawBid creates a bid withdrawal transaction and returns it to the caller.
