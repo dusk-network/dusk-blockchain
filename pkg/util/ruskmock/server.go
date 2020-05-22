@@ -102,17 +102,17 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 		return nil, err
 	}
 
-	if err := s.addConsensusNodes(blk.Txs /*req.CurrentHeight*/, 0); err != nil {
+	if err := s.addConsensusNodes(blk.Txs /*, req.CurrentHeight*/, 0); err != nil {
 		return nil, err
 	}
 
 	return &rusk.ExecuteStateTransitionResponse{
 		// TODO: return correct height
-		Success: s.cfg.PassStateTransition,
-		// TODO: manage committee
-		Committee: nil,
+		Success:   s.cfg.PassStateTransition,
+		Committee: provisionersToRuskCommittee(s.p),
 	}, nil
 }
+
 func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight uint64) error {
 	for _, tx := range txs {
 		if tx.Type() == transactions.StakeType {

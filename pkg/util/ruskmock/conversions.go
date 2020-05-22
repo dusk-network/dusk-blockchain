@@ -5,11 +5,29 @@ import (
 	"math/big"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
+
+func provisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
+	ruskProvisioners := make([]*rusk.Provisioner, len(p))
+	i := 0
+	for _, n := range p.Members {
+		ruskProvisioners[i].BlsKey = n.PublicKeyBLS
+		ruskProvisioners[i].Stakes = make([]*rusk.Stake, len(n.Stakes))
+		for j, s := range n.Stakes {
+			ruskProvisioners[i].Stakes[j].Amount = s.Amount
+			ruskProvisioners[i].Stakes[j].EndHeight = s.EndHeight
+			ruskProvisioners[i].Stakes[j].StartHeight = s.StartHeight
+		}
+		i++
+	}
+
+	return ruskProvisioners
+}
 
 func contractCallsToBlock([]*rusk.ContractCallTx) (*block.Block, error) {
 	return nil, nil
