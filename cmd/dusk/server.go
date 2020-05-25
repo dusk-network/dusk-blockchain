@@ -89,8 +89,7 @@ func Setup() *Server {
 	rpcBus := rpcbus.New()
 
 	// Instantiate gRPC client
-	// TODO: get address from config
-	client := rpc.InitRPCClients(ctx, "127.0.0.1:9090")
+	client := rpc.InitRPCClients(ctx, cfg.Get().RPC.Rusk.Address)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond

@@ -71,9 +71,8 @@ func New(cfg *Config) (*Server, error) {
 
 // Serve will start listening on a hardcoded IP and port. The server will then accept
 // incoming gRPC requests.
-// TODO: don't hardcode IP and port
-func (s *Server) Serve() error {
-	l, err := net.Listen("tcp", "127.0.0.1:9090")
+func (s *Server) Serve(network, url string) error {
+	l, err := net.Listen(network, url)
 	if err != nil {
 		return err
 	}

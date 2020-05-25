@@ -74,6 +74,9 @@ type rpcConfiguration struct {
 
 // rpc/rusk related configurations
 type ruskConfiguration struct {
+	Network string
+	Address string
+
 	// timeout for rusk calls
 	ContractTimeout uint
 	DefaultTimeout  uint
