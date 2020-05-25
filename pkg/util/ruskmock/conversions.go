@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/sirupsen/logrus"
 )
 
 func provisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
@@ -29,8 +30,34 @@ func provisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
 	return ruskProvisioners
 }
 
-func contractCallsToBlock([]*rusk.ContractCallTx) (*block.Block, error) {
-	return nil, nil
+func contractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
+	blk := block.NewBlock()
+
+	for _, call := range calls {
+		var tx transactions.Transaction
+		var err error
+		switch call.ContractCall.(type) {
+		case *rusk.ContractCallTx_Tx:
+			tx, err = ruskTxToStandard(call.GetTx())
+		case *rusk.ContractCallTx_Stake:
+			tx, err = ruskStakeToStake(call.GetStake())
+		case *rusk.ContractCallTx_Bid:
+			tx, err = ruskBidToBid(call.GetBid())
+		case *rusk.ContractCallTx_Distribute:
+			tx, err = ruskDistributeToCoinbase(call.GetDistribute())
+		default:
+			logrus.Warnln("encountered unexpected tx type")
+			continue
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		blk.AddTx(tx)
+	}
+
+	return blk, nil
 }
 
 func standardToRuskTx(tx *transactions.Standard) (*rusk.Transaction, error) {
@@ -141,6 +168,11 @@ func ruskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 		},
 		M: tx.M,
 	}, nil
+}
+
+// TODO: implement
+func ruskDistributeToCoinbase(tx *rusk.DistributeTransaction) (*transactions.Coinbase, error) {
+	return nil, nil
 }
 
 func inputsToRuskInputs(inputs transactions.Inputs) ([]*rusk.TransactionInput, error) {
