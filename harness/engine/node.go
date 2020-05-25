@@ -41,6 +41,9 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
 		node.Cfg.RPC.Address = "127.0.0.1:" + node.Id
 	}
 
+	node.Cfg.RPC.Rusk.Network = "tcp"
+	node.Cfg.RPC.Rusk.Address = "127.0.0.1:" + strconv.Itoa(nodeID+1000)
+
 	node.Gql = graphql.NewClient("http://" + node.Cfg.Gql.Address)
 	return node
 }
