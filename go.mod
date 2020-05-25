@@ -32,7 +32,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/urfave/cli v1.22.3
 	golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
-	google.golang.org/grpc v1.28.0
+	google.golang.org/grpc v1.29.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.2.7 // indirect
 )
