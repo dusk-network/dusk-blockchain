@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
 	"github.com/machinebox/graphql"
 )
 
@@ -15,6 +16,7 @@ type DuskNode struct {
 	// fields represents a dusk-blockchain instance
 	Cfg config.Registry
 	Gql *graphql.Client
+	Srv *ruskmock.Server
 
 	// dusk-blockchain node directory
 	Dir string

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -36,7 +37,6 @@ type Network struct {
 // Bootstrap performs all actions needed to initialize and start a local network
 // This network is alive by the end of all tests execution
 func (n *Network) Bootstrap(workspace string) error {
-
 	// Network bootstrapping is disabled by default as it's intended to be run
 	// on demand only but not by CI for now.
 	// To enable it: go test -v ./...  -args -enable
@@ -48,7 +48,7 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	initProfiles()
 
-	_, _, seederExec, err := n.getExec()
+	_, seederExec, err := n.getExec()
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (n *Network) Teardown() {
 // StartNode locally
 func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 
-	blockchainExec, blindBidExec, _, err := n.getExec()
+	blockchainExec, _, err := n.getExec()
 	if err != nil {
 		return err
 	}
@@ -115,14 +115,20 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 		return tomlErr
 	}
 
+	// Start the mock RUSK server
+	srv, err := ruskmock.New(nil)
+	if err != nil {
+		return err
+	}
+	node.Srv = srv
+
+	if err := srv.Serve(); err != nil {
+		return err
+	}
+
 	// Run dusk-blockchain node process
 	if startErr := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); startErr != nil {
 		return startErr
-	}
-
-	// Run blindbid node process
-	if bbErr := n.start(nodeDir, blindBidExec); bbErr != nil {
-		return bbErr
 	}
 
 	return nil
@@ -173,21 +179,15 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 
 // getExec returns paths of all node executables
 // dusk-blockchain, blindbid and seeder
-func (n *Network) getExec() (string, string, string, error) {
+func (n *Network) getExec() (string, string, error) {
 
 	blockchainExec, err := getEnv("DUSK_BLOCKCHAIN")
 	if err != nil {
-		return "", "", "", err
-	}
-
-	blindBidExec, err := getEnv("DUSK_BLINDBID")
-	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 
 	seederExec, _ := getEnv("DUSK_SEEDER")
-
-	return blockchainExec, blindBidExec, seederExec, nil
+	return blockchainExec, seederExec, nil
 }
 
 func getEnv(envVarName string) (string, error) {
