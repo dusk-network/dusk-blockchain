@@ -72,7 +72,7 @@ func New(cfg *Config) (*Server, error) {
 // incoming gRPC requests.
 // TODO: don't hardcode IP and port
 func (s *Server) Serve() error {
-	l, err := net.Listen("tcp", "127.0.0.1:8080")
+	l, err := net.Listen("tcp", "127.0.0.1:9090")
 	if err != nil {
 		return err
 	}
