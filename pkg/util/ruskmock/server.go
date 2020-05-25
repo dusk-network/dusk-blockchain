@@ -65,6 +65,7 @@ func New(cfg *Config) (*Server, error) {
 
 	grpcServer := grpc.NewServer()
 	rusk.RegisterRuskServer(grpcServer, srv)
+	srv.s = grpcServer
 	return srv, nil
 }
 
