@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"net"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	zkproof "github.com/dusk-network/dusk-zkproof"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -44,6 +46,7 @@ func DefaultConfig() *Config {
 // of scenarios on demand.
 type Server struct {
 	cfg *Config
+	s   *grpc.Server
 
 	w *wallet.Wallet
 	p *user.Provisioners
@@ -63,6 +66,21 @@ func New(cfg *Config) (*Server, error) {
 	grpcServer := grpc.NewServer()
 	rusk.RegisterRuskServer(grpcServer, srv)
 	return srv, nil
+}
+
+func (s *Server) Serve() error {
+	l, err := net.Listen("tcp", "127.0.0.1:8080")
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		if err := s.s.Serve(l); err != nil {
+			logrus.WithError(err).Errorln("rusk mock server encountered an error")
+		}
+	}()
+
+	return nil
 }
 
 // Echo the rusk server to see if it's still running.
