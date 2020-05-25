@@ -122,7 +122,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	}
 	node.Srv = srv
 
-	if err := srv.Serve(config.Get().RPC.Rusk.Network, config.Get().RPC.Rusk.Address); err != nil {
+	if err := srv.Serve(node.Cfg.RPC.Rusk.Network, node.Cfg.RPC.Rusk.Address); err != nil {
 		return err
 	}
 
