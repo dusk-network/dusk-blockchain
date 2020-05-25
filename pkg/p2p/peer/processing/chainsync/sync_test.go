@@ -42,8 +42,9 @@ func TestSynchronizeBehind(t *testing.T) {
 
 	// Check highest seen
 	highestSeenHeightMsg := <-highestSeenChan
-	highestSeenHeight := highestSeenHeightMsg.Payload().(uint64)
+	highestSeenHeight, err := message.ConvU64(highestSeenHeightMsg.Payload())
 
+	assert.NoError(err)
 	assert.Equal(highestSeenHeight, height)
 }
 
@@ -86,7 +87,7 @@ func setupSynchronizer() (*chainsync.ChainSynchronizer, *eventbus.EventBus, chan
 	responseChan := make(chan *bytes.Buffer, 100)
 	counter := chainsync.NewCounter(eb)
 	cs := chainsync.NewChainSynchronizer(eb, rpcBus, responseChan, counter)
-	go respond(rpcBus)
+	respond(rpcBus)
 	return cs, eb, responseChan
 }
 
@@ -95,6 +96,8 @@ func setupSynchronizer() (*chainsync.ChainSynchronizer, *eventbus.EventBus, chan
 func respond(rpcBus *rpcbus.RPCBus) {
 	g := make(chan rpcbus.Request, 1)
 	rpcBus.Register(topics.GetLastBlock, g)
-	r := <-g
-	r.RespChan <- rpcbus.NewResponse(*helper.RandomBlock(0, 1), nil)
+	go func() {
+		r := <-g
+		r.RespChan <- rpcbus.NewResponse(*helper.RandomBlock(0, 1), nil)
+	}()
 }

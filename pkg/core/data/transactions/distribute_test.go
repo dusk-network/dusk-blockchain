@@ -1,6 +1,7 @@
 package transactions_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -33,4 +34,24 @@ func TestJSONUnMarshaling(t *testing.T) {
 	htest, err := test.CalculateHash()
 	assert.NoError(err)
 	assert.Equal(h, htest)
+}
+
+func TestUnMashaling(t *testing.T) {
+	assert := assert.New(t)
+	d := transactions.RandDistributeTx(50, 12)
+
+	b := new(bytes.Buffer)
+	assert.NoError(transactions.MarshalDistribute(b, *d))
+	assert.NoError(transactions.UnmarshalDistribute(b, d))
+}
+
+func TestCopy(t *testing.T) {
+	assert := assert.New(t)
+	d1 := transactions.RandDistributeTx(50, 12)
+	d2 := d1.Copy().(*transactions.DistributeTransaction)
+	b1 := new(bytes.Buffer)
+	assert.NoError(transactions.MarshalDistribute(b1, *d1))
+	b2 := new(bytes.Buffer)
+	assert.NoError(transactions.MarshalDistribute(b2, *d2))
+	assert.Equal(b1.Bytes(), b2.Bytes())
 }

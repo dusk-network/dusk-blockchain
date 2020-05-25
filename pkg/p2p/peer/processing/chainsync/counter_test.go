@@ -1,7 +1,6 @@
 package chainsync
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
@@ -22,7 +21,7 @@ func TestStopTimerGoroutine(t *testing.T) {
 
 	c.StartSyncing(1)
 
-	msg := message.New(topics.AcceptedBlock, bytes.Buffer{})
+	msg := message.New(topics.AcceptedBlock, message.SafeBuffer{})
 	// Decrement to 0. This should stop the running `listenForTimer` goroutine
 	// that's related to the current sync session.
 	bus.Publish(topics.AcceptedBlock, msg)

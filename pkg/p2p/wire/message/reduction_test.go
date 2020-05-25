@@ -2,6 +2,7 @@ package message_test
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -51,6 +52,14 @@ func TestVoteSetUnMarshal(t *testing.T) {
 	}
 
 	assert.Equal(t, evs, evs2)
+}
+
+func TestReductionCopy(t *testing.T) {
+	assert := assert.New(t)
+	r := newReductionEvent(253088, 4)
+
+	cpy := r.Copy()
+	assert.True(reflect.DeepEqual(r, cpy))
 }
 
 func newReductionEvent(round uint64, step uint8) message.Reduction {

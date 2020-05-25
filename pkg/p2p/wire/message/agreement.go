@@ -12,6 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
@@ -49,6 +50,16 @@ type (
 	}
 )
 
+// Copy deeply the StepVotes
+func (s *StepVotes) Copy() *StepVotes {
+	return &StepVotes{
+		BitSet:    s.BitSet,
+		Step:      s.Step,
+		Apk:       s.Apk.Copy(),
+		Signature: s.Signature.Copy(),
+	}
+}
+
 // String representation of the Agreement
 func (a Agreement) String() string {
 	var sb strings.Builder
@@ -58,6 +69,32 @@ func (a Agreement) String() string {
 	_, _ = sb.WriteString(" repr='")
 	_, _ = sb.WriteString(util.StringifyBytes(a.Repr.Bytes()))
 	return sb.String()
+}
+
+// Copy the Agreement is somewhat more expensive than the other structures
+// since it involves Marshaling and Unmarshaling. This is necessary since we do
+// not have access to the underlying BLS structs
+func (a Agreement) Copy() payload.Safe {
+	// NOTE: we ignore the error here. Since we deal with a well formed agreement we
+	// assume that the marshaling cannot fail
+	cpy := new(Agreement)
+	cpy.hdr = a.hdr.Copy().(header.Header)
+	if a.signedVotes != nil {
+		cpy.signedVotes = make([]byte, len(a.signedVotes))
+		copy(cpy.signedVotes, a.signedVotes)
+	}
+
+	cpy.Repr = new(big.Int)
+	cpy.Repr.Set(a.Repr)
+
+	if a.VotesPerStep != nil {
+		// Un-Marshaling the StepVotes for equality
+		cpy.VotesPerStep = make([]*StepVotes, len(a.VotesPerStep))
+		for i, vps := range a.VotesPerStep {
+			cpy.VotesPerStep[i] = vps.Copy()
+		}
+	}
+	return *cpy
 }
 
 // NewStepVotesMsg creates a StepVotesMsg
@@ -71,6 +108,20 @@ func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) Ste
 		},
 		StepVotes: sv,
 	}
+}
+
+// Copy deeply the StepVotesMsg
+func (s StepVotesMsg) Copy() payload.Safe {
+	b := new(bytes.Buffer)
+	_ = MarshalStepVotes(b, &s.StepVotes)
+	sv, _ := UnmarshalStepVotes(b)
+
+	cpy := StepVotesMsg{
+		hdr:       s.hdr.Copy().(header.Header),
+		StepVotes: *sv,
+	}
+
+	return cpy
 }
 
 // State returns the Header without information about Sender (as this is only

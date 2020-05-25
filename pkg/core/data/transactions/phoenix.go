@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -16,6 +17,30 @@ type Transaction struct {
 	Fee     *TransactionOutput   `json:"fee,omitempty"`
 	Proof   []byte               `json:"proof,omitempty"`
 	Data    []byte               `json:"data,omitempty"`
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *Transaction) Copy() payload.Safe {
+	cpy := &Transaction{
+		Fee: t.Fee.Copy(),
+	}
+
+	cpy.Inputs = make([]*TransactionInput, len(t.Inputs))
+	for i, tx := range t.Inputs {
+		cpy.Inputs[i] = tx.Copy()
+	}
+	cpy.Outputs = make([]*TransactionOutput, len(t.Outputs))
+	for i, tx := range t.Outputs {
+		cpy.Outputs[i] = tx.Copy()
+	}
+	cpy.Proof = make([]byte, len(t.Proof))
+	copy(cpy.Proof, t.Proof)
+	if t.Data != nil {
+		cpy.Data = make([]byte, len(t.Data))
+		copy(cpy.Data, t.Data)
+	}
+	return cpy
 }
 
 // Values returns a tuple where the first element is the sum of all transparent
@@ -102,8 +127,11 @@ func MTx(r *rusk.Transaction, t *Transaction) error {
 
 	r.Proof = make([]byte, len(t.Proof))
 	copy(r.Proof, t.Proof)
-	r.Data = make([]byte, len(t.Data))
-	copy(r.Data, t.Data)
+
+	if t.Data != nil {
+		r.Data = make([]byte, len(t.Data))
+		copy(r.Data, t.Data)
+	}
 	return nil
 }
 
@@ -130,8 +158,10 @@ func UTx(r *rusk.Transaction, t *Transaction) error {
 
 	t.Proof = make([]byte, len(r.Proof))
 	copy(t.Proof, r.Proof)
-	t.Data = make([]byte, len(r.Data))
-	copy(t.Data, r.Data)
+	if r.Data != nil {
+		t.Data = make([]byte, len(r.Data))
+		copy(t.Data, r.Data)
+	}
 	return nil
 }
 
@@ -163,6 +193,9 @@ func MarshalTransaction(r *bytes.Buffer, t Transaction) error {
 		return err
 	}
 
+	// wire protocol does not support nil values, so we encode nil Data as
+	// empty []byte. When unmarshaling, we force empty byte slice to nil to be
+	// consistent with all other serializations (i.e. protobuf and JSON)
 	if err := encoding.WriteVarBytes(r, t.Data); err != nil {
 		return err
 	}
@@ -211,6 +244,10 @@ func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
 	if err := encoding.ReadVarBytes(r, &t.Data); err != nil {
 		return err
 	}
+	// Data is nilable, so we force it to nil if it does not contain any data
+	if len(t.Data) == 0 {
+		t.Data = nil
+	}
 	return nil
 }
 
@@ -218,6 +255,16 @@ func UnmarshalTransaction(r *bytes.Buffer, t *Transaction) error {
 type TransactionInput struct {
 	Nullifier  *Nullifier `json:"nullifier"`
 	MerkleRoot *Scalar    `json:"merkle_root"`
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *TransactionInput) Copy() *TransactionInput {
+	cpy := &TransactionInput{
+		Nullifier:  t.Nullifier.Copy(),
+		MerkleRoot: t.MerkleRoot.Copy(),
+	}
+	return cpy
 }
 
 // MTxIn copies from rusk.TransactionInput to transactions.TransactionInput
@@ -267,6 +314,17 @@ type TransactionOutput struct {
 	Note           *Note      `json:"note"`
 	Pk             *PublicKey `json:"pk,omitempty"`
 	BlindingFactor *Scalar    `json:"blinding_factor,omitempty"`
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *TransactionOutput) Copy() *TransactionOutput {
+	cpy := &TransactionOutput{
+		Note:           t.Note.Copy(),
+		Pk:             t.Pk.Copy(),
+		BlindingFactor: t.BlindingFactor.Copy(),
+	}
+	return cpy
 }
 
 // Value returns the amount for this transaction output if Note is not

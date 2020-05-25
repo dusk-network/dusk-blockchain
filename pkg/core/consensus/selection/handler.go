@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -74,9 +73,6 @@ func (sh *ScoreHandler) Verify(ctx context.Context, round uint64, step uint8, m 
 	if sh.threshold.Exceeds(m.Score) {
 		return errors.New("threshold exceeds score")
 	}
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(500*time.Millisecond))
-	defer cancel()
 
 	return sh.scoreVerifier.VerifyScore(ctx, round, step, transactions.Score{
 		Proof:    m.Proof,

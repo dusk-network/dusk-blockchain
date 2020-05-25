@@ -77,11 +77,8 @@ type Mempool struct {
 // checkTx is responsible to determine if a tx is valid or not.
 // Among the other checks, the underlying verifier also checks double spending
 func (m *Mempool) checkTx(tx transactions.ContractCall) error {
-	ctx, cancel := context.WithDeadline(m.ctx, time.Now().Add(500*time.Millisecond))
-	defer cancel()
-
 	// check if external verifyTx is provided
-	if err := m.verifier.VerifyTransaction(ctx, tx); err != nil {
+	if err := m.verifier.VerifyTransaction(m.ctx, tx); err != nil {
 		return fmt.Errorf("transaction verification failed: %v", err)
 	}
 	return nil

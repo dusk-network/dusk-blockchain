@@ -1,80 +1,41 @@
-package message
+package message_test
 
 import (
-	"bytes"
+	"reflect"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
-	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStepVotes(t *testing.T) {
-	set := sortedset.New()
+func TestCopy(t *testing.T) {
+	assert := assert.New(t)
+	aggro := RandAgreement()
+	cpy := aggro.Copy().(message.Agreement)
+	red := aggro.State()
+	h := cpy.State()
 
-	hash := []byte("this is a mock message")
-	k1 := genKeys(&set)
-	k2 := genKeys(&set)
-	subset := set
-	//inserting a third key in the set to better test packing and unpacking
-	genKeys(&set)
+	assert.True(reflect.DeepEqual(aggro, cpy))
 
-	bitset := set.Bits(subset)
+	// HEADER
+	assert.Equal(red.Round, h.Round)
+	assert.Equal(red.Step, h.Step)
+	assert.Equal(red.BlockHash, h.BlockHash)
+	assert.Equal(red.PubKeyBLS, h.PubKeyBLS)
 
-	s, err := bls.Sign(k1.BLSSecretKey, k1.BLSPubKey, hash)
-	assert.NoError(t, err)
+	// SignedVotes
+	assert.Equal(aggro.SignedVotes(), cpy.SignedVotes())
 
-	s2, err := bls.Sign(k2.BLSSecretKey, k2.BLSPubKey, hash)
-	assert.NoError(t, err)
-
-	apk := bls.NewApk(k1.BLSPubKey)
-	assert.NoError(t, apk.Aggregate(k2.BLSPubKey))
-
-	s.Aggregate(s2)
-	assert.NoError(t, bls.Verify(apk, hash, s))
-
-	expectedStepVotes := NewStepVotes()
-	expectedStepVotes.Apk = apk
-	expectedStepVotes.BitSet = bitset
-	expectedStepVotes.Signature = s
-
-	buf := new(bytes.Buffer)
-
-	assert.NoError(t, MarshalStepVotes(buf, expectedStepVotes))
-
-	result, err := UnmarshalStepVotes(buf)
-	assert.NoError(t, err)
-
-	assert.Equal(t, expectedStepVotes, result)
-	assert.NoError(t, bls.Verify(result.Apk, hash, result.Signature))
-}
-
-// Test that adding Reduction events to a StepVotes struct results in a properly
-// aggregated public key and signature.
-func TestStepVotesAdd(t *testing.T) {
-	sv := NewStepVotes()
-	set := sortedset.New()
-	hash := []byte("this is a mock message")
-	assert.NoError(t, sv.Add(genReduction(hash, &set)))
-	assert.NoError(t, sv.Add(genReduction(hash, &set)))
-	assert.NoError(t, sv.Add(genReduction(hash, &set)))
-
-	assert.NoError(t, bls.Verify(sv.Apk, hash, sv.Signature))
-}
-
-func genKeys(set *sortedset.Set) key.Keys {
-	k, _ := key.NewRandKeys()
-	set.Insert(k.BLSPubKeyBytes)
-	return k
-}
-
-func genReduction(hash []byte, set *sortedset.Set) ([]byte, []byte, uint8) {
-	k := genKeys(set)
-	s, err := bls.Sign(k.BLSSecretKey, k.BLSPubKey, hash)
-	if err != nil {
-		panic(err)
+	// VotesPerStep
+	for i, vps := range aggro.VotesPerStep {
+		assert.Equal(vps, cpy.VotesPerStep[i])
 	}
+}
 
-	return s.Compress(), k.BLSPubKeyBytes, uint8(1)
+func RandAgreement() message.Agreement {
+	p, keys := consensus.MockProvisioners(50)
+	hash, _ := crypto.RandEntropy(32)
+	return message.MockAgreement(hash, 44, 6, keys, p)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
@@ -51,6 +52,32 @@ func NewScoreProposal(hdr header.Header, seed []byte, score transactions.Score) 
 	}
 }
 
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (e ScoreProposal) Copy() payload.Safe {
+	cpy := ScoreProposal{
+		hdr: e.hdr.Copy().(header.Header),
+	}
+
+	if e.Score != nil {
+		cpy.Score = make([]byte, len(e.Score))
+		copy(cpy.Score, e.Score)
+	}
+	if e.Proof != nil {
+		cpy.Proof = make([]byte, len(e.Proof))
+		copy(cpy.Proof, e.Proof)
+	}
+	if e.Seed != nil {
+		cpy.Seed = make([]byte, len(e.Seed))
+		copy(cpy.Seed, e.Seed)
+	}
+	if e.Identity != nil {
+		cpy.Identity = make([]byte, len(e.Identity))
+		copy(cpy.Identity, e.Identity)
+	}
+	return cpy
+}
+
 // IsEmpty tests a ScoreProposal for emptyness
 func (e ScoreProposal) IsEmpty() bool {
 	return e.Score == nil
@@ -87,6 +114,20 @@ func NewScore(proposal ScoreProposal, pubkey, prevHash, voteHash []byte) *Score 
 	score.ScoreProposal.hdr.PubKeyBLS = pubkey
 	score.ScoreProposal.hdr.BlockHash = voteHash
 	return score
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (e Score) Copy() payload.Safe {
+	cpy := Score{
+		ScoreProposal: e.ScoreProposal.Copy().(ScoreProposal),
+		PrevHash:      make([]byte, len(e.PrevHash)),
+		VoteHash:      make([]byte, len(e.VoteHash)),
+	}
+
+	copy(cpy.PrevHash, e.PrevHash)
+	copy(cpy.VoteHash, e.VoteHash)
+	return cpy
 }
 
 // EmptyScore is used primarily to initialize the Score,

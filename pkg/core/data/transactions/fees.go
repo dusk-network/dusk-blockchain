@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -17,6 +18,23 @@ type WithdrawFeesTransaction struct {
 	BlsKey []byte `json:"bls_key"`
 	Sig    []byte `json:"sig"`
 	Msg    []byte `json:"msg"`
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (t *WithdrawFeesTransaction) Copy() payload.Safe {
+	cpy := &WithdrawFeesTransaction{
+		ContractTx: t.ContractTx.Copy(),
+		BlsKey:     make([]byte, len(t.BlsKey)),
+		Sig:        make([]byte, len(t.Sig)),
+		Msg:        make([]byte, len(t.Msg)),
+	}
+
+	copy(cpy.BlsKey, t.BlsKey)
+	copy(cpy.Sig, t.Sig)
+	copy(cpy.Msg, t.Msg)
+
+	return cpy
 }
 
 // MarshalJSON provides a json-encoded readable representation of a

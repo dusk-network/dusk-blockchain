@@ -301,6 +301,8 @@ func MockBidTx(amount, expiration uint64, edPk, seed []byte) *BidTransaction {
 	if err := UTx(rtx, stx.Tx); err != nil {
 		panic(err)
 	}
+	stx.M = Rand32Bytes()
+	stx.Commitment = Rand32Bytes()
 	stx.Pk = edPk
 	stx.R = Rand32Bytes()
 	stx.Seed = seed
@@ -316,6 +318,8 @@ func MockDeterministicBid(amount, expiration uint64, edPk, seed []byte) *BidTran
 	if err := UTx(rtx, stx.Tx); err != nil {
 		panic(err)
 	}
+	stx.M = make([]byte, 32)
+	stx.Commitment = make([]byte, 32)
 	stx.Pk = edPk
 	stx.R = make([]byte, 32)
 	stx.Seed = seed
@@ -622,13 +626,19 @@ func RandUint64() uint64 {
 // Rand32Bytes)
 var RandBlind = Rand32Bytes
 
-// Rand32Bytes returns random 32 bytes
-func Rand32Bytes() []byte {
+// RandBytes returns a random byte slice of the desired size
+func RandBytes(size int) []byte {
 	blind := make([]byte, 32)
 	if _, err := rand.Read(blind); err != nil {
 		panic(err)
 	}
 	return blind
+
+}
+
+// Rand32Bytes returns random 32 bytes
+func Rand32Bytes() []byte {
+	return RandBytes(32)
 }
 
 // RandBool returns a random boolean

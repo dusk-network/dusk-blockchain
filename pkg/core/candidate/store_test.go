@@ -43,6 +43,16 @@ func TestStoreFetchClear(t *testing.T) {
 	assert.Empty(c.messages)
 }
 
+func TestDeepCopy(t *testing.T) {
+	assert := assert.New(t)
+
+	cm := mockCandidate()
+	clone := cm.Copy().(message.Candidate)
+
+	assert.True(cm.Block.Equals(clone.Block))
+	assert.True(cm.Certificate.Equals(clone.Certificate))
+}
+
 // Test the candidate request functionality.
 func TestRequestCandidate(t *testing.T) {
 	assert := assert.New(t)

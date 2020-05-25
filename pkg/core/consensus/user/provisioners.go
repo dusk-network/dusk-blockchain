@@ -31,9 +31,40 @@ type (
 	}
 )
 
+// Copy deeply a set of Provisioners
+func (p Provisioners) Copy() Provisioners {
+	cpy := Provisioners{
+		Set:     p.Set.Copy(),
+		Members: make(map[string]*Member),
+	}
+	for k, v := range p.Members {
+		cpy.Members[k] = v
+	}
+	return cpy
+}
+
 // AddStake appends a stake to the stake set
 func (m *Member) AddStake(stake Stake) {
 	m.Stakes = append(m.Stakes, stake)
+}
+
+// Copy deep a Member
+func (m *Member) Copy() *Member {
+	cpy := &Member{
+		PublicKeyBLS: make([]byte, len(m.PublicKeyBLS)),
+		Stakes:       make([]Stake, len(m.Stakes)),
+	}
+
+	copy(cpy.PublicKeyBLS, m.PublicKeyBLS)
+	for i, s := range m.Stakes {
+		cpy.Stakes[i] = Stake{
+			Amount:      s.Amount,
+			StartHeight: s.StartHeight,
+			EndHeight:   s.EndHeight,
+		}
+	}
+
+	return cpy
 }
 
 // RemoveStake removes a Stake (most likely because it expired)

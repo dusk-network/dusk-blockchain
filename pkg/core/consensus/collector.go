@@ -4,6 +4,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
@@ -29,6 +30,21 @@ type (
 		Hash  []byte
 	}
 )
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (r RoundUpdate) Copy() payload.Safe {
+	ru := RoundUpdate{
+		Round: r.Round,
+		P:     r.P.Copy(),
+		Seed:  make([]byte, len(r.Seed)),
+		Hash:  make([]byte, len(r.Hash)),
+	}
+
+	copy(ru.Seed, r.Seed)
+	copy(ru.Hash, r.Hash)
+	return ru
+}
 
 // InitRoundUpdate initializes a Round update channel and fires up the TopicListener
 // as well. Its purpose is to lighten up a bit the amount of arguments in creating
