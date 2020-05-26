@@ -54,7 +54,7 @@ type Server struct {
 
 // New returns a new Rusk mock server with the given config. If no config is
 // passed, a default one is put into place.
-func New(cfg *Config) (*Server, error) {
+func New(cfg *Config, c config.Registry) (*Server, error) {
 	if cfg == nil {
 		cfg = DefaultConfig()
 	}
@@ -66,6 +66,21 @@ func New(cfg *Config) (*Server, error) {
 	grpcServer := grpc.NewServer()
 	rusk.RegisterRuskServer(grpcServer, srv)
 	srv.s = grpcServer
+
+	// First load the database
+	db, err := database.New(c.Wallet.Store + "_2")
+	if err != nil {
+		return nil, err
+	}
+
+	// Then load the wallet
+	w, err := wallet.LoadFromFile(byte(2), db, fetchDecoys, fetchInputs, "password", c.Wallet.File)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	srv.w = w
 	return srv, nil
 }
 
