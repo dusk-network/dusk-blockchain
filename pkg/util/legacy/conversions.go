@@ -1,4 +1,4 @@
-package ruskmock
+package legacy
 
 import (
 	"bytes"
@@ -6,6 +6,8 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	newblock "github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	newtx "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/block"
@@ -13,7 +15,42 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func provisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
+func oldBlockToNewBlock(b *block.Block) (*newblock.Block, error) {
+	nb := newblock.NewBlock()
+	nb.Header = oldHeaderToNewHeader(b.Header)
+	calls, err := blockToContractCalls(b.Txs)
+	if err != nil {
+		return nil, err
+	}
+
+	nb.Txs = calls
+	return nb, nil
+}
+
+func oldHeaderToNewHeader(h *block.Header) *newblock.Header {
+	nh := newblock.NewHeader()
+	nh.Version = h.Version
+	nh.Height = h.Height
+	nh.Timestamp = h.Timestamp
+	nh.PrevBlockHash = h.PrevBlockHash
+	nh.Seed = h.Seed
+	nh.TxRoot = h.TxRoot
+	nh.Certificate = oldCertificateToNewCertificate(h.Certificate)
+	nh.Hash = h.Hash
+	return nh
+}
+
+func oldCertificateToNewCertificate(c *block.Certificate) *newblock.Certificate {
+	nc := newblock.EmptyCertificate()
+	nc.StepOneBatchedSig = c.StepOneBatchedSig
+	nc.StepTwoBatchedSig = c.StepTwoBatchedSig
+	nc.Step = c.Step
+	nc.StepOneCommittee = c.StepOneCommittee
+	nc.StepTwoCommittee = c.StepTwoCommittee
+	return nc
+}
+
+func ProvisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
 	ruskProvisioners := make([]*rusk.Provisioner, len(p.Members))
 	i := 0
 	for _, n := range p.Members {
@@ -30,39 +67,59 @@ func provisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
 	return ruskProvisioners
 }
 
-func blockToContractCalls(txs []transactions.Transaction) ([]*rusk.ContractCallTx, error) {
-	calls := make([]*rusk.ContractCall, len(txs))
+func blockToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, error) {
+	calls := make([]newtx.ContractCall, len(txs))
 
-	for i, tx := range txs {
-		switch tx.Type() {
+	for i, c := range txs {
+		switch c.Type() {
 		case transactions.StandardType:
-			call, err = standardToRuskTx(call.GetTx())
+			call, err := StandardToRuskTx(c.(*transactions.Standard))
 			if err != nil {
 				return nil, err
 			}
 
-			calls[i] = &rusk.ContractCallTx{ContractCall: call}
+			tx := &newtx.Transaction{}
+			if err := newtx.UTx(call, tx); err != nil {
+				return nil, err
+			}
+
+			calls[i] = tx
 		case transactions.StakeType:
-			call, err = stakeToRuskStake(call.GetStake())
+			call, err := StakeToRuskStake(c.(*transactions.Stake))
 			if err != nil {
 				return nil, err
 			}
 
-			calls[i] = &rusk.ContractCallTx{ContractCall: call}
+			tx := &newtx.StakeTransaction{}
+			if err := newtx.UStake(call, tx); err != nil {
+				return nil, err
+			}
+
+			calls[i] = tx
 		case transactions.BidType:
-			call, err = bidToRuskBid(call.GetBid())
+			call, err := BidToRuskBid(c.(*transactions.Bid))
 			if err != nil {
 				return nil, err
 			}
 
-			calls[i] = &rusk.ContractCallTx{ContractCall: call}
+			tx := &newtx.BidTransaction{}
+			if err := newtx.UBid(call, tx); err != nil {
+				return nil, err
+			}
+
+			calls[i] = tx
 		case transactions.CoinbaseType:
-			call, err = coinbaseToRuskDistribute(call.GetDistribute())
+			call, err := CoinbaseToRuskDistribute(c.(*transactions.Coinbase))
 			if err != nil {
 				return nil, err
 			}
 
-			calls[i] = &rusk.ContractCallTx{ContractCall: call}
+			tx := &newtx.DistributeTransaction{}
+			if err := newtx.UDistribute(call, tx); err != nil {
+				return nil, err
+			}
+
+			calls[i] = tx
 		default:
 			logrus.Warnln("encountered unexpected tx type")
 			continue
@@ -72,7 +129,7 @@ func blockToContractCalls(txs []transactions.Transaction) ([]*rusk.ContractCallT
 	return calls, nil
 }
 
-func contractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
+func ContractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
 	blk := block.NewBlock()
 
 	for _, call := range calls {
@@ -80,13 +137,13 @@ func contractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
 		var err error
 		switch call.ContractCall.(type) {
 		case *rusk.ContractCallTx_Tx:
-			tx, err = ruskTxToStandard(call.GetTx())
+			tx, err = RuskTxToStandard(call.GetTx())
 		case *rusk.ContractCallTx_Stake:
-			tx, err = ruskStakeToStake(call.GetStake())
+			tx, err = RuskStakeToStake(call.GetStake())
 		case *rusk.ContractCallTx_Bid:
-			tx, err = ruskBidToBid(call.GetBid())
+			tx, err = RuskBidToBid(call.GetBid())
 		case *rusk.ContractCallTx_Distribute:
-			tx, err = ruskDistributeToCoinbase(call.GetDistribute())
+			tx, err = RuskDistributeToCoinbase(call.GetDistribute())
 		default:
 			logrus.Warnln("encountered unexpected tx type")
 			continue
@@ -102,7 +159,7 @@ func contractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
 	return blk, nil
 }
 
-func standardToRuskTx(tx *transactions.Standard) (*rusk.Transaction, error) {
+func StandardToRuskTx(tx *transactions.Standard) (*rusk.Transaction, error) {
 	buf := new(bytes.Buffer)
 	if err := tx.RangeProof.Encode(buf, true); err != nil {
 		return nil, err
@@ -156,7 +213,7 @@ func standardToRuskTx(tx *transactions.Standard) (*rusk.Transaction, error) {
 	}, nil
 }
 
-func ruskTxToStandard(tx *rusk.Transaction) (*transactions.Standard, error) {
+func RuskTxToStandard(tx *rusk.Transaction) (*transactions.Standard, error) {
 	var feeScalar ristretto.Scalar
 	feeScalar.SetBigInt(big.NewInt(int64(tx.Fee.Value)))
 
@@ -187,8 +244,8 @@ func ruskTxToStandard(tx *rusk.Transaction) (*transactions.Standard, error) {
 	return stx, nil
 }
 
-func stakeToRuskStake(tx *transactions.Stake) (*rusk.StakeTransaction, error) {
-	rtx, err := standardToRuskTx(tx.StandardTx())
+func StakeToRuskStake(tx *transactions.Stake) (*rusk.StakeTransaction, error) {
+	rtx, err := StandardToRuskTx(tx.StandardTx())
 	if err != nil {
 		return nil, err
 	}
@@ -200,8 +257,8 @@ func stakeToRuskStake(tx *transactions.Stake) (*rusk.StakeTransaction, error) {
 	}, nil
 }
 
-func ruskStakeToStake(tx *rusk.StakeTransaction) (*transactions.Stake, error) {
-	stx, err := ruskTxToStandard(tx.Tx)
+func RuskStakeToStake(tx *rusk.StakeTransaction) (*transactions.Stake, error) {
+	stx, err := RuskTxToStandard(tx.Tx)
 	if err != nil {
 		return nil, err
 	}
@@ -215,8 +272,8 @@ func ruskStakeToStake(tx *rusk.StakeTransaction) (*transactions.Stake, error) {
 	}, nil
 }
 
-func bidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
-	rtx, err := standardToRuskTx(tx.StandardTx())
+func BidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
+	rtx, err := StandardToRuskTx(tx.StandardTx())
 	if err != nil {
 		return nil, err
 	}
@@ -228,8 +285,8 @@ func bidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
 	}, nil
 }
 
-func ruskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
-	stx, err := ruskTxToStandard(tx.Tx)
+func RuskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
+	stx, err := RuskTxToStandard(tx.Tx)
 	if err != nil {
 		return nil, err
 	}
@@ -244,12 +301,12 @@ func ruskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 }
 
 // TODO: implement
-func ruskDistributeToCoinbase(tx *rusk.DistributeTransaction) (*transactions.Coinbase, error) {
+func RuskDistributeToCoinbase(tx *rusk.DistributeTransaction) (*transactions.Coinbase, error) {
 	return nil, nil
 }
 
 // TODO: implement
-func coinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.DistributeTransaction, error) {
+func CoinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.DistributeTransaction, error) {
 	return nil, nil
 }
 

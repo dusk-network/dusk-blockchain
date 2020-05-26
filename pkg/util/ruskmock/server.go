@@ -9,6 +9,7 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -128,7 +129,7 @@ func (s *Server) ValidateStateTransition(ctx context.Context, req *rusk.Validate
 // ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
 // configuration.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
-	blk, err := contractCallsToBlock(req.Calls)
+	blk, err := legacy.ContractCallsToBlock(req.Calls)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 	return &rusk.ExecuteStateTransitionResponse{
 		// TODO: return correct height
 		Success:   s.cfg.PassStateTransition,
-		Committee: provisionersToRuskCommittee(s.p),
+		Committee: legacy.ProvisionersToRuskCommittee(s.p),
 	}, nil
 }
 
@@ -340,7 +341,7 @@ func (s *Server) NewTransaction(ctx context.Context, req *rusk.NewTransactionReq
 		return nil, err
 	}
 
-	return standardToRuskTx(tx)
+	return legacy.StandardToRuskTx(tx)
 }
 
 // GetBalance calculates and returns the balance of the caller.
@@ -372,7 +373,7 @@ func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest
 		return nil, err
 	}
 
-	return stakeToRuskStake(stake)
+	return legacy.StakeToRuskStake(stake)
 }
 
 // VerifyStake will verify a staking transaction.
@@ -400,7 +401,7 @@ func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*
 		return nil, err
 	}
 
-	return bidToRuskBid(bid)
+	return legacy.BidToRuskBid(bid)
 }
 
 // NewWithdrawBid creates a bid withdrawal transaction and returns it to the caller.
