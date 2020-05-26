@@ -55,7 +55,7 @@ func main() {
 	go Routine()
 
 	http.HandleFunc("/metrics", MetricsHttp)
-	err := http.ListenAndServe("0.0.0.0:9090", nil)
+	err := http.ListenAndServe("0.0.0.0:9099", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -139,11 +139,16 @@ func MetricsHttp(w http.ResponseWriter, r *http.Request) {
 
 	CalculateTotals(currentBlock)
 
+	var duskTps int64
+	if duskInfo.EffectiveBlockTime != 0 {
+		duskTps = int64(len(currentBlock.Txs)) / duskInfo.EffectiveBlockTime
+	}
+
 	allOut = append(allOut, fmt.Sprintf("dusk_block %v", currentBlock.Header.Height))
 	allOut = append(allOut, fmt.Sprintf("dusk_seconds_last_block %0.2f", now.Sub(lastBlockUpdate).Seconds()))
 	allOut = append(allOut, fmt.Sprintf("dusk_effective_block_time %v", duskInfo.EffectiveBlockTime))
 	allOut = append(allOut, fmt.Sprintf("dusk_block_transactions %v", len(currentBlock.Txs)))
-	allOut = append(allOut, fmt.Sprintf("dusk_block_tps %d", int64(len(currentBlock.Txs))/duskInfo.EffectiveBlockTime))
+	allOut = append(allOut, fmt.Sprintf("dusk_block_tps %d", duskTps))
 	allOut = append(allOut, fmt.Sprintf("dusk_block_value %v", duskInfo.TotalDusk))
 	allOut = append(allOut, fmt.Sprintf("dusk_block_size_bytes %v", duskInfo.BlockSize))
 	allOut = append(allOut, fmt.Sprintf("dusk_contracts_created %v", duskInfo.ContractsCreated))
