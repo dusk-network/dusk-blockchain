@@ -30,6 +30,48 @@ func provisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
 	return ruskProvisioners
 }
 
+func blockToContractCalls(txs []transactions.Transaction) ([]*rusk.ContractCallTx, error) {
+	calls := make([]*rusk.ContractCall, len(txs))
+
+	for i, tx := range txs {
+		switch tx.Type() {
+		case transactions.StandardType:
+			call, err = standardToRuskTx(call.GetTx())
+			if err != nil {
+				return nil, err
+			}
+
+			calls[i] = &rusk.ContractCallTx{ContractCall: call}
+		case transactions.StakeType:
+			call, err = stakeToRuskStake(call.GetStake())
+			if err != nil {
+				return nil, err
+			}
+
+			calls[i] = &rusk.ContractCallTx{ContractCall: call}
+		case transactions.BidType:
+			call, err = bidToRuskBid(call.GetBid())
+			if err != nil {
+				return nil, err
+			}
+
+			calls[i] = &rusk.ContractCallTx{ContractCall: call}
+		case transactions.CoinbaseType:
+			call, err = coinbaseToRuskDistribute(call.GetDistribute())
+			if err != nil {
+				return nil, err
+			}
+
+			calls[i] = &rusk.ContractCallTx{ContractCall: call}
+		default:
+			logrus.Warnln("encountered unexpected tx type")
+			continue
+		}
+	}
+
+	return calls, nil
+}
+
 func contractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
 	blk := block.NewBlock()
 
@@ -203,6 +245,11 @@ func ruskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 
 // TODO: implement
 func ruskDistributeToCoinbase(tx *rusk.DistributeTransaction) (*transactions.Coinbase, error) {
+	return nil, nil
+}
+
+// TODO: implement
+func coinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.DistributeTransaction, error) {
 	return nil, nil
 }
 
