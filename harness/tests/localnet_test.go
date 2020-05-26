@@ -55,7 +55,6 @@ func TestMain(m *testing.M) {
 
 	var code int
 	err = localNet.Bootstrap(workspace)
-
 	if err == engine.ErrDisabledHarness {
 		_ = os.RemoveAll(workspace)
 		os.Exit(0)

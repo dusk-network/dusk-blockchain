@@ -116,7 +116,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	}
 
 	// Start the mock RUSK server
-	srv, err := ruskmock.New(nil)
+	srv, err := ruskmock.New(nil, node.Cfg)
 	if err != nil {
 		return err
 	}
