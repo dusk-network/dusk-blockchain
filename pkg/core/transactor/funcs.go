@@ -76,7 +76,7 @@ func (t *Transactor) loadWallet(password string) (pubKey transactions.PublicKey,
 	// assign wallet
 	t.w = w
 
-	return pubKey, err
+	return w.PublicKey, err
 }
 
 // DecodeAddressToPublicKey will decode a []byte to rusk.PublicKey
