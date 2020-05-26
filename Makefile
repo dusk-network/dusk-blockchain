@@ -11,7 +11,7 @@ lint: ## Lint the files
 test: ## Run unittests
 	@go test $(TFLAGS) -p 1 -short ${PKG_LIST}
 test-harness: ## Run harness tests
-	@go test -v --count=1 --test.timeout=0 ./harness/tests/... -args -enable
+	@go test -v --count=1 --test.timeout=0 ./harness/tests/... -args -enable #-keepalive
 get-blindbid: ## download dusk-blindbidproof
 	@rm -rf ${PWD}/bin/blindbid-linux-amd64 || true
 	@wget -P ${PWD}/bin/ https://github.com/dusk-network/dusk-blindbidproof/releases/download/v0.1.0/blindbid-linux-amd64 && chmod +x ${PWD}/bin/blindbid-linux-amd64
