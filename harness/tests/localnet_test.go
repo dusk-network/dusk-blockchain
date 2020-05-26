@@ -27,7 +27,6 @@ var workspace string
 // TestMain sets up a temporarily local network of N nodes running from genesis block
 // The network should be fully functioning and ready to accept messaging
 func TestMain(m *testing.M) {
-
 	flag.Parse()
 
 	var err error
@@ -84,7 +83,6 @@ func TestMain(m *testing.M) {
 // by all nodes in the network within a particular time frame and within
 // the same block
 func TestSendBidTransaction(t *testing.T) {
-
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 
 	t.Log("Send request to all nodes to loadWallet")
