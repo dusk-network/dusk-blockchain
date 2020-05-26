@@ -76,7 +76,38 @@ func standardToRuskTx(tx *transactions.Standard) (*rusk.Transaction, error) {
 		Inputs:  inputs,
 		Outputs: outputs,
 		Fee: &rusk.TransactionOutput{
+			BlindingFactor: &rusk.Scalar{
+				Data: make([]byte, 32),
+			},
+			Pk: &rusk.PublicKey{
+				AG: &rusk.CompressedPoint{
+					Y: make([]byte, 32),
+				},
+				BG: &rusk.CompressedPoint{
+					Y: make([]byte, 32),
+				},
+			},
 			Value: tx.Fee.BigInt().Uint64(),
+			Note: &rusk.Note{
+				ValueCommitment: &rusk.Scalar{
+					Data: make([]byte, 0),
+				},
+				RG: &rusk.CompressedPoint{
+					Y: make([]byte, 0),
+				},
+				Nonce: &rusk.Nonce{
+					Bs: make([]byte, 0),
+				},
+				PkR: &rusk.CompressedPoint{
+					Y: make([]byte, 0),
+				},
+				BlindingFactor: &rusk.Note_TransparentBlindingFactor{
+					TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+				},
+				Value: &rusk.Note_TransparentValue{
+					TransparentValue: uint64(0),
+				},
+			},
 		},
 		Proof: buf.Bytes(),
 		Data:  tx.R.Bytes(),
@@ -256,6 +287,9 @@ func outputsToRuskOutputs(outputs transactions.Outputs) []*rusk.TransactionOutpu
 				AG: &rusk.CompressedPoint{
 					Y: output.PubKey.P.Bytes(),
 				},
+				BG: &rusk.CompressedPoint{
+					Y: make([]byte, 32),
+				},
 			},
 			Note: &rusk.Note{
 				ValueCommitment: &rusk.Scalar{
@@ -263,6 +297,18 @@ func outputsToRuskOutputs(outputs transactions.Outputs) []*rusk.TransactionOutpu
 				},
 				RG: &rusk.CompressedPoint{
 					Y: output.EncryptedMask.Bytes(),
+				},
+				Nonce: &rusk.Nonce{
+					Bs: make([]byte, 0),
+				},
+				PkR: &rusk.CompressedPoint{
+					Y: make([]byte, 0),
+				},
+				BlindingFactor: &rusk.Note_TransparentBlindingFactor{
+					TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
+				},
+				Value: &rusk.Note_TransparentValue{
+					TransparentValue: uint64(0),
 				},
 			},
 		}
