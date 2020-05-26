@@ -134,7 +134,7 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy.Provider(), proxy.KeyMaster())
+	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy)
 	if err != nil {
 		log.Panic(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -34,8 +35,7 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 		return nil, err
 	}
 
-	// TODO: will this still make sense after the migration
-	// t.launchConsensus()
+	t.launchConsensus()
 
 	return loadResponseFromPub(t.w.PublicKey), nil
 }
@@ -90,8 +90,7 @@ func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse
 		return nil, err
 	}
 
-	// TODO: will this still make sense after migration?
-	// t.launchConsensus()
+	t.launchConsensus()
 
 	return loadResponseFromPub(pubKey), nil
 }
@@ -103,8 +102,7 @@ func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadRe
 
 	err := t.createWallet(req.Seed, req.Password)
 
-	// TODO: will this still make sense after migration?
-	// t.launchConsensus()
+	t.launchConsensus()
 
 	return loadResponseFromPub(t.w.PublicKey), err
 }
@@ -124,7 +122,7 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	// FIXME: 476 - here we need to create K, EdPk; retrieve seed somehow and decide
 	// an ExpirationHeight (most likely the last 2 should be retrieved from he DB)
 	// Create the Ed25519 Keypair
-	tx, err := t.provider.NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
+	tx, err := t.proxy.Provider().NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +156,7 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 	// the chain for the last block through the RPC bus and calculating the
 	// height)
 	var expirationHeight uint64
-	tx, err := t.provider.NewStakeTx(ctx, blsKey.Marshal(), expirationHeight, transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
+	tx, err := t.proxy.Provider().NewStakeTx(ctx, blsKey.Marshal(), expirationHeight, transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +185,7 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 	}
 
 	txReq := transactions.MakeTxRequest(t.w.SecretKey, pb, req.Amount, req.Fee, false)
-	tx, err := t.provider.NewTransactionTx(ctx, txReq)
+	tx, err := t.proxy.Provider().NewTransactionTx(ctx, txReq)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +207,7 @@ func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
 	// NOTE: maybe we will separate the locked and unlocked balances
 	// This call should be updated in that case
 	ctx := context.Background()
-	balance, err := t.provider.GetBalance(ctx, t.w.ViewKey)
+	balance, err := t.proxy.Provider().GetBalance(ctx, t.w.ViewKey)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +259,7 @@ func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.Tran
 	}
 
 	txReq := transactions.MakeTxRequest(t.w.SecretKey, pb, uint64(0), c.Fee, true)
-	tx, err := t.provider.NewContractCall(ctx, c.Data, txReq)
+	tx, err := t.proxy.Provider().NewContractCall(ctx, c.Data, txReq)
 	if err != nil {
 		return nil, err
 	}
@@ -282,10 +280,8 @@ func loadResponseFromPub(pubKey transactions.PublicKey) *node.LoadResponse {
 
 //nolint:unused
 func (t *Transactor) launchConsensus() {
-	// if !t.walletOnly {
-	// 	log.Tracef("Launch consensus")
-	// 	go initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
-	// }
+	log.Tracef("Launch consensus")
+	go initiator.LaunchConsensus(context.Background(), t.eb, t.rb, t.w, t.proxy)
 }
 
 //nolint:unused
