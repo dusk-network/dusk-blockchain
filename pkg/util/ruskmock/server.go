@@ -414,5 +414,24 @@ func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Ke
 }
 
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
-	return nil
+	var decoys []ristretto.Point
+	for i := 0; i < numMixins; i++ {
+		decoy := ristretto.Point{}
+		decoy.Rand()
+
+		decoys = append(decoys, decoy)
+	}
+
+	var pubKeys []mlsag.PubKeys
+	for i := 0; i < numMixins; i++ {
+		var keyVector mlsag.PubKeys
+		keyVector.AddPubKey(decoys[i])
+
+		var secondaryKey ristretto.Point
+		secondaryKey.Rand()
+		keyVector.AddPubKey(secondaryKey)
+
+		pubKeys = append(pubKeys, keyVector)
+	}
+	return pubKeys
 }
