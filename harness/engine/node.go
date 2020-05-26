@@ -46,6 +46,8 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
 	node.Cfg.RPC.Rusk.ContractTimeout = 6000
 	node.Cfg.RPC.Rusk.DefaultTimeout = 1000
 
+	node.Cfg.Genesis.Legacy = true
+
 	node.Gql = graphql.NewClient("http://" + node.Cfg.Gql.Address)
 	return node
 }

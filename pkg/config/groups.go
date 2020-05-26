@@ -118,3 +118,7 @@ type consensusConfiguration struct {
 	DefaultLockTime uint64
 	DefaultAmount   uint64
 }
+
+type genesisConfiguration struct {
+	Legacy bool
+}

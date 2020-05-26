@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 )
 
 // A signle point of constants definition
@@ -33,6 +34,10 @@ const (
 
 // DecodeGenesis marshals a genesis block into a buffer
 func DecodeGenesis() *block.Block {
+	if Get().Genesis.Legacy {
+		return legacy.DecodeGenesis()
+	}
+
 	b := block.NewBlock()
 	switch Get().General.Network {
 	case "testnet": //nolint
