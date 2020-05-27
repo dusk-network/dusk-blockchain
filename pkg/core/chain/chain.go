@@ -158,6 +158,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		getLastCertificateChan:   getLastCertificateChan,
 		getRoundResultsChan:      getRoundResultsChan,
 		getLastCommitteeChan:     getLastCommitteeChan,
+		lastCommittee:            make([][]byte, 0),
 		loader:                   loader,
 		verifier:                 verifier,
 		executor:                 executor,
