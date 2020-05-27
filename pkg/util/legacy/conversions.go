@@ -329,7 +329,7 @@ func CoinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.DistributeTransa
 	tx := &rusk.DistributeTransaction{
 		Tx: &rusk.Transaction{
 			Inputs: make([]*rusk.TransactionInput, 0),
-			Outputs: []*rusk.TransactionOutput{&rusk.TransactionOutput{
+			Outputs: []*rusk.TransactionOutput{{
 				Note: &rusk.Note{
 					Value: &rusk.Note_TransparentValue{
 						TransparentValue: binary.LittleEndian.Uint64(cb.Rewards[0].EncryptedAmount.Bytes()),
