@@ -2,6 +2,7 @@ package legacy
 
 import (
 	"bytes"
+	"encoding/binary"
 	"math/big"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -312,23 +313,37 @@ func RuskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 // RuskDistributeToCoinbase turns a rusk distribute call to an equivalent legacy coinbase.
 func RuskDistributeToCoinbase(tx *rusk.DistributeTransaction) (*transactions.Coinbase, error) {
 	c := transactions.NewCoinbase(make([]byte, 10), make([]byte, 10), byte(2))
-	c.Rewards = ruskOutputsToOutputs(tx.Tx.Outputs)
+	var amount ristretto.Scalar
+	amount.SetBigInt(big.NewInt(int64(tx.Tx.Outputs[0].Note.Value.(*rusk.Note_TransparentValue).TransparentValue)))
+	var pk ristretto.Scalar
+	_ = pk.UnmarshalBinary(tx.BgPk.AG.Y)
+	c.Rewards = append(c.Rewards, &transactions.Output{
+		EncryptedAmount: amount,
+		EncryptedMask:   pk,
+	})
 	return c, nil
 }
 
 // CoinbaseToRuskDistribute turns a legacy coinbase into an equivalent rusk distribute call.
 func CoinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.DistributeTransaction, error) {
-	outputs := outputsToRuskOutputs(cb.Rewards)
 	tx := &rusk.DistributeTransaction{
 		Tx: &rusk.Transaction{
-			Inputs:  make([]*rusk.TransactionInput, 0),
-			Outputs: outputs,
-			Proof:   make([]byte, 0),
-			Data:    make([]byte, 0),
+			Inputs: make([]*rusk.TransactionInput, 0),
+			Outputs: []*rusk.TransactionOutput{&rusk.TransactionOutput{
+				Note: &rusk.Note{
+					Value: &rusk.Note_TransparentValue{
+						TransparentValue: binary.LittleEndian.Uint64(cb.Rewards[0].EncryptedAmount.Bytes()),
+					},
+				},
+			}},
+			Proof: make([]byte, 0),
+			Data:  make([]byte, 0),
 		},
 		ProvisionersAddresses: make([][]byte, 0),
 		BgPk: &rusk.PublicKey{
-			AG: outputs[0].Note.PkR,
+			AG: &rusk.CompressedPoint{
+				Y: cb.Rewards[0].EncryptedMask.Bytes(),
+			},
 			BG: &rusk.CompressedPoint{
 				Y: make([]byte, 0),
 			},
