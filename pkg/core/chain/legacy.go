@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -29,7 +30,9 @@ func (c *Chain) reconstructCommittee(b *block.Block) error {
 	for _, tx := range b.Txs {
 		switch t := tx.(type) {
 		case *transactions.StakeTransaction:
-			amount := t.ContractTx.Tx.Outputs[0].Note.TransparentValue
+			amountBytes := t.ContractTx.Tx.Outputs[0].Note.ValueCommitment.Data
+			amount := binary.LittleEndian.Uint64(amountBytes[0:8])
+
 			if err := c.addProvisioner(t.BlsKey, amount, 0, t.ExpirationHeight); err != nil {
 				return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
 			}
