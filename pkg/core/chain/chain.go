@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
@@ -179,6 +180,17 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		}
 
 		chain.intermediateBlock = blk
+
+		// If we're running the test harness, we should also populate some consensus values
+		if config.Get().Genesis.Legacy {
+			if err := setupBidValues(); err != nil {
+				return nil, err
+			}
+
+			if err := chain.reconstructCommittee(prevBlock); err != nil {
+				return nil, err
+			}
+		}
 	}
 	chain.prevBlock = *prevBlock
 
