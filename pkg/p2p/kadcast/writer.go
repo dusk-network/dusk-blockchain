@@ -20,6 +20,8 @@ type Writer struct {
 
 	// Kademlia routing state
 	router *RoutingTable
+
+	writeQueue chan message.Message
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -39,12 +41,20 @@ func NewWriter(router *RoutingTable, subscriber eventbus.Subscriber, gossip *pro
 // Serve processes any kadcast messaging to the wire
 func (w *Writer) Serve() {
 
-	// NewCallbackListener is preferred here as it passes message.Message to the
+	// NewChanListener is preferred here as it passes message.Message to the
 	// Write, where NewStreamListener works with bytes.Buffer only.
 	// Later this could be change if perf issue noticed
-	w.subscriptionID = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewCallbackListener(w.Write))
 
-	// writeQueue not needed in kadcast
+	w.writeQueue = make(chan message.Message, 1000)
+	w.subscriptionID = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(w.writeQueue))
+
+	go func() {
+		for msg := range w.writeQueue {
+			if err := w.Write(msg); err != nil {
+				log.WithError(err).Trace("kadcast writer problem")
+			}
+		}
+	}()
 }
 
 // Write expects the actual payload in a marshaled form
