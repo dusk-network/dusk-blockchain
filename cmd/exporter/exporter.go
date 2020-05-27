@@ -20,6 +20,7 @@ var (
 	node               *engine.DuskNode
 	currentBlockNumber uint64
 	gqlClient          *graphql.Client
+	pendingTx          int
 	//rpcClient       *Client
 )
 
@@ -75,7 +76,7 @@ func Routine() {
 
 		t1 := time.Now()
 
-		//pendingTx, _ = query.PendingTransactionCount(client,nil)
+		pendingTx, _ = PendingTransactionCount(gqlClient, nil)
 		newBlock, err := GetBlockByNumber(gqlClient, map[string]interface{}{"height": currentBlockNumber + 1})
 
 		if err != nil {
@@ -151,6 +152,7 @@ func MetricsHttp(w http.ResponseWriter, r *http.Request) {
 	allOut = append(allOut, fmt.Sprintf("dusk_block_tps %d", duskTps))
 	allOut = append(allOut, fmt.Sprintf("dusk_block_value %v", duskInfo.TotalDusk))
 	allOut = append(allOut, fmt.Sprintf("dusk_block_size_bytes %v", duskInfo.BlockSize))
+	allOut = append(allOut, fmt.Sprintf("dusk_pending_transactions %v", pendingTx))
 	allOut = append(allOut, fmt.Sprintf("dusk_contracts_created %v", duskInfo.ContractsCreated))
 	allOut = append(allOut, fmt.Sprintf("dusk_token_transfers %v", duskInfo.TokenTransfers))
 	allOut = append(allOut, fmt.Sprintf("dusk_transfers %v", duskInfo.DuskTransfers))

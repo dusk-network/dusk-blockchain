@@ -122,6 +122,30 @@ func GetBlockByNumber(client *graphql.Client, values map[string]interface{}) (*B
 	return &blk.(*Blocks).Blocks[0], nil
 }
 
+func PendingTransactionCount(client *graphql.Client, values map[string]interface{}) (int, error) {
+	query := `
+	mempool(txid: "") {
+		txid
+		txtype
+ 	 },
+	`
+	//TODO: replace it with correct schema
+	var resp map[string]map[string][]map[string]string
+	txs, err := ExecuteQuery(client, query, resp, values)
+	if err != nil {
+		return 0, err
+	}
+
+	//log.Info("Got PendingTransactionCount", txs)
+
+	result, ok := txs.(map[string]map[string][]map[string]string)["data"]
+	count := 0
+	if ok {
+		count = len(result["transactions"])
+	}
+	return count, nil
+}
+
 func GetTransactionByID(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
 	query := `
 	  query($txid: String!) {
