@@ -24,7 +24,8 @@ func setupBidValues() error {
 	})
 }
 
-func (c *Chain) reconstructCommittee(b *block.Block) error {
+// ReconstructCommittee will fill in the committee members that are present from genesis.
+func ReconstructCommittee(p *user.Provisioners, b *block.Block) error {
 	// We should properly reconstruct the committee, though. This is because the keys
 	// need to match up with what's found in the wallet.
 	for _, tx := range b.Txs {
@@ -33,7 +34,7 @@ func (c *Chain) reconstructCommittee(b *block.Block) error {
 			amountBytes := t.ContractTx.Tx.Outputs[0].Note.ValueCommitment.Data
 			amount := binary.LittleEndian.Uint64(amountBytes[0:8])
 
-			if err := c.addProvisioner(t.BlsKey, amount, 0, t.ExpirationHeight); err != nil {
+			if err := addProvisioner(p, t.BlsKey, amount, 0, t.ExpirationHeight); err != nil {
 				return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
 			}
 		}
@@ -42,7 +43,7 @@ func (c *Chain) reconstructCommittee(b *block.Block) error {
 }
 
 // addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
-func (c *Chain) addProvisioner(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
+func addProvisioner(p *user.Provisioners, pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
 	if len(pubKeyBLS) != 129 {
 		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
@@ -51,20 +52,20 @@ func (c *Chain) addProvisioner(pubKeyBLS []byte, amount, startHeight, endHeight 
 	stake := user.Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
 
 	// Check for duplicates
-	_, inserted := c.p.Set.IndexOf(pubKeyBLS)
+	_, inserted := p.Set.IndexOf(pubKeyBLS)
 	if inserted {
 		// If they already exist, just add their new stake
-		c.p.Members[i].AddStake(stake)
+		p.Members[i].AddStake(stake)
 		return nil
 	}
 
 	// This is a new provisioner, so let's initialize the Member struct and add them to the list
-	c.p.Set.Insert(pubKeyBLS)
+	p.Set.Insert(pubKeyBLS)
 	m := &user.Member{}
 
 	m.PublicKeyBLS = pubKeyBLS
 	m.AddStake(stake)
 
-	c.p.Members[i] = m
+	p.Members[i] = m
 	return nil
 }

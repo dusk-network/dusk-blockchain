@@ -188,7 +188,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 				return nil, err
 			}
 
-			if err := chain.reconstructCommittee(prevBlock); err != nil {
+			if err := ReconstructCommittee(chain.p, prevBlock); err != nil {
 				return nil, err
 			}
 		}
