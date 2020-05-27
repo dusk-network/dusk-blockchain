@@ -57,9 +57,11 @@ func ProvisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
 	ruskProvisioners := make([]*rusk.Provisioner, len(p.Members))
 	i := 0
 	for _, n := range p.Members {
+		ruskProvisioners[i] = new(rusk.Provisioner)
 		ruskProvisioners[i].BlsKey = n.PublicKeyBLS
 		ruskProvisioners[i].Stakes = make([]*rusk.Stake, len(n.Stakes))
 		for j, s := range n.Stakes {
+			ruskProvisioners[i].Stakes[j] = new(rusk.Stake)
 			ruskProvisioners[i].Stakes[j].Amount = s.Amount
 			ruskProvisioners[i].Stakes[j].EndHeight = s.EndHeight
 			ruskProvisioners[i].Stakes[j].StartHeight = s.StartHeight
@@ -467,6 +469,7 @@ func ruskOutputsToOutputs(outputs []*rusk.TransactionOutput) transactions.Output
 	sOutputs := make(transactions.Outputs, len(outputs))
 
 	for i, output := range outputs {
+		sOutputs[i] = new(transactions.Output)
 		_ = sOutputs[i].Commitment.UnmarshalBinary(output.BlindingFactor.Data)
 		_ = sOutputs[i].PubKey.P.UnmarshalBinary(output.Pk.AG.Y)
 		_ = sOutputs[i].EncryptedAmount.UnmarshalBinary(output.Note.ValueCommitment.Data)
