@@ -176,9 +176,6 @@ func sendTCPStream(raddr net.UDPAddr, data []byte) {
 		log.WithError(err).Warnf("Could not establish a peer connection %s.", raddr.String())
 		return
 	}
-	defer func() {
-		_ = conn.Close()
-	}()
 
 	log.WithField("src", conn.LocalAddr().String()).
 		WithField("dest", raddr.String()).Traceln("Sending tcp")
@@ -188,8 +185,9 @@ func sendTCPStream(raddr net.UDPAddr, data []byte) {
 	// Write our message to the connection.
 	if err = writeTCPFrame(conn, data); err != nil {
 		log.WithError(err).Warnf("Could not write to addr %s", raddr.String())
-		return
 	}
+
+	_ = conn.Close()
 }
 
 // Gets the local address of the sender `Peer` and the UDPAddress of the
