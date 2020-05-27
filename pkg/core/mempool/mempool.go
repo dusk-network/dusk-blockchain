@@ -251,15 +251,18 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	return txid, nil
 }
 
+// propagateTx (re)-propagate tx in gossip or kadcast network but not in both
 func (m *Mempool) propagateTx(t TxDesc, txid []byte) {
 
-	// Kadcast complete transaction data
-	if err := m.kadcastTx(t); err != nil {
-		log.WithError(err).Warn("Transaction kadcast sending failed")
+	if config.Get().Kadcast.Enabled {
+		// Kadcast complete transaction data
+		if err := m.kadcastTx(t); err != nil {
+			log.WithError(err).Warn("Transaction kadcast sending failed")
+		}
+	} else {
+		// Advertise the transaction hash to gossip network via "Inventory Vectors"
+		m.advertiseTxHash(txid)
 	}
-
-	// Advertise the transaction hash to gossip network via "Inventory Vectors"
-	m.advertiseTxHash(txid)
 }
 
 func (m *Mempool) onBlock(b block.Block) {
