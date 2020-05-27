@@ -300,14 +300,30 @@ func RuskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 	}, nil
 }
 
-// TODO: implement
 func RuskDistributeToCoinbase(tx *rusk.DistributeTransaction) (*transactions.Coinbase, error) {
-	return nil, nil
+	c := transactions.NewCoinbase(make([]byte, 10), make([]byte, 10), byte(2))
+	c.Rewards = ruskOutputsToOutputs(tx.Tx.Outputs)
+	return c, nil
 }
 
-// TODO: implement
 func CoinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.DistributeTransaction, error) {
-	return nil, nil
+	outputs := outputsToRuskOutputs(cb.Rewards)
+	tx := &rusk.DistributeTransaction{
+		Tx: &rusk.Transaction{
+			Inputs:  make([]*rusk.TransactionInput, 0),
+			Outputs: outputs,
+			Proof:   make([]byte, 0),
+			Data:    make([]byte, 0),
+		},
+		ProvisionersAddresses: make([][]byte, 0),
+		BgPk: &rusk.PublicKey{
+			AG: outputs[0].Note.PkR,
+			BG: &rusk.CompressedPoint{
+				Y: make([]byte, 0),
+			},
+		},
+	}
+	return tx, nil
 }
 
 func inputsToRuskInputs(inputs transactions.Inputs) ([]*rusk.TransactionInput, error) {
