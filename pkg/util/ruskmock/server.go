@@ -8,6 +8,7 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -62,6 +63,7 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 
 	srv := &Server{
 		cfg: cfg,
+		p:   user.NewProvisioners(),
 	}
 
 	grpcServer := grpc.NewServer()
@@ -80,9 +82,21 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	w.UpdateWalletHeight(0)
+
+	if err := w.UpdateWalletHeight(0); err != nil {
+		return nil, err
+	}
 
 	srv.w = w
+
+	// Sync up the provisioners
+	genesis := legacy.DecodeGenesis()
+	// Note that we don't use `addConsensusNodes` here because the transaction types
+	// are incompatible.
+	if err := chain.ReconstructCommittee(srv.p, genesis); err != nil {
+		return nil, err
+	}
+
 	return srv, nil
 }
 
