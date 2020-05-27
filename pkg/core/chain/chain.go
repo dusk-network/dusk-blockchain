@@ -312,6 +312,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	_, provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
 	if err != nil {
 		l.WithError(err).Errorln("Error in executing the state transition")
+		return err
 	}
 
 	// Caching the provisioners and bidList
