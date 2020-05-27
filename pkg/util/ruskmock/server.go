@@ -80,6 +80,7 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	w.UpdateWalletHeight(0)
 
 	srv.w = w
 	return srv, nil
