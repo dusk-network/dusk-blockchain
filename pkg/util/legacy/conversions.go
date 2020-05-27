@@ -50,6 +50,8 @@ func oldCertificateToNewCertificate(c *block.Certificate) *newblock.Certificate 
 	return nc
 }
 
+// ProvisionersToRuskCommittee converts a native Provisioners struct to a slice of
+// rusk Provisioners.
 func ProvisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
 	ruskProvisioners := make([]*rusk.Provisioner, len(p.Members))
 	i := 0
@@ -129,6 +131,7 @@ func blockToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall,
 	return calls, nil
 }
 
+// ContractCallsToBlock turns a slice of rusk contract calls into a legacy block.
 func ContractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
 	blk := block.NewBlock()
 
@@ -159,6 +162,7 @@ func ContractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
 	return blk, nil
 }
 
+// StandardToRuskTx turns a legacy transaction into a rusk transaction.
 func StandardToRuskTx(tx *transactions.Standard) (*rusk.Transaction, error) {
 	buf := new(bytes.Buffer)
 	if err := tx.RangeProof.Encode(buf, true); err != nil {
@@ -213,6 +217,7 @@ func StandardToRuskTx(tx *transactions.Standard) (*rusk.Transaction, error) {
 	}, nil
 }
 
+// RuskTxToStandard turns a rusk transaction into a legacy transaction.
 func RuskTxToStandard(tx *rusk.Transaction) (*transactions.Standard, error) {
 	var feeScalar ristretto.Scalar
 	feeScalar.SetBigInt(big.NewInt(int64(tx.Fee.Value)))
@@ -244,6 +249,7 @@ func RuskTxToStandard(tx *rusk.Transaction) (*transactions.Standard, error) {
 	return stx, nil
 }
 
+// StakeToRuskStake turns a legacy stake into a rusk stake.
 func StakeToRuskStake(tx *transactions.Stake) (*rusk.StakeTransaction, error) {
 	rtx, err := StandardToRuskTx(tx.StandardTx())
 	if err != nil {
@@ -257,6 +263,7 @@ func StakeToRuskStake(tx *transactions.Stake) (*rusk.StakeTransaction, error) {
 	}, nil
 }
 
+// RuskStakeToStake turns a rusk stake into a legacy stake.
 func RuskStakeToStake(tx *rusk.StakeTransaction) (*transactions.Stake, error) {
 	stx, err := RuskTxToStandard(tx.Tx)
 	if err != nil {
@@ -272,6 +279,7 @@ func RuskStakeToStake(tx *rusk.StakeTransaction) (*transactions.Stake, error) {
 	}, nil
 }
 
+// BidToRuskBid turns a legacy bid into a rusk bid.
 func BidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
 	rtx, err := StandardToRuskTx(tx.StandardTx())
 	if err != nil {
@@ -285,6 +293,7 @@ func BidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
 	}, nil
 }
 
+// RuskBidToBid turns a rusk bid into a legacy bid.
 func RuskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 	stx, err := RuskTxToStandard(tx.Tx)
 	if err != nil {
@@ -300,12 +309,14 @@ func RuskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 	}, nil
 }
 
+// RuskDistributeToCoinbase turns a rusk distribute call to an equivalent legacy coinbase.
 func RuskDistributeToCoinbase(tx *rusk.DistributeTransaction) (*transactions.Coinbase, error) {
 	c := transactions.NewCoinbase(make([]byte, 10), make([]byte, 10), byte(2))
 	c.Rewards = ruskOutputsToOutputs(tx.Tx.Outputs)
 	return c, nil
 }
 
+// CoinbaseToRuskDistribute turns a legacy coinbase into an equivalent rusk distribute call.
 func CoinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.DistributeTransaction, error) {
 	outputs := outputsToRuskOutputs(cb.Rewards)
 	tx := &rusk.DistributeTransaction{
