@@ -1,8 +1,10 @@
 # README
 
-### Intro
+## Intro
 
-GraphQL package is here to provide a read-only access to any persistent/non-persistent node data. It should allow fetching:
+GraphQL package is here to provide a read-only access to any persistent/non-persistent node data. It is intended to play the same role to DUSK Blockchain data as SQL to RDBMS, providing query flexibility and multiple-fetches in single a query.
+
+ It should allow fetching:
 
 * chain data \(block header and transactions\)
 * mempool state information
@@ -45,7 +47,7 @@ keyFile = ""
 maxRequestLimit = 20
 ```
 
-### Example queries that can be sent as message body of a HTTP POST request to endpoint /graphql
+## Example queries  
 
 NB: The examples from below represent only query structures. To send a query as a http request the following schema must be used:
 
@@ -98,7 +100,7 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-* Fetch local chain tip and current state of mempool in a single request.
+* Fetch local chain tip and all pending mempool txs in a single request.
 
   ```graphql
   {
@@ -147,7 +149,7 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-* Fetch data of a set of transactions by txIDs
+* Fetch data of a set of accepted transactions by txIDs
 
 ```graphql
 {
@@ -211,7 +213,7 @@ NB: The examples from below represent only query structures. To send a query as 
   }
   ```
 
-* Fetch last/latest 100 transactions \(type and size fetched\)
+* Fetch last/latest accepted 100 transactions \(type and size fields\)
 
   ```graphql
   { 
