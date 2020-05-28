@@ -3,7 +3,25 @@ package rpc
 import (
 	"crypto/ed25519"
 	"encoding/json"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/hashset"
 )
+
+const servicePrefix = "/node.Auth/"
+
+// CreateSessionRoute is the RPC to create a session
+const CreateSessionRoute = servicePrefix + "CreateSession"
+
+// StatusRoute is the RPC to inquiry the status of the wallet
+const StatusRoute = servicePrefix + "Status"
+
+// OpenRoutes is the set of RPC that do not require session authentication
+var OpenRoutes = hashset.New()
+
+func init() {
+	OpenRoutes.Add([]byte(CreateSessionRoute))
+	OpenRoutes.Add([]byte(StatusRoute))
+}
 
 // AuthToken is what we put in the authorization header
 type AuthToken struct {
