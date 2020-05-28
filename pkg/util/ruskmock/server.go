@@ -321,6 +321,7 @@ func (s *Server) Keys(ctx context.Context, req *rusk.SecretKey) (*rusk.KeysRespo
 }
 
 // FullScanOwnedNotes returns the inputs belonging to the given view key.
+// TODO: implement (if necessary)
 func (s *Server) FullScanOwnedNotes(ctx context.Context, req *rusk.ViewKey) (*rusk.OwnedNotesResponse, error) {
 	return nil, nil
 }
@@ -363,6 +364,7 @@ func (s *Server) NewTransaction(ctx context.Context, req *rusk.NewTransactionReq
 }
 
 // GetBalance calculates and returns the balance of the caller.
+// TODO: implement
 func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*rusk.GetBalanceResponse, error) {
 	return nil, nil
 }
@@ -376,6 +378,7 @@ func (s *Server) VerifyTransaction(ctx context.Context, req *rusk.ContractCallTx
 
 // CalculateMempoolBalance will return the amount of DUSK that is pending in the mempool
 // for the caller.
+// TODO: implement
 func (s *Server) CalculateMempoolBalance(ctx context.Context, req *rusk.CalculateMempoolBalanceRequest) (*rusk.GetBalanceResponse, error) {
 	return nil, nil
 }
@@ -401,6 +404,7 @@ func (s *Server) VerifyStake(ctx context.Context, req *rusk.StakeTransaction) (*
 }
 
 // NewWithdrawStake creates a stake withdrawal transaction and returns it to the caller.
+// TODO: implement
 func (s *Server) NewWithdrawStake(ctx context.Context, req *rusk.WithdrawStakeTransactionRequest) (*rusk.WithdrawStakeTransaction, error) {
 	return nil, nil
 }
@@ -423,16 +427,19 @@ func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*
 }
 
 // NewWithdrawBid creates a bid withdrawal transaction and returns it to the caller.
+// TODO: implement
 func (s *Server) NewWithdrawBid(ctx context.Context, req *rusk.WithdrawBidTransactionRequest) (*rusk.WithdrawBidTransaction, error) {
 	return nil, nil
 }
 
 // NewWithdrawFees creates a fee withdrawal transaction and returns it to the caller.
+// TODO: implement
 func (s *Server) NewWithdrawFees(ctx context.Context, req *rusk.WithdrawFeesTransactionRequest) (*rusk.WithdrawFeesTransaction, error) {
 	return nil, nil
 }
 
 // NewSlash creates a slashing transaction and returns it to the caller.
+// TODO: implement
 func (s *Server) NewSlash(ctx context.Context, req *rusk.SlashTransactionRequest) (*rusk.SlashTransaction, error) {
 	return nil, nil
 }
@@ -447,6 +454,8 @@ func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Ke
 	return db.FetchInputs(privSpend.Bytes(), totalAmount)
 }
 
+// This will just mock some decoys. Note that, if we change to actual tx verification,
+// this should be updated accordingly.
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
 	var decoys []ristretto.Point
 	for i := 0; i < numMixins; i++ {
