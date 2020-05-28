@@ -13,6 +13,7 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/database"
 	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
@@ -147,10 +148,12 @@ func (s *Server) ValidateStateTransition(ctx context.Context, req *rusk.Validate
 // ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
 // configuration.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
-	blk, err := legacy.ContractCallsToBlock(req.Calls)
+	txs, err := legacy.ContractCallsToTxs(req.Calls)
 	if err != nil {
 		return nil, err
 	}
+	blk := block.NewBlock()
+	blk.Txs = txs
 	blk.Header.Height = req.Height
 
 	_, _, err = s.w.CheckWireBlock(*blk)

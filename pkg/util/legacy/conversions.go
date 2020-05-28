@@ -20,7 +20,7 @@ import (
 func OldBlockToNewBlock(b *block.Block) (*newblock.Block, error) {
 	nb := newblock.NewBlock()
 	nb.Header = oldHeaderToNewHeader(b.Header)
-	calls, err := blockToContractCalls(b.Txs)
+	calls, err := txsToContractCalls(b.Txs)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func ProvisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
 	return ruskProvisioners
 }
 
-func blockToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, error) {
+func txsToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, error) {
 	calls := make([]newtx.ContractCall, len(txs))
 
 	for i, c := range txs {
@@ -135,11 +135,11 @@ func blockToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall,
 	return calls, nil
 }
 
-// ContractCallsToBlock turns a slice of rusk contract calls into a legacy block.
-func ContractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
-	blk := block.NewBlock()
+// ContractCallsToBlock turns a slice of rusk contract calls into a slice of standard txs.
+func ContractCallsToTxs(calls []*rusk.ContractCallTx) ([]transactions.Transaction, error) {
+	txs := make([]transactions.Transaction, len(calls))
 
-	for _, call := range calls {
+	for i, call := range calls {
 		var tx transactions.Transaction
 		var err error
 		switch call.ContractCall.(type) {
@@ -160,10 +160,10 @@ func ContractCallsToBlock(calls []*rusk.ContractCallTx) (*block.Block, error) {
 			return nil, err
 		}
 
-		blk.AddTx(tx)
+		txs[i] = tx
 	}
 
-	return blk, nil
+	return txs, nil
 }
 
 // StandardToRuskTx turns a legacy transaction into a rusk transaction.
