@@ -58,6 +58,8 @@ type Registry struct {
 	Performance performanceConfiguration
 	Logger      loggerConfiguration
 	Profile     []profileConfiguration
+
+	Genesis genesisConfiguration
 }
 
 // Load makes an attempt to read and unmarshal any configs from flag, env and

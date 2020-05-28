@@ -74,6 +74,9 @@ type rpcConfiguration struct {
 
 // rpc/rusk related configurations
 type ruskConfiguration struct {
+	Network string
+	Address string
+
 	// timeout for rusk calls
 	ContractTimeout uint
 	DefaultTimeout  uint
@@ -114,4 +117,8 @@ type mempoolConfiguration struct {
 type consensusConfiguration struct {
 	DefaultLockTime uint64
 	DefaultAmount   uint64
+}
+
+type genesisConfiguration struct {
+	Legacy bool
 }

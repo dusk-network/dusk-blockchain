@@ -123,6 +123,27 @@ func MDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error 
 	return nil
 }
 
+// UDistribute copies the Distribute struct into the rusk  datastruct
+func UDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error {
+	t.ContractTx = new(ContractTx)
+	t.Tx = new(Transaction)
+	t.Tx.Outputs = make([]*TransactionOutput, 1)
+	t.Tx.Outputs[0] = new(TransactionOutput)
+	t.Tx.Outputs[0].Note = new(Note)
+	t.Tx.Outputs[0].Note.TransparentValue = r.Tx.Outputs[0].Note.Value.(*rusk.Note_TransparentValue).TransparentValue
+	t.ProvisionersAddresses = r.ProvisionersAddresses
+	t.BgPk = &PublicKey{
+		AG: &CompressedPoint{
+			Y: make([]byte, 0),
+		},
+		BG: &CompressedPoint{
+			Y: make([]byte, 0),
+		},
+	}
+	UPublicKey(r.BgPk, t.BgPk)
+	return nil
+}
+
 //MarshalDistribute into a buffer
 func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
 	reward := s.Tx.Outputs[0].Note.TransparentValue

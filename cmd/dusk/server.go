@@ -11,12 +11,14 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
@@ -49,7 +51,17 @@ type Server struct {
 // component and performs a DB sanity check
 func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server) (chain.Loader, error) {
 	// creating and firing up the chain process
-	genesis := cfg.DecodeGenesis()
+	var genesis *block.Block
+	if cfg.Get().Genesis.Legacy {
+		g := legacy.DecodeGenesis()
+		var err error
+		genesis, err = legacy.OldBlockToNewBlock(g)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		genesis = cfg.DecodeGenesis()
+	}
 	_, db := heavy.CreateDBConnection()
 	l := chain.NewDBLoader(db, genesis)
 
@@ -89,8 +101,7 @@ func Setup() *Server {
 	rpcBus := rpcbus.New()
 
 	// Instantiate gRPC client
-	// TODO: get address from config
-	client := rpc.InitRPCClients(ctx, "127.0.0.1:8080")
+	client := rpc.InitRPCClients(ctx, cfg.Get().RPC.Rusk.Address)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
@@ -135,7 +146,7 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy.Provider(), proxy.KeyMaster())
+	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy)
 	if err != nil {
 		log.Panic(err)
 	}

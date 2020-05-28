@@ -9,7 +9,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -18,7 +17,7 @@ import (
 )
 
 // LaunchConsensus start the whole consensus algorithm
-func LaunchConsensus(ctx context.Context, eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, _ *chainsync.Counter, proxy transactions.Proxy) {
+func LaunchConsensus(ctx context.Context, eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, proxy transactions.Proxy) {
 	// Setting up the consensus factory
 	f := factory.New(ctx, eventBroker, rpcBus, config.ConsensusTimeOut, &w.PublicKey, w.Keys(), proxy)
 	f.StartConsensus()

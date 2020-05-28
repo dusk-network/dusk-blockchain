@@ -47,6 +47,8 @@ func NewComponent(ctx context.Context, publisher eventbus.Publisher, consensusKe
 		k:         k,
 		d:         d,
 		threshold: consensus.NewThreshold(),
+		bg:        bg,
+		ctx:       ctx,
 	}
 }
 

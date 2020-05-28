@@ -31,14 +31,14 @@ type Transactor struct { // TODO: rename
 
 	secretKey transactions.SecretKey
 
-	provider  transactions.Provider
+	proxy     transactions.Proxy
 	keyMaster transactions.KeyMaster
 
 	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, provider transactions.Provider, keyMaster transactions.KeyMaster) (*Transactor, error) {
+func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -52,8 +52,7 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 		rb:        rb,
 		stakeChan: stakeChan,
 		bidChan:   bidChan,
-		keyMaster: keyMaster,
-		provider:  provider,
+		proxy:     proxy,
 	}
 
 	if srv != nil {
