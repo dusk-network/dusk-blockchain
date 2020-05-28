@@ -72,10 +72,8 @@ maxInvItems = 10000
 
 # gRPC API service
 [rpc]
-
 # network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
 network="unix"
-
 # in case the network is unix, 
 # address must be a path to a unix socket (e.g /tmp/file.sock)
 # in case the network is tcp*,
