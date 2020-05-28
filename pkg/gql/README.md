@@ -1,28 +1,31 @@
-##### Intro
-GraphQL package is here to provide a read-only access to any persistent/non-persistent node data.
-It should allow fetching:
+# README
 
-- chain data (block header and transactions)
-- mempool state information
-- node status (pending)
+### Intro
 
-##### API Endpoints
+GraphQL package is here to provide a read-only access to any persistent/non-persistent node data. It should allow fetching:
 
-- `/graphql` - Support data fetching
-- `/ws` - Support websocket notifications
+* chain data \(block header and transactions\)
+* mempool state information
+* node status \(pending\)
 
-##### Scenarios
+### API Endpoints
+
+* `/graphql` - Support data fetching
+* `/ws` - Support websocket notifications
+
+### Scenarios
 
 Scenarios where it's supposed to be useful:
 
-- Blockchain explorer fetching chain, mempool or consensus data
-- Test Harness ensuring chain state after a set of actions executed
-- User retrieving data in curl-request manner
+* Blockchain explorer fetching chain, mempool or consensus data
+* Test Harness ensuring chain state after a set of actions executed
+* User retrieving data in curl-request manner
 
 The utility should not be used for any data mutations or node commanding.
 
-#### Configuration
-```toml
+## Configuration
+
+```text
 # GraphQL API service
 [gql]
 # enable graphql service
@@ -42,11 +45,11 @@ keyFile = ""
 maxRequestLimit = 20
 ```
 
-##### Example queries that can be sent as message body of a HTTP POST request to endpoint /graphql
+### Example queries that can be sent as message body of a HTTP POST request to endpoint /graphql
 
 NB: The examples from below represent only query structures. To send a query as a http request the following schema must be used:
 
-```json
+```javascript
 {  
    "query":"query ($num: Int!) { transactions(last: $num) { txid txtype }}",
    "variables":{  
@@ -55,7 +58,7 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
--  Fetch block by hash with full set of supported fields
+* Fetch block by hash with full set of supported fields
 
 ```graphql
 {
@@ -76,7 +79,8 @@ NB: The examples from below represent only query structures. To send a query as 
   }
 }
 ```
-- Fetch block fields by height
+
+* Fetch block fields by height
 
 ```graphql
 {
@@ -94,9 +98,10 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-- Fetch local chain tip and current state of mempool in a single request.
-```graphql
-{
+* Fetch local chain tip and current state of mempool in a single request.
+
+  ```graphql
+  {
   blocks(height: -1 ) {
     header {
        height
@@ -108,12 +113,13 @@ NB: The examples from below represent only query structures. To send a query as 
       txid
       txtype
   },
-}
-``` 
+  }
+  ```
 
-- Fetch block header fields for range of blocks (from 116346 to 116348 height)
-```graphql
-{
+* Fetch block header fields for range of blocks \(from 116346 to 116348 height\)
+
+  ```graphql
+  {
   blocks(range: [116346,116348] ) {
     header {
        height
@@ -126,9 +132,10 @@ NB: The examples from below represent only query structures. To send a query as 
       txtype
     }
   }
-}
-```
-- Fetch data of a single (accepted) transaction
+  }
+  ```
+
+* Fetch data of a single \(accepted\) transaction
 
 ```graphql
 {
@@ -140,7 +147,7 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-- Fetch data of a set of transactions by txIDs
+* Fetch data of a set of transactions by txIDs
 
 ```graphql
 {
@@ -152,7 +159,7 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-- Fetch first and last block timestamps
+* Fetch first and last block timestamps
 
 ```graphql
 {
@@ -171,7 +178,7 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-- Fetch last 10 blocks accepted
+* Fetch last 10 blocks accepted
 
 ```graphql
 {
@@ -187,9 +194,10 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-- Fetch a slice of blocks by their hashes
-```graphql
-{
+* Fetch a slice of blocks by their hashes
+
+  ```graphql
+  {
   blocks(hashes: ["194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620","ba87ceec9f31ccfccabc9d2be9f753666e0ed559744f59d3f4bd2afd320f7b03"]) {
     header {
        height
@@ -200,33 +208,36 @@ NB: The examples from below represent only query structures. To send a query as 
       txtype
     }
   }
-}
-```
+  }
+  ```
 
-- Fetch last/latest 100 transactions (type and size fetched)
-```graphql
-{ 
+* Fetch last/latest 100 transactions \(type and size fetched\)
+
+  ```graphql
+  { 
   transactions(last: 100) 
   { 
     txid
     txtype
     size
   }
-}
-```
+  }
+  ```
 
-- Calculate count of blocks (tip - old height) since 1970-01-01T00:00:20+00:00
-```graphql
-{
-	tip: blocks(height: -1) {
-		header {
-			height
-		}
-	}
-	old: blocks(since: "1970-01-01T00:00:20+00:00") {
-		header {
-			height
-		}
-	}
-}
-```
+* Calculate count of blocks \(tip - old height\) since 1970-01-01T00:00:20+00:00
+
+  ```graphql
+  {
+    tip: blocks(height: -1) {
+        header {
+            height
+        }
+    }
+    old: blocks(since: "1970-01-01T00:00:20+00:00") {
+        header {
+            height
+        }
+    }
+  }
+  ```
+
