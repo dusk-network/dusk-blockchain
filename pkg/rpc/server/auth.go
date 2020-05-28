@@ -15,20 +15,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var openRoutes = hashset.New()
-
 type authField int
 
 const (
 	edPkField authField = iota
 )
-
-const servicePrefix = "/node.Auth/"
-
-func init() {
-	openRoutes.Add([]byte(servicePrefix + "CreateSession"))
-	openRoutes.Add([]byte(servicePrefix + "Status"))
-}
 
 type (
 	// Auth struct is a bit weird since it contains an array of known public keys,
@@ -41,17 +32,22 @@ type (
 	// AuthInterceptor is the grpc interceptor to authenticate grpc calls
 	// before they get forwarded to the relevant services
 	AuthInterceptor struct {
-		jwtMan *JWTManager
+		jwtMan      *JWTManager
+		store       *hashset.SafeSet
+		openMethods *hashset.Set
 	}
 )
 
 // NewAuth is the authorization service to manage the session with a client
 func NewAuth(j *JWTManager) (*Auth, *AuthInterceptor) {
+	safeSet := hashset.NewSafe()
 	return &Auth{
-			store:  hashset.NewSafe(),
+			store:  safeSet,
 			jwtMan: j,
 		}, &AuthInterceptor{
-			jwtMan: j,
+			store:       safeSet,
+			jwtMan:      j,
+			openMethods: rpc.OpenRoutes,
 		}
 }
 
@@ -85,7 +81,7 @@ func (a *Auth) DropSession(ctx context.Context, req *node.EmptyRequest) (*node.G
 	if !ok {
 		return nil, status.Error(codes.Internal, "unable to retrieve client pk from context")
 	}
-	// add the PK to the set of known PK (which should be of just one element)
+	// remove the PK to the set of known PK (which should be of just one element)
 	_ = a.store.Remove(clientPk)
 
 	res := &node.GenericResponse{Response: "session successfully dropped"}
@@ -98,35 +94,36 @@ func (ai *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 		tag := "Unary call " + info.FullMethod
 		log.Tracef("%s", tag)
 
-		if err := ai.authorize(ctx, info.FullMethod); err != nil {
+		vctx, err := ai.authorize(ctx, info.FullMethod)
+		if err != nil {
 			return nil, err
 		}
 
-		return handler(ctx, req)
+		return handler(vctx, req)
 	}
 }
 
-func (ai *AuthInterceptor) authorize(ctx context.Context, method string) error {
-	if openRoutes.Has([]byte(method)) {
-		return nil
+func (ai *AuthInterceptor) authorize(ctx context.Context, method string) (context.Context, error) {
+	if ai.openMethods.Has([]byte(method)) {
+		return ctx, nil
 	}
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return status.Errorf(codes.Unauthenticated, "metadata not provided")
+		return ctx, status.Errorf(codes.Unauthenticated, "metadata not provided")
 	}
 
 	values := md["authorization"]
 	if len(values) == 0 {
-		return status.Error(codes.Unauthenticated, "token not provided")
+		return ctx, status.Error(codes.Unauthenticated, "token not provided")
 	}
 
 	clientPk, err := ai.extractClientPK(values[0])
 	if err != nil {
-		return status.Errorf(codes.Unauthenticated, "error in extracting the client PK: %v", err)
+		return ctx, status.Errorf(codes.Unauthenticated, "error in extracting the client PK: %v", err)
 	}
-	context.WithValue(ctx, edPkField, clientPk)
-	return nil
+
+	return context.WithValue(ctx, edPkField, clientPk), nil
 }
 
 func (ai *AuthInterceptor) extractClientPK(a string) ([]byte, error) {
@@ -147,6 +144,10 @@ func (ai *AuthInterceptor) extractClientPK(a string) ([]byte, error) {
 	edPk, err := base64.StdEncoding.DecodeString(b64EdPk)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not decode sender")
+	}
+
+	if !ai.store.Has(edPk) {
+		return nil, status.Errorf(codes.Internal, "client does not have an active session")
 	}
 
 	// verify the client signature with extracted public key

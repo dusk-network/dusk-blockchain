@@ -29,6 +29,13 @@ type ClientClaims struct {
 	ClientEdPk string `json:"client-edpk"`
 }
 
+func init() {
+	method := &SigningMethodEdDSA{}
+	jwt.RegisterSigningMethod(method.Alg(), func() jwt.SigningMethod {
+		return method
+	})
+}
+
 // NewJWTManager creates a JWTMnager
 func NewJWTManager(duration time.Duration) (*JWTManager, error) {
 	pk, sk, err := ed25519.GenerateKey(rand.Reader)
@@ -62,11 +69,11 @@ func (m *JWTManager) Verify(accessToken string) (*ClientClaims, error) {
 		accessToken,
 		&ClientClaims{},
 		func(t *jwt.Token) (interface{}, error) {
-			_, ok := t.Method.(*jwt.SigningMethodECDSA)
+			_, ok := t.Method.(*SigningMethodEdDSA)
 			if !ok {
 				return nil, errSigMethodMismatch
 			}
-			return m.sk, nil
+			return m.pk, nil
 		},
 	)
 
