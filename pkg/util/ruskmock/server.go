@@ -8,7 +8,6 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -93,7 +92,11 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 	genesis := legacy.DecodeGenesis()
 	// Note that we don't use `addConsensusNodes` here because the transaction types
 	// are incompatible.
-	if err := chain.ReconstructCommittee(srv.p, genesis); err != nil {
+	if err := srv.addConsensusNodes(genesis.Txs, 0); err != nil {
+		return nil, err
+	}
+
+	if _, _, err := srv.w.CheckWireBlock(*genesis); err != nil {
 		return nil, err
 	}
 
@@ -148,18 +151,18 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 	if err != nil {
 		return nil, err
 	}
+	blk.Header.Height = req.Height
 
 	_, _, err = s.w.CheckWireBlock(*blk)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.addConsensusNodes(blk.Txs /*, req.CurrentHeight*/, 0); err != nil {
+	if err := s.addConsensusNodes(blk.Txs, req.Height); err != nil {
 		return nil, err
 	}
 
 	return &rusk.ExecuteStateTransitionResponse{
-		// TODO: return correct height
 		Success:   s.cfg.PassStateTransition,
 		Committee: legacy.ProvisionersToRuskCommittee(s.p),
 	}, nil
