@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Transaction is the struct that holds common transaction fields
 type Transaction struct {
 	Amount   uint64
 	LockTime uint64
