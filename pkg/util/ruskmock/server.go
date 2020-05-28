@@ -2,7 +2,6 @@ package ruskmock
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"net"
 
@@ -175,40 +174,12 @@ func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight u
 	for _, tx := range txs {
 		if tx.Type() == transactions.StakeType {
 			stake := tx.(*transactions.Stake)
-			if err := s.addProvisioner(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
+			if err := s.p.Add(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
 				return err
 			}
 		}
 	}
 
-	return nil
-}
-
-// addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
-func (s *Server) addProvisioner(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
-	if len(pubKeyBLS) != 129 {
-		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
-	}
-
-	i := string(pubKeyBLS)
-	stake := user.Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
-
-	// Check for duplicates
-	_, inserted := s.p.Set.IndexOf(pubKeyBLS)
-	if inserted {
-		// If they already exist, just add their new stake
-		s.p.Members[i].AddStake(stake)
-		return nil
-	}
-
-	// This is a new provisioner, so let's initialize the Member struct and add them to the list
-	s.p.Set.Insert(pubKeyBLS)
-	m := &user.Member{}
-
-	m.PublicKeyBLS = pubKeyBLS
-	m.AddStake(stake)
-
-	s.p.Members[i] = m
 	return nil
 }
 

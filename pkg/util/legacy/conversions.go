@@ -135,7 +135,7 @@ func txsToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, e
 	return calls, nil
 }
 
-// ContractCallsToBlock turns a slice of rusk contract calls into a slice of standard txs.
+// ContractCallsToTxs turns a slice of rusk contract calls into a slice of standard txs.
 func ContractCallsToTxs(calls []*rusk.ContractCallTx) ([]transactions.Transaction, error) {
 	txs := make([]transactions.Transaction, len(calls))
 

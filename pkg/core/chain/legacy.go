@@ -34,38 +34,10 @@ func reconstructCommittee(p *user.Provisioners, b *block.Block) error {
 			amountBytes := t.ContractTx.Tx.Outputs[0].Note.ValueCommitment.Data
 			amount := binary.LittleEndian.Uint64(amountBytes[0:8])
 
-			if err := addProvisioner(p, t.BlsKey, amount, 0, t.ExpirationHeight); err != nil {
+			if err := p.Add(t.BlsKey, amount, 0, t.ExpirationHeight); err != nil {
 				return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
 			}
 		}
 	}
-	return nil
-}
-
-// addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
-func addProvisioner(p *user.Provisioners, pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
-	if len(pubKeyBLS) != 129 {
-		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
-	}
-
-	i := string(pubKeyBLS)
-	stake := user.Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
-
-	// Check for duplicates
-	_, inserted := p.Set.IndexOf(pubKeyBLS)
-	if inserted {
-		// If they already exist, just add their new stake
-		p.Members[i].AddStake(stake)
-		return nil
-	}
-
-	// This is a new provisioner, so let's initialize the Member struct and add them to the list
-	p.Set.Insert(pubKeyBLS)
-	m := &user.Member{}
-
-	m.PublicKeyBLS = pubKeyBLS
-	m.AddStake(stake)
-
-	p.Members[i] = m
 	return nil
 }
