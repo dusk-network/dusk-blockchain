@@ -188,7 +188,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 				return nil, err
 			}
 
-			if err := ReconstructCommittee(chain.p, prevBlock); err != nil {
+			if err := reconstructCommittee(chain.p, prevBlock); err != nil {
 				return nil, err
 			}
 		}
@@ -309,7 +309,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 
 	// 3. Call ExecuteStateTransitionFunction
 	l.Debug("calling ExecuteStateTransitionFunction")
-	_, provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
+	provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs, blk.Header.Height)
 	if err != nil {
 		l.WithError(err).Errorln("Error in executing the state transition")
 		return err

@@ -124,7 +124,7 @@ type Executor interface {
 
 	// ExecuteStateTransition performs a global state mutation and steps the
 	// block-height up
-	ExecuteStateTransition(context.Context, []ContractCall) (uint64, user.Provisioners, error)
+	ExecuteStateTransition(context.Context, []ContractCall, uint64) (user.Provisioners, error)
 }
 
 // Provisioner encapsulates the operations common to a Provisioner during the
@@ -486,14 +486,15 @@ func (e *executor) ValidateStateTransition(ctx context.Context, calls []Contract
 
 // ExecuteStateTransition performs a global state mutation and steps the
 // block-height up
-func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall) (uint64, user.Provisioners, error) {
+func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall, height uint64) (user.Provisioners, error) {
 	vstr := new(rusk.ExecuteStateTransitionRequest)
 	vstr.Calls = make([]*rusk.ContractCallTx, len(calls))
+	vstr.Height = height
 	var err error
 	for i, call := range calls {
 		vstr.Calls[i], err = EncodeContractCall(call)
 		if err != nil {
-			return 0, user.Provisioners{}, err
+			return user.Provisioners{}, err
 		}
 	}
 
@@ -501,11 +502,11 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	defer cancel()
 	res, err := e.client.ExecuteStateTransition(ctx, vstr)
 	if err != nil {
-		return 0, user.Provisioners{}, err
+		return user.Provisioners{}, err
 	}
 
 	if !res.Success {
-		return 0, user.Provisioners{}, errors.New("unsuccessful state transition function execution")
+		return user.Provisioners{}, errors.New("unsuccessful state transition function execution")
 	}
 
 	provisioners := user.NewProvisioners()
@@ -518,7 +519,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	}
 	provisioners.Members = memberMap
 
-	return res.CurrentHeight, *provisioners, nil
+	return *provisioners, nil
 }
 
 type provisioner struct {
