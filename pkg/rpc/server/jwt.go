@@ -10,10 +10,8 @@ import (
 )
 
 var (
-	errAlreadyLoggedIn   = errors.New("login already there")
 	errAccessDenied      = errors.New("access denied")
 	errInvalidToken      = errors.New("token is invalid")
-	errMissingMetadata   = errors.New("missing metadata")
 	errSigMethodMismatch = errors.New("wrong signature scheme used")
 )
 
@@ -54,7 +52,7 @@ func (m *JWTManager) Generate(edPkBase64 string) (string, error) {
 		ClientEdPk: edPkBase64,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	token := jwt.NewWithClaims(&SigningMethodEdDSA{}, claims)
 	return token.SignedString(m.sk)
 }
 
@@ -81,4 +79,56 @@ func (m *JWTManager) Verify(accessToken string) (*ClientClaims, error) {
 		return nil, errInvalidToken
 	}
 	return claims, nil
+}
+
+// SigningMethodEdDSA is the encryption method based on ed25519. It is demanded
+// by the JWT library and implements jwt.SigningMethod interface
+type SigningMethodEdDSA struct{}
+
+// ErrEdDSAVerification is the error triggered when verification of ed25519
+// signatures within the JWT is not successful
+var ErrEdDSAVerification = errors.New("crypto/ed25519: verification error")
+
+// Alg complies with jwt.SigningMethod interface
+func (m *SigningMethodEdDSA) Alg() string {
+	return "EdDSA"
+}
+
+// Verify complies with jwt.SigningMethod interface for signature verification
+func (m *SigningMethodEdDSA) Verify(signingString string, signature string, key interface{}) error {
+	sig, err := jwt.DecodeSegment(signature)
+	if err != nil {
+		return err
+	}
+
+	ed25519Key, ok := key.(ed25519.PublicKey)
+	if !ok {
+		return jwt.ErrInvalidKeyType
+	}
+
+	if len(ed25519Key) != ed25519.PublicKeySize {
+		return jwt.ErrInvalidKey
+	}
+
+	if ok := ed25519.Verify(ed25519Key, []byte(signingString), sig); !ok {
+		return ErrEdDSAVerification
+	}
+
+	return nil
+}
+
+// Sign complies with jwt.SigningMethod interface for signing
+func (m *SigningMethodEdDSA) Sign(signingString string, key interface{}) (str string, err error) {
+	ed25519Key, ok := key.(ed25519.PrivateKey)
+	if !ok {
+		return "", jwt.ErrInvalidKeyType
+	}
+
+	if len(ed25519Key) != ed25519.PrivateKeySize {
+		return "", jwt.ErrInvalidKey
+	}
+
+	// Sign the string and return the encoded result
+	sig := ed25519.Sign(ed25519Key, []byte(signingString))
+	return jwt.EncodeSegment(sig), nil
 }

@@ -17,11 +17,17 @@ import (
 
 var openRoutes = hashset.New()
 
-const edPkField = "_client_pk"
+type authField int
+
+const (
+	edPkField authField = iota
+)
+
+const servicePrefix = "/node.Auth/"
 
 func init() {
-	openRoutes.Add([]byte("createSession"))
-	openRoutes.Add([]byte("status"))
+	openRoutes.Add([]byte(servicePrefix + "CreateSession"))
+	openRoutes.Add([]byte(servicePrefix + "Status"))
 }
 
 type (
@@ -119,7 +125,7 @@ func (ai *AuthInterceptor) authorize(ctx context.Context, method string) error {
 	if err != nil {
 		return status.Errorf(codes.Unauthenticated, "error in extracting the client PK: %v", err)
 	}
-	context.WithValue(ctx, clientPk, edPkField)
+	context.WithValue(ctx, edPkField, clientPk)
 	return nil
 }
 
