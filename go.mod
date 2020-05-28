@@ -1,9 +1,10 @@
 module github.com/dusk-network/dusk-blockchain
 
 require (
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/didip/tollbooth v4.0.2+incompatible
-	github.com/dusk-network/dusk-crypto v0.1.2
-	github.com/dusk-network/dusk-protobuf v0.2.7
+	github.com/dusk-network/dusk-crypto v0.1.3
+	github.com/dusk-network/dusk-protobuf v0.2.8-0.20200528064656-d7854553ffe2
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/go-chi/render v1.0.1
 	github.com/gogo/protobuf v1.3.1
@@ -31,7 +32,6 @@ require (
 	github.com/urfave/cli v1.22.3
 	golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
 	google.golang.org/grpc v1.28.0
-	google.golang.org/protobuf v1.23.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.2.7 // indirect
 )
