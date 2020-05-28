@@ -2,12 +2,13 @@ package client
 
 import (
 	"context"
+	"errors"
+	"sync"
 
 	"encoding/json"
 	"time"
 
 	"crypto/ed25519"
-	"crypto/rand"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/hashset"
@@ -53,40 +54,30 @@ type (
 
 	// AuthClientInterceptor handles the authorization for the grpc systems
 	AuthClientInterceptor struct {
-		client      *AuthClient
+		lock        sync.RWMutex
 		accessToken string
-		authMethods *hashset.Set
+		openMethods *hashset.Set
+		edPk        ed25519.PublicKey
+		edSk        ed25519.PrivateKey
 	}
 )
 
-// NewClient returns a new AuthClient
-func NewClient(cc *grpc.ClientConn) *AuthClient {
-	pk, sk, _ := ed25519.GenerateKey(rand.Reader)
+// NewClient returns a new AuthClient and AuthClientInterceptor
+func NewClient(cc *grpc.ClientConn, edPk ed25519.PublicKey, edSk ed25519.PrivateKey) *AuthClient {
 	return &AuthClient{
 		service: node.NewAuthClient(cc),
-		edPk:    pk,
-		edSk:    sk,
+		edPk:    edPk,
+		edSk:    edSk,
 	}
 }
 
-// NewClientInterceptor creates the client interceptor and creates the session. If a duration of 0 is
-// specified then the session needs to be created manually
-func NewClientInterceptor(client *AuthClient, refresh time.Duration) (*AuthClientInterceptor, error) {
-	methods := hashset.New()
-	methods.Add([]byte("login"))
-	interceptor := &AuthClientInterceptor{
-		client:      client,
-		authMethods: methods,
+// NewClientInterceptor injects the session to the outgoing requests
+func NewClientInterceptor(refresh time.Duration, edPk ed25519.PublicKey, edSk ed25519.PrivateKey) *AuthClientInterceptor {
+	return &AuthClientInterceptor{
+		openMethods: rpc.OpenRoutes,
+		edSk:        edSk,
+		edPk:        edPk,
 	}
-
-	if refresh != 0 {
-		err := interceptor.scheduleRefreshToken(refresh)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return interceptor, nil
 }
 
 // CreateSession creates a JWT
@@ -94,6 +85,10 @@ func (c *AuthClient) CreateSession() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	return c.createSessionWithContext(ctx)
+}
+
+func (c *AuthClient) createSessionWithContext(ctx context.Context) (string, error) {
 	edSig := ed25519.Sign(c.edSk, c.edPk)
 	req := &node.SessionRequest{
 		EdPk:  c.edPk,
@@ -117,7 +112,7 @@ func (c *AuthClient) DropSession() error {
 // Unary returns the grpc unary interceptor
 func (i *AuthClientInterceptor) Unary() grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-		if !i.authMethods.Has([]byte(method)) {
+		if !i.openMethods.Has([]byte(method)) {
 			tky, err := i.attachToken(ctx)
 			if err != nil {
 				return err
@@ -125,8 +120,26 @@ func (i *AuthClientInterceptor) Unary() grpc.UnaryClientInterceptor {
 			return invoker(tky, method, req, reply, cc, opts...)
 		}
 
+		if method == rpc.CreateSessionRoute {
+			err := invoker(ctx, method, req, reply, cc, opts...)
+			if err != nil {
+				return err
+			}
+
+			session := reply.(*node.Session)
+			i.SetAccessToken(session.GetAccessToken())
+			return nil
+		}
+
 		return invoker(ctx, method, req, reply, cc, opts...)
 	}
+}
+
+// SetAccessToken sets the session token in a threadsafe way
+func (i *AuthClientInterceptor) SetAccessToken(accessToken string) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	i.accessToken = accessToken
 }
 
 // attachToken creates the authorization header from a JSON object with the
@@ -148,7 +161,7 @@ func (i *AuthClientInterceptor) attachToken(ctx context.Context) (context.Contex
 	}
 
 	// creating the signature
-	sig := ed25519.Sign(i.client.edSk, jb)
+	sig := ed25519.Sign(i.edSk, jb)
 
 	// adding it to the AuthToken
 	auth.Sig = sig
@@ -163,34 +176,68 @@ func (i *AuthClientInterceptor) attachToken(ctx context.Context) (context.Contex
 	return metadata.AppendToOutgoingContext(ctx, "authorization", string(payload)), nil
 }
 
-func (i *AuthClientInterceptor) scheduleRefreshToken(refresh time.Duration) error {
-
-	if err := i.refreshToken(); err != nil {
-		return err
-	}
-
-	go func() {
-		wait := refresh
-		for {
-			time.Sleep(wait)
-			if err := i.refreshToken(); err != nil {
-				wait = time.Second
-				continue
+// ScheduleRefreshToken is supposed to run in a goroutine. It refreshes the
+// session token according to the specified refresh frequency
+func ScheduleRefreshToken(ctx context.Context, client *AuthClient, interceptor *AuthClientInterceptor, refresh time.Time, retries int, errChan chan error) {
+	for {
+		refreshCtx, cancel := context.WithDeadline(ctx, refresh)
+		select {
+		case <-ctx.Done(): // parent context cancellation
+			cancel()
+			return
+		case <-refreshCtx.Done(): // time to recreate the Session
+			cancel() // avoiding goroutine leaks
+			sessionToken, err := refreshToken(ctx, client, 1*time.Second, retries)
+			if err != nil {
+				errChan <- err
+				return
 			}
 
-			wait = refresh
+			interceptor.lock.Lock()
+			interceptor.accessToken = sessionToken
+			interceptor.lock.Unlock()
 		}
-	}()
-
-	return nil
+	}
 }
 
-func (i *AuthClientInterceptor) refreshToken() error {
-	accessToken, err := i.client.CreateSession()
-	if err != nil {
-		return err
+func refreshToken(ctx context.Context, client *AuthClient, timeout time.Duration, retries int) (string, error) {
+	for i := 0; i < retries; i++ {
+		// first check for context done
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		default:
+		}
+
+		// creating the timeout
+		reqCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		// we use a circuit-breakers, i.e. a goroutine that would invoke
+		// CreateSession. The advantage is that we can timeout the request with
+		// the context if it takes too long
+		sessionChan := make(chan string, 1)
+		iErrChan := make(chan error, 1)
+		go func() {
+			session, err := client.createSessionWithContext(reqCtx)
+			if err != nil {
+				iErrChan <- err
+				return
+			}
+			sessionChan <- session
+		}()
+
+		select {
+		case accessToken := <-sessionChan:
+			return accessToken, nil
+		case err := <-iErrChan:
+			return "", err
+		case <-reqCtx.Done():
+		}
+
+		// sleeping before retrying. Here we should implement exponential backoffs
+		time.Sleep(1 * time.Second)
 	}
 
-	i.accessToken = accessToken
-	return nil
+	return "", errors.New("max retries exceeded")
 }

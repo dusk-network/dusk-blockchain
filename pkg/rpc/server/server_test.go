@@ -2,6 +2,8 @@ package server_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"net"
 	"os"
 	"testing"
@@ -11,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	log "github.com/sirupsen/logrus"
-	assert "github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -44,37 +45,24 @@ func TestMain(m *testing.M) {
 	// get the server address from configuration
 	go serve(conf.Network, conf.Address, grpcSrv)
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(200 * time.Millisecond)
+	// create the client
+	pk, sk, _ := ed25519.GenerateKey(rand.Reader)
+	interceptor := client.NewClientInterceptor(0, pk, sk)
+
 	// create the GRPC connection
 	conn, err := grpc.Dial(
 		conf.Address,
 		grpc.WithInsecure(),
 		grpc.WithContextDialer(getDialer("unix")),
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	// create the client
-	authClient = client.NewClient(conn)
-	// create the client interceptor to inject the session into another service
-	// client
-	interceptor, err := client.NewClientInterceptor(authClient, 0)
-	if err != nil {
-		panic(err)
-	}
-
-	wconn, err := grpc.Dial(
-		conf.Address,
-		grpc.WithInsecure(),
 		grpc.WithUnaryInterceptor(interceptor.Unary()),
 	)
-
 	if err != nil {
 		panic(err)
 	}
 
-	walletClient = node.NewWalletClient(wconn)
+	authClient = client.NewClient(conn, pk, sk)
+	walletClient = node.NewWalletClient(conn)
 
 	// run the tests
 	res := m.Run()
@@ -94,11 +82,4 @@ func serve(network, addr string, srv *grpc.Server) {
 	if serr := srv.Serve(l); serr != nil {
 		panic(serr)
 	}
-}
-
-func TestCreateSession(t *testing.T) {
-	assert := assert.New(t)
-	jwt, err := authClient.CreateSession()
-	assert.NoError(err)
-	assert.NotEmpty(jwt)
 }
