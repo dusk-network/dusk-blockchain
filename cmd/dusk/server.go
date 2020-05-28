@@ -10,7 +10,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
@@ -41,7 +42,7 @@ type Server struct {
 	counter       *chainsync.Counter
 	gossip        *processing.Gossip
 	grpcServer    *grpc.Server
-	rpcClient     *rpc.Client
+	ruskConn      *grpc.ClientConn
 	cancelMonitor StopFunc
 }
 
@@ -75,7 +76,7 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 func Setup() *Server {
 	ctx := context.Background()
 
-	grpcServer, err := rpc.SetupgRPCServer()
+	grpcServer, err := server.SetupGRPCServer()
 	if err != nil {
 		log.Panic(err)
 	}
@@ -90,11 +91,11 @@ func Setup() *Server {
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	client := rpc.InitRPCClients(ctx, "127.0.0.1:8080")
+	ruskClient, ruskConn := client.CreateRuskClient(ctx, "127.0.0.1:8080")
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	proxy := transactions.NewProxy(client.RuskClient, txTimeout, defaultTimeout)
+	proxy := transactions.NewProxy(ruskClient, txTimeout, defaultTimeout)
 
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()
@@ -131,7 +132,7 @@ func Setup() *Server {
 		counter:    counter,
 		gossip:     processing.NewGossip(protocol.TestNet),
 		grpcServer: grpcServer,
-		rpcClient:  client,
+		ruskConn:   ruskConn,
 	}
 
 	// Setting up the transactor component
@@ -230,6 +231,6 @@ func (s *Server) Close() {
 	_ = s.loader.Close(cfg.Get().Database.Driver)
 	s.rpcBus.Close()
 	s.grpcServer.GracefulStop()
-	_ = s.rpcClient.Close()
 	s.cancelMonitor()
+	_ = s.ruskConn.Close()
 }

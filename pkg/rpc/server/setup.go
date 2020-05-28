@@ -1,36 +1,39 @@
 // This package represents the GRPC server exposing functions to interoperate
 // with the node components as well as the wallet
-package rpc
+package server
 
 import (
-	"encoding/base64"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
 
-// SetupgRPCServer will create a new gRPC server with the correct authentication
+var log = logrus.WithField("process", "grpc-server")
+
+// SetupGRPCServer will create a new gRPC server with the correct authentication
 // and TLS settings. This server can then be used to register services.
 // Note that the server still needs to be turned on (`Serve`).
-func SetupgRPCServer() (*grpc.Server, error) {
+func SetupGRPCServer() (*grpc.Server, error) {
 	conf := config.Get().RPC
 
-	// Build basic auth token, if configured
-	if len(conf.User) > 0 && len(conf.Pass) > 0 {
-		msg := conf.User + ":" + conf.Pass
-		token = base64.StdEncoding.EncodeToString([]byte(msg))
-	} else {
-		if conf.Network != "unix" {
-			log.Panicf("basic auth is disabled on %s network", conf.Network)
-		}
+	// creating the JWT token manager
+	jwtMan, err := NewJWTManager(time.Duration(conf.SessionDurationMins) * time.Minute)
+	if err != nil {
+		return nil, err
 	}
 
-	// Add default interceptors to provide basic authentication and error logging
+	// instantiate the auth service and the interceptor
+	auth, authInterceptor := NewAuth(jwtMan)
+
+	// Add default interceptors to provide jwt-based session authentication and error logging
 	// for both unary and stream RPC calls
 	serverOpt := make([]grpc.ServerOption, 0)
-	serverOpt = append(serverOpt, grpc.StreamInterceptor(streamInterceptor))
-	serverOpt = append(serverOpt, grpc.UnaryInterceptor(unaryInterceptor))
+	//serverOpt = append(serverOpt, grpc.StreamInterceptor(streamInterceptor))
+	serverOpt = append(serverOpt, grpc.UnaryInterceptor(authInterceptor.Unary()))
 
 	// Enable TLS if configured
 	opt, tlsVer := loadTLSFiles(conf.EnableTLS, conf.CertFile, conf.KeyFile, conf.Network)
@@ -40,8 +43,11 @@ func SetupgRPCServer() (*grpc.Server, error) {
 	log.WithField("tls", tlsVer).Infof("gRPC HTTP server TLS configured")
 
 	grpcServer := grpc.NewServer(serverOpt...)
-	grpc.EnableTracing = false
 
+	// hooking up the Auth service
+	node.RegisterAuthServer(grpcServer, auth)
+
+	grpc.EnableTracing = false
 	return grpcServer, nil
 }
 
