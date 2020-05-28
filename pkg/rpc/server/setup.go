@@ -14,12 +14,33 @@ import (
 
 var log = logrus.WithField("process", "grpc-server")
 
-// SetupGRPCServer will create a new gRPC server with the correct authentication
+// Setup is a configuration struct to setup the GRPC with
+type Setup struct {
+	SessionDurationMins uint
+	EnableTLS           bool
+	CertFile            string
+	KeyFile             string
+	Network             string
+	Address             string
+}
+
+// FromCfg creates a Setup from the configuration. This is handy when a
+// configuration should be used (i.e. outside of tests)
+func FromCfg() Setup {
+	rpc := config.Get().RPC
+	return Setup{
+		SessionDurationMins: rpc.SessionDurationMins,
+		CertFile:            rpc.CertFile,
+		KeyFile:             rpc.KeyFile,
+		Network:             rpc.Network,
+		Address:             rpc.Address,
+	}
+}
+
+// SetupGRPC will create a new gRPC server with the correct authentication
 // and TLS settings. This server can then be used to register services.
 // Note that the server still needs to be turned on (`Serve`).
-func SetupGRPCServer() (*grpc.Server, error) {
-	conf := config.Get().RPC
-
+func SetupGRPC(conf Setup) (*grpc.Server, error) {
 	// creating the JWT token manager
 	jwtMan, err := NewJWTManager(time.Duration(conf.SessionDurationMins) * time.Minute)
 	if err != nil {

@@ -75,8 +75,7 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 // Stake and Blind Bid channels
 func Setup() *Server {
 	ctx := context.Background()
-
-	grpcServer, err := server.SetupGRPCServer()
+	grpcServer, err := server.SetupGRPC(server.FromCfg())
 	if err != nil {
 		log.Panic(err)
 	}
