@@ -1,15 +1,15 @@
-package main
+package metrics
 
 import (
 	"fmt"
-	"github.com/dusk-network/dusk-blockchain/harness/engine"
-	"github.com/machinebox/graphql"
 	"math/big"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/harness/engine"
+	"github.com/machinebox/graphql"
 )
 
 var (
@@ -24,6 +24,7 @@ var (
 	//rpcClient       *Client
 )
 
+// DuskInfo is the placeholder for exporter metrics
 type DuskInfo struct {
 	ContractsCreated   int64
 	TokenTransfers     int64
@@ -35,52 +36,42 @@ type DuskInfo struct {
 	EffectiveBlockTime int64
 }
 
-func init() {
+// RunMetrics will run the metrics collection endpoint
+func RunMetrics(gqlPort, nodePort, port int, hostname string) {
 	duskInfo = new(DuskInfo)
 	duskInfo.TotalDusk = big.NewInt(0)
 
-}
-
-func main() {
-	defer handlePanic()
-
-	node = engine.NewDuskNode(9503, 9000, "default")
+	node = engine.NewDuskNode(gqlPort, nodePort, "default")
 	localNet.Nodes = append(localNet.Nodes, node)
 
 	// Instantiate graphQL client
 	gqlClient = graphql.NewClient("http://" + node.Cfg.Gql.Address + "/graphql")
 
-	//// Instantiate gRPC client
-	//rpcClient = InitRPCClients(context.Background(), node.Cfg.RPC.Address)
+	// Instantiate gRPC client
+	// rpcClient = InitRPCClients(context.Background(), node.Cfg.RPC.Address)
 
 	go Routine()
 
-	http.HandleFunc("/metrics", MetricsHttp)
-	err := http.ListenAndServe("0.0.0.0:9099", nil)
+	http.HandleFunc("/metrics", HandlerMetrics)
+	err := http.ListenAndServe(hostname+":"+strconv.Itoa(port), nil)
 	if err != nil {
 		panic(err)
 	}
 
 }
 
-func handlePanic() {
-	if r := recover(); r != nil {
-		_, _ = fmt.Fprintln(os.Stderr, fmt.Errorf("%+v", r), "Application Exporter panic")
-	}
-	time.Sleep(time.Second * 1)
-}
-
+// Routine its a infinite loop that collects metrics
 func Routine() {
 
 	for {
 
 		t1 := time.Now()
 
-		pendingTx, _ = PendingTransactionCount(gqlClient, nil)
-		newBlock, err := GetBlockByNumber(gqlClient, map[string]interface{}{"height": currentBlockNumber + 1})
+		pendingTx, _ = pendingTransactionCount(gqlClient, nil)
+		newBlock, err := getBlockByNumber(gqlClient, map[string]interface{}{"height": currentBlockNumber + 1})
 
 		if err != nil {
-			fmt.Errorf("error: %+v", err)
+			_ = fmt.Errorf("error: %+v", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -96,7 +87,7 @@ func Routine() {
 
 			previousBlockNum := currentBlock.Header.Height - 1
 
-			lastBlock, err := GetBlockByNumber(gqlClient, map[string]interface{}{"height": previousBlockNum})
+			lastBlock, err := getBlockByNumber(gqlClient, map[string]interface{}{"height": previousBlockNum})
 			if err != nil {
 				fmt.Printf("Received Error on block  #%v, Error: %+v", currentBlock.Header.Height, err)
 				continue
@@ -117,7 +108,7 @@ func Routine() {
 
 			previousBlockNum := currentBlock.Header.Height - 1
 
-			lastBlock, _ := GetBlockByNumber(gqlClient, map[string]interface{}{"height": previousBlockNum})
+			lastBlock, _ := getBlockByNumber(gqlClient, map[string]interface{}{"height": previousBlockNum})
 
 			newTimestamp, _ := strconv.Atoi(newBlock.Header.Timestamp)
 			lastTimestamp, _ := strconv.Atoi(lastBlock.Header.Timestamp)
@@ -132,8 +123,8 @@ func Routine() {
 	}
 }
 
-// HTTP response handler for /metrics
-func MetricsHttp(w http.ResponseWriter, r *http.Request) {
+// HandlerMetrics is a HTTP response handler for /metrics
+func HandlerMetrics(w http.ResponseWriter, r *http.Request) {
 	var allOut []string
 
 	now := time.Now()
@@ -158,9 +149,10 @@ func MetricsHttp(w http.ResponseWriter, r *http.Request) {
 	allOut = append(allOut, fmt.Sprintf("dusk_transfers %v", duskInfo.DuskTransfers))
 	allOut = append(allOut, fmt.Sprintf("dusk_load_time %0.4f", duskInfo.LoadTime))
 
-	fmt.Fprintln(w, strings.Join(allOut, "\n"))
+	_, _ = fmt.Fprintln(w, strings.Join(allOut, "\n"))
 }
 
+// CalculateTotals will calculate totals for a block
 func CalculateTotals(block *Block) {
 	duskInfo.TotalDusk = big.NewInt(0)
 	duskInfo.ContractsCreated = 0

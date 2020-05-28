@@ -1,9 +1,10 @@
-package main
+package metrics
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc"
 )

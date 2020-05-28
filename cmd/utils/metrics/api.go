@@ -1,14 +1,15 @@
-package main
+package metrics
 
 import (
 	"context"
+
 	"github.com/machinebox/graphql"
 )
 
-func ExecuteQuery(client *graphql.Client, query string, target interface{}, values map[string]interface{}) (interface{}, error) {
+func executeQuery(client *graphql.Client, query string, target interface{}, values map[string]interface{}) (interface{}, error) {
 	req := graphql.NewRequest(query)
 
-	if values != nil && len(values) > 0 {
+	if len(values) > 0 {
 		for k, v := range values {
 			req.Var(k, v)
 		}
@@ -25,7 +26,8 @@ func ExecuteQuery(client *graphql.Client, query string, target interface{}, valu
 	return target, nil
 }
 
-func GetLatestTransactions(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
+//nolint
+func getLatestTransactions(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
 	query := `
 	  query {
 		transactions(last: 15) {
@@ -37,10 +39,11 @@ func GetLatestTransactions(client *graphql.Client, values map[string]interface{}
 	//TODO: replace it with correct schema
 	var target interface{}
 
-	return ExecuteQuery(client, query, target, values)
+	return executeQuery(client, query, target, values)
 }
 
-func GetLatestBlocks(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
+//nolint
+func getLatestBlocks(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
 	query := `
 	  query {
 		blocks(last: 15) {
@@ -55,10 +58,11 @@ func GetLatestBlocks(client *graphql.Client, values map[string]interface{}) (int
 	//TODO: replace it with correct schema
 	var target interface{}
 
-	return ExecuteQuery(client, query, target, values)
+	return executeQuery(client, query, target, values)
 }
 
-func GetBlockTransactionsByHash(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
+//nolint
+func getBlockTransactionsByHash(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
 	query := `
 	  query ($hash: String!) {
 		blocks(hash: $hash) {
@@ -73,10 +77,11 @@ func GetBlockTransactionsByHash(client *graphql.Client, values map[string]interf
 	//TODO: replace it with correct schema
 	var target interface{}
 
-	return ExecuteQuery(client, query, target, values)
+	return executeQuery(client, query, target, values)
 }
 
-func GetBlockByHash(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
+//nolint
+func getBlockByHash(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
 	query := `
 	  query($hash: String!) {
 		blocks(hash: $hash ) {
@@ -95,10 +100,10 @@ func GetBlockByHash(client *graphql.Client, values map[string]interface{}) (inte
 	//TODO: replace it with correct schema
 	var target interface{}
 
-	return ExecuteQuery(client, query, target, values)
+	return executeQuery(client, query, target, values)
 }
 
-func GetBlockByNumber(client *graphql.Client, values map[string]interface{}) (*Block, error) {
+func getBlockByNumber(client *graphql.Client, values map[string]interface{}) (*Block, error) {
 	query := `
 	  query($height: Int!) {
 		blocks(height: $height) {
@@ -112,7 +117,7 @@ func GetBlockByNumber(client *graphql.Client, values map[string]interface{}) (*B
 	`
 	//TODO: replace it with correct schema
 
-	blk, err := ExecuteQuery(client, query, new(Blocks), values)
+	blk, err := executeQuery(client, query, new(Blocks), values)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +127,7 @@ func GetBlockByNumber(client *graphql.Client, values map[string]interface{}) (*B
 	return &blk.(*Blocks).Blocks[0], nil
 }
 
-func PendingTransactionCount(client *graphql.Client, values map[string]interface{}) (int, error) {
+func pendingTransactionCount(client *graphql.Client, values map[string]interface{}) (int, error) {
 	query := `
 	mempool(txid: "") {
 		txid
@@ -131,7 +136,7 @@ func PendingTransactionCount(client *graphql.Client, values map[string]interface
 	`
 	//TODO: replace it with correct schema
 	var resp map[string]map[string][]map[string]string
-	txs, err := ExecuteQuery(client, query, resp, values)
+	txs, err := executeQuery(client, query, resp, values)
 	if err != nil {
 		return 0, err
 	}
@@ -146,7 +151,8 @@ func PendingTransactionCount(client *graphql.Client, values map[string]interface
 	return count, nil
 }
 
-func GetTransactionByID(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
+//nolint
+func getTransactionByID(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
 	query := `
 	  query($txid: String!) {
 		transactions(txid: $txid) {
@@ -166,10 +172,11 @@ func GetTransactionByID(client *graphql.Client, values map[string]interface{}) (
 	//TODO: replace it with correct schema
 	var target interface{}
 
-	return ExecuteQuery(client, query, target, values)
+	return executeQuery(client, query, target, values)
 }
 
-func GetBlocksCountQuery(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
+//nolint
+func getBlocksCountQuery(client *graphql.Client, values map[string]interface{}) (interface{}, error) {
 	query := `
 	  query($time: DateTime!) {
 		tip: blocks(height: -1) {
@@ -187,5 +194,5 @@ func GetBlocksCountQuery(client *graphql.Client, values map[string]interface{}) 
 	//TODO: replace it with correct schema
 	var target interface{}
 
-	return ExecuteQuery(client, query, target, values)
+	return executeQuery(client, query, target, values)
 }

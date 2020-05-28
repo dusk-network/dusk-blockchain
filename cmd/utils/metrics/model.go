@@ -1,5 +1,6 @@
-package main
+package metrics
 
+// Blocks is the placeholder for blocks
 type Blocks struct {
 	Blocks []Block `json:"blocks"`
 }
