@@ -4,7 +4,7 @@ require (
 	github.com/bwesterb/go-ristretto v1.1.0
 	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/dusk-network/dusk-crypto v0.1.2
-	github.com/dusk-network/dusk-protobuf v0.2.7
+	github.com/dusk-network/dusk-protobuf v0.2.8-0.20200528094759-4457b6e5f466
 	github.com/dusk-network/dusk-wallet/v2 v2.0.2
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/go-chi/render v1.0.1
