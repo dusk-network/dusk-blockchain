@@ -35,7 +35,13 @@ const (
 // DecodeGenesis marshals a genesis block into a buffer
 func DecodeGenesis() *block.Block {
 	if Get().Genesis.Legacy {
-		return legacy.DecodeGenesis()
+		g := legacy.DecodeGenesis()
+		c, err := legacy.OldBlockToNewBlock(g)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		return c
 	}
 
 	b := block.NewBlock()

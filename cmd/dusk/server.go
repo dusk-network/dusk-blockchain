@@ -53,7 +53,12 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
-		genesis = legacy.DecodeGenesis()
+		g := legacy.DecodeGenesis()
+		var err error
+		genesis, err = legacy.OldBlockToNewBlock(g)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		genesis = cfg.DecodeGenesis()
 	}
