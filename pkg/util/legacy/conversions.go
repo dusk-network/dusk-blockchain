@@ -16,7 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func oldBlockToNewBlock(b *block.Block) (*newblock.Block, error) {
+func OldBlockToNewBlock(b *block.Block) (*newblock.Block, error) {
 	nb := newblock.NewBlock()
 	nb.Header = oldHeaderToNewHeader(b.Header)
 	calls, err := blockToContractCalls(b.Txs)
