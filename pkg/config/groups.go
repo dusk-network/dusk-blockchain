@@ -59,8 +59,9 @@ type profileConfiguration struct {
 
 // pkg/rpc package configs
 type rpcConfiguration struct {
-	Network string
-	Address string
+	Network             string
+	Address             string
+	SessionDurationMins uint
 
 	EnableTLS bool
 	CertFile  string

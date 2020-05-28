@@ -81,11 +81,8 @@ network="unix"
 # in case the network is tcp*,
 # address must be in form of a IP address (e.g 127.0.0.1:9000)
 address="/tmp/dusk-grpc.sock"
-
-# Basic HTTP Authentication credentials
-# if empty, auth is disabled
-user=""
-pass=""
+# duration of the session for the grpc services exposed by the node
+sessionDurationMins=5
 
 enableTLS=false
 # server TLS certificate file
