@@ -184,7 +184,7 @@ NB: The examples from below represent only query structures. To send a query as 
 
 ```graphql
 {
-   blocks(last: 10) {
+  blocks(last: 10) {
     header {
        height
        timestamp 
@@ -200,7 +200,7 @@ NB: The examples from below represent only query structures. To send a query as 
 
   ```graphql
   {
-  blocks(hashes: ["194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620","ba87ceec9f31ccfccabc9d2be9f753666e0ed559744f59d3f4bd2afd320f7b03"]) {
+    blocks(hashes: ["194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620","ba87ceec9f31ccfccabc9d2be9f753666e0ed559744f59d3f4bd2afd320f7b03"]) {
     header {
        height
        hash
@@ -210,19 +210,18 @@ NB: The examples from below represent only query structures. To send a query as 
       txtype
     }
   }
-  }
   ```
 
 * Fetch last/latest accepted 100 transactions \(type and size fields\)
 
   ```graphql
   { 
-  transactions(last: 100) 
-  { 
-    txid
-    txtype
-    size
-  }
+    transactions(last: 100) 
+    { 
+      txid
+      txtype
+      size
+    }
   }
   ```
 
