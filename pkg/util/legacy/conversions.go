@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// OldBlockToNewBlock will convert a dusk-wallet block into a dusk-blockchain block.
 func OldBlockToNewBlock(b *block.Block) (*newblock.Block, error) {
 	nb := newblock.NewBlock()
 	nb.Header = oldHeaderToNewHeader(b.Header)
