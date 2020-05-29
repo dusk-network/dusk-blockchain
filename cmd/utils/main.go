@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dusk-network/dusk-blockchain/cmd/utils/transactions"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/metrics"
 
 	"github.com/urfave/cli"
@@ -16,6 +19,7 @@ func main() {
 
 	app.Commands = []cli.Command{
 		metricsCMD,
+		transactionsCMD,
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -25,6 +29,36 @@ func main() {
 }
 
 var (
+	grpcHostFlag = cli.StringFlag{
+		Name:  "grpchost",
+		Usage: "gRPC HOST , eg: --grpchost=127.0.0.1:9001",
+		Value: "127.0.0.1:9001",
+	}
+
+	amountFlag = cli.Uint64Flag{
+		Name:  "amount",
+		Usage: "amount , eg: --amount=1",
+		Value: 10,
+	}
+
+	lockTimeFlag = cli.Uint64Flag{
+		Name:  "locktime",
+		Usage: "locktime , eg: --locktime=1",
+		Value: 10,
+	}
+
+	txtypeFlag = cli.StringFlag{
+		Name:  "txtype",
+		Usage: "Dusk hostname , eg: --txtype=consensus",
+		Value: "consensus",
+	}
+
+	addressFlag = cli.StringFlag{
+		Name:  "address",
+		Usage: "Dusk address , eg: --address=0x123",
+		Value: "0x123",
+	}
+
 	gqlPortFlag = cli.IntFlag{
 		Name:  "gqlport",
 		Usage: "GQL PORT , eg: --gqlport=9503",
@@ -37,16 +71,15 @@ var (
 		Value: 9000,
 	}
 
-	hostnameFlag = cli.StringFlag{
-		Name:  "hostname",
-		Usage: "Dusk hostname , eg: --hostname=127.0.0.1",
-		Value: "127.0.0.1",
-	}
-
 	portFlag = cli.IntFlag{
 		Name:  "port",
 		Usage: "Exporter probe port , eg: --port=9099",
 		Value: 9099,
+	}
+	hostnameFlag = cli.StringFlag{
+		Name:  "hostname",
+		Usage: "Dusk hostname , eg: --hostname=127.0.0.1",
+		Value: "127.0.0.1",
 	}
 
 	metricsCMD = cli.Command{
@@ -62,6 +95,21 @@ var (
 		},
 		Description: `Expose a Dusk metrics endpoint to be consumed by Prometheus`,
 	}
+
+	transactionsCMD = cli.Command{
+		Name:      "transactions",
+		Usage:     "",
+		Action:    transactionsAction,
+		ArgsUsage: "",
+		Flags: []cli.Flag{
+			txtypeFlag,
+			grpcHostFlag,
+			amountFlag,
+			lockTimeFlag,
+			addressFlag,
+		},
+		Description: `Execute/Query transactions for a Dusk node`,
+	}
 )
 
 // metricsAction will expose the metrics endpoint
@@ -73,6 +121,37 @@ func metricsAction(ctx *cli.Context) error {
 	hostname := ctx.String(hostnameFlag.Name)
 
 	metrics.RunMetrics(gqlPort, nodePort, port, hostname)
+
+	return nil
+}
+
+// transactionsAction will expose the metrics endpoint
+func transactionsAction(ctx *cli.Context) error {
+
+	grpcHost := ctx.String(grpcHostFlag.Name)
+	amount := ctx.Uint64(amountFlag.Name)
+	lockTime := ctx.Uint64(lockTimeFlag.Name)
+	txtype := ctx.String(txtypeFlag.Name)
+	address := ctx.String(addressFlag.Name)
+
+	transfer := transactions.Transaction{
+		Amount: amount, LockTime: lockTime,
+		TXtype: txtype, Address: address,
+	}
+
+	log.WithField("transfer", transfer).
+		Info("transactions Action started")
+
+	transferResponse, err := transactions.RunTransactions(
+		grpcHost,
+		transfer,
+	)
+	if err != nil {
+		return err
+	}
+
+	log.WithField("transferResponse", transferResponse).
+		Info("transactions Action completed")
 
 	return nil
 }
