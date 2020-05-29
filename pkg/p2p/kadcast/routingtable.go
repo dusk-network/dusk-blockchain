@@ -1,10 +1,13 @@
 package kadcast
 
 import (
+	"bytes"
 	"net"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 )
 
 // Alpha is the number of nodes to which a node will
@@ -28,7 +31,7 @@ type RoutingTable struct {
 	// Local peer fields
 
 	lpeerUDPAddr net.UDPAddr
-	LpeerInfo    PeerInfo
+	LpeerInfo    encoding.PeerInfo
 	// Holds the Nonce that satisfies: `H(ID || Nonce) < Tdiff`.
 	localPeerNonce uint32
 }
@@ -36,16 +39,16 @@ type RoutingTable struct {
 // MakeRoutingTable allows to create a router which holds the peerInfo and
 // also the routing tree information.
 func MakeRoutingTable(address string) RoutingTable {
-	myPeer, _ := MakePeerFromAddr(address)
+	myPeer, _ := encoding.MakePeerFromAddr(address)
 	return makeRoutingTableFromPeer(myPeer)
 }
 
-func makeRoutingTableFromPeer(peer PeerInfo) RoutingTable {
+func makeRoutingTableFromPeer(peer encoding.PeerInfo) RoutingTable {
 	return RoutingTable{
 		tree:           makeTree(),
-		lpeerUDPAddr:   peer.getUDPAddr(),
+		lpeerUDPAddr:   peer.GetUDPAddr(),
 		LpeerInfo:      peer,
-		localPeerNonce: peer.computePeerNonce(),
+		localPeerNonce: encoding.ComputeNonce(peer.ID[:]),
 		beta:           DefaultMaxBetaDelegates,
 	}
 }
@@ -59,14 +62,14 @@ func makeRoutingTableFromPeer(peer PeerInfo) RoutingTable {
 
 // Returns the complete list of Peers in order to be sorted
 // as they have the xor distance in respec to a Peer as a parameter.
-func (router *RoutingTable) getPeerSortDist(refPeer PeerInfo) []PeerSort {
-	var peerList []PeerInfo
-	router.tree.mu.RLock()
-	for buckIdx, bucket := range router.tree.buckets {
+func (rt *RoutingTable) getPeerSortDist(refPeer encoding.PeerInfo) []PeerSort {
+	var peerList []encoding.PeerInfo
+	rt.tree.mu.RLock()
+	for buckIdx, bucket := range rt.tree.buckets {
 		if buckIdx == 0 {
 			// Look for neighbor peer in spanning tree
 			for _, p := range bucket.entries {
-				if !router.LpeerInfo.IsEqual(p) {
+				if !rt.LpeerInfo.IsEqual(p) {
 					// neighbor peer
 					peerList = append(peerList, p)
 				}
@@ -75,7 +78,7 @@ func (router *RoutingTable) getPeerSortDist(refPeer PeerInfo) []PeerSort {
 			peerList = append(peerList, bucket.entries[:]...)
 		}
 	}
-	router.tree.mu.RUnlock()
+	rt.tree.mu.RUnlock()
 	var peerListSort []PeerSort
 	for _, peer := range peerList {
 		// We don't want to return the Peer struct of the Peer
@@ -83,14 +86,22 @@ func (router *RoutingTable) getPeerSortDist(refPeer PeerInfo) []PeerSort {
 		if peer != refPeer {
 			peerListSort = append(peerListSort[:],
 				PeerSort{
-					ip:        peer.ip,
-					port:      peer.port,
-					id:        peer.id,
-					xorMyPeer: xor(refPeer.id, peer.id),
+					ip:        peer.IP,
+					port:      peer.Port,
+					id:        peer.ID,
+					xorMyPeer: xor(refPeer.ID, peer.ID),
 				})
 		}
 	}
 	return peerListSort
+}
+
+// PeerSort is a helper type to sort `Peers`
+type PeerSort struct {
+	ip        [4]byte
+	port      uint16
+	id        [16]byte
+	xorMyPeer [16]byte
 }
 
 // ByXORDist implements sort.Interface based on the IdDistance
@@ -105,18 +116,18 @@ func (a ByXORDist) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 // Returns a list of the selected number of closest peers
 // in respect to a certain `Peer`.
-func (router *RoutingTable) getXClosestPeersTo(peerNum int, refPeer PeerInfo) []PeerInfo {
-	var xPeers []PeerInfo
-	peerList := router.getPeerSortDist(refPeer)
+func (rt *RoutingTable) getXClosestPeersTo(peerNum int, refPeer encoding.PeerInfo) []encoding.PeerInfo {
+	var xPeers []encoding.PeerInfo
+	peerList := rt.getPeerSortDist(refPeer)
 	sort.Sort(ByXORDist(peerList))
 
 	// Get the `peerNum` closest ones.
 	for _, peer := range peerList {
 		xPeers = append(xPeers[:],
-			PeerInfo{
-				ip:   peer.ip,
-				port: peer.port,
-				id:   peer.id,
+			encoding.PeerInfo{
+				IP:   peer.ip,
+				Port: peer.port,
+				ID:   peer.id,
 			})
 		if len(xPeers) >= peerNum {
 			break
@@ -130,15 +141,15 @@ func (router *RoutingTable) getXClosestPeersTo(peerNum int, refPeer PeerInfo) []
 // for the `PONG` message arrivals.
 // Then looks for the closest peer to the node itself into the
 // buckets and returns it.
-func (router *RoutingTable) pollClosestPeer(t time.Duration) PeerInfo {
+func (rt *RoutingTable) pollClosestPeer(t time.Duration) encoding.PeerInfo {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	router.sendFindNodes()
+	rt.sendFindNodes()
 
-	var p PeerInfo
+	var p encoding.PeerInfo
 	timer := time.AfterFunc(t, func() {
-		ps := router.getXClosestPeersTo(DefaultAlphaClosestNodes, router.LpeerInfo)
+		ps := rt.getXClosestPeersTo(DefaultAlphaClosestNodes, rt.LpeerInfo)
 		if len(ps) > 0 {
 			p = ps[0]
 		}
@@ -154,18 +165,26 @@ func (router *RoutingTable) pollClosestPeer(t time.Duration) PeerInfo {
 // the node knows and waits for a certain time in order to wait
 // for the `PONG` message arrivals.
 // Returns back the new number of peers the node is connected to.
-func (router *RoutingTable) pollBootstrappingNodes(bootNodes []PeerInfo, t time.Duration) uint64 {
+func (rt *RoutingTable) pollBootstrappingNodes(bootNodes []encoding.PeerInfo, t time.Duration) uint64 {
 	var wg sync.WaitGroup
 	var peerNum uint64
 
 	wg.Add(1)
 
 	for _, peer := range bootNodes {
-		router.sendPing(peer)
+
+		h := makeHeader(encoding.PingMsg, rt)
+
+		var buf bytes.Buffer
+		if err := encoding.MarshalBinary(h, nil, &buf); err != nil {
+			continue
+		}
+
+		sendUDPPacket(rt.lpeerUDPAddr, peer.GetUDPAddr(), buf.Bytes())
 	}
 
 	timer := time.AfterFunc(t, func() {
-		peerNum = router.tree.getTotalPeers()
+		peerNum = rt.tree.getTotalPeers()
 		wg.Done()
 	})
 
@@ -174,69 +193,25 @@ func (router *RoutingTable) pollBootstrappingNodes(bootNodes []PeerInfo, t time.
 	return peerNum
 }
 
-// ------- Packet-sending utilities for the Router ------- //
-
-// Builds and sends a `PING` packet
-func (router *RoutingTable) sendPing(receiver PeerInfo) {
-	// Build empty packet.
-	var p Packet
-	// Fill the headers with the type, ID, Nonce and destPort.
-	p.setHeadersInfo(0, router)
-
-	// Since return values from functions are not addressable, we need to
-	// allocate the receiver UDPAddr
-	destUDPAddr := receiver.getUDPAddr()
-	// Send the packet
-	sendUDPPacket(router.lpeerUDPAddr, destUDPAddr, marshalPacket(p))
-}
-
-// Builds and sends a `PONG` packet
-func (router *RoutingTable) sendPong(receiver PeerInfo) {
-	// Build empty packet.
-	var p Packet
-	// Fill the headers with the type, ID, Nonce and destPort.
-	p.setHeadersInfo(1, router)
-
-	// Since return values from functions are not addressable, we need to
-	// allocate the receiver UDPAddr
-	destUDPAddr := receiver.getUDPAddr()
-	// Send the packet
-	sendUDPPacket(router.lpeerUDPAddr, destUDPAddr, marshalPacket(p))
-}
-
 // Builds and sends a `FIND_NODES` packet.
-func (router *RoutingTable) sendFindNodes() {
+func (rt *RoutingTable) sendFindNodes() {
 	// Get `Alpha` closest nodes to me.
-	destPeers := router.getXClosestPeersTo(Alpha, router.LpeerInfo)
+	destPeers := rt.getXClosestPeersTo(Alpha, rt.LpeerInfo)
 	// Fill the headers with the type, ID, Nonce and destPort.
 	for _, peer := range destPeers {
-		// Build the packet
-		var p Packet
-		p.setHeadersInfo(2, router)
-		// We don't need to add the ID to the payload snce we already have
-		// it in the headers.
-		// Send the packet
-		sendUDPPacket(router.lpeerUDPAddr, peer.getUDPAddr(), marshalPacket(p))
-	}
-}
 
-// Builds and sends a `NODES` packet.
-func (router *RoutingTable) sendNodes(receiver PeerInfo) {
-	// Build empty packet
-	var p Packet
-	// Set headers
-	p.setHeadersInfo(3, router)
-	// Set payload with the `k` peers closest to receiver.
-	peersToSend := p.setNodesPayload(router, receiver)
-	// If we don't have any peers to announce, we just skip sending
-	// the `NODES` messsage.
-	if peersToSend == 0 {
-		return
+		h := makeHeader(encoding.FindNodesMsg, rt)
+
+		var buf bytes.Buffer
+		if err := encoding.MarshalBinary(h, nil, &buf); err != nil {
+			return
+		}
+
+		sendUDPPacket(rt.lpeerUDPAddr, peer.GetUDPAddr(), buf.Bytes())
 	}
-	sendUDPPacket(router.lpeerUDPAddr, receiver.getUDPAddr(), marshalPacket(p))
 }
 
 // GetTotalPeers the total amount of peers that a `Peer` is connected to
-func (router *RoutingTable) GetTotalPeers() uint64 {
-	return router.tree.getTotalPeers()
+func (rt *RoutingTable) GetTotalPeers() uint64 {
+	return rt.tree.getTotalPeers()
 }

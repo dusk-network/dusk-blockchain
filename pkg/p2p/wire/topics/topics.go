@@ -184,6 +184,7 @@ var Topics = [...]topicBuf{
 	{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
 	{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 	{SyncProgress, *(bytes.NewBuffer([]byte{byte(SyncProgress)})), "syncprogress"},
+	{Kadcast, *(bytes.NewBuffer([]byte{byte(Kadcast)})), "kadcast"},
 }
 
 func checkConsistency(topics []topicBuf) {

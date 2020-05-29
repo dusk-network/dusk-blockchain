@@ -1,18 +1,20 @@
 package kadcast
 
+import "github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
+
 // bucket stores peer info of the peers that are at a certain
 // distance range to the peer itself.
 type bucket struct {
 	idLength         uint8
 	totalPeersPassed uint64
 	// Should always be less than `MaxBucketPeers`
-	entries []PeerInfo
+	entries []encoding.PeerInfo
 	// This map keeps the order of arrivals for LRU
-	lru map[PeerInfo]uint64
+	lru map[encoding.PeerInfo]uint64
 	// This map allows us to quickly see if a Peer is
 	// included on a entries set without iterating over
 	// it.
-	lruPresent map[PeerInfo]bool
+	lruPresent map[encoding.PeerInfo]bool
 }
 
 // Allocates space for a `bucket` and returns a instance
@@ -21,9 +23,9 @@ func makeBucket(idlen uint8) bucket {
 	return bucket{
 		idLength:         idlen,
 		totalPeersPassed: 0,
-		entries:          make([]PeerInfo, 0, DefaultMaxBucketPeers),
-		lru:              make(map[PeerInfo]uint64),
-		lruPresent:       make(map[PeerInfo]bool),
+		entries:          make([]encoding.PeerInfo, 0, DefaultMaxBucketPeers),
+		lru:              make(map[encoding.PeerInfo]uint64),
+		lruPresent:       make(map[encoding.PeerInfo]bool),
 	}
 }
 
@@ -46,7 +48,7 @@ func (b bucket) findLRUPeerIndex() (int, uint64) {
 // caring about the order.
 // It also maps the `Peer` to false on the LRU map.
 // The resulting slice of entries is then returned.
-func (b *bucket) removePeerAtIndex(index int) []PeerInfo {
+func (b *bucket) removePeerAtIndex(index int) []encoding.PeerInfo {
 	// Remove peer from the lruPresent map.
 	b.lruPresent[b.entries[index]] = false
 
@@ -57,7 +59,7 @@ func (b *bucket) removePeerAtIndex(index int) []PeerInfo {
 
 // Adds a `Peer` to the `bucket` entries list.
 // the LRU policy.
-func (b *bucket) addPeer(peer PeerInfo) {
+func (b *bucket) addPeer(peer encoding.PeerInfo) {
 
 	// Check if the entries set can hold more peers.
 	if len(b.entries) < int(DefaultMaxBucketPeers) {

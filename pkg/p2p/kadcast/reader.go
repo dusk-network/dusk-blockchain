@@ -2,9 +2,11 @@ package kadcast
 
 import (
 	"bytes"
+	"errors"
 	"net"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -22,14 +24,14 @@ type Reader struct {
 	gossip    *protocol.Gossip
 
 	// lpeer is the tuple identifying this peer
-	lpeer PeerInfo
+	lpeer encoding.PeerInfo
 
 	listener      *net.TCPListener
 	messageRouter messageRouter
 }
 
 // NewReader makes a new kadcast reader that handles TCP packets of broadcasting
-func NewReader(lpeerInfo PeerInfo, publisher eventbus.Publisher, gossip *protocol.Gossip, dupeMap *dupemap.DupeMap) *Reader {
+func NewReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher, gossip *protocol.Gossip, dupeMap *dupemap.DupeMap) *Reader {
 
 	addr := lpeerInfo.Address()
 	lAddr, err := net.ResolveTCPAddr("tcp4", addr)
@@ -94,7 +96,9 @@ func (r *Reader) processPacket(conn *net.TCPConn) {
 		}
 	}()
 
-	llog := log.WithField("l_addr", r.lpeer.String()).WithField("r_addr", conn.RemoteAddr())
+	remotePeerAddr := conn.RemoteAddr().String()
+	llog := log.WithField("l_addr", r.lpeer.String()).
+		WithField("r_addr", remotePeerAddr)
 
 	// Read frame payload Set a new deadline for the connection.
 	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
@@ -105,28 +109,36 @@ func (r *Reader) processPacket(conn *net.TCPConn) {
 		return
 	}
 
-	// Verify frame data and extract packet fields
-	var packet Packet
-	if _, _, err := unmarshalPacket(b, &packet, MaxTCPacketSize); err != nil {
+	// Unmarshal message header
+	buf := bytes.NewBuffer(b)
+	var header encoding.Header
+	err = header.UnmarshalBinary(buf)
+	if err != nil {
 		llog.WithError(err).Warn("TCP reader rejects a packet")
 		return
 	}
 
-	if err := r.handleBroadcast(packet); err != nil {
-		llog.WithError(err).Warn("could not handle broadcast message")
+	// Run extra checks over message data
+	if err := isValidMessage(remotePeerAddr, header); err != nil {
+		llog.WithError(err).Warn("TCP reader rejects a packet")
+		return
+	}
+
+	// Unmarshal broadcast message payload
+	var p encoding.BroadcastPayload
+	if err := p.UnmarshalBinary(buf); err != nil {
+		llog.WithError(err).Warn("could not unmarshal message")
+	}
+
+	// Handle broadcast message
+	if err := r.handleBroadcast(p.Height, p.GossipFrame); err != nil {
+		llog.WithError(err).Warn("could not handle message")
 	} else {
 		llog.Traceln("Received Broadcast message")
 	}
 }
 
-func (r *Reader) handleBroadcast(packet Packet) error {
-
-	// Read gossip frame and broadcast_height from the packet payload
-	height, _, gossipFrame, err := packet.getChunksPayloadInfo()
-	if err != nil {
-		log.Info("could not read packet payload")
-		return err
-	}
+func (r *Reader) handleBroadcast(height byte, gossipFrame []byte) error {
 
 	// Read `message` from gossip frame
 	buf := bytes.NewBuffer(gossipFrame)
@@ -155,6 +167,29 @@ func (r *Reader) handleBroadcast(packet Packet) error {
 	// NB Currently, repropagate in kadcast is fully delegated to the receiving
 	// component. That's needed because only the receiving component is capable
 	// of verifying message fully. E.g Chain component can verifies a new block
+
+	return nil
+}
+
+func isValidMessage(remotePeerIP string, header encoding.Header) error {
+
+	// Reader handles only broadcast-type messages
+	if header.MsgType != encoding.BroadcastMsg {
+		return errors.New("message type not supported")
+	}
+
+	// Make remote peerInfo based on addr from IP datagram and RemotePeerPort
+	// from header
+	remotePeer, err := encoding.MakePeerFromIP(remotePeerIP, header.RemotePeerPort)
+	if err != nil {
+		return err
+	}
+
+	// Ensure the RemotePeerID from header is correct one
+	// This together with Nonce-PoW aims at providing a bit of DDoS protection
+	if !bytes.Equal(remotePeer.ID[:], header.RemotePeerID[:]) {
+		return errors.New("invalid remote peer id")
+	}
 
 	return nil
 }

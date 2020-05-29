@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -80,9 +81,9 @@ func (p *Peer) Close() {
 // JoinNetwork makes attempts to join the network based on the configured bootstrapping nodes
 func JoinNetwork(router *RoutingTable, bootstrapAddrs []string) {
 
-	bootstrapNodes := make([]PeerInfo, 0)
+	bootstrapNodes := make([]encoding.PeerInfo, 0)
 	for _, addr := range bootstrapAddrs {
-		p, _ := MakePeerFromAddr(addr)
+		p, _ := encoding.MakePeerFromAddr(addr)
 		bootstrapNodes = append(bootstrapNodes, p)
 	}
 
@@ -101,7 +102,7 @@ func JoinNetwork(router *RoutingTable, bootstrapAddrs []string) {
 // it panics.
 // Otherways, it returns `nil` and logs the Number of peers
 // the node is connected to at the end of the process.
-func InitBootstrap(router *RoutingTable, bootNodes []PeerInfo) error {
+func InitBootstrap(router *RoutingTable, bootNodes []encoding.PeerInfo) error {
 	log.Info("Bootstrapping process started.")
 	// Get PeerList ordered by distance so we can compare it
 	// after the `PONG` arrivals.

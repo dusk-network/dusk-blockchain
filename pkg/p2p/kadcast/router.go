@@ -19,11 +19,18 @@ type messageRouter struct {
 }
 
 func (m *messageRouter) Collect(packet []byte, height byte) error {
+
+	// Register message in the global message registry for stats collecting
+	// TODO:
+
 	b := bytes.NewBuffer(packet)
 	msg, err := message.Unmarshal(b)
 	if err != nil {
 		return err
 	}
+
+	// Always append kadcast height
+	msg = message.NewWithHeader(msg.Category(), msg.Payload(), []byte{height})
 	return m.route(*b, msg, height)
 }
 
@@ -31,7 +38,7 @@ func (m *messageRouter) Collect(packet []byte, height byte) error {
 // For now, request-response wire messages are not introduced in kadcast network
 func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 	switch topic {
-	case topics.Tx, // TODO: Pending
+	case topics.Tx,
 		topics.Block,
 		topics.Candidate, // TODO: Pending
 		topics.Reduction, // TODO: Pending
@@ -56,14 +63,18 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message, height byte) 
 
 	// Filter duplicated messages
 	if !m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
-		return fmt.Errorf("duplicated message received with topic %s", category.String())
+		// return fmt.Errorf("duplicated message received with topic %s", category.String())
 	}
 
 	// Publish wire message to the eventbus so that the subscribed
 	// components could handle it
 	switch category {
-	case topics.Tx: // TODO:  Not supported yet
-	case topics.Candidate: // TODO:  Not supported yet
+	case topics.Tx:
+		m.publisher.Publish(category, msg)
+	case topics.Candidate:
+		// We don't use the dupe map
+		// See also topics.Candidate handling in gossip
+		m.publisher.Publish(category, msg)
 	case topics.Reduction: // TODO:  Not supported yet
 	case topics.Agreement: // TODO:  Not supported yet
 	case topics.Block:

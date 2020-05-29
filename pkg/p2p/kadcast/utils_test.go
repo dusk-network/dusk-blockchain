@@ -6,19 +6,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
-
-func TestPOW(t *testing.T) {
-	a := PeerInfo{
-		ip:   [4]byte{192, 169, 1, 1},
-		port: 25519,
-		id:   [16]byte{22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22},
-	}
-
-	println(a.computePeerNonce())
-}
 
 func TestWriteTCPFrame(t *testing.T) {
 	writePayload := bytes.NewBufferString("some payload data")
@@ -50,7 +40,10 @@ func TestWriteTCPFrameErr(t *testing.T) {
 func TestReadTCPFrameErr(t *testing.T) {
 
 	frame := new(bytes.Buffer)
-	_ = encoding.WriteUint32LE(frame, MaxFrameSize+1)
+
+	var b [4]byte
+	binary.LittleEndian.PutUint32(b[:], uint32(MaxFrameSize+1))
+	_, _ = frame.Write(b[:])
 
 	readPayload, err := readTCPFrame(frame)
 	if readPayload != nil {
@@ -98,14 +91,16 @@ func TestGenerateRandomDelegates(t *testing.T) {
 	ip := [4]byte{127, 0, 0, 1}
 	id := [16]byte{1, 2, 3, 4}
 
-	in := make([]PeerInfo, 10)
+	in := make([]encoding.PeerInfo, 10)
 	for i := 0; i < len(in); i++ {
-		in[i] = PeerInfo{ip, uint16(i), id}
+		in[i] = encoding.PeerInfo{IP: ip,
+			Port: uint16(i),
+			ID:   id}
 	}
 
 	for i := 0; i < len(in); i++ {
 		var beta uint8 = uint8(i)
-		out := make([]PeerInfo, 0)
+		out := make([]encoding.PeerInfo, 0)
 		generateRandomDelegates(beta, in, &out)
 
 		if len(out) != int(beta) {
@@ -114,7 +109,7 @@ func TestGenerateRandomDelegates(t *testing.T) {
 	}
 
 	beta := uint8(len(in) * 2)
-	out := make([]PeerInfo, 0)
+	out := make([]encoding.PeerInfo, 0)
 	generateRandomDelegates(beta, in, &out)
 
 	if len(out) != len(in) {
