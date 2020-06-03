@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 
@@ -150,7 +151,10 @@ func transactionsAction(ctx *cli.Context) error {
 		return err
 	}
 
+	txHash := hex.EncodeToString(transferResponse.Hash)
+
 	log.WithField("transferResponse", transferResponse).
+		WithField("txHash", txHash).
 		Info("transactions Action completed")
 
 	return nil
