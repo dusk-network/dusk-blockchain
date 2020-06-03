@@ -33,10 +33,14 @@ type rpcConfiguration struct {
 }
 
 // InitConfig will init the config vars from viper
-func InitConfig() Registry {
+func InitConfig(cfg string) Registry {
 	viper.SetConfigName("dusk")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("$HOME/.dusk/")
+	if cfg == "" {
+		viper.AddConfigPath(".")
+		viper.AddConfigPath("$HOME/.dusk/")
+	} else {
+		viper.AddConfigPath(cfg)
+	}
 
 	if err := viper.ReadInConfig(); err != nil {
 		_, _ = fmt.Fprintln(os.Stdout, "Config file not found. Please place dusk-wallet-cli in the same directory as your dusk.toml file.")
