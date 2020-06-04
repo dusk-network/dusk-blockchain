@@ -112,6 +112,11 @@ func getBlockByNumber(client *graphql.Client, values map[string]interface{}) (*B
 			height
 			timestamp
 		  }
+		  transactions {
+			txid
+			txtype
+			size
+		  }
 		}
 	  }
 	`
