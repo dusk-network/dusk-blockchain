@@ -56,8 +56,8 @@ var (
 
 	addressFlag = cli.StringFlag{
 		Name:  "address",
-		Usage: "Dusk address , eg: --address=0x123",
-		Value: "0x123",
+		Usage: "Dusk address , eg: --address=self",
+		Value: "self",
 	}
 
 	gqlPortFlag = cli.IntFlag{
@@ -153,8 +153,7 @@ func transactionsAction(ctx *cli.Context) error {
 
 	txHash := hex.EncodeToString(transferResponse.Hash)
 
-	log.WithField("transferResponse", transferResponse).
-		WithField("txHash", txHash).
+	log.WithField("txHash", txHash).
 		Info("transactions Action completed")
 
 	return nil

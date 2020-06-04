@@ -3,9 +3,9 @@ package transactions
 import (
 	"context"
 	"errors"
+	node "github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"time"
 
-	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -19,7 +19,7 @@ type Transaction struct {
 }
 
 // RunTransactions will
-func RunTransactions(grpcHost string, transaction Transaction) (*pb.TransferResponse, error) {
+func RunTransactions(grpcHost string, transaction Transaction) (*node.TransferResponse, error) {
 
 	log.WithField("transaction", transaction).Info("Set up a connection to the grpc server")
 	conn, err := grpc.Dial(grpcHost, grpc.WithInsecure())
@@ -30,23 +30,34 @@ func RunTransactions(grpcHost string, transaction Transaction) (*pb.TransferResp
 		_ = conn.Close()
 	}()
 
-	client := pb.NewNodeClient(conn)
+	client := node.NewNodeClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	var resp *pb.TransferResponse
+	var resp *node.TransferResponse
 	switch transaction.TXtype {
 	case "consensus":
 		log.WithField("transaction", transaction).Info("Sending consensus tx")
-		req := pb.ConsensusTxRequest{Amount: transaction.Amount, LockTime: transaction.LockTime}
+		req := node.ConsensusTxRequest{Amount: transaction.Amount, LockTime: transaction.LockTime}
 		resp, err = client.SendBid(ctx, &req)
 	case "stake":
 		log.WithField("transaction", transaction).Info("Sending stake tx")
-		req := pb.ConsensusTxRequest{Amount: transaction.Amount, LockTime: transaction.LockTime}
+		req := node.ConsensusTxRequest{Amount: transaction.Amount, LockTime: transaction.LockTime}
 		resp, err = client.SendStake(ctx, &req)
 	case "transfer":
 		log.WithField("transaction", transaction).Info("Sending transfer tx")
-		req := pb.TransferRequest{Amount: transaction.Amount, Address: []byte(transaction.Address)}
+
+		if transaction.Address == "self" {
+			log.WithField("transaction", transaction).Debug("Address defined as self, will go get node self address via grpc ...")
+			resp, err := client.GetAddress(context.Background(), &node.EmptyRequest{})
+			if err != nil {
+				return nil, err
+			}
+			log.WithField("address", string(resp.Key.PublicKey)).Info("Sending transfer tx to self address")
+			transaction.Address = string(resp.Key.PublicKey)
+		}
+
+		req := node.TransferRequest{Amount: transaction.Amount, Address: []byte(transaction.Address)}
 		resp, err = client.Transfer(ctx, &req)
 	default:
 		log.Info("")
