@@ -62,8 +62,8 @@ var (
 
 	gqlPortFlag = cli.IntFlag{
 		Name:  "gqlport",
-		Usage: "GQL PORT , eg: --gqlport=9503",
-		Value: 9503,
+		Usage: "GQL PORT , eg: --gqlport=9501",
+		Value: 9501,
 	}
 
 	nodePortFlag = cli.IntFlag{
