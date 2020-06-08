@@ -3,8 +3,9 @@ package transactions
 import (
 	"context"
 	"errors"
-	node "github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"time"
+
+	node "github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -49,9 +50,9 @@ func RunTransactions(grpcHost string, transaction Transaction) (*node.TransferRe
 
 		if transaction.Address == "self" {
 			log.WithField("transaction", transaction).Debug("Address defined as self, will go get node self address via grpc ...")
-			resp, err := client.GetAddress(context.Background(), &node.EmptyRequest{})
-			if err != nil {
-				return nil, err
+			resp, err1 := client.GetAddress(context.Background(), &node.EmptyRequest{})
+			if err1 != nil {
+				return nil, err1
 			}
 			log.WithField("address", string(resp.Key.PublicKey)).Info("Sending transfer tx to self address")
 			transaction.Address = string(resp.Key.PublicKey)
