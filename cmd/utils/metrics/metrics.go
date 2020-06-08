@@ -12,6 +12,10 @@ import (
 	"github.com/machinebox/graphql"
 )
 
+const (
+	layoutISO = "2006-01-02 15:04:05 -0700 MST"
+)
+
 var (
 	lastBlockUpdate    time.Time
 	currentBlock       *Block
@@ -93,10 +97,10 @@ func Routine() {
 				continue
 			}
 
-			newTimestamp, _ := strconv.Atoi(newBlock.Header.Timestamp)
-			lastTimestamp, _ := strconv.Atoi(lastBlock.Header.Timestamp)
+			newTimestamp, _ := time.Parse(layoutISO, newBlock.Header.Timestamp)
+			lastTimestamp, _ := time.Parse(layoutISO, lastBlock.Header.Timestamp)
 
-			duskInfo.EffectiveBlockTime = int64(time.Unix(int64(newTimestamp), 0).Sub(time.Unix(int64(lastTimestamp), 0)).Seconds())
+			duskInfo.EffectiveBlockTime = int64(time.Unix(newTimestamp.Unix(), 0).Sub(time.Unix(lastTimestamp.Unix(), 0)).Seconds())
 			duskInfo.LoadTime = diff.Seconds()
 
 			continue
@@ -110,10 +114,10 @@ func Routine() {
 
 			lastBlock, _ := getBlockByNumber(gqlClient, map[string]interface{}{"height": previousBlockNum})
 
-			newTimestamp, _ := strconv.Atoi(newBlock.Header.Timestamp)
-			lastTimestamp, _ := strconv.Atoi(lastBlock.Header.Timestamp)
+			newTimestamp, _ := time.Parse(layoutISO, newBlock.Header.Timestamp)
+			lastTimestamp, _ := time.Parse(layoutISO, lastBlock.Header.Timestamp)
 
-			duskInfo.EffectiveBlockTime = int64(time.Unix(int64(newTimestamp), 0).Sub(time.Unix(int64(lastTimestamp), 0)).Seconds())
+			duskInfo.EffectiveBlockTime = int64(time.Unix(newTimestamp.Unix(), 0).Sub(time.Unix(lastTimestamp.Unix(), 0)).Seconds())
 
 			diff := lastBlockUpdate.Sub(t1)
 			duskInfo.LoadTime = diff.Seconds()

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 
@@ -55,14 +56,14 @@ var (
 
 	addressFlag = cli.StringFlag{
 		Name:  "address",
-		Usage: "Dusk address , eg: --address=0x123",
-		Value: "0x123",
+		Usage: "Dusk address , eg: --address=self",
+		Value: "self",
 	}
 
 	gqlPortFlag = cli.IntFlag{
 		Name:  "gqlport",
-		Usage: "GQL PORT , eg: --gqlport=9503",
-		Value: 9503,
+		Usage: "GQL PORT , eg: --gqlport=9501",
+		Value: 9501,
 	}
 
 	nodePortFlag = cli.IntFlag{
@@ -150,7 +151,9 @@ func transactionsAction(ctx *cli.Context) error {
 		return err
 	}
 
-	log.WithField("transferResponse", transferResponse).
+	txHash := hex.EncodeToString(transferResponse.Hash)
+
+	log.WithField("txHash", txHash).
 		Info("transactions Action completed")
 
 	return nil
