@@ -81,7 +81,6 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 
 // LoadWalletCmd sends gRPC command LoadWallet and returns pubkey (if loaded)
 func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
-
 	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
 
 	// Set up a connection to the server.
@@ -108,7 +107,6 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 
 // SendBidCmd sends gRPC command SendBid and returns tx hash
 func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
-
 	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
 
 	// Set up a connection to the server.
@@ -136,7 +134,6 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 // SendWireMsg sends a P2P message to the specified network node
 // NB: Handshaking procedure must be performed prior to the message sending
 func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
-
 	if ind >= uint(len(n.Nodes)) {
 		return errors.New("invalid node index")
 	}
@@ -183,7 +180,6 @@ func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.B
 // WriteFrame writes a frame to a buffer
 // TODO: remove *bytes.Buffer from the returned parameters
 func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
-
 	msg := new(bytes.Buffer)
 	// Append prefix(header)
 	if err := encoding.WriteUint64LE(msg, uint64(0)); err != nil {
@@ -203,7 +199,6 @@ func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 
 // WaitUntil blocks until the node at index ind reaches the target height
 func (n *Network) WaitUntil(t *testing.T, ind uint, targetHeight uint64, waitFor time.Duration, tick time.Duration) {
-
 	condition := func() bool {
 		// Construct query to fetch block height
 		query := "{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}"
@@ -226,7 +221,6 @@ func (n *Network) WaitUntil(t *testing.T, ind uint, targetHeight uint64, waitFor
 // WaitUntilTx blocks until the node at index ind accepts the specified Tx
 // Returns hash of the block that includes this tx
 func (n *Network) WaitUntilTx(t *testing.T, ind uint, txID string) string {
-
 	var blockhash string
 	condition := func() bool {
 		// Construct query to fetch txid

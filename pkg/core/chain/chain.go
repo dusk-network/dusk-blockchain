@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
@@ -157,6 +158,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		getLastCertificateChan:   getLastCertificateChan,
 		getRoundResultsChan:      getRoundResultsChan,
 		getLastCommitteeChan:     getLastCommitteeChan,
+		lastCommittee:            make([][]byte, 0),
 		loader:                   loader,
 		verifier:                 verifier,
 		executor:                 executor,
@@ -179,6 +181,17 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		}
 
 		chain.intermediateBlock = blk
+
+		// If we're running the test harness, we should also populate some consensus values
+		if config.Get().Genesis.Legacy {
+			if err := setupBidValues(); err != nil {
+				return nil, err
+			}
+
+			if err := reconstructCommittee(chain.p, prevBlock); err != nil {
+				return nil, err
+			}
+		}
 	}
 	chain.prevBlock = *prevBlock
 
@@ -296,9 +309,10 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 
 	// 3. Call ExecuteStateTransitionFunction
 	l.Debug("calling ExecuteStateTransitionFunction")
-	_, provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs)
+	provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs, blk.Header.Height)
 	if err != nil {
 		l.WithError(err).Errorln("Error in executing the state transition")
+		return err
 	}
 
 	// Caching the provisioners and bidList

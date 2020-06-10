@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
 	"github.com/machinebox/graphql"
 )
 
@@ -15,6 +16,7 @@ type DuskNode struct {
 	// fields represents a dusk-blockchain instance
 	Cfg config.Registry
 	Gql *graphql.Client
+	Srv *ruskmock.Server
 
 	// dusk-blockchain node directory
 	Dir string
@@ -29,15 +31,22 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
 
 	node.Cfg = config.Registry{}
 	node.Cfg.Gql.Address = "127.0.0.1:" + strconv.Itoa(graphqlPort)
-	node.Cfg.Gql.Network = "tcp"
+	node.Cfg.Gql.Network = "tcp" //nolint
 
 	if *RPCNetworkType == "unix" { //nolint
 		node.Cfg.RPC.Network = "unix"
 		node.Cfg.RPC.Address = "/dusk-grpc.sock"
 	} else {
-		node.Cfg.RPC.Network = "tcp"
+		node.Cfg.RPC.Network = "tcp" //nolint
 		node.Cfg.RPC.Address = "127.0.0.1:" + node.Id
 	}
+
+	node.Cfg.RPC.Rusk.Network = "tcp" //nolint
+	node.Cfg.RPC.Rusk.Address = "127.0.0.1:" + strconv.Itoa(nodeID+1000)
+	node.Cfg.RPC.Rusk.ContractTimeout = 6000
+	node.Cfg.RPC.Rusk.DefaultTimeout = 1000
+
+	node.Cfg.Genesis.Legacy = true
 
 	node.Gql = graphql.NewClient("http://" + node.Cfg.Gql.Address)
 	return node

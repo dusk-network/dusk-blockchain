@@ -151,3 +151,6 @@ accumulatorWorkers = 4
 defaultlocktime = 250000
 # default amount, in whole units of DUSK, to send for consensus transactions.
 defaultamount = 5
+
+[genesis]
+legacy = false

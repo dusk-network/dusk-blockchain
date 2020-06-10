@@ -98,6 +98,34 @@ func NewProvisioners() *Provisioners {
 	}
 }
 
+// Add a Member to the Provisioners by using the bytes of a BLS public key.
+func (p *Provisioners) Add(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
+	if len(pubKeyBLS) != 129 {
+		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
+	}
+
+	i := string(pubKeyBLS)
+	stake := Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
+
+	// Check for duplicates
+	_, inserted := p.Set.IndexOf(pubKeyBLS)
+	if inserted {
+		// If they already exist, just add their new stake
+		p.Members[i].AddStake(stake)
+		return nil
+	}
+
+	// This is a new provisioner, so let's initialize the Member struct and add them to the list
+	p.Set.Insert(pubKeyBLS)
+	m := &Member{}
+
+	m.PublicKeyBLS = pubKeyBLS
+	m.AddStake(stake)
+
+	p.Members[i] = m
+	return nil
+}
+
 // SubsetSizeAt returns how many provisioners are active on a given round.
 // This function is used to determine the correct committee size for
 // sortition in the case where one or more provisioner stakes have not

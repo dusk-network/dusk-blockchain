@@ -40,9 +40,8 @@ func (p *PermissiveExecutor) ValidateStateTransition(ctx context.Context, cc []C
 
 // ExecuteStateTransition performs a global state mutation and steps the
 // block-height up
-func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall) (uint64, user.Provisioners, error) {
-	p.height++
-	return p.height, *p.P, nil
+func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, height uint64) (user.Provisioners, error) {
+	return *p.P, nil
 }
 
 // PermissiveProvisioner mocks verification of scores
