@@ -23,7 +23,6 @@ var (
 	duskInfo           *DuskInfo
 	node               *engine.DuskNode
 	currentBlockNumber uint64
-	gqlClient          *graphql.Client
 	pendingTx          int
 	//rpcClient       *Client
 )
@@ -38,6 +37,8 @@ type DuskInfo struct {
 	LoadTime           float64
 	TotalDusk          *big.Int
 	EffectiveBlockTime int64
+	GQLEndpoint        string
+	GQLClient          *graphql.Client
 }
 
 // RunMetrics will run the metrics collection endpoint
@@ -49,7 +50,8 @@ func RunMetrics(gqlPort, nodePort, port int, hostname string) {
 	localNet.Nodes = append(localNet.Nodes, node)
 
 	// Instantiate graphQL client
-	gqlClient = graphql.NewClient("http://" + node.Cfg.Gql.Address + "/graphql")
+	duskInfo.GQLEndpoint = "http://" + node.Cfg.Gql.Address + "/graphql"
+	duskInfo.GQLClient = graphql.NewClient(duskInfo.GQLEndpoint)
 
 	// Instantiate gRPC client
 	// rpcClient = InitRPCClients(context.Background(), node.Cfg.RPC.Address)
@@ -70,12 +72,16 @@ func Routine() {
 	for {
 
 		t1 := time.Now()
+		var err error
+		pendingTx, err = pendingTransactionCount(duskInfo)
+		if err != nil {
+			_ = fmt.Errorf("pendingTransactionCount, error: %+v", err)
+		}
 
-		pendingTx, _ = pendingTransactionCount(gqlClient, nil)
-		newBlock, err := getBlockByNumber(gqlClient, map[string]interface{}{"height": currentBlockNumber + 1})
+		newBlock, err := getBlockByNumber(duskInfo, map[string]interface{}{"height": currentBlockNumber + 1})
 
 		if err != nil {
-			_ = fmt.Errorf("error: %+v", err)
+			_ = fmt.Errorf("getBlockByNumber, error: %+v", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -91,7 +97,7 @@ func Routine() {
 
 			previousBlockNum := currentBlock.Header.Height - 1
 
-			lastBlock, err := getBlockByNumber(gqlClient, map[string]interface{}{"height": previousBlockNum})
+			lastBlock, err := getBlockByNumber(duskInfo, map[string]interface{}{"height": previousBlockNum})
 			if err != nil {
 				fmt.Printf("Received Error on block  #%v, Error: %+v", currentBlock.Header.Height, err)
 				continue
@@ -112,7 +118,7 @@ func Routine() {
 
 			previousBlockNum := currentBlock.Header.Height - 1
 
-			lastBlock, _ := getBlockByNumber(gqlClient, map[string]interface{}{"height": previousBlockNum})
+			lastBlock, _ := getBlockByNumber(duskInfo, map[string]interface{}{"height": previousBlockNum})
 
 			newTimestamp, _ := time.Parse(layoutISO, newBlock.Header.Timestamp)
 			lastTimestamp, _ := time.Parse(layoutISO, lastBlock.Header.Timestamp)
@@ -133,6 +139,12 @@ func HandlerMetrics(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 
+	if currentBlock == nil {
+		fmt.Printf("Received Error on HandlerMetrics  #%v, Error: %+v\n", 0, http.StatusServiceUnavailable)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	CalculateTotals(currentBlock)
 
 	var duskTps int64
@@ -144,10 +156,10 @@ func HandlerMetrics(w http.ResponseWriter, r *http.Request) {
 	allOut = append(allOut, fmt.Sprintf("dusk_seconds_last_block %0.2f", now.Sub(lastBlockUpdate).Seconds()))
 	allOut = append(allOut, fmt.Sprintf("dusk_effective_block_time %v", duskInfo.EffectiveBlockTime))
 	allOut = append(allOut, fmt.Sprintf("dusk_block_transactions %v", len(currentBlock.Txs)))
+	allOut = append(allOut, fmt.Sprintf("dusk_pending_transactions %v", pendingTx))
 	allOut = append(allOut, fmt.Sprintf("dusk_block_tps %d", duskTps))
 	allOut = append(allOut, fmt.Sprintf("dusk_block_value %v", duskInfo.TotalDusk))
 	allOut = append(allOut, fmt.Sprintf("dusk_block_size_bytes %v", duskInfo.BlockSize))
-	allOut = append(allOut, fmt.Sprintf("dusk_pending_transactions %v", pendingTx))
 	allOut = append(allOut, fmt.Sprintf("dusk_contracts_created %v", duskInfo.ContractsCreated))
 	allOut = append(allOut, fmt.Sprintf("dusk_token_transfers %v", duskInfo.TokenTransfers))
 	allOut = append(allOut, fmt.Sprintf("dusk_transfers %v", duskInfo.DuskTransfers))
