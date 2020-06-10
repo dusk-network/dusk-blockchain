@@ -17,7 +17,7 @@ import (
 
 var (
 	localNetSizeStr = os.Getenv("NETWORK_SIZE")
-	mockEnabled     = os.Getenv("MOCK_ENABLED")
+	mockAddress     = os.Getenv("MOCK_ADDRESS")
 	localNetSize    = 10
 )
 
@@ -49,8 +49,8 @@ func TestMain(m *testing.M) {
 		localNet.Nodes = append(localNet.Nodes, node)
 	}
 
-	if mockEnabled != "" {
-		StartMockServer("127.0.0.1:8080")
+	if mockAddress != "" {
+		StartMockServer(mockAddress)
 	}
 
 	var code int
