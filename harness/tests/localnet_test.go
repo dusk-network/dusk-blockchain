@@ -23,7 +23,9 @@ var (
 var localNet engine.Network
 var workspace string
 
-// TestMain sets up a temporarily local network of N nodes running from genesis block
+// TestMain sets up a temporarily local network of N nodes running from genesis
+// block
+//
 // The network should be fully functioning and ready to accept messaging
 func TestMain(m *testing.M) {
 
@@ -43,9 +45,14 @@ func TestMain(m *testing.M) {
 		}
 	}
 
+	profileID := os.Getenv("DUSK_PROFILE")
+	if len(profileID) == 0 {
+		profileID = "default"
+	}
+
 	// Create a network of N nodes
 	for i := 0; i < localNetSize; i++ {
-		node := engine.NewDuskNode(9500+i, 9000+i, "default")
+		node := engine.NewDuskNode(9500+i, 9000+i, profileID)
 		localNet.Nodes = append(localNet.Nodes, node)
 	}
 
@@ -76,13 +83,14 @@ func TestMain(m *testing.M) {
 }
 
 // TestSendBidTransaction ensures that a valid bid transaction has been accepted
-// by all nodes in the network within a particular time frame and within
-// the same block
+// by all nodes in the network within a particular time frame and within the
+// same block
 func TestSendBidTransaction(t *testing.T) {
 
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 
-	// Half of the network is supposed to run the consensus, the rest should be light nodes
+	// Half of the network is supposed to run the consensus, the rest should be
+	// light nodes
 	t.Log("Send request to half of the network nodes to loadWallet")
 	halfNetwork := localNetSize / 2
 	for i := 0; i < halfNetwork; i++ {
@@ -123,8 +131,8 @@ func TestSendBidTransaction(t *testing.T) {
 	}
 }
 
-// TestCatchup tests that a node which falls behind during consensus
-// will properly catch up and re-join the consensus execution trace.
+// TestCatchup tests that a node which falls behind during consensus will
+// properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
 
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
@@ -157,4 +165,45 @@ func TestCatchup(t *testing.T) {
 
 	t.Log("Ensure the new node has been synced up")
 	localNet.WaitUntil(t, uint(ind), 5, 2*time.Minute, 5*time.Second)
+}
+
+// TestMeasureNetworkTPS is a placeholder for a simple test definition on top of
+// which network TPS metric should be collected
+func TestMeasureNetworkTPS(t *testing.T) {
+
+	// Not needed in CI
+	t.Skip()
+
+	walletsPass := os.Getenv("DUSK_WALLET_PASS")
+	consensusNodes := os.Getenv("DUSK_CONSENSUS_NODES")
+	if len(consensusNodes) == 0 {
+		consensusNodes = "10"
+	}
+
+	nodesNum, err := strconv.Atoi(consensusNodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//Send to all consensus-running nodes a request for wallet loading. This
+	//will trigger consensus as well
+	for i := 0; i < nodesNum; i++ {
+		_, _ = localNet.LoadWalletCmd(uint(i), walletsPass)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// Send to all consensus-running nodes a bid tx
+	for i := 0; i < nodesNum; i++ {
+		txidBytes, err := localNet.SendBidCmd(uint(i), 10, 10)
+		if err != nil {
+			continue
+		}
+		txID := hex.EncodeToString(txidBytes)
+		t.Logf("Bid transaction id: %s", txID)
+
+		time.Sleep(3 * time.Second)
+	}
+
+	time.Sleep(20 * time.Second)
 }
