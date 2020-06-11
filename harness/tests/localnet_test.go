@@ -17,7 +17,6 @@ import (
 
 var (
 	localNetSizeStr = os.Getenv("NETWORK_SIZE")
-	mockAddress     = os.Getenv("MOCK_ADDRESS")
 	localNetSize    = 10
 )
 
@@ -47,10 +46,6 @@ func TestMain(m *testing.M) {
 	for i := 0; i < localNetSize; i++ {
 		node := engine.NewDuskNode(9500+i, 9000+i, "default")
 		localNet.Nodes = append(localNet.Nodes, node)
-	}
-
-	if mockAddress != "" {
-		StartMockServer(mockAddress)
 	}
 
 	var code int

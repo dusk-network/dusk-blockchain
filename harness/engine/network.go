@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -25,6 +24,9 @@ var (
 
 	// ErrDisabledHarness yields a disabled test harness
 	ErrDisabledHarness = errors.New("disabled test harness")
+
+	// MOCK_ADDRESS is optional string for the mock address to listen to, eg: 127.0.0.1:8080
+	MOCK_ADDRESS = os.Getenv("MOCK_ADDRESS")
 )
 
 // Network describes the current network configuration in terms of nodes and
@@ -48,7 +50,7 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	initProfiles()
 
-	_, seederExec, err := n.getExec()
+	_, utilsExec, seederExec, err := n.getExec()
 	if err != nil {
 		return err
 	}
@@ -61,6 +63,15 @@ func (n *Network) Bootstrap(workspace string) error {
 	} else {
 		// If path not provided, then it's assumed that the seeder is already running
 		log.Warnf("Seeder path not provided. Please, ensure dusk-seeder is already running")
+	}
+
+	if MOCK_ADDRESS != "" {
+		// Run mock process
+		if bbErr := n.start("", utilsExec, "mock",
+			"--grpcmockhost", MOCK_ADDRESS,
+		); bbErr != nil {
+			return bbErr
+		}
 	}
 
 	// Foreach node read localNet.Nodes, configure and run new nodes
@@ -91,7 +102,7 @@ func (n *Network) Teardown() {
 // StartNode locally
 func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 
-	blockchainExec, _, err := n.getExec()
+	blockchainExec, utilsExec, _, err := n.getExec()
 	if err != nil {
 		return err
 	}
@@ -115,17 +126,17 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 		return tomlErr
 	}
 
-	// Start the mock RUSK server
-	srv, err := ruskmock.New(nil, node.Cfg)
-	if err != nil {
-		return err
+	if MOCK_ADDRESS != "" {
+		// Start the mock RUSK server
+		if startErr := n.start("", utilsExec, "mockrusk",
+			"--rusknetwork", node.Cfg.RPC.Rusk.Network,
+			"--ruskaddress", node.Cfg.RPC.Rusk.Address,
+			"--walletstore", node.Cfg.Wallet.Store,
+			"--walletfile", node.Cfg.Wallet.File,
+		); startErr != nil {
+			return startErr
+		}
 	}
-	node.Srv = srv
-
-	if err := srv.Serve(node.Cfg.RPC.Rusk.Network, node.Cfg.RPC.Rusk.Address); err != nil {
-		return err
-	}
-
 	// Run dusk-blockchain node process
 	if startErr := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); startErr != nil {
 		return startErr
@@ -179,15 +190,24 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 
 // getExec returns paths of all node executables
 // dusk-blockchain, blindbid and seeder
-func (n *Network) getExec() (string, string, error) {
+func (n *Network) getExec() (string, string, string, error) {
 
 	blockchainExec, err := getEnv("DUSK_BLOCKCHAIN")
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	seederExec, _ := getEnv("DUSK_SEEDER")
-	return blockchainExec, seederExec, nil
+	utilsExec, err := getEnv("DUSK_UTILS")
+	if err != nil {
+		return "", "", "", err
+	}
+
+	seederExec, err := getEnv("DUSK_SEEDER")
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return blockchainExec, utilsExec, seederExec, nil
 }
 
 func getEnv(envVarName string) (string, error) {

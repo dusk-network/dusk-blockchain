@@ -17,13 +17,13 @@ const (
 )
 
 var (
-	lastBlockUpdate    time.Time
-	currentBlock       *Block
-	localNet           engine.Network
-	duskInfo           *DuskInfo
-	node               *engine.DuskNode
-	currentBlockNumber uint64
-	pendingTx          int
+	lastBlockUpdate time.Time
+	currentBlock    *Block
+	localNet        engine.Network
+	duskInfo        *DuskInfo
+	node            *engine.DuskNode
+	pendingTx       int
+	//currentBlockNumber uint64
 	//rpcClient       *Client
 )
 
@@ -86,7 +86,7 @@ func Routine() {
 			continue
 		}
 
-		currentBlockNumber = newBlock.Header.Height
+		//currentBlockNumber = newBlock.Header.Height
 
 		if currentBlock == nil {
 
