@@ -23,7 +23,7 @@ type messageRouter struct {
 func (m *messageRouter) Collect(packet []byte, height byte) error {
 
 	// Register message in the global message registry for stats collecting
-	diagnostics.Register(topics.Kadcast, packet)
+	diagnostics.RegisterWireMsg(topics.Kadcast.String(), packet)
 
 	b := bytes.NewBuffer(packet)
 	msg, err := message.Unmarshal(b)
