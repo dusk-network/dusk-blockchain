@@ -69,12 +69,15 @@ func (n *Network) Bootstrap(workspace string) error {
 		if err != nil {
 			return err
 		}
+
+		// Minor delay between nodes bootstrap to ease seeder handling
+		time.Sleep(30 * time.Millisecond)
 	}
 
 	log.Infof("Local network workspace: %s", workspace)
 	log.Infof("Running %d nodes", len(n.Nodes))
 
-	time.Sleep(20 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	return nil
 }
