@@ -12,7 +12,6 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -227,6 +226,14 @@ func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) {
 }
 
 func (c *Chain) onAcceptBlock(m message.Message) error {
+
+	// (Re)propagate block in kadcast, if enabled.
+	if config.Get().Kadcast.Enabled {
+		// NB Until kadcast is in experimental phase, here the block is
+		// propagated  without any verification.
+		c.kadcastBlock(m)
+	}
+
 	// Ignore blocks from peers if we are only one behind - we are most
 	// likely just about to finalize consensus.
 	// TODO: we should probably just accept it if consensus was not
@@ -241,13 +248,8 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	// Accept the block
 	blk := m.Payload().(block.Block)
 
-	var kadHeight byte = 255
-	if len(m.Header()) > 0 {
-		kadHeight = m.Header()[0]
-	}
-
 	// This will decrement the sync counter
-	if err := c.AcceptBlock(blk, kadHeight); err != nil {
+	if err := c.AcceptBlock(blk); err != nil {
 		return err
 	}
 
@@ -280,7 +282,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 // 1. We have not seen it before
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
-func (c *Chain) AcceptBlock(blk block.Block, kadHeight byte) error {
+func (c *Chain) AcceptBlock(blk block.Block) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -325,8 +327,10 @@ func (c *Chain) AcceptBlock(blk block.Block, kadHeight byte) error {
 	c.prevBlock = blk
 
 	// 5. Gossip advertise block Hash
-	l.Trace("gossiping and kadcast-sending block")
-	startBlockBroadcast(c.eventBus, blk, kadHeight)
+	l.Trace("gossiping block")
+	if err := c.advertiseBlockHash(blk); err != nil {
+		l.WithError(err).Errorln("block advertising failed")
+	}
 
 	// 6. Remove expired provisioners and bids
 	l.Trace("removing expired consensus transactions")
@@ -396,46 +400,57 @@ func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
 	r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
 }
 
-// startBlockBroadcast propagates block hash to gossip network and complete block to kadcast network
-func startBlockBroadcast(publisher eventbus.Publisher, b block.Block, kadHeight byte) {
+func (c *Chain) kadcastBlock(m message.Message) error {
 
-	// (Re)Propagate complete block data into kadcast network together with kad height
-	if config.Get().Kadcast.Enabled && kadHeight <= kadcast.InitHeight {
-
-		buf := new(bytes.Buffer)
-		if err := message.MarshalBlock(buf, &b); err != nil {
-			log.Panic(err)
-		}
-
-		if err := topics.Prepend(buf, topics.Block); err != nil {
-			log.Panic(err)
-		}
-
-		m := message.NewWithHeader(topics.Block, *buf, []byte{kadHeight})
-		publisher.Publish(topics.Kadcast, m)
-
-		// time.Sleep(1 * time.Second)
+	var kadHeight byte = 255
+	if len(m.Header()) > 0 {
+		kadHeight = m.Header()[0]
 	}
 
-	// Send Inventory message to all peers advertising the newly accepted block hash
-	if !config.Get().Network.DisableBroadcast {
-		msg := &peermsg.Inv{}
-		msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
-
-		buf := new(bytes.Buffer)
-		if err := msg.Encode(buf); err != nil {
-			log.Panic(err)
-		}
-
-		if err := topics.Prepend(buf, topics.Inv); err != nil {
-			log.Panic(err)
-		}
-
-		m := message.New(topics.Inv, *buf)
-		publisher.Publish(topics.Gossip, m)
-
+	b, ok := m.Payload().(block.Block)
+	if !ok {
+		return errors.New("message payload not a block")
 	}
 
+	buf := new(bytes.Buffer)
+	if err := message.MarshalBlock(buf, &b); err != nil {
+		return err
+	}
+
+	if err := topics.Prepend(buf, topics.Block); err != nil {
+		return err
+	}
+
+	m = message.NewWithHeader(topics.Block, *buf, []byte{kadHeight})
+	c.eventBus.Publish(topics.Kadcast, m)
+
+	return nil
+}
+
+// advertiseBlockHash sends Inventory message to all peers advertising the newly accepted block hash
+func (c *Chain) advertiseBlockHash(b block.Block) error {
+
+	// Disable gossiping messages if kadcast mode
+	if config.Get().Kadcast.Enabled {
+		return nil
+	}
+
+	msg := &peermsg.Inv{}
+	msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
+
+	buf := new(bytes.Buffer)
+	if err := msg.Encode(buf); err != nil {
+		return err
+	}
+
+	if err := topics.Prepend(buf, topics.Inv); err != nil {
+		return err
+	}
+
+	m := message.New(topics.Inv, *buf)
+	c.eventBus.Publish(topics.Gossip, m)
+
+	return nil
 }
 
 // TODO: consensus data should be persisted to disk, to decrease
@@ -622,7 +637,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 
 func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {
 	c.intermediateBlock.Header.Certificate = cert
-	return c.AcceptBlock(*c.intermediateBlock, kadcast.InitHeight)
+	return c.AcceptBlock(*c.intermediateBlock)
 }
 
 // Send out a query for agreement messages and an intermediate block.
