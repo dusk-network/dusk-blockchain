@@ -118,7 +118,11 @@ func Routine() {
 
 			previousBlockNum := currentBlock.Header.Height - 1
 
-			lastBlock, _ := getBlockByNumber(duskInfo, map[string]interface{}{"height": previousBlockNum})
+			lastBlock, err := getBlockByNumber(duskInfo, map[string]interface{}{"height": previousBlockNum})
+			if err != nil {
+				fmt.Printf("Received Error on block  #%v, Error: %+v", previousBlockNum, err)
+				continue
+			}
 
 			newTimestamp, _ := time.Parse(layoutISO, newBlock.Header.Timestamp)
 			lastTimestamp, _ := time.Parse(layoutISO, lastBlock.Header.Timestamp)
