@@ -1,8 +1,13 @@
 package metrics
 
 import (
+	"bytes"
 	"context"
-	log "github.com/sirupsen/logrus"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 
 	"github.com/machinebox/graphql"
 )
@@ -25,6 +30,45 @@ func executeQuery(client *graphql.Client, query string, target interface{}, valu
 	}
 
 	return target, nil
+}
+
+func executeQueryHTTP(endpoint string, query string, target interface{}) error {
+
+	buf := bytes.Buffer{}
+	if _, err := buf.Write([]byte(query)); err != nil {
+		return errors.New("invalid query")
+	}
+
+	//nolint:gosec
+	resp, err := http.Post(endpoint, "application/json", &buf)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	//body, err := ioutil.ReadAll(resp.Body)
+	//if err != nil {
+	//	return err
+	//}
+
+	//bodyString := string(body)
+	//
+	//if err := json.Unmarshal(body, &target); err != nil {
+	//	fmt.Println("ERROR executeQueryHTTP,  ", err, bodyString)
+	//	return err
+	//}
+
+	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+		body, _ := ioutil.ReadAll(resp.Body)
+		fmt.Println("ERROR executeQueryHTTP,  ", err, string(body))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 //nolint
@@ -60,6 +104,27 @@ func getLatestBlocks(client *graphql.Client, values map[string]interface{}) (int
 	var target interface{}
 
 	return executeQuery(client, query, target, values)
+}
+
+//nolint
+func getLatestBlock(duskInfo *DuskInfo) (*Block, error) {
+	query := "{\"query\" : \"{  blocks(height: -1 ) { header { hash height timestamp } transactions { txid txtype size } } }\"}"
+	var resp map[string]interface{}
+
+	err := executeQueryHTTP(duskInfo.GQLEndpoint, query, &resp)
+	if err != nil {
+		return nil, err
+	}
+	result := resp["data"]
+	fmt.Println("getLatestBlock, ", result, resp)
+
+	byt, err := json.Marshal(result)
+	blocks := new(Blocks)
+	if err := json.Unmarshal(byt, blocks); err != nil {
+		panic(err)
+	}
+
+	return &blocks.Blocks[0], nil
 }
 
 //nolint
@@ -104,7 +169,7 @@ func getBlockByHash(client *graphql.Client, values map[string]interface{}) (inte
 	return executeQuery(client, query, target, values)
 }
 
-func getBlockByNumber(client *graphql.Client, values map[string]interface{}) (*Block, error) {
+func getBlockByNumber(duskInfo *DuskInfo, values map[string]interface{}) (*Block, error) {
 	query := `
 	  query($height: Int!) {
 		blocks(height: $height) {
@@ -123,35 +188,30 @@ func getBlockByNumber(client *graphql.Client, values map[string]interface{}) (*B
 	`
 	//TODO: replace it with correct schema
 
-	blk, err := executeQuery(client, query, new(Blocks), values)
+	blk, err := executeQuery(duskInfo.GQLClient, query, new(Blocks), values)
 	if err != nil {
 		return nil, err
 	}
 
+	//log.Info("Got BlockByNumber", blk)
+
 	return &blk.(*Blocks).Blocks[0], nil
 }
 
-func pendingTransactionCount(client *graphql.Client, values map[string]interface{}) (int, error) {
-
-	query := `
-	mempool(txid: "") {
-		txid
-		txtype
- 	 },
-	`
+func pendingTransactionCount(duskInfo *DuskInfo) (int, error) {
+	query := "{\"query\" : \"{ mempool (txid: \\\"\\\") { txid txtype } }\"}"
 	//TODO: replace it with correct schema
 	var resp map[string]map[string][]map[string]string
-	txs, err := executeQuery(client, query, resp, values)
+
+	err := executeQueryHTTP(duskInfo.GQLEndpoint, query, &resp)
 	if err != nil {
 		return 0, err
 	}
 
-	log.Info("Got PendingTransactionCount", txs)
-
-	result, ok := txs.(map[string]map[string][]map[string]string)["data"]
+	result, ok := resp["data"]
 	count := 0
 	if ok {
-		count = len(result["transactions"])
+		count = len(result["mempool"])
 	}
 	return count, nil
 }
