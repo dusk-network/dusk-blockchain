@@ -25,7 +25,7 @@ address="/tmp/dusk-monitor.sock"
 # tell logger to stream errors and warnings to monitoring process
 streamErrors=true
     
-# Gossip P2P network specific settings
+# Gossip peer settings
 [network]
 
 # listens on all available unicast and anycast
@@ -33,10 +33,6 @@ streamErrors=true
 
 # port for the node to bind on
 port=7000
-
-# disable broadcast for topics.Block. 
-# Suitable when broadcasting only in kadcast network
-disableBroadcast=false
 
 [network.seeder]
 # array of seeder servers
@@ -50,16 +46,20 @@ fixed = []
 enabled = false
 address="monitor.dusk.network:1337"
 
-# Kadcast P2P network specific settings
+# Kadcast peer settings
 [kadcast]
 
-# By enabling it, kadcast peer service is launched
-# As per that, components broadcast messages in kadcast network
+# By enabling it, node will join an experimental kadcast network
+# In addition, topics.Block and topics.Tx will be propagated in kadcast network
+# NB: The messages propagated in kadcast are not propagated in gossip
 enabled=false
 
 # Both listeners (UDP and TCP) are binding on this local addr
 # NB The addr should be reachable from outside
 address="127.0.0.1:7100"
+
+# Maximum delegates per bucket
+maxDelegatesNum=3
 
 # List of bootstarpping nodes
 bootstrappers=["voucher.dusk.network:9090","voucher.dusk.network:9091","voucher.dusk.network:9092"]
