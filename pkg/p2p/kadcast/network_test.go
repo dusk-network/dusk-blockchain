@@ -44,6 +44,8 @@ func kadcastRandomBlock(t *testing.T, eventbus *eventbus.EventBus) (*block.Block
 // broadcast a message to all network peers
 func TestBroadcastChunksMsg(t *testing.T) {
 
+	//logrus.SetLevel(logrus.TraceLevel)
+
 	nodes, err := kadcast.TestNetwork(networkSize, basePort)
 	if err != nil {
 		t.Error(err)

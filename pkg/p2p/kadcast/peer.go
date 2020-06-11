@@ -22,11 +22,13 @@ type Peer struct {
 	m *Maintainer
 	w *Writer
 	r *Reader
+
+	raptorqEnabled bool
 }
 
 // NewPeer makes a kadcast peer instance
-func NewPeer(eventBus *eventbus.EventBus, g *protocol.Gossip, dp *dupemap.DupeMap) *Peer {
-	return &Peer{eventBus: eventBus, gossip: g, dupemap: dp}
+func NewPeer(eventBus *eventbus.EventBus, g *protocol.Gossip, dp *dupemap.DupeMap, raptorqEnabled bool) *Peer {
+	return &Peer{eventBus: eventBus, gossip: g, dupemap: dp, raptorqEnabled: raptorqEnabled}
 }
 
 // Launch starts kadcast service
@@ -51,12 +53,19 @@ func (p *Peer) Launch(addr string, bootstrapAddrs []string, beta uint8) {
 
 	// A writer for Kadcast broadcast messages
 	// Read-only access to Router
-	w := NewWriter(&router, p.eventBus, p.gossip)
+	w := NewWriter(&router, p.eventBus, p.gossip, p.raptorqEnabled)
 	go w.Serve()
 
-	// A reader for Kadcast broadcast messsages
-	r := NewReader(peerInfo, p.eventBus, p.gossip, p.dupemap)
-	go r.Serve()
+	if p.raptorqEnabled {
+		// RaptorQ depends on C++ 3rd. Until this is added to CI or reimplemented in Golang,
+		// raptorq compilation is disabled
+		// A reader for Kadcast broadcast messsages
+		//r := NewFECReader(peerInfo, p.eventBus, p.gossip, p.dupemap)
+		// go r.Serve()
+	} else {
+		r := NewReader(peerInfo, p.eventBus, p.gossip, p.dupemap)
+		go r.Serve()
+	}
 
 	// Start Bootstrapping processes
 	go JoinNetwork(&router, bootstrapAddrs)

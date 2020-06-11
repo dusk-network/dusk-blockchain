@@ -21,18 +21,20 @@ type Writer struct {
 	// Kademlia routing state
 	router *RoutingTable
 
-	writeQueue chan message.Message
+	writeQueue     chan message.Message
+	raptorqEnabled bool
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(router *RoutingTable, subscriber eventbus.Subscriber, gossip *protocol.Gossip) *Writer {
+func NewWriter(router *RoutingTable, subscriber eventbus.Subscriber, gossip *protocol.Gossip, raptorqEnabled bool) *Writer {
 
 	pw := &Writer{
-		subscriber: subscriber,
-		router:     router,
-		gossip:     gossip,
+		subscriber:     subscriber,
+		router:         router,
+		gossip:         gossip,
+		raptorqEnabled: raptorqEnabled,
 	}
 
 	return pw
@@ -181,7 +183,11 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []b
 			WithField("height", H).
 			Traceln("Sending Broadcast message")
 
-		go sendTCPStream(destPeer.GetUDPAddr(), buf.Bytes())
+		if w.raptorqEnabled {
+			// go rqSendUDP(w.router.lpeerUDPAddr, destPeer.GetUDPAddr(), buf.Bytes())
+		} else {
+			go tcpSend(destPeer.GetUDPAddr(), buf.Bytes())
+		}
 	}
 }
 

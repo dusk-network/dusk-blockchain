@@ -131,6 +131,8 @@ func TestNode(port int) *Node {
 	m := NewMaintainer(&router)
 	go m.Serve()
 
+	rqEnabled := false
+
 	// A reader for Kadcast broadcast messsage.
 	//
 	// It listens for a valid kadcast wire messages
@@ -139,10 +141,16 @@ func TestNode(port int) *Node {
 	//
 	// Reader forwards the message to the eventbus
 	// Reader repropagates any valid kadcast wire messages
-	r := NewReader(router.LpeerInfo, eb, g, d)
-	go r.Serve()
 
-	w := NewWriter(&router, eb, g)
+	if rqEnabled {
+		// r := NewFECReader(router.LpeerInfo, eb, g, d)
+		// go r.Serve()
+	} else {
+		r := NewReader(router.LpeerInfo, eb, g, d)
+		go r.Serve()
+	}
+
+	w := NewWriter(&router, eb, g, rqEnabled)
 	go w.Serve()
 
 	return newKadcastNode(&router, eb)

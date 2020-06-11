@@ -166,9 +166,9 @@ func writeTCPFrame(w io.Writer, data []byte) error {
 	return nil
 }
 
-// Opens a TCP connection with the peer sent on the params and transmits
+// tcpSend Opens a TCP connection with the peer sent on the params and transmits
 // a stream of bytes. Once transmitted, closes the connection.
-func sendTCPStream(raddr net.UDPAddr, data []byte) {
+func tcpSend(raddr net.UDPAddr, data []byte) {
 
 	address := raddr.IP.String() + ":" + strconv.Itoa(raddr.Port)
 	conn, err := net.Dial("tcp4", address)
@@ -203,9 +203,6 @@ func sendUDPPacket(laddr, raddr net.UDPAddr, payload []byte) {
 		log.WithError(err).Warn("Could not establish a connection with the dest Peer.")
 		return
 	}
-	defer func() {
-		_ = conn.Close()
-	}()
 
 	log.WithField("src", conn.LocalAddr().String()).
 		WithField("dest", raddr.String()).Traceln("Sending udp")
@@ -214,8 +211,9 @@ func sendUDPPacket(laddr, raddr net.UDPAddr, payload []byte) {
 	_, err = conn.Write(payload)
 	if err != nil {
 		log.WithError(err).Warn("Error while writing to the filedescriptor.")
-		return
 	}
+
+	_ = conn.Close()
 }
 
 // generateRandomDelegates selects n random and distinct items from `in` and

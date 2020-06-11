@@ -8,6 +8,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+	_ "github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
@@ -21,7 +23,7 @@ type messageRouter struct {
 func (m *messageRouter) Collect(packet []byte, height byte) error {
 
 	// Register message in the global message registry for stats collecting
-	// TODO:
+	diagnostics.Register(topics.Kadcast, packet)
 
 	b := bytes.NewBuffer(packet)
 	msg, err := message.Unmarshal(b)
