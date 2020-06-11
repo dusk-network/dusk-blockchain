@@ -19,7 +19,6 @@ var profileList Profiles
 func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Reset()
 	viper.Set("general.network", "testnet")
-	viper.Set("general.walletonly", "false")
 
 	viper.Set("logger.output", node.Dir+"/dusk")
 	viper.Set("gql.address", node.Cfg.Gql.Address)
@@ -62,16 +61,18 @@ func Profile3(index int, node *DuskNode, walletPath string) {
 	Profile1(index, node, walletPath)
 
 	viper.Set("kadcast.enabled", true)
-	viper.Set("network.disableBroadcast", true)
+	basePortNumber := 10000
 
-	laddr := getOutboundAddr(7200 + index)
+	laddr := getOutboundAddr(basePortNumber + index)
 	viper.Set("kadcast.address", laddr)
+	viper.Set("kadcast.maxDelegatesNum", 1)
+	viper.Set("kadcast.raptorq", false)
 
 	bootstrappers := make([]string, 4)
-	bootstrappers[0] = getOutboundAddr(7200)
-	bootstrappers[1] = getOutboundAddr(7201)
-	bootstrappers[2] = getOutboundAddr(7202)
-	bootstrappers[2] = getOutboundAddr(7203)
+	bootstrappers[0] = getOutboundAddr(basePortNumber)
+	bootstrappers[1] = getOutboundAddr(basePortNumber + 1)
+	bootstrappers[2] = getOutboundAddr(basePortNumber + 2)
+	bootstrappers[3] = getOutboundAddr(basePortNumber + 3)
 	viper.Set("kadcast.bootstrappers", bootstrappers)
 }
 
