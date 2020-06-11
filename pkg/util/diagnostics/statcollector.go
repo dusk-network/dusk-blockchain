@@ -74,14 +74,14 @@ type NoteArgs struct {
 type NoteRequest struct {
 	Method string     `json:"method"`
 	Params []NoteArgs `json:"params"`
-	Id     string     `json:"id"`
+	ID     string     `json:"id"`
 }
 
 // Say rpc method
 func (h *NoteRequest) Say(p NoteArgs) *NoteRequest {
 	h.Method = "NoteService.Say"
 	h.Params = []NoteArgs{p}
-	h.Id = "1"
+	h.ID = "1"
 	return h
 }
 

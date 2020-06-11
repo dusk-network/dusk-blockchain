@@ -231,7 +231,9 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	if config.Get().Kadcast.Enabled {
 		// NB Until kadcast is in experimental phase, here the block is
 		// propagated  without any verification.
-		c.kadcastBlock(m)
+		if err := c.kadcastBlock(m); err != nil {
+			log.WithError(err).Warn("propagate block in kadcast failed")
+		}
 	}
 
 	// Ignore blocks from peers if we are only one behind - we are most
