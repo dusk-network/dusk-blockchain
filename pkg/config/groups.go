@@ -21,10 +21,9 @@ type logMonitorConfiguration struct {
 }
 
 type networkConfiguration struct {
-	Seeder           seedersConfiguration
-	Monitor          monitorConfiguration
-	Port             string
-	DisableBroadcast bool
+	Seeder  seedersConfiguration
+	Monitor monitorConfiguration
+	Port    string
 }
 
 type kadcastConfiguration struct {
@@ -39,6 +38,8 @@ type kadcastConfiguration struct {
 
 	// Kadcast protocol configs
 	MaxDelegatesNum byte
+
+	Raptorq bool
 }
 
 type monitorConfiguration struct {
