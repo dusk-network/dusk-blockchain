@@ -107,8 +107,8 @@ func getLatestBlocks(client *graphql.Client, values map[string]interface{}) (int
 }
 
 //nolint
-func getLatestBlock(duskInfo *DuskInfo) (*Block, error) {
-	query := "{\"query\" : \"{  blocks(height: -1 ) { header { hash height timestamp } transactions { txid txtype size } } }\"}"
+func getLatestBlock(duskInfo *DuskInfo, height uint64) (*Block, error) {
+	query := fmt.Sprintf("{\"query\" : \"{  blocks(height: %d ) { header { hash height timestamp } transactions { txid txtype size } } }\"}", height)
 	var resp map[string]interface{}
 
 	err := executeQueryHTTP(duskInfo.GQLEndpoint, query, &resp)
@@ -121,7 +121,11 @@ func getLatestBlock(duskInfo *DuskInfo) (*Block, error) {
 	byt, err := json.Marshal(result)
 	blocks := new(Blocks)
 	if err := json.Unmarshal(byt, blocks); err != nil {
-		panic(err)
+		return nil, err
+	}
+
+	if len(blocks.Blocks) == 0 {
+		return nil, errors.New("block not found")
 	}
 
 	return &blocks.Blocks[0], nil
