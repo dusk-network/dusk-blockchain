@@ -29,16 +29,18 @@ func encodeWrite(conn *net.UDPConn, sourceObject []byte, overhead uint8) error {
 		return err
 	}
 
+	var pduCount int
+
 	commonOTI := enc.CommonOTI()
 	schemeSpecOTI := enc.SchemeSpecificOTI()
-
-	packets := make([][]byte, 0)
-
 	sbnCount := enc.NumSourceBlocks()
-	for sbn := uint8(0); sbn < sbnCount; sbn++ {
 
-		numEsi := enc.MinSymbols(sbn)
-		for esi := uint16(0); esi < numEsi+uint16(overhead); esi++ {
+	// Now get the source and repair symbols.
+	// make sure that at the end we end with "block.symbols() + overhead"
+	// symbols, so that decoding is possible
+	for sbn := uint8(0); sbn < sbnCount; sbn++ {
+		numEsi := enc.NumSourceSymbols(sbn) + uint16(overhead)
+		for esi := uint16(0); esi < numEsi; esi++ {
 
 			symbol := make([]byte, SymbolSize)
 			var written uint
@@ -48,7 +50,6 @@ func encodeWrite(conn *net.UDPConn, sourceObject []byte, overhead uint8) error {
 			}
 
 			p := NewPacket(digest, sbn, esi, symbol[0:written], commonOTI, schemeSpecOTI)
-
 			var buf bytes.Buffer
 			if err = p.MarshalBinary(&buf); err != nil {
 				break
@@ -58,7 +59,7 @@ func encodeWrite(conn *net.UDPConn, sourceObject []byte, overhead uint8) error {
 				break
 			}
 
-			packets = append(packets, buf.Bytes())
+			pduCount++
 		}
 
 		if err != nil {
@@ -73,7 +74,7 @@ func encodeWrite(conn *net.UDPConn, sourceObject []byte, overhead uint8) error {
 		return err
 	}
 
-	log.Tracef("NumSourceBlocks %d, overall symbols %d, commonOTI %d, schemeSpecOTI %d", sbnCount, len(packets), commonOTI, schemeSpecOTI)
+	log.Tracef("NumSourceBlocks %d, overall symbols %d, commonOTI %d, schemeSpecOTI %d", sbnCount, pduCount, commonOTI, schemeSpecOTI)
 	return nil
 }
 
