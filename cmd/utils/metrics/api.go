@@ -1,7 +1,11 @@
 package metrics
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
 
 	"github.com/machinebox/graphql"
 )
@@ -24,6 +28,29 @@ func executeQuery(client *graphql.Client, query string, target interface{}, valu
 	}
 
 	return target, nil
+}
+
+func executeQueryHTTP(endpoint string, query string, target interface{}) error {
+
+	buf := bytes.Buffer{}
+	if _, err := buf.Write([]byte(query)); err != nil {
+		return errors.New("invalid query")
+	}
+
+	//nolint:gosec
+	resp, err := http.Post(endpoint, "application/json", &buf)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 //nolint
@@ -103,7 +130,7 @@ func getBlockByHash(client *graphql.Client, values map[string]interface{}) (inte
 	return executeQuery(client, query, target, values)
 }
 
-func getBlockByNumber(client *graphql.Client, values map[string]interface{}) (*Block, error) {
+func getBlockByNumber(duskInfo *DuskInfo, values map[string]interface{}) (*Block, error) {
 	query := `
 	  query($height: Int!) {
 		blocks(height: $height) {
@@ -122,7 +149,7 @@ func getBlockByNumber(client *graphql.Client, values map[string]interface{}) (*B
 	`
 	//TODO: replace it with correct schema
 
-	blk, err := executeQuery(client, query, new(Blocks), values)
+	blk, err := executeQuery(duskInfo.GQLClient, query, new(Blocks), values)
 	if err != nil {
 		return nil, err
 	}
@@ -132,27 +159,23 @@ func getBlockByNumber(client *graphql.Client, values map[string]interface{}) (*B
 	return &blk.(*Blocks).Blocks[0], nil
 }
 
-func pendingTransactionCount(client *graphql.Client, values map[string]interface{}) (int, error) {
-	query := `
-	mempool(txid: "") {
-		txid
-		txtype
- 	 },
-	`
+func pendingTransactionCount(duskInfo *DuskInfo) (int, error) {
+	query := "{\"query\" : \"{ mempool (txid: \\\"\\\") { txid txtype } }\"}"
 	//TODO: replace it with correct schema
 	var resp map[string]map[string][]map[string]string
-	txs, err := executeQuery(client, query, resp, values)
+
+	err := executeQueryHTTP(duskInfo.GQLEndpoint, query, &resp)
 	if err != nil {
 		return 0, err
 	}
 
-	//log.Info("Got PendingTransactionCount", txs)
-
-	result, ok := txs.(map[string]map[string][]map[string]string)["data"]
+	result, ok := resp["data"]
 	count := 0
 	if ok {
-		count = len(result["transactions"])
+		count = len(result["mempool"])
 	}
+
+	//fmt.Println("Got PendingTransactionCount", resp, count)
 	return count, nil
 }
 
