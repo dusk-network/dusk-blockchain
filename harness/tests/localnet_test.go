@@ -17,7 +17,6 @@ import (
 
 var (
 	localNetSizeStr = os.Getenv("NETWORK_SIZE")
-	mockEnabled     = os.Getenv("MOCK_ENABLED")
 	localNetSize    = 10
 )
 
@@ -45,12 +44,8 @@ func TestMain(m *testing.M) {
 
 	// Create a network of N nodes
 	for i := 0; i < localNetSize; i++ {
-		node := engine.NewDuskNode(9552+i, 9003+i, "default")
+		node := engine.NewDuskNode(9500+i, 9000+i, "default")
 		localNet.Nodes = append(localNet.Nodes, node)
-	}
-
-	if mockEnabled != "" {
-		StartMockServer("127.0.0.1:8080")
 	}
 
 	var code int

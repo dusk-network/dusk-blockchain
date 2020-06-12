@@ -12,11 +12,11 @@ test: ## Run unittests
 	@go test $(TFLAGS) -short ${PKG_LIST}
 test-harness: ## Run harness tests
 	@go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable
-get-blindbid: ## download dusk-blindbidproof
-	@rm -rf ${PWD}/bin/blindbid-linux-amd64 || true
-	@wget -P ${PWD}/bin/ https://github.com/dusk-network/dusk-blindbidproof/releases/download/v0.1.0/blindbid-linux-amd64 && chmod +x ${PWD}/bin/blindbid-linux-amd64
 test-harness-ci: build
-	MOCK_ENABLED=true NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" make test-harness
+	MOCK_ADDRESS=127.0.0.1:8080 NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" make test-harness
+test-harness-alive: stop build
+	MOCK_ADDRESS=127.0.0.1:9191 NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+	go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable 
 race: dep ## Run data race detector
 	@go test $(TFLAGS) -race -v ${PKG_LIST}
 coverage: ## Generate global code coverage report
@@ -40,6 +40,17 @@ voucher: build
 	./bin/voucher
 wallet: build
 	./bin/wallet
+mock: build
+	./bin/utils mock --grpcmockhost=127.0.0.1:9191
+mockrusk: build
+	./bin/utils mockrusk --rusknetwork=tcp --ruskaddress=127.0.0.1:10000 \
+	--walletstore=/tmp/localnet-137601832/node-9003/walletDB/ \
+	--walletfile=./harness/data/wallet-9000.dat
+stop:
+	echo "will stop dusk app"
+	killall dusk || true
+	killall voucher || true
+	killall utils || true
 ###################################CROSS#################################################
 install-tools:
 	go get -u github.com/karalabe/xgo

@@ -5,6 +5,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
 	"github.com/spf13/viper"
 )
 
@@ -27,6 +28,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("rpc.network", node.Cfg.RPC.Network)
 	if node.Cfg.RPC.Network == "unix" {
 		viper.Set("rpc.address", node.Dir+node.Cfg.RPC.Address)
+		node.GRPCClient = client.New(node.Cfg.RPC.Network, node.Dir+node.Cfg.RPC.Address)
 	} else {
 		viper.Set("rpc.address", node.Cfg.RPC.Address)
 	}

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -34,10 +35,11 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
 	node.Cfg = config.Registry{}
 	node.Cfg.Gql.Address = "127.0.0.1:" + strconv.Itoa(graphqlPort)
 	node.Cfg.Gql.Network = "tcp" //nolint
+	fmt.Println(strconv.Itoa(graphqlPort))
 
 	if *RPCNetworkType == "unix" { //nolint
 		node.Cfg.RPC.Network = "unix"
-		node.Cfg.RPC.Address = "/dusk-grpc.sock" + node.Id
+		node.Cfg.RPC.Address = "/dusk-grpc.sock"
 	} else {
 		node.Cfg.RPC.Network = "tcp" //nolint
 		node.Cfg.RPC.Address = "127.0.0.1:" + node.Id
@@ -51,6 +53,5 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
 	node.Cfg.Genesis.Legacy = true
 
 	node.Gql = graphql.NewClient("http://" + node.Cfg.Gql.Address)
-	node.GRPCClient = client.New(node.Cfg.RPC.Network, node.Cfg.RPC.Address)
 	return node
 }

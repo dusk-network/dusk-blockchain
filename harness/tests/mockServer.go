@@ -16,9 +16,6 @@ func StartMockServer(address string) {
 	node.RegisterWalletServer(s, &node.WalletMock{})
 	node.RegisterTransactorServer(s, &node.TransactorMock{})
 
-	if address == "" {
-		address = "127.0.0.1:8080"
-	}
 	lis, _ := net.Listen("tcp", address)
 	go func() {
 		if err := s.Serve(lis); err != nil {
