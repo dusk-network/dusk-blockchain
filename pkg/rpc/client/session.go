@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -53,6 +54,10 @@ func New(proto, addr string) *NodeClient {
 	}
 
 	go nc.monitorError()
+	log.WithFields(logger.Fields{
+		"network": proto,
+		"address": addr,
+	}).Traceln("created grpc session client")
 	return nc
 }
 
@@ -101,7 +106,7 @@ func (n *NodeClient) DropSession() error {
 		// closing the existing connection
 		_ = conn.Close()
 		// if persistentConn is conn, it gets closed with the above instruction
-		// otherwise all it happends is that it gets harmlessly put to nil
+		// otherwise all it appends is that it gets harmlessly put to nil
 		n.persistentConn = nil
 	}()
 
