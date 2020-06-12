@@ -72,7 +72,7 @@ func NewClient(cc *grpc.ClientConn, edPk ed25519.PublicKey, edSk ed25519.Private
 }
 
 // NewClientInterceptor injects the session to the outgoing requests
-func NewClientInterceptor(refresh time.Duration, edPk ed25519.PublicKey, edSk ed25519.PrivateKey) *AuthClientInterceptor {
+func NewClientInterceptor(edPk ed25519.PublicKey, edSk ed25519.PrivateKey) *AuthClientInterceptor {
 	return &AuthClientInterceptor{
 		openMethods: rpc.OpenRoutes,
 		edSk:        edSk,
@@ -109,7 +109,15 @@ func (c *AuthClient) DropSession() error {
 	return err
 }
 
-// Unary returns the grpc unary interceptor
+func (i *AuthClientInterceptor) isSessionActive() bool {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+	return i.accessToken != ""
+}
+
+// Unary returns the grpc unary interceptor. It implictly saves the access
+// token when a new session is created and drops it when the session gets
+// explicitly dropped
 func (i *AuthClientInterceptor) Unary() grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		if !i.openMethods.Has([]byte(method)) {
@@ -117,7 +125,13 @@ func (i *AuthClientInterceptor) Unary() grpc.UnaryClientInterceptor {
 			if err != nil {
 				return err
 			}
-			return invoker(tky, method, req, reply, cc, opts...)
+			err = invoker(tky, method, req, reply, cc, opts...)
+			//following an explicit session drop, the session token is
+			//invalidated, no matter the error
+			if method == rpc.DropSessionRoute {
+				i.invalidateToken()
+			}
+			return err
 		}
 
 		if method == rpc.CreateSessionRoute {
@@ -140,6 +154,12 @@ func (i *AuthClientInterceptor) SetAccessToken(accessToken string) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 	i.accessToken = accessToken
+}
+
+func (i *AuthClientInterceptor) invalidateToken() {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	i.accessToken = ""
 }
 
 // attachToken creates the authorization header from a JSON object with the

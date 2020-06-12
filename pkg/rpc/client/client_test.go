@@ -1,9 +1,6 @@
-package server_test
+package client_test
 
 import (
-	"context"
-	"crypto/ed25519"
-	"crypto/rand"
 	"net"
 	"os"
 	"testing"
@@ -11,26 +8,16 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
-
-var authClient *client.AuthClient
-var walletClient node.WalletClient
 
 func init() {
 	log.SetLevel(log.ErrorLevel)
 }
 
 var address = "/tmp/dusk-grpc-test01.sock"
-
-func getDialer(proto string) func(context.Context, string) (net.Conn, error) {
-	d := &net.Dialer{}
-	return func(ctx context.Context, addr string) (net.Conn, error) {
-		return d.DialContext(ctx, proto, addr)
-	}
-}
+var nodeClient *client.NodeClient
 
 func TestMain(m *testing.M) {
 	conf := server.Setup{Network: "unix", Address: address}
@@ -48,27 +35,7 @@ func TestMain(m *testing.M) {
 	// GRPC client bootstrap
 	time.Sleep(200 * time.Millisecond)
 	// create the client
-	pk, sk, _ := ed25519.GenerateKey(rand.Reader)
-	// injecting the interceptor
-	interceptor := client.NewClientInterceptor(pk, sk)
-
-	// create the GRPC connection
-	conn, err := grpc.Dial(
-		conf.Address,
-		grpc.WithInsecure(),
-		grpc.WithContextDialer(getDialer("unix")),
-		grpc.WithUnaryInterceptor(interceptor.Unary()),
-	)
-
-	if err != nil {
-		panic(err)
-	}
-
-	// authClient performs the session calls
-	authClient = client.NewClient(conn, pk, sk)
-	// walletClient performs the wallet calls. It reuses the connection from
-	// the authClient
-	walletClient = node.NewWalletClient(conn)
+	nodeClient = client.New("unix", address)
 
 	// run the tests
 	res := m.Run()

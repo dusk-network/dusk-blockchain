@@ -16,7 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc"
 )
 
 // PublishTopic publishes an event bus topic to the specified node via
@@ -81,16 +80,12 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 
 // LoadWalletCmd sends gRPC command LoadWallet and returns pubkey (if loaded)
 func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
-	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
-
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+	// GRPCClient will create a session if none is available, or return its
+	// persisted connection
+	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn()
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		_ = conn.Close()
-	}()
 
 	client := pb.NewWalletClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -107,16 +102,12 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 
 // SendBidCmd sends gRPC command SendBid and returns tx hash
 func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
-	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
-
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+	// GRPCClient will create a session if none is available, or return its
+	// persisted connection
+	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn()
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = conn.Close()
-	}()
 
 	client := pb.NewTransactorClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)

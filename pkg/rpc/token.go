@@ -12,6 +12,9 @@ const servicePrefix = "/node.Auth/"
 // CreateSessionRoute is the RPC to create a session
 const CreateSessionRoute = servicePrefix + "CreateSession"
 
+// DropSessionRoute is the RPC to create a session
+const DropSessionRoute = servicePrefix + "DropSession"
+
 // StatusRoute is the RPC to inquiry the status of the wallet
 const StatusRoute = servicePrefix + "Status"
 

@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
 	"github.com/machinebox/graphql"
 )
@@ -14,9 +15,10 @@ type DuskNode struct {
 	ConfigProfileID string
 
 	// fields represents a dusk-blockchain instance
-	Cfg config.Registry
-	Gql *graphql.Client
-	Srv *ruskmock.Server
+	Cfg        config.Registry
+	Gql        *graphql.Client
+	Srv        *ruskmock.Server
+	GRPCClient *client.NodeClient
 
 	// dusk-blockchain node directory
 	Dir string
@@ -49,5 +51,6 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
 	node.Cfg.Genesis.Legacy = true
 
 	node.Gql = graphql.NewClient("http://" + node.Cfg.Gql.Address)
+	node.GRPCClient = client.New(node.Cfg.RPC.Network, node.Cfg.RPC.Address)
 	return node
 }
