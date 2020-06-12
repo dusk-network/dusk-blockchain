@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	GOLANGCI_VERSION = "github.com/golangci/golangci-lint/cmd/golangci-lint@v1.24.0"
+	GOLANGCI_VERSION = "github.com/golangci/golangci-lint/cmd/golangci-lint@v1.27.0"
 )
 
 // GOBIN environment variable
