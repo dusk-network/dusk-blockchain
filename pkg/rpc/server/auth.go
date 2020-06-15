@@ -69,7 +69,7 @@ func (a *Auth) CreateSession(ctx context.Context, req *node.SessionRequest) (*no
 		return nil, status.Errorf(codes.Internal, "cannot generate token: %v", err)
 	}
 
-	// add the PK to the set of known PKs 
+	// add the PK to the set of known PKs
 	_ = a.store.Add(edPk)
 
 	res := &node.Session{AccessToken: token}
@@ -83,7 +83,7 @@ func (a *Auth) DropSession(ctx context.Context, req *node.EmptyRequest) (*node.G
 	if !ok {
 		return nil, status.Error(codes.Internal, "unable to retrieve client pk from context")
 	}
-	// remove the PK to the set of known PKs 
+	// remove the PK to the set of known PKs
 	_ = a.store.Remove(clientPk)
 
 	res := &node.GenericResponse{Response: "session successfully dropped"}
