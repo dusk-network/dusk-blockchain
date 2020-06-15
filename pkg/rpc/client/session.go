@@ -64,18 +64,21 @@ func New(proto, addr string) *NodeClient {
 // GetSessionConn triggers a CreateSession through the auth client and
 // implicitly populates the interceptor with the session token.
 // It returns a new connection or an error
-func (n *NodeClient) GetSessionConn() (*grpc.ClientConn, error) {
+func (n *NodeClient) GetSessionConn(options ...grpc.DialOption) (*grpc.ClientConn, error) {
 	if n.IsSessionActive() {
-		return n.persistentConn, nil
+		if n.persistentConn != nil {
+			return n.persistentConn, nil
+		}
 	}
 
 	// session is not active but we still have a connection dangling around
 	if n.persistentConn != nil {
+		// first we close the connection
 		_ = n.persistentConn.Close()
 	}
 
 	// recreating the session and the connection
-	conn, err := n.createConn()
+	conn, err := n.createConn(options...)
 	if err != nil {
 		return nil, err
 	}
@@ -98,28 +101,19 @@ func (n *NodeClient) ScheduleSessionRefresh(cadence time.Time) error {
 }
 
 // DropSession closes a session, invalidate the session token and closes the
-// eventual persistent connection if any
-func (n *NodeClient) DropSession() error {
-	var conn *grpc.ClientConn
+// persistent connection gracefully
+func (n *NodeClient) DropSession(options ...grpc.DialOption) error {
 	var err error
-	defer func() {
-		// closing the existing connection
-		_ = conn.Close()
-		// if persistentConn is conn, it gets closed with the above instruction
-		// otherwise all it appends is that it gets harmlessly put to nil
-		n.persistentConn = nil
-	}()
+	defer n.GracefulClose()
 
-	if n.persistentConn != nil {
-		conn = n.persistentConn
-	} else {
-		conn, err = n.createConn()
+	if n.persistentConn == nil {
+		n.persistentConn, err = n.createConn(options...)
 		if err != nil {
 			return err
 		}
 	}
 
-	authClient := NewClient(conn, n.pk, n.sk)
+	authClient := NewClient(n.persistentConn, n.pk, n.sk)
 	err = authClient.DropSession()
 	n.sessionHandler.invalidateToken()
 	return err
@@ -149,13 +143,16 @@ func (n *NodeClient) IsSessionActive() bool {
 	return n.sessionHandler.isSessionActive()
 }
 
-func (n *NodeClient) createConn() (*grpc.ClientConn, error) {
+func (n *NodeClient) createConn(options ...grpc.DialOption) (*grpc.ClientConn, error) {
+	options = append(
+		options,
+		grpc.WithContextDialer(getDialer(n.proto)),
+		grpc.WithUnaryInterceptor(n.sessionHandler.Unary()),
+	)
 	// create the GRPC connection
 	return grpc.Dial(
 		n.addr,
-		grpc.WithInsecure(),
-		grpc.WithContextDialer(getDialer(n.proto)),
-		grpc.WithUnaryInterceptor(n.sessionHandler.Unary()),
+		options...,
 	)
 }
 

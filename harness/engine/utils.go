@@ -16,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
 )
 
 // PublishTopic publishes an event bus topic to the specified node via
@@ -82,7 +83,7 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 	// GRPCClient will create a session if none is available, or return its
 	// persisted connection
-	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn()
+	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return "", err
 	}
@@ -104,7 +105,7 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
 	// GRPCClient will create a session if none is available, or return its
 	// persisted connection
-	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn()
+	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
