@@ -126,10 +126,10 @@ func (n *NodeClient) monitorError() {
 }
 
 // GracefulClose cancels the session refresh and actively drops the session
-func (n *NodeClient) GracefulClose() {
+func (n *NodeClient) GracefulClose(opts ...grpc.DialOption) {
 	n.Close()
 	if n.IsSessionActive() {
-		_ = n.DropSession()
+		_ = n.DropSession(opts...)
 	}
 }
 

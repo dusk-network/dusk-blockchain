@@ -90,7 +90,10 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 
 	client := pb.NewWalletClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	defer func() {
+		n.Nodes[ind].GRPCClient.GracefulClose(grpc.WithInsecure(), grpc.WithBlock())
+		cancel()
+	}()
 
 	req := pb.LoadRequest{Password: password}
 	resp, err := client.LoadWallet(ctx, &req)
@@ -112,7 +115,10 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 
 	client := pb.NewTransactorClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	defer func() {
+		n.Nodes[ind].GRPCClient.GracefulClose(grpc.WithInsecure(), grpc.WithBlock())
+		cancel()
+	}()
 
 	req := pb.BidRequest{Amount: amount}
 	resp, err := client.Bid(ctx, &req)
