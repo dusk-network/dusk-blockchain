@@ -33,6 +33,11 @@ func TestPersistentConn(t *testing.T) {
 	conn2, err := nodeClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
 	assert.NoError(err)
 	assert.Equal(conn1, conn2)
+
+	nodeClient.DropSession(grpc.WithInsecure(), grpc.WithBlock())
+	conn3, err := nodeClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	assert.NoError(err)
+	assert.NotEqual(conn1, conn3)
 }
 
 // TestPersistentSession tests that the client can exploit the session injected
@@ -42,6 +47,10 @@ func TestPersistentSession(t *testing.T) {
 	conn, err := nodeClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
 	assert.NoError(err)
 	assert.NoError(createDumbWallet(conn))
+	assert.NoError(loadDumbWallet(conn))
+
+	nodeClient.DropSession(grpc.WithInsecure(), grpc.WithBlock())
+	assert.Error(createDumbWallet(conn))
 }
 
 func createDumbWallet(conn grpc.ClientConnInterface) error {
@@ -51,13 +60,24 @@ func createDumbWallet(conn grpc.ClientConnInterface) error {
 	// spawn an authenticated RPC call
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	in := &node.CreateRequest{
-		Password: "pippo",
-		Seed:     []byte("pluto"),
-	}
+	in := &node.CreateRequest{}
 
 	// the mock always returns success, so if there is an error it is likely to
 	// be linked to the session and authorization layer
 	_, err := walletClient.CreateWallet(ctx, in)
+	return err
+}
+
+func loadDumbWallet(conn grpc.ClientConnInterface) error {
+	// create a wallet client
+	walletClient := node.NewWalletClient(conn)
+
+	// spawn an authenticated RPC call
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	// the mock always returns success, so if there is an error it is likely to
+	// be linked to the session and authorization layer
+	_, err := walletClient.LoadWallet(ctx, &node.LoadRequest{})
 	return err
 }
