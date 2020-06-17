@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
@@ -88,28 +89,29 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	return qd, nil
 }
 
+// IsNil will check for nil in a output
 func IsNil(output *core.TransactionOutput) bool {
-	if output.Pk == nil  {
+	if output.Pk == nil {
 		log.Warn("invalid output, Pk field is nil")
 		return true
 	}
 
-	if output.Pk.AG == nil  {
+	if output.Pk.AG == nil {
 		log.Warn("invalid output, Pk.AG field is nil")
 		return true
 	}
 
-	if output.Pk.AG.Y == nil  {
+	if output.Pk.AG.Y == nil {
 		log.Warn("invalid output, Pk.AG.Y is nil")
 		return true
 	}
 
-	if output.Pk.BG == nil  {
+	if output.Pk.BG == nil {
 		log.Warn("invalid output, Pk.BG is nil")
 		return true
 	}
 
-	if output.Pk.BG.Y == nil  {
+	if output.Pk.BG.Y == nil {
 		log.Warn("invalid output, Pk.BG.Y is nil")
 		return true
 	}
