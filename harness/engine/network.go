@@ -85,7 +85,7 @@ func (n *Network) Bootstrap(workspace string) error {
 	log.Infof("Local network workspace: %s", workspace)
 	log.Infof("Running %d nodes", len(n.Nodes))
 
-	time.Sleep(20 * time.Second)
+	time.Sleep(time.Duration(len(n.Nodes)) * time.Second)
 
 	return nil
 }
