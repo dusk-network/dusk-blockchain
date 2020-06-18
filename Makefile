@@ -46,6 +46,8 @@ mockrusk: build
 	./bin/utils mockrusk --rusknetwork=tcp --ruskaddress=127.0.0.1:10000 \
 	--walletstore=/tmp/localnet-137601832/node-9003/walletDB/ \
 	--walletfile=./harness/data/wallet-9000.dat
+devnet: stop
+	./devnet.sh
 stop:
 	echo "will stop dusk app"
 	killall dusk || true

@@ -6,6 +6,9 @@ TYPE=branch
 DUSK_VERSION=v0.3.0
 INIT=true
 MOCK=true
+VOUCHER=true
+MOCK_ADDRESS=127.0.0.1:9191
+currentDir=$(pwd)
 
 # define command exec location
 duskCMD="../bin/dusk"
@@ -44,16 +47,18 @@ fi
 #init dusk
 init_dusk_func() {
   echo "init Dusk node $i ..."
-  currentDir=$(pwd)
   DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
   LOGS="${currentDir}/devnet/dusk_data/logs"
 
   # cleanup
   rm -rf "${DDIR}"
   rm -rf "${LOGS}"
+  rm -rf "${DDIR}/walletDB/"
 
   mkdir -p "${DDIR}"
   mkdir -p "${LOGS}"
+  mkdir -p "${DDIR}/walletDB/"
+
   cat <<EOF > "${DDIR}"/dusk.toml
 [consensus]
   defaultamount = 50
@@ -78,6 +83,7 @@ init_dusk_func() {
 
 [logger]
   output = "${DDIR}/dusk"
+  level = "debug"
 
 [mempool]
   maxinvitems = "10000"
@@ -107,23 +113,54 @@ init_dusk_func() {
   store = "${DDIR}/walletDB/"
 EOF
 
-  echo "init Dusk node, done."
+  echo "init Dusk node $i, done."
 }
 
 # start dusk mocks
-start_dusk_mock_func() {
-  echo "starting Dusk mocks $i ..."
+start_dusk_mock_rusk_func() {
+  echo "starting Dusk Rusk mock $i ..."
 
-#  EXEC_PID=$!
-#  echo "started Dusk node, pid=$EXEC_PID"
+  DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
+  WALLET_FILE="${currentDir}/harness/data/wallet-$((9000+$i)).dat"
+
+  CMD="${currentDir}/bin/utils mockrusk --rusknetwork tcp --ruskaddress 127.0.0.1:$((10000+$i)) --walletstore ${DDIR}/walletDB/ --walletfile ${WALLET_FILE}"
+  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/mock$i.log" 2>&1 &
+
+  EXEC_PID=$!
+  echo "started Dusk Rusk Mock node $i, pid=$EXEC_PID"
 }
 
 # start dusk
 start_dusk_func() {
   echo "starting Dusk node $i ..."
 
-#  EXEC_PID=$!
-#  echo "started Dusk node, pid=$EXEC_PID"
+  DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
+
+  CMD="${currentDir}/bin/dusk --config ${DDIR}/dusk.toml"
+  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/dusk$i.log" 2>&1 &
+
+  EXEC_PID=$!
+  echo "started Dusk node $i, pid=$EXEC_PID"
+}
+
+start_dusk_mock_func() {
+  echo "starting Dusk Utils mock ..."
+
+  CMD="${currentDir}/bin/utils mock --grpcmockhost $MOCK_ADDRESS"
+  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/mock.log" 2>&1 &
+
+  EXEC_PID=$!
+  echo "started Dusk Utils mock, pid=$EXEC_PID"
+}
+
+start_voucher_func() {
+  echo "starting Dusk Voucher ..."
+
+  CMD="${currentDir}/bin/voucher"
+  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/voucher.log" 2>&1 &
+
+  EXEC_PID=$!
+  echo "started Dusk Voucher, pid=$EXEC_PID"
 }
 
 if [ "${INIT}" == "true" ]; then
@@ -134,13 +171,23 @@ if [ "${INIT}" == "true" ]; then
 
 fi
 
-sleep 2
+sleep 1
+
+if [ "${VOUCHER}" == "true" ]; then
+  start_voucher_func
+fi
+
+sleep 1
 
 if [ "${MOCK}" == "true" ]; then
+  start_dusk_mock_func
+
   for i in $(seq 0 "$QTD"); do
-    start_dusk_mock_func "$i"
+    start_dusk_mock_rusk_func "$i"
   done
 fi
+
+sleep 1
 
 for i in $(seq 0 "$QTD"); do
   start_dusk_func "$i"
