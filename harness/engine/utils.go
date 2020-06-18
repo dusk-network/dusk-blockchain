@@ -81,19 +81,18 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 
 // LoadWalletCmd sends gRPC command LoadWallet and returns pubkey (if loaded)
 func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
-	// GRPCClient will create a session if none is available, or return its
-	// persisted connection
+	// session has been setup already in the TestMain, so here the client
+	// should be returning the permanent connection
 	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+
 	if err != nil {
+		fmt.Println(n.Nodes[ind])
 		return "", err
 	}
 
 	client := pb.NewWalletClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer func() {
-		n.Nodes[ind].GRPCClient.GracefulClose(grpc.WithInsecure(), grpc.WithBlock())
-		cancel()
-	}()
+	defer cancel()
 
 	req := pb.LoadRequest{Password: password}
 	resp, err := client.LoadWallet(ctx, &req)
@@ -106,8 +105,8 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 
 // SendBidCmd sends gRPC command SendBid and returns tx hash
 func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
-	// GRPCClient will create a session if none is available, or return its
-	// persisted connection
+	// session has been setup already in the TestMain, so here the client is
+	// returning the permanent connection
 	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return nil, err
@@ -115,10 +114,7 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 
 	client := pb.NewTransactorClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer func() {
-		n.Nodes[ind].GRPCClient.GracefulClose(grpc.WithInsecure(), grpc.WithBlock())
-		cancel()
-	}()
+	defer cancel()
 
 	req := pb.BidRequest{Amount: amount}
 	resp, err := client.Bid(ctx, &req)

@@ -7,11 +7,15 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/harness/engine"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 )
 
@@ -48,29 +52,71 @@ func TestMain(m *testing.M) {
 		localNet.Nodes = append(localNet.Nodes, node)
 	}
 
-	var code int
-	err = localNet.Bootstrap(workspace)
-	if err == engine.ErrDisabledHarness {
-		_ = os.RemoveAll(workspace)
-		os.Exit(0)
-	}
+	if err := localNet.Bootstrap(workspace); err != nil {
+		if err == engine.ErrDisabledHarness {
+			_ = os.RemoveAll(workspace)
+			os.Exit(0)
+		}
 
-	if err != nil {
 		// Failed temp network bootstrapping
-		code = 1
 		log.Fatal(err)
-
-	} else {
-		// Start all tests
-		code = m.Run()
+		exit(localNet, workspace, 1)
 	}
 
+	nodes := make([]*engine.DuskNode, len(localNet.Nodes))
+	for i, node := range localNet.Nodes {
+		node.GRPCClient = client.New(node.Cfg.RPC.Network, node.Cfg.RPC.Address)
+		nodes[i] = node
+	}
+
+	// setup session
+	if err := establishSession(nodes); err != nil {
+		log.Fatal(err)
+		exit(localNet, workspace, 1)
+	}
+
+	// Start all tests
+	code := m.Run()
+
+	// close sessions
+	closeSession(nodes)
+
+	// finalize the tests and exit
+	exit(localNet, workspace, code)
+}
+
+func exit(localNet engine.Network, workspace string, code int) {
 	if *engine.KeepAlive != true {
 		localNet.Teardown()
 		_ = os.RemoveAll(workspace)
 	}
-
 	os.Exit(code)
+}
+
+func establishSession(nodes []*engine.DuskNode) error {
+	var g errgroup.Group
+
+	for _, c := range nodes {
+		client := c.GRPCClient
+		g.Go(func() error {
+			_, err := client.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+			return err
+		})
+	}
+	return g.Wait()
+}
+
+func closeSession(nodes []*engine.DuskNode) {
+	var wg sync.WaitGroup
+	for _, n := range nodes {
+		c := n.GRPCClient
+		wg.Add(1)
+		go func(cli *client.NodeClient) {
+			cli.GracefulClose(grpc.WithInsecure())
+			wg.Done()
+		}(c)
+	}
+	wg.Wait()
 }
 
 // TestSendBidTransaction ensures that a valid bid transaction has been accepted
