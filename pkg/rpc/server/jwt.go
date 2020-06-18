@@ -36,7 +36,7 @@ func init() {
 	})
 }
 
-// NewJWTManager creates a JWTMnager
+// NewJWTManager creates a JWTManager
 func NewJWTManager(duration time.Duration) (*JWTManager, error) {
 	pk, sk, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -54,7 +54,8 @@ func NewJWTManager(duration time.Duration) (*JWTManager, error) {
 func (m *JWTManager) Generate(edPkBase64 string) (string, error) {
 	claims := ClientClaims{
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(m.tDuration).Unix(),
+			//ExpiresAt: time.Now().Add(m.tDuration).Unix(),
+			ExpiresAt: time.Now().Add(5 * time.Minute).Unix(),
 		},
 		ClientEdPk: edPkBase64,
 	}
@@ -78,11 +79,13 @@ func (m *JWTManager) Verify(accessToken string) (*ClientClaims, error) {
 	)
 
 	if err != nil {
+		log.WithError(err).Warnln("invalid token")
 		return nil, errInvalidToken
 	}
 
 	claims, ok := token.Claims.(*ClientClaims)
 	if !ok {
+		log.WithError(err).Warnln("invalid claim")
 		return nil, errInvalidToken
 	}
 	return claims, nil
