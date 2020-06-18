@@ -141,6 +141,12 @@ start_dusk_func() {
 
   EXEC_PID=$!
   echo "started Dusk node $i, pid=$EXEC_PID"
+  sleep 1
+
+  # load wallet cmd
+  LOADWALLET_CMD="./bin/utils walletutils --grpchost unix://${DDIR}/dusk-grpc.sock --walletcmd loadwallet --walletpassword password"
+  ${LOADWALLET_CMD} >> "${currentDir}/devnet/dusk_data/logs/load_wallet$i.log" 2>&1 &
+
 }
 
 start_dusk_mock_func() {
