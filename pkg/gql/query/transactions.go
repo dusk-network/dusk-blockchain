@@ -61,6 +61,11 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 
 	qd.Outputs = make([]queryOutput, 0)
 	for _, output := range tx.StandardTx().Outputs {
+
+		if IsNil(output) {
+			continue
+		}
+
 		pubkey := append(output.Pk.AG.Y, output.Pk.BG.Y...)
 		qd.Outputs = append(qd.Outputs, queryOutput{pubkey})
 	}
@@ -82,6 +87,36 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	qd.Size = buf.Len()
 
 	return qd, nil
+}
+
+// IsNil will check for nil in a output
+func IsNil(output *core.TransactionOutput) bool {
+	if output.Pk == nil {
+		log.Warn("invalid output, Pk field is nil")
+		return true
+	}
+
+	if output.Pk.AG == nil {
+		log.Warn("invalid output, Pk.AG field is nil")
+		return true
+	}
+
+	if output.Pk.AG.Y == nil {
+		log.Warn("invalid output, Pk.AG.Y is nil")
+		return true
+	}
+
+	if output.Pk.BG == nil {
+		log.Warn("invalid output, Pk.BG is nil")
+		return true
+	}
+
+	if output.Pk.BG.Y == nil {
+		log.Warn("invalid output, Pk.BG.Y is nil")
+		return true
+	}
+
+	return false
 }
 
 func (t transactions) getQuery() *graphql.Field {
