@@ -23,23 +23,6 @@ func TestCreateDropSession(t *testing.T) {
 	assert.Error(nodeClient.DropSession(grpc.WithInsecure()))
 }
 
-// TestPersistentConn tests that subsequent calls to
-// NodeClient.GetSessionConn do not recreate a connection
-func TestPersistentConn(t *testing.T) {
-	assert := assert.New(t)
-	conn1, err := nodeClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
-	assert.NoError(err)
-
-	conn2, err := nodeClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
-	assert.NoError(err)
-	assert.Equal(conn1, conn2)
-
-	nodeClient.DropSession(grpc.WithInsecure(), grpc.WithBlock())
-	conn3, err := nodeClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
-	assert.NoError(err)
-	assert.NotEqual(conn1, conn3)
-}
-
 // TestPersistentSession tests that the client can exploit the session injected
 // through the AuthClientInterceptor and perform authenticated calls
 func TestPersistentSession(t *testing.T) {
