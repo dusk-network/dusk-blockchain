@@ -86,6 +86,8 @@ var nodeClient *client.NodeClient
 
 func TestMain(m *testing.M) {
 	conf := server.Setup{Network: "unix", Address: address}
+	// forcing session on the configuration
+	conf.RequireSession = true
 	// create the GRPC server here
 	grpcSrv, err := server.SetupGRPC(conf)
 
