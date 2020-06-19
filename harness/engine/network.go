@@ -47,14 +47,19 @@ type GrpcClient interface {
 }
 
 type sessionlessClient struct {
-	addr string
-	conn *grpc.ClientConn
+	network string
+	addr    string
+	conn    *grpc.ClientConn
 }
 
 // GetSessionConn returns a connection to the grpc server
 func (s *sessionlessClient) GetSessionConn(opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	var err error
-	s.conn, err = grpc.Dial(s.addr, opts...)
+	addr := s.addr
+	if s.network == "unix" { //nolint
+		addr = "unix://" + addr
+	}
+	s.conn, err = grpc.Dial(addr, opts...)
 	return s.conn, err
 }
 
@@ -87,7 +92,7 @@ func (n *Network) AddGrpcClient(nodeID, network, addr string) {
 	if n.IsSessionRequired() {
 		c = client.New(network, addr)
 	} else {
-		c = &sessionlessClient{addr: addr}
+		c = &sessionlessClient{network: network, addr: addr}
 	}
 
 	n.grpcClients[nodeID] = c

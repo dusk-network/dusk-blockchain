@@ -31,6 +31,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 		viper.Set("rpc.address", node.Cfg.RPC.Address)
 	}
 	viper.Set("rpc.sessionDurationMins", node.Cfg.RPC.SessionDurationMins)
+	viper.Set("rpc.requireSession", node.Cfg.RPC.RequireSession)
 
 	viper.Set("rpc.enabled", "true")
 	viper.Set("rpc.rusk.network", node.Cfg.RPC.Rusk.Network)

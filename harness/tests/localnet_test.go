@@ -104,15 +104,12 @@ func TestSendBidTransaction(t *testing.T) {
 		}
 	}
 
-	fmt.Println("wallet loaded")
-
 	t.Log("Send request to node 0 to generate and process a Bid transaction")
 	txidBytes, err := localNet.SendBidCmd(0, 10, 10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	fmt.Println("bid sent")
 	txID := hex.EncodeToString(txidBytes)
 	t.Logf("Bid transaction id: %s", txID)
 
