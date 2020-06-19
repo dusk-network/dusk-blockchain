@@ -17,6 +17,7 @@ var log = logrus.WithField("process", "grpc-server")
 // Setup is a configuration struct to setup the GRPC with
 type Setup struct {
 	SessionDurationMins uint
+	RequireSession      bool
 	EnableTLS           bool
 	CertFile            string
 	KeyFile             string
@@ -34,6 +35,7 @@ func FromCfg() Setup {
 		KeyFile:             rpc.KeyFile,
 		Network:             rpc.Network,
 		Address:             rpc.Address,
+		RequireSession:      rpc.RequireSession,
 	}
 }
 
@@ -47,15 +49,9 @@ func SetupGRPC(conf Setup) (*grpc.Server, error) {
 		return nil, err
 	}
 
-	// instantiate the auth service and the interceptor
-	auth, authInterceptor := NewAuth(jwtMan)
-
 	// Add default interceptors to provide jwt-based session authentication and error logging
 	// for both unary and stream RPC calls
 	serverOpt := make([]grpc.ServerOption, 0)
-	//serverOpt = append(serverOpt, grpc.StreamInterceptor(streamInterceptor))
-	serverOpt = append(serverOpt, grpc.UnaryInterceptor(authInterceptor.Unary()))
-
 	// Enable TLS if configured
 	opt, tlsVer := loadTLSFiles(conf.EnableTLS, conf.CertFile, conf.KeyFile, conf.Network)
 	if opt != nil {
@@ -63,13 +59,23 @@ func SetupGRPC(conf Setup) (*grpc.Server, error) {
 	}
 	log.WithField("tls", tlsVer).Infof("gRPC HTTP server TLS configured")
 
-	grpcServer := grpc.NewServer(serverOpt...)
-
-	// hooking up the Auth service
-	node.RegisterAuthServer(grpcServer, auth)
-
 	grpc.EnableTracing = false
-	return grpcServer, nil
+
+	if conf.RequireSession {
+		// instantiate the auth service and the interceptor
+		auth, authInterceptor := NewAuth(jwtMan)
+
+		//serverOpt = append(serverOpt, grpc.StreamInterceptor(streamInterceptor))
+		serverOpt = append(serverOpt, grpc.UnaryInterceptor(authInterceptor.Unary()))
+		grpcServer := grpc.NewServer(serverOpt...)
+
+		// hooking up the Auth service
+		node.RegisterAuthServer(grpcServer, auth)
+		return grpcServer, nil
+
+	}
+
+	return grpc.NewServer(serverOpt...), nil
 }
 
 func loadTLSFiles(enable bool, certFile, keyFile, network string) (grpc.ServerOption, string) {

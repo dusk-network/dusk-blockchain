@@ -54,8 +54,7 @@ func NewJWTManager(duration time.Duration) (*JWTManager, error) {
 func (m *JWTManager) Generate(edPkBase64 string) (string, error) {
 	claims := ClientClaims{
 		StandardClaims: jwt.StandardClaims{
-			//ExpiresAt: time.Now().Add(m.tDuration).Unix(),
-			ExpiresAt: time.Now().Add(5 * time.Minute).Unix(),
+			ExpiresAt: time.Now().Add(m.tDuration).Unix(),
 		},
 		ClientEdPk: edPkBase64,
 	}

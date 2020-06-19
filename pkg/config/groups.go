@@ -62,6 +62,7 @@ type rpcConfiguration struct {
 	Network             string
 	Address             string
 	SessionDurationMins uint
+	RequireSession      bool
 
 	EnableTLS bool
 	CertFile  string

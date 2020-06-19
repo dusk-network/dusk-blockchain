@@ -25,8 +25,7 @@ type DuskNode struct {
 }
 
 // NewDuskNode instantiates a new DuskNode
-func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
-
+func NewDuskNode(graphqlPort, nodeID int, profileID string, requireSession bool) *DuskNode {
 	node := new(DuskNode)
 	node.Id = strconv.Itoa(nodeID)
 	node.ConfigProfileID = profileID
@@ -34,6 +33,9 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
 	node.Cfg = config.Registry{}
 	node.Cfg.Gql.Address = "127.0.0.1:" + strconv.Itoa(graphqlPort)
 	node.Cfg.Gql.Network = "tcp" //nolint
+
+	node.Cfg.RPC.RequireSession = requireSession
+	node.Cfg.RPC.SessionDurationMins = 5
 
 	if *RPCNetworkType == "unix" { //nolint
 		node.Cfg.RPC.Network = "unix"

@@ -80,7 +80,9 @@ network="unix"
 # address must be in form of a IP address (e.g 127.0.0.1:9000)
 address="/tmp/dusk-grpc.sock"
 # duration of the session for the grpc services exposed by the node
-sessionDurationMins=5
+sessionDurationMins = 5
+# do not require session
+requireSession = false
 
 enableTLS=false
 # server TLS certificate file

@@ -51,11 +51,11 @@ func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
 
 // SendQuery sends a graphql query to the specified network node
 func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) error {
-	if nodeIndex >= uint(len(n.Nodes)) {
+	if nodeIndex >= uint(len(n.nodes)) {
 		return errors.New("invalid node index")
 	}
 
-	targetNode := n.Nodes[nodeIndex]
+	targetNode := n.nodes[nodeIndex]
 	addr := "http://" + targetNode.Cfg.Gql.Address + "/graphql"
 
 	buf := bytes.Buffer{}
@@ -83,10 +83,8 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 	// session has been setup already in the TestMain, so here the client
 	// should be returning the permanent connection
-	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
-
+	conn, err := n.GetGrpcConn(ind, grpc.WithInsecure())
 	if err != nil {
-		fmt.Println(n.Nodes[ind])
 		return "", err
 	}
 
@@ -107,7 +105,8 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
 	// session has been setup already in the TestMain, so here the client is
 	// returning the permanent connection
-	conn, err := n.Nodes[ind].GRPCClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	c := n.grpcClients[n.nodes[ind].Id]
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
@@ -128,11 +127,11 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 // SendWireMsg sends a P2P message to the specified network node
 // NB: Handshaking procedure must be performed prior to the message sending
 func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
-	if ind >= uint(len(n.Nodes)) {
+	if ind >= uint(len(n.nodes)) {
 		return errors.New("invalid node index")
 	}
 
-	targetNode := n.Nodes[ind]
+	targetNode := n.nodes[ind]
 	addr := "127.0.0.1:" + targetNode.Cfg.Network.Port
 
 	// connect to this socket
