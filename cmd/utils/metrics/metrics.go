@@ -17,13 +17,13 @@ const (
 )
 
 var (
-	lastBlockUpdate time.Time
-	currentBlock    *Block
-	localNet        engine.Network
-	duskInfo        *DuskInfo
-	node            *engine.DuskNode
-	pendingTx       int
-	//currentBlockNumber uint64
+	lastBlockUpdate    time.Time
+	currentBlock       *Block
+	localNet           engine.Network
+	duskInfo           *DuskInfo
+	node               *engine.DuskNode
+	pendingTx          int
+	currentBlockNumber uint64
 	//rpcClient       *Client
 )
 
@@ -79,14 +79,14 @@ func Routine() {
 		}
 
 		//newBlock, err := getBlockByNumber(duskInfo, map[string]interface{}{"height": currentBlockNumber + 1})
-		newBlock, err := getLatestBlock(duskInfo)
+		newBlock, err := getLatestBlock(duskInfo, currentBlockNumber+1)
 		if err != nil {
-			fmt.Printf("ERROR: getBlockByNumber: %+v\n", err)
-			time.Sleep(1 * time.Second)
+			//fmt.Printf("ERROR: getBlockByNumber: %+v\n", err)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
-		//currentBlockNumber = newBlock.Header.Height
+		currentBlockNumber = newBlock.Header.Height
 
 		if currentBlock == nil {
 
