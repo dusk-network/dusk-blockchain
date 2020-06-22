@@ -34,6 +34,7 @@ func getDialer(proto string) func(context.Context, string) (net.Conn, error) {
 
 func TestMain(m *testing.M) {
 	conf := server.Setup{Network: "unix", Address: address}
+	conf.RequireSession = true
 	// create the GRPC server here
 	grpcSrv, err := server.SetupGRPC(conf)
 
