@@ -23,12 +23,12 @@ type Peer struct {
 	w *Writer
 	r *Reader
 
-	raptorqEnabled bool
+	raptorCodeEnabled bool
 }
 
 // NewPeer makes a kadcast peer instance
-func NewPeer(eventBus *eventbus.EventBus, g *protocol.Gossip, dp *dupemap.DupeMap, raptorqEnabled bool) *Peer {
-	return &Peer{eventBus: eventBus, gossip: g, dupemap: dp, raptorqEnabled: raptorqEnabled}
+func NewPeer(eventBus *eventbus.EventBus, g *protocol.Gossip, dp *dupemap.DupeMap, raptorCodeEnabled bool) *Peer {
+	return &Peer{eventBus: eventBus, gossip: g, dupemap: dp, raptorCodeEnabled: raptorCodeEnabled}
 }
 
 // Launch starts kadcast service
@@ -44,6 +44,7 @@ func (p *Peer) Launch(addr string, bootstrapAddrs []string, beta uint8) {
 
 	log.WithField("laddr", peerInfo.String()).
 		WithField("MaxDelegatesNum", router.beta).
+		WithField("Raptor", p.raptorCodeEnabled).
 		Infoln("Starting Kadcast Node")
 
 	// Routing table maintainer.
@@ -53,15 +54,13 @@ func (p *Peer) Launch(addr string, bootstrapAddrs []string, beta uint8) {
 
 	// A writer for Kadcast broadcast messages
 	// Read-only access to Router
-	w := NewWriter(&router, p.eventBus, p.gossip, p.raptorqEnabled)
+	w := NewWriter(&router, p.eventBus, p.gossip, p.raptorCodeEnabled)
 	go w.Serve()
 
-	if p.raptorqEnabled {
-		// RaptorQ depends on C++ 3rd. Until this is added to CI or reimplemented in Golang,
-		// raptorq compilation is disabled
+	if p.raptorCodeEnabled {
 		// A reader for Kadcast broadcast messsages
-		//r := NewFECReader(peerInfo, p.eventBus, p.gossip, p.dupemap)
-		// go r.Serve()
+		r := NewRaptorCodeReader(router.LpeerInfo, p.eventBus, p.gossip, p.dupemap)
+		go r.Serve()
 	} else {
 		r := NewReader(peerInfo, p.eventBus, p.gossip, p.dupemap)
 		go r.Serve()
