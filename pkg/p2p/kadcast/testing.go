@@ -80,11 +80,11 @@ func (n *Node) onAcceptBlock(m message.Message) error {
 	/// repropagate
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, &blk); err != nil {
-		return err
+		panic(err)
 	}
 
 	if err := topics.Prepend(buf, topics.Block); err != nil {
-		return err
+		panic(err)
 	}
 
 	repropagateMsg := message.NewWithHeader(topics.Block, *buf, m.Header())
@@ -125,13 +125,12 @@ func TestNode(port int) *Node {
 	// optimal broadcast (no duplicates)
 	router.beta = 1
 
-	log.Infof("Starting Kadcast Node on: %s", peer.String())
+	raptorEnabled := true
+	log.Infof("Starting Kadcast Node (raptor:%v) on: %s", raptorEnabled, peer.String())
 
 	// Routing table maintainer
 	m := NewMaintainer(&router)
 	go m.Serve()
-
-	rqEnabled := false
 
 	// A reader for Kadcast broadcast messsage.
 	//
@@ -142,15 +141,15 @@ func TestNode(port int) *Node {
 	// Reader forwards the message to the eventbus
 	// Reader repropagates any valid kadcast wire messages
 
-	if rqEnabled {
-		// r := NewFECReader(router.LpeerInfo, eb, g, d)
-		// go r.Serve()
+	if raptorEnabled {
+		r := NewRaptorCodeReader(router.LpeerInfo, eb, g, d)
+		go r.Serve()
 	} else {
 		r := NewReader(router.LpeerInfo, eb, g, d)
 		go r.Serve()
 	}
 
-	w := NewWriter(&router, eb, g, rqEnabled)
+	w := NewWriter(&router, eb, g, raptorEnabled)
 	go w.Serve()
 
 	return newKadcastNode(&router, eb)
