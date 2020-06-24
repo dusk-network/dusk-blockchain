@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dusk-network/dusk-blockchain/cmd/utils/walletutils"
+
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/mock"
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/transactions"
@@ -25,6 +27,7 @@ func main() {
 		transactionsCMD,
 		mockCMD,
 		mockRUSKCMD,
+		walletUtilsCMD,
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -116,6 +119,18 @@ var (
 		Value: "./harness/data/wallet-9000.dat",
 	}
 
+	walletCMDFlag = cli.StringFlag{
+		Name:  "walletcmd",
+		Usage: "Dusk WalletCmd , eg: --walletcmd=loadwallet",
+		Value: "loadwallet",
+	}
+
+	walletPasswordFlag = cli.StringFlag{
+		Name:  "walletpassword",
+		Usage: "Dusk Wallet Password, eg: --walletpassword=password",
+		Value: "password",
+	}
+
 	metricsCMD = cli.Command{
 		Name:      "metrics",
 		Usage:     "expose a metrics endpoint",
@@ -168,6 +183,19 @@ var (
 			walletFileFlag,
 		},
 		Description: `Execute/Query transactions for a Dusk node`,
+	}
+
+	walletUtilsCMD = cli.Command{
+		Name:      "walletutils",
+		Usage:     "execute cmd to a Dusk wallet",
+		Action:    walletAction,
+		ArgsUsage: "",
+		Flags: []cli.Flag{
+			grpcHostFlag,
+			walletCMDFlag,
+			walletPasswordFlag,
+		},
+		Description: `Execute/Query a Dusk wallet`,
 	}
 )
 
@@ -232,5 +260,21 @@ func mockRuskAction(ctx *cli.Context) error {
 	walletFile := ctx.String(walletFileFlag.Name)
 
 	err := mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
+	return err
+}
+
+func walletAction(ctx *cli.Context) error {
+
+	grpcHost := ctx.String(grpcHostFlag.Name)
+	walletCMD := ctx.String(walletCMDFlag.Name)
+	walletPassword := ctx.String(walletPasswordFlag.Name)
+
+	log.WithField("walletCMD", walletCMD).
+		Info("wallet Action started")
+
+	resp, err := walletutils.RunWallet(grpcHost, walletCMD, walletPassword)
+
+	log.WithField("resp", resp).
+		Info("wallet Action completed")
 	return err
 }

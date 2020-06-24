@@ -41,3 +41,5 @@ demo/**.*
 
 # Testnet binary
 launch/testnet/testnet
+
+devnet
