@@ -21,23 +21,20 @@ type Writer struct {
 	// Kademlia routing state
 	router *RoutingTable
 
-	writeQueue     chan message.Message
-	raptorqEnabled bool
+	writeQueue        chan message.Message
+	raptorCodeEnabled bool
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(router *RoutingTable, subscriber eventbus.Subscriber, gossip *protocol.Gossip, raptorqEnabled bool) *Writer {
-
-	pw := &Writer{
-		subscriber:     subscriber,
-		router:         router,
-		gossip:         gossip,
-		raptorqEnabled: raptorqEnabled,
+func NewWriter(router *RoutingTable, subscriber eventbus.Subscriber, gossip *protocol.Gossip, raptorCodeEnabled bool) *Writer {
+	return &Writer{
+		subscriber:        subscriber,
+		router:            router,
+		gossip:            gossip,
+		raptorCodeEnabled: raptorCodeEnabled,
 	}
-
-	return pw
 }
 
 // Serve processes any kadcast messaging to the wire
@@ -100,6 +97,9 @@ func (w *Writer) broadcastPacket(height byte, payload []byte) {
 		delegates := w.fetchDelegates(h)
 
 		// Send to all delegates the payload
+		//
+		// TODO: Optional here could be to marshal binary once but tamper height field in
+		// the blob on each height change
 		w.sendToDelegates(delegates, h, payload)
 	}
 }
@@ -181,10 +181,19 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []b
 		log.WithField("l_addr", localPeer.String()).
 			WithField("r_addr", destPeer.String()).
 			WithField("height", H).
-			Traceln("Sending Broadcast message")
+			WithField("raptor", w.raptorCodeEnabled).
+			Tracef("Sending Broadcast message (len: %d)", buf.Len())
 
-		if w.raptorqEnabled {
-			// go rqSendUDP(w.router.lpeerUDPAddr, destPeer.GetUDPAddr(), buf.Bytes())
+		// Send message to the dest peer with rc-udp or tcp
+		if w.raptorCodeEnabled {
+			// rc-udp write is destructive to the input message. If more than delegates are selected,
+			// duplicate the message
+			messageCopy := buf.Bytes()
+			if len(delegates) > 1 {
+				messageCopy = make([]byte, buf.Len())
+				copy(messageCopy, buf.Bytes())
+			}
+			go rcudpWrite(w.router.lpeerUDPAddr, destPeer.GetUDPAddr(), messageCopy)
 		} else {
 			go tcpSend(destPeer.GetUDPAddr(), buf.Bytes())
 		}
