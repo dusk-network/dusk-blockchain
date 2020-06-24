@@ -39,7 +39,7 @@ type kadcastConfiguration struct {
 	// Kadcast protocol configs
 	MaxDelegatesNum byte
 
-	Raptorq bool
+	Raptor bool
 }
 
 type monitorConfiguration struct {

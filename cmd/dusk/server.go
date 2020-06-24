@@ -74,8 +74,7 @@ func (s *Server) launchKadcastPeer() {
 		return
 	}
 
-	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, s.dupeMap, kcfg.Raptorq)
-
+	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, s.dupeMap, kcfg.Raptor)
 	// Launch kadcast peer services and join network defined by bootstrappers
 	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
 	s.kadPeer = kadPeer
