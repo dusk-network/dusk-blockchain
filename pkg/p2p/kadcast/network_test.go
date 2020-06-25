@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -82,7 +83,7 @@ func TestBroadcastChunksMsg(t *testing.T) {
 		kadcast.TraceRoutingState(r.Router)
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// Broadcast Chunk message. Each of the nodes makes an attempt to broadcast
 	// a CHUNK message to the network
@@ -108,4 +109,8 @@ func TestBroadcastChunksMsg(t *testing.T) {
 
 		kadcast.TestReceivedMsgOnce(t, nodes, i, blk)
 	}
+}
+
+func init() {
+	logrus.SetLevel(logrus.TraceLevel)
 }
