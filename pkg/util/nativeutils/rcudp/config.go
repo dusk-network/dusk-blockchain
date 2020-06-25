@@ -32,7 +32,7 @@ const (
 
 	// Messages are considered stale when more than staleTimeout seconds pass
 	// after receiving the first block of the message.
-	staleTimeout = int64(2)
+	staleTimeout = int64(10)
 	// UDP Recv buffer size
 	readBufferSize = 208 * 1024
 
