@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-crypto/hash"
 	fountain "github.com/google/gofountain"
 	logger "github.com/sirupsen/logrus"
 )
@@ -144,8 +146,18 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 	if decoded != nil {
 		// The object(message) is reconstructed.
 		// Run callback to collect the message
-		err := r.collector(srcAddr.String(), decoded)
+
+		msgID, err := hash.Xxhash(decoded)
 		if err != nil {
+			return err
+		}
+
+		// Sanity check to ensure the message reconstruction is correct
+		if !bytes.Equal(msgID, p.messageID[:]) {
+			return fmt.Errorf("sanity check failed msgID: %s", hex.EncodeToString(p.messageID[:]))
+		}
+
+		if err := r.collector(srcAddr.String(), decoded); err != nil {
 			return err
 		}
 
@@ -178,7 +190,7 @@ func (r *UDPReader) cleanup() {
 				if !v.decoder.IsReady() {
 					d := v.decoder
 					log.WithField("receiver", r.lAddr.Port).
-						Warnf("Not collected message with oID %s, NumSourceSymbols %d, PaddingSize %d",
+						Warnf("Not collected message with msgID %s, NumSourceSymbols %d, PaddingSize %d",
 							hex.EncodeToString(k[:]), d.numSourceSymbols, d.paddingSize)
 				}
 			}

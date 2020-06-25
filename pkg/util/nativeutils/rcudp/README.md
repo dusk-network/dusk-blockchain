@@ -29,9 +29,9 @@ In this package `a message` means the complete data blob to be transmitted on th
 
 Note that overall size of a packet is up to 1472 (=1500-8-20) bytes. (`default MTU size` minus `UDP Header size` minus `IPv4 header size`)
 
-The size of a complete wire message is `TransferLength` - `PaddingSize`.
+The size of a complete wire message is `TransferLength` - `PaddingSize`. A limitation is that the code supports a maximum of 8192 source blocks. With current BlockData size of 1452, the maximum length of a message that can be transmitted is 1452*8192 (~11.89 MB)
 
-NumSourceSymbols - `#TODO`
+`NumSourceSymbols` - K. Must be in the range [4, 8192] (inclusive). This is how many source symbols the input message will be divided into.
 
 ### Tuning
 

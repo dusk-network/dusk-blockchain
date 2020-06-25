@@ -37,7 +37,7 @@ const (
 	readBufferSize = 208 * 1024
 
 	// Writer configs
-	backoffTimeout = 10 * time.Microsecond
+	backoffTimeout = 50 * time.Microsecond
 	// UDP Sender buffer size
 	writeBufferSize = 208 * 1024
 )
