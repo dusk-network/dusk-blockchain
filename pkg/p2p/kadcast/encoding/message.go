@@ -7,7 +7,14 @@ import (
 )
 
 const (
-	// Message types over UDP
+
+	// IDLen PeerInfo ID length
+	IDLen = 16
+
+	// NonceLen PoW-Nonce length
+	NonceLen = 4
+
+	// Message types handled by Maintainer
 
 	// PingMsg wire Ping message id
 	PingMsg = 0
@@ -21,16 +28,10 @@ const (
 	// NodesMsg wire Nodes message id
 	NodesMsg = 3
 
-	// Message types over TCP
+	// Message types handled by (TCP) Reader or RaptorCodeReader
 
-	// BroadcastMsg wire Broadcast message id
+	// BroadcastMsg Message propagation type
 	BroadcastMsg = 10
-
-	// IDLen PeerInfo ID length
-	IDLen = 16
-
-	// NonceLen PoW-Nonce length
-	NonceLen = 4
 )
 
 var (
