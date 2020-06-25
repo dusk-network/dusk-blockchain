@@ -65,6 +65,10 @@ func Write(laddr, raddr *net.UDPAddr, message []byte, redundancyFactor uint8) er
 		return err
 	}
 
+	if err = conn.SetWriteBuffer(writeBufferSize); err != nil {
+		log.WithError(err).Traceln("SetWriteBuffer socket problem")
+	}
+
 	err = sendRaptorRFC5053(conn, message, redundancyFactor)
 	_ = conn.Close()
 	return err

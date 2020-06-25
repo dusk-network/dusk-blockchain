@@ -33,9 +33,13 @@ const (
 	// Messages are considered stale when more than staleTimeout seconds pass
 	// after receiving the first block of the message.
 	staleTimeout = int64(2)
+	// UDP Recv buffer size
+	readBufferSize = 208 * 1024
 
 	// Writer configs
 	backoffTimeout = 10 * time.Microsecond
+	// UDP Sender buffer size
+	writeBufferSize = 208 * 1024
 )
 
 var (

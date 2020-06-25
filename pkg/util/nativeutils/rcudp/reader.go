@@ -20,7 +20,6 @@ type msgID [8]byte
 type message struct {
 	decoder   *Decoder
 	srcAddr   net.UDPAddr
-	collected bool
 	recv_time int64
 }
 
@@ -54,6 +53,10 @@ func (r *UDPReader) Serve() {
 		log.Panic(err)
 	}
 
+	if err := listener.SetReadBuffer(readBufferSize); err != nil {
+		log.WithError(err).Traceln("Failed to change UDP Recv Buffer Size")
+	}
+
 	log.WithField("addr", r.lAddr.String()).
 		Infof("Start Raptor code UDPReader")
 
@@ -79,6 +82,13 @@ func (r *UDPReader) Serve() {
 
 func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 
+	defer func() {
+		if r := recover(); r != nil {
+			// Panicking here might be caused by corrupted packets
+			log.Errorf("processPacket recovered from %v", r)
+		}
+	}()
+
 	p := Packet{}
 	buf := bytes.NewBuffer(data)
 	if err := p.unmarshalBinary(buf); err != nil {
@@ -102,7 +112,6 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 			decoder:   d,
 			srcAddr:   srcAddr,
 			recv_time: time.Now().Unix(),
-			collected: false,
 		}
 
 		r.objects[p.messageID] = m
@@ -114,7 +123,7 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 		return err
 	}
 
-	if m.collected {
+	if m.decoder.IsReady() {
 		// this message has been already decoded and collected
 		return nil
 	}
@@ -133,8 +142,8 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 
 	decoded := m.decoder.AddBlock(b)
 	if decoded != nil {
-		// run callback here
-		m.collected = true
+		// The object(message) is reconstructed.
+		// Run callback to collect the message
 		err := r.collector(srcAddr.String(), decoded)
 		if err != nil {
 			return err
@@ -166,7 +175,7 @@ func (r *UDPReader) cleanup() {
 				// this message is out of time. Pending to be deleted. if not
 				// collected yet, that might mean staleTimeout should be
 				// increased or message delivery simply failed
-				if !v.collected {
+				if !v.decoder.IsReady() {
 					d := v.decoder
 					log.WithField("receiver", r.lAddr.Port).
 						Warnf("Not collected message with oID %s, NumSourceSymbols %d, PaddingSize %d",
@@ -187,7 +196,6 @@ func (r *UDPReader) cleanup() {
 		}
 		r.lock.Unlock()
 	}
-
 }
 
 func addrEqual(a1, a2 net.UDPAddr) bool {

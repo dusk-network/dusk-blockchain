@@ -25,12 +25,13 @@ func NewDecoder(numSourceSymbols, symbolAlignmentSize, transferLength, paddingSi
 		paddingSize:         paddingSize}
 }
 
-// AddBlock add a LTBlock to the a decoder
+// AddBlock add a LTBlock to the a decoder.
 func (d *Decoder) AddBlock(b fountain.LTBlock) []byte {
 	return d.AddBlocks([]fountain.LTBlock{b})
 }
 
-// AddBlocks add a set of LTBlock to the a decoder
+// AddBlocks add a set of LTBlock to the a decoder If the object is
+// reconsturcted (fully decoded), AddBlocks returns the decoded object.
 func (d *Decoder) AddBlocks(blocks []fountain.LTBlock) []byte {
 
 	if d.decoded != nil {
@@ -45,4 +46,9 @@ func (d *Decoder) AddBlocks(blocks []fountain.LTBlock) []byte {
 
 	// Not ready yet. More blocks needed to be added
 	return nil
+}
+
+// IsReady returns true, if the object is already reconstructed
+func (d *Decoder) IsReady() bool {
+	return len(d.decoded) > 0
 }

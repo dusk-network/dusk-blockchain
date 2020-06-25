@@ -44,7 +44,8 @@ func TestEncodeRFC5053(t *testing.T) {
 		for i := 0; i < len(blocks); i++ {
 			decoded = d.AddBlock(blocks[i])
 			if decoded != nil {
-				t.Logf("DECODED after %d blocks --------", i+1)
+				// Decoded after N blocks
+				//t.Logf("DECODED after %d blocks --------", i+1)
 				break
 			}
 		}
@@ -54,7 +55,8 @@ func TestEncodeRFC5053(t *testing.T) {
 			if !bytes.Equal(message, decoded) {
 				t.Fatalf("Decoding result must equal %d vs %d", len(message), len(decoded))
 			}
-			t.Logf("Decoded original message of size %d", len(message))
+			// Message completely decoded
+			// t.Logf("Decoded original message of size %d", len(message))
 		} else {
 			t.Fatal("Decoding determined failed")
 		}
