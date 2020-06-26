@@ -236,7 +236,7 @@ func DidNetworkReceivedMsg(nodes []*Node, senderIndex int, sentBlock *block.Bloc
 func TestReceivedMsgOnce(t *testing.T, nodes []*Node, i int, blk *block.Block) {
 
 	passed := false
-	for y := 0; y < 70; y++ {
+	for y := 0; y < 200; y++ {
 		// Wait a bit so all nodes receives the broadcast message
 		time.Sleep(100 * time.Millisecond)
 		if DidNetworkReceivedMsg(nodes, i, blk) {
