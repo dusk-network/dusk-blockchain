@@ -124,7 +124,7 @@ func (h Header) String() string {
 	_, _ = sb.WriteString(fmt.Sprintf("round='%d' step='%d'", h.Round, h.Step))
 	_, _ = sb.WriteString(" sender='")
 	_, _ = sb.WriteString(util.StringifyBytes(h.PubKeyBLS))
-	_, _ = sb.WriteString("' block hash='")
+	_, _ = sb.WriteString("' block_hash='")
 	_, _ = sb.WriteString(util.StringifyBytes(h.BlockHash))
 	_, _ = sb.WriteString("'")
 	return sb.String()

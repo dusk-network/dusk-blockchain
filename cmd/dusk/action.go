@@ -70,6 +70,11 @@ func action(ctx *cli.Context) error {
 		logFile = os.Stdout
 	}
 
+	if cfg.Get().Logger.Format == "json" {
+		log.Trace("Dusk log format set to JSON.")
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	}
+
 	logging.InitLog(logFile)
 
 	log.Info("Loaded config file", "UsedConfigFile", cfg.Get().UsedConfigFile)

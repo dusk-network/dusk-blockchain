@@ -130,7 +130,7 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	}
 
 	lg.WithFields(log.Fields{
-		"new best": score.Score,
+		"new_best": score.Score,
 	}).Debugln("swapping best score")
 	s.bestEvent = score
 	return nil
