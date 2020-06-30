@@ -134,33 +134,12 @@ filebeat.inputs:
     - ${DDIR}/dusk$((7100+$i)).log
   exclude_files: ['\.gz$']
   encoding: plain
-
-  json.message_key: msg
-  json.message_level: level
-  json.message_category: category
-  json.message_process: category
-  json.message_topic: topic
-
-  json.message_recipients: recipients
-  json.message_step: step
-  json.message_round: round
-  json.message_id: id
-  json.message_sender: sender
-  json.message_agreement: agreement
-  json.message_quorum: quorum
-
-  json.message_new_best: new_best
-
-  json.message_block_hash: block_hash
-  json.message_prefix: prefix
-  json.message_hash: hash
-
   json.keys_under_root: true
 name: dusk$((7100+$i))
 output.logstash:
   hosts: ["0.0.0.0:5000"]
   #index: "devnet-v1"
-  tags: ["devnet","dusk${i}"]
+  #tags: ["devnet","dusk${i}"]
   #ignore_older: "5h"
   #close_inactive: "4h"
   #close_renamed: true
@@ -168,12 +147,52 @@ output.logstash:
   #clean_removed: true
   #tail_files: true
   encoding: plain
+#setup.dashboards.enabled: true
+#setup.kibana.host: "localhost:5601"
+#setup.kibana.protocol: "http"
+#setup.kibana.username: elastic
+#setup.kibana.password: changeme
+#setup.dashboards.retry.enabled: true
+#setup.dashboards.retry_interval: 10
 fields:
   env: dusk$((7100+$i))
 #  type: node
-#processors:
+processors:
 #  - add_host_metadata: ~
 #  - add_cloud_metadata: ~
+#  - decode_json_fields:
+#      fields: ["field1", "field2", ...]
+#      process_array: false
+#      max_depth: 1
+#      target: ""
+#      overwrite_keys: false
+#      add_error_key: true
+  - convert:
+      fields:
+        - {from: "msg", type: "string"}
+        - {from: "level", to: "msg_level", type: "string"}
+        - {from: "category", to: "msg_category", type: "string"}
+        - {from: "process", to: "msg_process", type: "string"}
+        - {from: "topic", to: "msg_topic", type: "string"}
+        - {from: "recipients", to: "msg_recipients", type: "string"}
+        - {from: "step", to: "msg_step", type: "string"}
+        - {from: "round", to: "msg_round", type: "string"}
+        - {from: "id", to: "msg_id", type: "string"}
+        - {from: "sender", to :"msg_sender", type: "string"}
+        - {from: "agreement", to: "msg_agreement", type: "string"}
+        - {from: "quorum", to: "msg_quorum", type: "string"}
+        - {from: "new_best", to: "msg_new_best", type: "string"}
+        - {from: "block_hash", to: "msg_block_hash", type: "string"}
+        - {from: "prefix", to: "msg_prefix", type: "string"}
+        - {from: "hash", to: "msg_hash", type: "string"}
+        - {from: "error", to: "msg_error", type: "string"}
+        - {from: "score", to: "msg_score", type: "string"}
+      ignore_missing: true
+      fail_on_error: false
+      mode: rename
+  - drop_fields:
+      fields: ["agent", "ecs.version", "input", "log", "@metadata", "host"]
+
 EOF
 
   chmod go-w "${DDIR}"/filebeat.json.yml
