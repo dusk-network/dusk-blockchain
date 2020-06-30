@@ -2,7 +2,7 @@
 =============
  
 
-`p2p/kadcast`  package is an attempt to implement kadcast protocol specification from https://eprint.iacr.org/2019/876.pdf. It basically includes  Kademlia routing state and Message propagation algorithm. For the purpose of message propagation, Raptor Codes  [RFC5053](https://tools.ietf.org/html/rfc5053)  implementation from [gofountain](https://github.com/google/gofountain/) is used instead of the recommended fountain code - `RaptorQ`.
+`p2p/kadcast`  package is an attempt to implement kadcast protocol specification from https://eprint.iacr.org/2019/876.pdf. It basically includes  Kademlia routing state and Message propagation algorithm. For the purpose of message propagation, Raptor Codes  [RFC5053](https://tools.ietf.org/html/rfc5053)  implementation from [gofountain](https://github.com/google/gofountain/) is used instead of the recommended fountain code - `RaptorQ` (more details `pkg/util/nativeutils/rcudp/README.md`).
 
 ## Usage
 --------------
@@ -113,9 +113,6 @@ Empty
 **FindNodes Message Payload** \
 Empty
 
-
-
-
 \* The structure of DUSK_PROTOCOL_FRAME is the same as Gossip processor can read. See also `pkg/p2p/wire/protocol`
 
 
@@ -124,12 +121,24 @@ Empty
 
 Maintainer is a component that is responsible to build and maintain the Kadcast Routing State. It is a UDP server that handles the folling messages Types - Ping, Pong, FindNodes and FindNodes.
 
-### Ping Message Flow
-# `TODO`
+### FindNodes-Nodes Message Flow  (pseudo peers A and B)
 
-### Find Nodes Message Flow
+1. Peer_A sends `FindNodes message` with its PeerID
+2. Peer_B `Maintainer` handles `FindNodes`
+3. Peer_B `Maintainer` registers Peer_A
+4. Peer_B `Maintainer` tries to get `K` closest peers to `Peer_A`
+5. Peer_B `Maintainer` responds with `Nodes` message with K_Closest_Peers list and its own PeerID
+6. Peer_A handles `Nodes` message
+7. Peer_A registers Peer_B
+7. Peer_A starts `Ping-Pong` message flow for each received PeerID from K_Closest_Peers list 
 
-# `TODO`
+### Ping-Pong Message Flow (pseudo peers A and B)
+
+1. Peer_A sends `Ping message` with its PeerID
+2. Peer_B `Maintainer` handles Ping message from PeerA.
+3. Peer_B `Maintainer` registers `PeerA`
+4. Peer_B `Maintainer` responses with `Pong` message that includes its PeerID
+5. Peer_A `Maintainer` handles `Pong` message and registers Peer_B
 
 ## Collecting Message
 --------------

@@ -15,7 +15,7 @@ In this package `a message` means the complete data blob to be transmitted on th
 ## Writer
 ----------------
 
-`rcudp.Writer(...)` function is a udp client that uses `gofountain` raptor code encoder to break down a message into a set of blocks. A block together with metadata is packed as a UDP packet with following structure:
+`rcudp.Writer(...)` function is a UDP client that uses `gofountain` Raptor Code encoder to split a message into source blocks. An encoded block together with metadata is marshalled into a UDP packet with following structure:
 
 
 ```
@@ -39,7 +39,7 @@ The size of a complete wire message is `TransferLength` - `PaddingSize`. A limit
  
 `writeBufferSize` (config.go) - UDP Sender buffer size can be up to `net.core.wmem_max` (Linux)
 
-`redundancyFactor` input param - `#TODO`
+`redundancyFactor` input param - defines the count of additional encoded blocks to be generated and sent
 
 ## Reader
 -----
