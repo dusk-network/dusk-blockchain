@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -16,10 +17,13 @@ import (
 	"github.com/dusk-network/dusk-crypto/hash"
 )
 
+var (
+	_, enableCollecting = os.LookupEnv("DUSK_ENABLE_TPS_TEST")
+)
+
 const (
-	// EnableMonitoring enables data collecting by an external network-monitor
-	EnableMonitoring = false
-	serviceURL       = "http://localhost:1337/rpc"
+	// serviceURL is address of the external network-data-collector
+	serviceURL = "http://localhost:1337/rpc"
 )
 
 // RegisterWireMsg is a util for registering a wire message to a network-monitor
@@ -31,12 +35,12 @@ const (
 // rawdata is the wire message data
 func RegisterWireMsg(networkType string, rawdata []byte) {
 
-	if !EnableMonitoring {
-		return
-	}
-
 	// Record receive time before running the go-routine sender
 	recv_at := time.Now().UnixNano()
+
+	if !enableCollecting {
+		return
+	}
 
 	go func(recv_at int64) {
 		// extract message wire type from the message blob

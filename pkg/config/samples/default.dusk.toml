@@ -54,6 +54,9 @@ address="monitor.dusk.network:1337"
 # NB: The messages propagated in kadcast are not propagated in gossip
 enabled=false
 
+# Enable/Disable RC-UDP transport
+raptor=true
+
 # Both listeners (UDP and TCP) are binding on this local addr
 # NB The addr should be reachable from outside
 address="127.0.0.1:7100"

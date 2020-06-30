@@ -165,7 +165,9 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 	//TODO: is this really required ?
 	//nolint:gosec
 	cmd := exec.Command(name, arg...)
+	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
+
 	if err := cmd.Start(); err != nil {
 		return err
 	}

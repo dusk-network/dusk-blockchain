@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	localNetSizeStr = os.Getenv("NETWORK_SIZE")
+	localNetSizeStr = os.Getenv("DUSK_NETWORK_SIZE")
 	localNetSize    = 10
 )
 
@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 	if localNetSizeStr != "" {
 		currentLocalNetSize, currentErr := strconv.Atoi(localNetSizeStr)
 		if currentErr == nil {
-			fmt.Println("Going to setup NETWORK_SIZE with custom value", "currentLocalNetSize", currentLocalNetSize)
+			fmt.Println("Going to setup DUSK_NETWORK_SIZE with custom value", "currentLocalNetSize", currentLocalNetSize)
 			localNetSize = currentLocalNetSize
 		}
 	}
@@ -49,6 +49,8 @@ func TestMain(m *testing.M) {
 	if len(profileID) == 0 {
 		profileID = "default"
 	}
+
+	log.Infof("Selected profile: %s", profileID)
 
 	// Create a network of N nodes
 	for i := 0; i < localNetSize; i++ {
@@ -171,8 +173,14 @@ func TestCatchup(t *testing.T) {
 // which network TPS metric should be collected
 func TestMeasureNetworkTPS(t *testing.T) {
 
-	// Not needed in CI
-	t.Skip()
+	// Disabled by default not to messup the CI
+	_, presented := os.LookupEnv("DUSK_ENABLE_TPS_TEST")
+	if !presented {
+		t.SkipNow()
+	}
+
+	log.Info("60sec Wait for network nodes to complete bootstrapping procedure")
+	time.Sleep(60 * time.Second)
 
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 	consensusNodes := os.Getenv("DUSK_CONSENSUS_NODES")
@@ -191,7 +199,8 @@ func TestMeasureNetworkTPS(t *testing.T) {
 		_, _ = localNet.LoadWalletCmd(uint(i), walletsPass)
 	}
 
-	time.Sleep(1 * time.Second)
+	log.Info("10sec Wait for consensus-nodes to kick off consensus")
+	time.Sleep(10 * time.Second)
 
 	// Send to all consensus-running nodes a bid tx
 	for i := 0; i < nodesNum; i++ {

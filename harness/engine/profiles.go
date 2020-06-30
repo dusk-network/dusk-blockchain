@@ -21,6 +21,8 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("general.network", "testnet")
 
 	viper.Set("logger.output", node.Dir+"/dusk")
+	viper.Set("logger.level", "warn")
+
 	viper.Set("gql.address", node.Cfg.Gql.Address)
 	viper.Set("gql.network", node.Cfg.Gql.Network)
 	viper.Set("gql.enabled", "true")
@@ -60,7 +62,6 @@ func Profile3(index int, node *DuskNode, walletPath string) {
 
 	Profile1(index, node, walletPath)
 
-	viper.Set("logger.level", "info")
 	viper.Set("kadcast.enabled", true)
 	basePortNumber := 10000
 
