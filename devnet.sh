@@ -187,6 +187,9 @@ processors:
         - {from: "hash", to: "msg_hash", type: "string"}
         - {from: "error", to: "msg_error", type: "string"}
         - {from: "score", to: "msg_score", type: "string"}
+        - {from: "count", to: "msg_count", type: "string"}
+        - {from: "last_height", to: "msg_last_height", type: "string"}
+        - {from: "height", to: "msg_height", type: "string"}
       ignore_missing: true
       fail_on_error: false
       mode: rename
