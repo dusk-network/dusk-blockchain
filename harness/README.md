@@ -60,3 +60,10 @@ tests$ go test -v --count=1 --test.timeout=0  ./... -args -enable
  
 Alternatively, you can have a one liner do it all (run it from dusk-blockchain root dir):
 `DUSK_BLOCKCHAIN=$PWD/bin/dusk DUSK_BLINDBID=$PWD/../dusk-blindbidproof/target/debug/blindbid DUSK_SEEDER=$PWD/../dusk-seeder/voucher DUSK_WALLET_PASS="default" make test-harness`
+
+
+###### Benchmark testing
+
+0. Start net-collector
+1 `./setup-env.sh`
+2. `run-tps-test.sh`

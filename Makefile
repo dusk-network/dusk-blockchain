@@ -40,6 +40,8 @@ voucher: build
 	./bin/voucher
 wallet: build
 	./bin/wallet
+netcollector: build
+	./bin/netcollector
 ###################################CROSS#################################################
 install-tools:
 	go get -u github.com/karalabe/xgo
