@@ -1,3 +1,5 @@
+REPOPATH=`pwd`/../..
+
 # Run setup-env script before this one
 
 # Config template to be loaded
@@ -14,6 +16,15 @@ export DUSK_CONSENSUS_NODES=10
 
 # Enable TestMeasureNetworkTPS and Data collecting
 export DUSK_ENABLE_TPS_TEST=1
+
+# localnet wallet default password
+export  DUSK_WALLET_PASS="password"
+
+# Network executables
+export DUSK_BLINDBID="$REPOPATH/bin/blindbid-avx2"
+export DUSK_BLOCKCHAIN="$REPOPATH/bin/dusk"
+export DUSK_SEEDER="$REPOPATH/bin/voucher"
+
 
 # Increase open files OS limit
 ulimit -n 20000
