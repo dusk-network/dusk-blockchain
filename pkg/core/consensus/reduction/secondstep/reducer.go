@@ -158,6 +158,7 @@ func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 	} else {
 		// Increase timeout if we had no agreement
 		r.timeOut = r.timeOut * 2
+		lg.WithField("timeout", r.timeOut).Trace("increase_timeout")
 	}
 
 	restart := r.signer.Compose(restartFactory)
