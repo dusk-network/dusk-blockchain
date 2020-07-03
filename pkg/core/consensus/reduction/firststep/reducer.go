@@ -170,6 +170,10 @@ func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 		}
 		// Increase timeout if we did not have a good result
 		r.timeOut = r.timeOut * 2
+		if r.timeOut > 20*time.Second {
+			lg.WithField("timeout", r.timeOut).Trace("max_timeout_reached")
+			r.timeOut = 20 * time.Second
+		}
 		lg.WithField("timeout", r.timeOut).Trace("increase_timeout")
 		svm = r.signer.Compose(factory).(message.StepVotesMsg)
 	}

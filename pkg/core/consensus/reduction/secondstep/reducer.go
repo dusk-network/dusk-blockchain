@@ -158,6 +158,10 @@ func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 	} else {
 		// Increase timeout if we had no agreement
 		r.timeOut = r.timeOut * 2
+		if r.timeOut > 20*time.Second {
+			lg.WithField("timeout", r.timeOut).Trace("max_timeout_reached")
+			r.timeOut = 20 * time.Second
+		}
 		lg.WithField("timeout", r.timeOut).Trace("increase_timeout")
 	}
 
