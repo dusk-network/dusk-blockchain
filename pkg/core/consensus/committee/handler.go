@@ -1,12 +1,15 @@
 package committee
 
 import (
+	"github.com/sirupsen/logrus"
 	"math"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 )
+
+var lg = logrus.WithField("process", "committee")
 
 // PregenerationAmount is the size of a pregenerated committee
 var PregenerationAmount uint8 = 8
@@ -85,5 +88,9 @@ func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 func (b *Handler) membersAt(idx uint8) int {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
+	if len(b.Committees) < int(idx) {
+		lg.WithField("len_committees)", len(b.Committees)).WithField("idx", idx).Error("len committees is lower than idx")
+		return 0
+	}
 	return b.Committees[idx].Set.Len()
 }
