@@ -92,9 +92,9 @@ func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 func (b *Handler) membersAt(idx uint8) (int, error) {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
-	if len(b.Committees) < (int(idx) - 1) {
+	if len(b.Committees) <= (int(idx) - 1) {
 		err := errors.New("len committees is lower than idx")
-		lg.WithField("len_committees)", len(b.Committees)).WithField("idx", idx).WithError(err).Error("failed to run membersAt")
+		lg.WithField("len_committees", len(b.Committees)).WithField("idx", idx).WithError(err).Error("failed to run membersAt")
 		return 0, err
 	}
 	return b.Committees[idx].Set.Len(), nil
