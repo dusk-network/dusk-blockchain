@@ -171,7 +171,7 @@ func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 		// Increase timeout if we did not have a good result
 		r.timeOut = r.timeOut * 2
 		if r.timeOut > 60*time.Second {
-			lg.WithField("timeout", r.timeOut).Trace("max_timeout_reached")
+			lg.WithField("timeout", r.timeOut).Error("max_timeout_reached")
 			r.timeOut = 60 * time.Second
 		}
 		lg.WithField("timeout", r.timeOut).Trace("increase_timeout")
@@ -185,7 +185,8 @@ func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 // CollectBestScore activates the 2-step reduction cycle.
 // TODO: interface - rename into CollectStartReductionSignal
 func (r *Reducer) CollectBestScore(e consensus.InternalPacket) error {
-	lg.WithField("id", r.reductionID).Traceln("starting reduction")
+	lg.WithField("id", r.reductionID).
+		Trace("starting firststep reduction")
 	r.startReduction()
 	step := r.eventPlayer.Forward(r.ID())
 	r.eventPlayer.Play(r.reductionID)

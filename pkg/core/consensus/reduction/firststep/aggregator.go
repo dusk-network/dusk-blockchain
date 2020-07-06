@@ -105,10 +105,11 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	req := rpcbus.NewRequest(*bytes.NewBuffer(blockHash))
 	resp, err := rpcBus.Call(topics.GetCandidate, req, 5*time.Second)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "reduction",
-			"error":   err,
-		}).Errorln("fetching the candidate block failed")
+		log.
+			WithError(err).
+			WithFields(log.Fields{
+				"process": "reduction",
+			}).Error("fetching the candidate block failed")
 		return err
 	}
 	cm := resp.(message.Candidate)
@@ -118,10 +119,11 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	if !bytes.Equal(blockHash, emptyHash[:]) {
 		req := rpcbus.NewRequest(cm)
 		if _, err := rpcBus.Call(topics.VerifyCandidateBlock, req, 5*time.Second); err != nil {
-			log.WithFields(log.Fields{
-				"process": "reduction",
-				"error":   err,
-			}).Errorln("verifying the candidate block failed")
+			log.
+				WithError(err).
+				WithFields(log.Fields{
+					"process": "reduction",
+				}).Error("verifying the candidate block failed")
 			return err
 		}
 	}

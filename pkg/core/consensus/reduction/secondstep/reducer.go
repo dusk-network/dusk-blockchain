@@ -146,20 +146,23 @@ var restartFactory = consensus.Restarter{}
 // Halt is used by either the Aggregator in case of successful reduction or the timer in case of a timeout.
 // In the latter case no agreement message is pushed forward
 func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
-	lg.WithField("id", r.reductionID).Traceln("halted")
+	lg.
+		WithField("id", r.reductionID).
+		WithField("len_step", len(b)).
+		Trace("halted")
 	r.timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 
 	// Sending of agreement happens on it's own step
 	step := r.eventPlayer.Forward(r.ID())
 	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) && r.handler.AmMember(r.round, step) {
-		lg.WithField("step", step).Debugln("sending agreement")
+		lg.WithField("step", step).Debug("sending agreement")
 		r.sendAgreement(step, hash, b)
 	} else {
 		// Increase timeout if we had no agreement
 		r.timeOut = r.timeOut * 2
 		if r.timeOut > 60*time.Second {
-			lg.WithField("timeout", r.timeOut).Trace("max_timeout_reached")
+			lg.WithField("timeout", r.timeOut).Error("max_timeout_reached")
 			r.timeOut = 60 * time.Second
 		}
 		lg.WithField("timeout", r.timeOut).Trace("increase_timeout")
@@ -169,7 +172,7 @@ func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 	msg := message.New(topics.Restart, restart)
 
 	if err := r.signer.SendInternally(topics.Restart, msg, r.ID()); err != nil {
-		lg.WithError(err).Warnln("sending a restart after a Halt triggered error")
+		lg.WithError(err).Error("sending a restart after a Halt triggered error")
 	}
 }
 
@@ -179,7 +182,7 @@ func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 // StepVotesMsg and run with it anyway (to keep the security assumptions of the
 // protocol right).
 func (r *Reducer) CollectStepVotes(e consensus.InternalPacket) error {
-	lg.WithField("id", r.reductionID).Traceln("starting reduction")
+	lg.WithField("id", r.reductionID).Traceln("starting secondstep reduction")
 	sv := e.(message.StepVotesMsg)
 	hdr := sv.State()
 	r.startReduction(sv)
@@ -198,7 +201,7 @@ func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*message.StepVote
 	hdr := r.constructHeader(step, hash)
 	sig, err := r.signer.Sign(hdr)
 	if err != nil {
-		lg.WithField("category", "BUG").WithError(err).Errorln("cannot sign the agreement")
+		lg.WithField("category", "BUG").WithError(err).Error("cannot sign the agreement")
 		return
 	}
 
@@ -213,7 +216,7 @@ func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*message.StepVote
 	msg := message.New(topics.Agreement, *ev)
 	// then we forward the marshaled Agreement to the store to be sent
 	if err := r.signer.Gossip(msg, r.ID()); err != nil {
-		lg.WithField("category", "BUG").WithError(err).Errorln("error in gossiping the agreement")
+		lg.WithField("category", "BUG").WithError(err).Error("error in gossiping the agreement")
 	}
 }
 
