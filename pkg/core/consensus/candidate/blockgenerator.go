@@ -113,7 +113,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 
 	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, blk.Header.Hash}
 	score := bg.signer.Compose(scoreFactory)
-	lg.Debugln("sending score")
+	lg.WithField("score", score).Debugln("sending score")
 	msg := message.New(topics.Score, score)
 	if e := bg.signer.Gossip(msg, bg.ID()); e != nil {
 		return e
@@ -134,7 +134,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	// Since the Candidate message goes straight to the Chain, there is
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
-	lg.Debugln("sending candidate")
+	lg.WithField("candidate_height", blk.Header.Height).Debugln("sending candidate")
 	candidateMsg := message.MakeCandidate(blk, cert)
 	msg = message.New(topics.Candidate, candidateMsg)
 	return bg.signer.Gossip(msg, bg.ID())

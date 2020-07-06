@@ -377,7 +377,11 @@ func (c *Coordinator) FinalizeRound() {
 // components
 func (c *Coordinator) Forward(id uint32) uint8 {
 	if c.store.hasComponent(id) {
-		lg.WithField("id", id).Traceln("incrementing step")
+		lg.
+			WithField("step", c.Step()).
+			WithField("round", c.Round()).
+			WithField("id", id).
+			Traceln("incrementing step")
 		c.IncrementStep()
 	}
 	return c.Step()

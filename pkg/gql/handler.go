@@ -46,10 +46,6 @@ func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	log.Tracef("Query: %s", req.Query)
-	log.Tracef("Variables: %s", req.Variables)
-	log.Tracef("Operation: %s", req.Operation)
-
 	// Execute graphql query
 	result := graphql.Do(graphql.Params{
 		Schema:         *schema,
@@ -59,10 +55,14 @@ func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r *http.Request,
 		Context:        context.WithValue(context.Background(), "database", db), //nolint
 	})
 
-	// Error check
-	if len(result.Errors) > 0 {
-		log.Warnf("Execute query error(s): %v", result.Errors)
-	}
+	//// Error check
+	//if len(result.Errors) > 0 {
+	//	log.
+	//		WithField("query", req.Query).
+	//		WithField("variables", req.Variables).
+	//		WithField("operation", req.Operation).
+	//		WithField("errors", result.Errors).Error("Execute query error(s)")
+	//}
 
 	render.JSON(w, r, result)
 }

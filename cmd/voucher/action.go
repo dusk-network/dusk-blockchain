@@ -93,7 +93,7 @@ func handleConnection(duskNode *DuskNodes, conn net.Conn, ip string) {
 		return
 	}
 
-	log.WithField("message", string(buf)).Info("Message Received:")
+	log.WithField("message", string(buf)).Info("Message Received")
 
 	rep := strings.Split(string(buf), ",")
 	port := getPort(rep)

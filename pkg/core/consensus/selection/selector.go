@@ -158,9 +158,9 @@ func (s *Selector) startSelection() {
 func (s *Selector) IncreaseTimeOut() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if s.timeout > 20*time.Second {
+	if s.timeout > 60*time.Second {
 		lg.WithField("timeout", s.timeout).Trace("max_timeout_reached")
-		s.timeout = 20 * time.Second
+		s.timeout = 60 * time.Second
 	}
 	lg.WithField("timeout", s.timeout).Trace("increase_timeout")
 	s.timeout = s.timeout * 2

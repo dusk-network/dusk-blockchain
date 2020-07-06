@@ -54,6 +54,7 @@ type Registry struct {
 
 	RPC rpcConfiguration
 	Gql gqlConfiguration
+	API apiConfiguration
 
 	Performance performanceConfiguration
 	Logger      loggerConfiguration

@@ -91,17 +91,17 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 
 	getMempoolTxsChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetMempoolTxs, getMempoolTxsChan); err != nil {
-		log.Errorf("rpcbus.GetMempoolTxs err=%v", err)
+		log.WithError(err).Error("failed to register topics.GetMempoolTxs")
 	}
 
 	getMempoolTxsBySizeChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetMempoolTxsBySize, getMempoolTxsBySizeChan); err != nil {
-		log.Errorf("rpcbus.getMempoolTxsBySize err=%v", err)
+		log.WithError(err).Error("failed to register topics.GetMempoolTxsBySize")
 	}
 
 	sendTxChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.SendMempoolTx, sendTxChan); err != nil {
-		log.Errorf("rpcbus.SendMempoolTx err=%v", err)
+		log.WithError(err).Error("failed to register topics.SendMempoolTx")
 	}
 
 	intermediateBlockChan := initIntermediateBlockCollector(eventBus)
@@ -178,16 +178,22 @@ func (m *Mempool) Run() {
 // onPendingTx handles a submitted tx from any source (rpcBus or eventBus)
 func (m *Mempool) onPendingTx(t TxDesc) ([]byte, error) {
 
-	log.Infof("Pending txs=%d", len(m.pending))
+	log.WithField("len_pending", len(m.pending)).Info("handle submitted tx")
 
 	start := time.Now()
 	txid, err := m.processTx(t)
 	elapsed := time.Since(start)
 
 	if err != nil {
-		log.Errorf("Failed txid=%s err='%v' duration=%d μs", toHex(txid), err, elapsed.Microseconds())
+		log.WithError(err).
+			WithField("txid", toHex(txid)).
+			WithField("duration", elapsed.Microseconds()).
+			Error("Failed handle submitted tx")
 	} else {
-		log.Infof("Verified txid=%s duration=%d μs", toHex(txid), elapsed.Microseconds())
+		log.WithError(err).
+			WithField("txid", toHex(txid)).
+			WithField("duration", elapsed.Microseconds()).
+			Infof("Verified handle submitted tx")
 	}
 
 	return txid, err
@@ -201,7 +207,9 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 		return txid, fmt.Errorf("hash err: %s", err.Error())
 	}
 
-	log.Infof("Pending txid=%s size=%d bytes", toHex(txid), t.size)
+	log.WithField("txid", txid).
+		WithField("size_bytes", t.size).
+		Info("ensuring transaction rules satisfied")
 
 	if t.tx.Type() == transactions.Distribute {
 		// coinbase tx should be built by block generator only
@@ -252,7 +260,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 
 	blockHash := toHex(b.Header.Hash)
 
-	log.Infof("Processing block %s with %d txs", blockHash, len(b.Txs))
+	log.WithField("blockHash", blockHash).WithField("len txs", len(b.Txs)).Info("processing_block")
 
 	if m.verified.Len() == 0 {
 		// No txs accepted then no cleanup needed
@@ -287,27 +295,29 @@ func (m *Mempool) removeAccepted(b block.Block) {
 		m.verified = s
 	}
 
-	log.Infof("Processing block %s completed", toHex(b.Header.Hash))
+	log.WithField("header_hash", toHex(b.Header.Hash)).Info("processing_block_completed")
 }
 
 func (m *Mempool) onIdle() {
 
 	// stats to log
 	poolSize := float32(m.verified.Size()) / 1000
-	log.Infof("Txs count %d, total size %.3f kB", m.verified.Len(), poolSize)
+	log.WithField("txs_count", m.verified.Len()).WithField("pool_size", poolSize).Infof("stats to log")
 
 	// trigger alarms/notifications in case of abnormal state
 
 	// trigger alarms on too much txs memory allocated
 	maxSizeBytes := config.Get().Mempool.MaxSizeMB * 1000 * 1000
 	if m.verified.Size() > maxSizeBytes {
-		log.Warnf("Mempool is bigger than %d MB", config.Get().Mempool.MaxSizeMB)
+		log.WithField("max_size_mb", config.Get().Mempool.MaxSizeMB).
+			WithField("current_size", m.verified.Size()).
+			Warn("Mempool is too big")
 	}
 
 	if log.Logger.Level == logger.TraceLevel {
 		if m.verified.Len() > 0 {
 			_ = m.verified.Range(func(k txHash, t TxDesc) error {
-				log.Tracef("txid=%s", toHex(k[:]))
+				log.WithField("txid", toHex(k[:])).Trace("verified transaction")
 				return nil
 			})
 		}
@@ -557,16 +567,16 @@ func toHex(id []byte) string {
 // caller should be left to format the data however they wish
 func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}, error), name string) {
 
-	log.Tracef("Handling %s request", name)
+	//log.Tracef("Handling %s request", name)
 
 	result, err := handler(r)
 	if err != nil {
-		log.Errorf("Failed %s request: %v", name, err)
+		//log.Errorf("Failed %s request: %v", name, err)
 		r.RespChan <- rpcbus.Response{Err: err}
 		return
 	}
 
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
 
-	log.Tracef("Handled %s request", name)
+	//log.Tracef("Handled %s request", name)
 }

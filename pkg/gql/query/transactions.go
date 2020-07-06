@@ -3,8 +3,6 @@ package query
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
@@ -212,9 +210,9 @@ func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error)
 	}
 
 	if count >= txsFetchLimit {
-		msg := fmt.Sprintf("requested txs count exceeds the limit of %d", txsFetchLimit)
-		log.Warn(msg)
-
+		msg := "requested txs count exceeds the limit"
+		log.WithField("txsFetchLimit", txsFetchLimit).
+			Warn(msg)
 		return txs, errors.New(msg)
 	}
 

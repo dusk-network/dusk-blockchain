@@ -1,16 +1,12 @@
 package committee
 
 import (
-	"errors"
-	"github.com/sirupsen/logrus"
 	"math"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 )
-
-var lg = logrus.WithField("process", "committee")
 
 // PregenerationAmount is the size of a pregenerated committee
 var PregenerationAmount uint8 = 8
@@ -53,10 +49,7 @@ func (b *Handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8, maxSize i
 
 // Committee returns a VotingCommittee for a given round and step.
 func (b *Handler) Committee(round uint64, step uint8, maxSize int) user.VotingCommittee {
-	memberAtStep, err := b.membersAt(step)
-	if err != nil {
-		b.generateCommittees(round, step-1, maxSize)
-	} else if memberAtStep == 0 {
+	if b.membersAt(step) == 0 {
 		b.generateCommittees(round, step, maxSize)
 	}
 	b.lock.RLock()
@@ -89,13 +82,8 @@ func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 	return size
 }
 
-func (b *Handler) membersAt(idx uint8) (int, error) {
+func (b *Handler) membersAt(idx uint8) int {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
-	if len(b.Committees) <= (int(idx) - 1) {
-		err := errors.New("len committees is lower than idx")
-		lg.WithField("len_committees", len(b.Committees)).WithField("idx", idx).WithError(err).Error("failed to run membersAt")
-		return 0, err
-	}
-	return b.Committees[idx].Set.Len(), nil
+	return b.Committees[idx].Set.Len()
 }

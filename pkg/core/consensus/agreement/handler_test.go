@@ -34,7 +34,8 @@ func TestGetVoterKeys(t *testing.T) {
 	ev := message.MockAgreement(hash, 1, 3, keys, p)
 	handler := NewHandler(keys[0], *p)
 
-	voterKeys := handler.getVoterKeys(ev)
+	voterKeys, err := handler.getVoterKeys(ev)
+	assert.Nil(t, err)
 
 	// Ensure voterKeys only contains keys from `keys`
 	for _, key := range voterKeys {

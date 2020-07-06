@@ -98,6 +98,14 @@ type gqlConfiguration struct {
 	Notification notificationConfiguration
 }
 
+type apiConfiguration struct {
+	Enabled   bool
+	Address   string
+	EnableTLS bool
+	CertFile  string
+	KeyFile   string
+}
+
 type notificationConfiguration struct {
 	BrokersNum       uint
 	ClientsPerBroker uint

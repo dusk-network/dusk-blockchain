@@ -98,7 +98,11 @@ func (a *agreement) listen() {
 }
 
 func (a *agreement) sendCertificate(ag message.Agreement) {
-	keys := a.handler.getVoterKeys(ag)
+	keys, err := a.handler.getVoterKeys(ag)
+	if err != nil {
+		lg.WithField("agreement", ag.String()).Error("could not getVoterKeys for the agreement")
+		return
+	}
 	cert := message.NewCertificate(ag, keys)
 	msg := message.New(topics.Certificate, cert)
 	a.publisher.Publish(topics.Certificate, msg)

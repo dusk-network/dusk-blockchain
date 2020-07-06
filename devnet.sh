@@ -115,6 +115,11 @@ init_dusk_func() {
 [wallet]
   file = "${currentDir}/harness/data/wallet-$((9000+$i)).dat"
   store = "${DDIR}/walletDB/"
+[api]
+  enabled=false
+  enableTLS = false
+  address="127.0.0.1:9199"
+
 EOF
 
   echo "init Dusk node $i, done."
