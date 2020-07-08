@@ -126,12 +126,20 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	s.publisher.Publish(topics.ValidCandidateHash, msg)
 
 	if err := s.signer.Gossip(msg, s.ID()); err != nil {
+		lg.
+			WithError(err).
+			WithField("step", h.Step).
+			WithField("round", h.Round).
+			Error("CollectScoreEvent, failed to gossip")
 		return err
 	}
 
-	lg.WithFields(log.Fields{
-		"new_best": score.Score,
-	}).Debugln("swapping best score")
+	lg.
+		WithField("step", h.Step).
+		WithField("round", h.Round).
+		WithFields(log.Fields{
+			"new_best": score.Score,
+		}).Debugln("swapping best score")
 	s.bestEvent = score
 	return nil
 }
@@ -158,12 +166,20 @@ func (s *Selector) startSelection() {
 func (s *Selector) IncreaseTimeOut() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	s.timeout = s.timeout * 2
 	if s.timeout > 60*time.Second {
-		lg.WithField("timeout", s.timeout).Error("max_timeout_reached")
+		lg.
+			WithField("step", s.bestEvent.State().Step).
+			WithField("round", s.bestEvent.State().Round).
+			WithField("timeout", s.timeout).
+			Error("max_timeout_reached")
 		s.timeout = 60 * time.Second
 	}
-	lg.WithField("timeout", s.timeout).Trace("increase_timeout")
-	s.timeout = s.timeout * 2
+	lg.
+		WithField("step", s.bestEvent.State().Step).
+		WithField("round", s.bestEvent.State().Round).
+		WithField("timeout", s.timeout).
+		Trace("increase_timeout")
 }
 
 //nolint:unparam
@@ -180,7 +196,10 @@ func (s *Selector) sendBestEvent() error {
 	}
 
 	msg := message.New(topics.BestScore, bestEvent)
-	_ = s.signer.SendInternally(topics.BestScore, msg, s.ID())
+	err := s.signer.SendInternally(topics.BestScore, msg, s.ID())
+	if err != nil {
+		lg.WithError(err).Error("sendBestEvent, failed to SendInternally the BestScore")
+	}
 	s.handler.LowerThreshold()
 	s.IncreaseTimeOut()
 	return nil

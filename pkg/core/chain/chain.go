@@ -241,13 +241,14 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	}
 
 	// If we are more than one block behind, stop the consensus
+	log.Debug("topics.StopConsensus")
 	c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
 
 	// Accept the block
 	blk := m.Payload().(block.Block)
 
 	// This will decrement the sync counter
-	// TODO: a new context should be created with timeout, cancelation, etc
+	// TODO: a new context should be created with timeout, cancellation, etc
 	// instead of reusing the Chain global one
 	if err := c.AcceptBlock(c.ctx, blk); err != nil {
 		return err
@@ -267,7 +268,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 
 		// Once received, we can re-start consensus.
 		// This sets off a chain of processing which goes from sending the
-		// round update, to reinstantiating the consensus, to setting off
+		// round update, to re-instantiating the consensus, to setting off
 		// the first consensus loop. So, we do this in a goroutine to
 		// avoid blocking other requests to the chain.
 		go func() {
@@ -286,14 +287,14 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	field := logger.Fields{"process": "accept block"}
+	field := logger.Fields{"process": "accept block", "height": blk.Header.Height}
 	l := log.WithFields(field)
 
 	l.Trace("verifying block")
 
 	// 1. Check that stateless and stateful checks pass
 	if err := c.verifier.SanityCheckBlock(c.prevBlock, blk); err != nil {
-		l.WithError(err).Warnln("block verification failed")
+		l.WithError(err).Error("block verification failed")
 		return err
 	}
 
@@ -303,7 +304,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	// for the same round is negligible.
 	l.Trace("verifying block certificate")
 	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
-		l.WithError(err).Warnln("certificate verification failed")
+		l.WithError(err).Error("certificate verification failed")
 		return err
 	}
 
@@ -311,7 +312,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	l.Debug("calling ExecuteStateTransitionFunction")
 	provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs, blk.Header.Height)
 	if err != nil {
-		l.WithError(err).Errorln("Error in executing the state transition")
+		l.WithError(err).Error("Error in executing the state transition")
 		return err
 	}
 
@@ -321,14 +322,14 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	// 4. Store the approved block
 	l.Trace("storing block in db")
 	if err := c.loader.Append(&blk); err != nil {
-		l.WithError(err).Errorln("block storing failed")
+		l.WithError(err).Error("block storing failed")
 		return err
 	}
 
 	// 5. Gossip advertise block Hash
 	l.Trace("gossiping block")
 	if err := c.advertiseBlock(blk); err != nil {
-		l.WithError(err).Errorln("block advertising failed")
+		l.WithError(err).Error("block advertising failed")
 		return err
 	}
 
@@ -360,6 +361,9 @@ func (c *Chain) sendRoundUpdate() error {
 		Seed:  hdr.Seed,
 		Hash:  hdr.Hash,
 	}
+	log.
+		WithField("round", ru.Round).
+		Debug("sendRoundUpdate, topics.RoundUpdate")
 	msg := message.New(topics.RoundUpdate, ru)
 	c.eventBus.Publish(topics.RoundUpdate, msg)
 	return nil
@@ -578,7 +582,7 @@ func (c *Chain) provideRoundResults(r rpcbus.Request) {
 	r.RespChan <- rpcbus.NewResponse(*buf, nil)
 }
 
-// GetSyncProgress returns how close the node is to being sycned to the tip,
+// GetSyncProgress returns how close the node is to being synced to the tip,
 // as a percentage value.
 func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
 	if c.highestSeen == 0 {

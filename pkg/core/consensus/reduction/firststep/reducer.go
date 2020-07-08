@@ -154,7 +154,10 @@ func (s StepVotesMsgFactory) Create(sender []byte, round uint64, step uint8) con
 // on the StepVotes topic.
 func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 	var svm message.StepVotesMsg
-	lg.WithField("id", r.reductionID).Traceln("halted")
+	lg.
+		WithField("id", r.reductionID).
+		WithField("round", r.round).
+		Traceln("firststep_halted")
 	r.Timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 
@@ -171,15 +174,28 @@ func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 		// Increase timeout if we did not have a good result
 		r.timeOut = r.timeOut * 2
 		if r.timeOut > 60*time.Second {
-			lg.WithField("timeout", r.timeOut).Error("max_timeout_reached")
+			lg.
+				WithField("timeout", r.timeOut).
+				WithField("id", r.reductionID).
+				WithField("round", r.round).
+				Error("max_timeout_reached")
 			r.timeOut = 60 * time.Second
 		}
-		lg.WithField("timeout", r.timeOut).Trace("increase_timeout")
+		lg.WithField("timeout", r.timeOut).
+			WithField("id", r.reductionID).
+			WithField("round", r.round).
+			Trace("increase_timeout")
 		svm = r.signer.Compose(factory).(message.StepVotesMsg)
 	}
 
 	msg := message.New(topics.StepVotes, svm)
-	_ = r.signer.SendInternally(topics.StepVotes, msg, r.ID())
+	err := r.signer.SendInternally(topics.StepVotes, msg, r.ID())
+	if err != nil {
+		lg.WithField("timeout", r.timeOut).
+			WithField("id", r.reductionID).
+			WithField("round", r.round).
+			Error("firststep_halted, failed to SendInternally")
+	}
 }
 
 // CollectBestScore activates the 2-step reduction cycle.

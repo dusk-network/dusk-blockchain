@@ -107,7 +107,7 @@ func (r *Reducer) Collect(e consensus.InternalPacket) error {
 		"sender": hex.EncodeToString(ev.Sender()),
 		"id":     r.reductionID,
 		"hash":   hex.EncodeToString(hdr.BlockHash),
-	}).Debugln("received event")
+	}).Debugln("received_event")
 	return r.aggregator.collectVote(ev)
 }
 
@@ -147,32 +147,50 @@ var restartFactory = consensus.Restarter{}
 // In the latter case no agreement message is pushed forward
 func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 	lg.
-		WithField("id", r.reductionID).
 		WithField("len_step", len(b)).
-		Trace("halted")
+		WithField("id", r.reductionID).
+		WithField("round", r.round).
+		Trace("secondstep_halted")
 	r.timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 
 	// Sending of agreement happens on it's own step
 	step := r.eventPlayer.Forward(r.ID())
 	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) && r.handler.AmMember(r.round, step) {
-		lg.WithField("step", step).Debug("sending agreement")
+		lg.
+			WithField("step", step).
+			WithField("id", r.reductionID).
+			WithField("round", r.round).
+			Debug("sending agreement")
 		r.sendAgreement(step, hash, b)
 	} else {
 		// Increase timeout if we had no agreement
 		r.timeOut = r.timeOut * 2
 		if r.timeOut > 60*time.Second {
-			lg.WithField("timeout", r.timeOut).Error("max_timeout_reached")
+			lg.
+				WithField("timeout", r.timeOut).
+				WithField("step", step).
+				WithField("id", r.reductionID).
+				WithField("round", r.round).
+				Error("max_timeout_reached")
 			r.timeOut = 60 * time.Second
 		}
-		lg.WithField("timeout", r.timeOut).Trace("increase_timeout")
+		lg.WithField("timeout", r.timeOut).
+			WithField("step", step).
+			WithField("id", r.reductionID).
+			WithField("round", r.round).
+			Trace("increase_timeout")
 	}
 
 	restart := r.signer.Compose(restartFactory)
 	msg := message.New(topics.Restart, restart)
 
 	if err := r.signer.SendInternally(topics.Restart, msg, r.ID()); err != nil {
-		lg.WithError(err).Error("sending a restart after a Halt triggered error")
+		lg.WithError(err).
+			WithField("step", step).
+			WithField("id", r.reductionID).
+			WithField("round", r.round).
+			Error("secondstep_halted, failed to SendInternally")
 	}
 }
 
@@ -182,13 +200,18 @@ func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 // StepVotesMsg and run with it anyway (to keep the security assumptions of the
 // protocol right).
 func (r *Reducer) CollectStepVotes(e consensus.InternalPacket) error {
-	lg.WithField("id", r.reductionID).Traceln("starting secondstep reduction")
 	sv := e.(message.StepVotesMsg)
 	hdr := sv.State()
 	r.startReduction(sv)
 	// fetch the right step
 	step := r.eventPlayer.Forward(r.ID())
 	r.eventPlayer.Play(r.reductionID)
+
+	lg.
+		WithField("id", r.reductionID).
+		WithField("round", r.round).
+		WithField("step", step).
+		Traceln("starting secondstep reduction")
 
 	if r.handler.AmMember(r.round, step) {
 		// propagating a new StepVoteMsg with the right step

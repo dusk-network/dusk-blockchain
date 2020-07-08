@@ -113,7 +113,10 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 
 	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, blk.Header.Hash}
 	score := bg.signer.Compose(scoreFactory)
-	lg.WithField("score", score).Debugln("sending score")
+	lg.
+		WithField("step", score.State().Step).
+		WithField("round", score.State().Round).
+		Debugln("sending score")
 	msg := message.New(topics.Score, score)
 	if e := bg.signer.Gossip(msg, bg.ID()); e != nil {
 		return e

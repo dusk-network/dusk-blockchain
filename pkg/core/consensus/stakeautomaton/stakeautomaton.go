@@ -72,7 +72,7 @@ func (m *StakeAutomaton) Listen() {
 
 		if m.height+renewalOffset >= m.stakeEndHeight {
 			if err := m.sendStake(); err != nil {
-				l.WithError(err).Warnln("could not send stake tx")
+				l.WithError(err).Error("could not send stake tx")
 				continue
 			}
 		}

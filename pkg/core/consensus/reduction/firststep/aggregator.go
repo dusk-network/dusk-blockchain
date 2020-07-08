@@ -67,6 +67,12 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 		sv.Cluster = sortedset.NewCluster()
 	}
 	if err := sv.StepVotes.Add(ev.SignedHash, hdr.PubKeyBLS, hdr.Step); err != nil {
+		lg.
+			WithError(err).
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			WithField("quorum", sv.Cluster.TotalOccurrences()).
+			Debug("firststep, StepVotes.Add failed")
 		return err
 	}
 
@@ -76,6 +82,12 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 	}
 	a.voteSets[hash] = sv
 	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum(hdr.Round) {
+		lg.
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			WithField("quorum", sv.Cluster.TotalOccurrences()).
+			Debug("firststep_quorum_reached")
+
 		a.finished = true
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
 
@@ -91,6 +103,12 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 		}
 
 		a.requestHalt(blockHash, sv.StepVotes)
+	} else {
+		lg.
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			WithField("quorum", sv.Cluster.TotalOccurrences()).
+			Debug("firststep_quorum_not_reached")
 	}
 	return nil
 }
