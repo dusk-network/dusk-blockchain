@@ -102,11 +102,11 @@ func (r *Reducer) Collect(e consensus.InternalPacket) error {
 	}
 
 	lg.WithFields(log.Fields{
-		"round":  hdr.Round,
-		"step":   hdr.Step,
-		"sender": hex.EncodeToString(ev.Sender()),
-		"id":     r.reductionID,
-		"hash":   hex.EncodeToString(hdr.BlockHash),
+		"round": hdr.Round,
+		"step":  hdr.Step,
+		//"sender": hex.EncodeToString(ev.Sender()),
+		"id":   r.reductionID,
+		"hash": hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received_event")
 	return r.aggregator.collectVote(ev)
 }
@@ -118,6 +118,11 @@ func (r *Reducer) Filter(hdr header.Header) bool {
 }
 
 func (r *Reducer) startReduction(sv message.StepVotesMsg) {
+	lg.WithFields(log.Fields{
+		"round":   r.round,
+		"id":      r.reductionID,
+		"timeout": r.timeOut / time.Second,
+	}).Debugln("startReduction")
 	r.timer.Start(r.timeOut)
 	r.aggregator = newAggregator(r.Halt, r.handler, &sv.StepVotes)
 }

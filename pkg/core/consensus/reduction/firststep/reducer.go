@@ -1,7 +1,6 @@
 package firststep
 
 import (
-	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -95,11 +94,11 @@ func (r *Reducer) Collect(e consensus.InternalPacket) error {
 
 	hdr := red.State()
 	lg.WithFields(log.Fields{
-		"round":  hdr.Round,
-		"step":   hdr.Step,
-		"sender": hex.EncodeToString(hdr.Sender()),
-		"id":     r.reductionID,
-		"hash":   hex.EncodeToString(hdr.BlockHash),
+		"round": hdr.Round,
+		"step":  hdr.Step,
+		//"sender": hex.EncodeToString(hdr.Sender()),
+		"id": r.reductionID,
+		//"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received event")
 	return r.aggregator.collectVote(red)
 }
@@ -111,6 +110,11 @@ func (r *Reducer) Filter(hdr header.Header) bool {
 }
 
 func (r *Reducer) startReduction() {
+	lg.WithFields(log.Fields{
+		"round":   r.round,
+		"id":      r.reductionID,
+		"timeout": r.timeOut / time.Second,
+	}).Debugln("firststep, startReduction")
 	r.Timer.Start(r.timeOut)
 	r.aggregator = newAggregator(r.Halt, r.handler, r.rpcBus)
 }
@@ -201,7 +205,9 @@ func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 // CollectBestScore activates the 2-step reduction cycle.
 // TODO: interface - rename into CollectStartReductionSignal
 func (r *Reducer) CollectBestScore(e consensus.InternalPacket) error {
-	lg.WithField("id", r.reductionID).
+	lg.
+		WithField("id", r.reductionID).
+		WithField("round", r.round).
 		Trace("starting firststep reduction")
 	r.startReduction()
 	step := r.eventPlayer.Forward(r.ID())

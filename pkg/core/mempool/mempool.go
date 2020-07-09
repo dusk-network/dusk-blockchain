@@ -260,7 +260,11 @@ func (m *Mempool) removeAccepted(b block.Block) {
 
 	blockHash := toHex(b.Header.Hash)
 
-	log.WithField("blockHash", blockHash).WithField("len txs", len(b.Txs)).Info("processing_block")
+	log.
+		WithField("height", b.Header.Height).
+		WithField("hash", blockHash).
+		WithField("len_txs", len(b.Txs)).
+		Info("processing_block")
 
 	if m.verified.Len() == 0 {
 		// No txs accepted then no cleanup needed
@@ -289,13 +293,22 @@ func (m *Mempool) removeAccepted(b block.Block) {
 		})
 
 		if err != nil {
-			log.Error(err.Error())
+			log.
+				WithError(err).
+				WithField("height", b.Header.Height).
+				WithField("hash", blockHash).
+				WithField("len_txs", len(b.Txs)).
+				Error("could not check mempool verified tx")
 		}
 
 		m.verified = s
 	}
 
-	log.WithField("header_hash", toHex(b.Header.Hash)).Info("processing_block_completed")
+	log.
+		WithField("height", b.Header.Height).
+		WithField("hash", blockHash).
+		WithField("len_txs", len(b.Txs)).
+		Info("processing_block_completed")
 }
 
 func (m *Mempool) onIdle() {

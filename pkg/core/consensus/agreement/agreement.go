@@ -88,7 +88,11 @@ func (a *agreement) CollectAgreementEvent(packet consensus.InternalPacket) error
 func (a *agreement) listen() {
 	select {
 	case evs := <-a.accumulator.CollectedVotesChan:
-		lg.WithField("id", a.agreementID).Debugln("quorum reached")
+		lg.
+			WithField("round", a.round).
+			WithField("step", evs[0].State().Step).
+			WithField("id", a.agreementID).
+			Debugln("quorum reached")
 		// Start a goroutine here to release the lock held by
 		// Coordinator.CollectEvent
 		// Send the Agreement to the Certificate Collector within the Chain

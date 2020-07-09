@@ -97,6 +97,11 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 		// StepVotes
 		if !bytes.Equal(blockHash, emptyHash[:]) {
 			if err := verifyCandidateBlock(a.rpcBus, blockHash); err != nil {
+				log.
+					WithError(err).
+					WithField("round", hdr.Round).
+					WithField("step", hdr.Step).
+					Error("firststep_verifyCandidateBlock the candidate block failed")
 				a.requestHalt(emptyHash[:])
 				return nil
 			}
@@ -127,7 +132,7 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 			WithError(err).
 			WithFields(log.Fields{
 				"process": "reduction",
-			}).Error("fetching the candidate block failed")
+			}).Error("firststep, fetching the candidate block failed")
 		return err
 	}
 	cm := resp.(message.Candidate)
@@ -141,7 +146,7 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 				WithError(err).
 				WithFields(log.Fields{
 					"process": "reduction",
-				}).Error("verifying the candidate block failed")
+				}).Error("firststep, verifying the candidate block failed")
 			return err
 		}
 	}

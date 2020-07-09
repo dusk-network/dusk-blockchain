@@ -121,13 +121,16 @@ func (s *roundStore) Dispatch(m message.Message) {
 		"topic":             m.Category().String(),
 	}).Traceln("notifying subscribers")
 	for _, sub := range subscribers {
-		if err := sub.NotifyPayload(m.Payload().(InternalPacket)); err != nil {
+		ip := m.Payload().(InternalPacket)
+		if err := sub.NotifyPayload(ip); err != nil {
 			lg.WithFields(log.Fields{
 				"coordinator_round": s.coordinator.Round(),
 				"coordinator_step":  s.coordinator.Step(),
 				"topic":             m.Category().String(),
+				"round":             ip.State().Round,
+				"step":              ip.State().Step,
 				"id":                sub.ID(),
-			}).WithError(err).Warnln("notifying subscriber failed")
+			}).WithError(err).Error("notifying subscriber failed")
 		}
 	}
 }
