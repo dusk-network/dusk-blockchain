@@ -96,6 +96,8 @@ func (a *agreement) listen() {
 		// Start a goroutine here to release the lock held by
 		// Coordinator.CollectEvent
 		// Send the Agreement to the Certificate Collector within the Chain
+
+		//TODO: what happens when sending the certificate fails ?
 		go a.sendCertificate(evs[0])
 	case <-a.quitChan:
 	}

@@ -152,7 +152,7 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	for {
 		select {
 		case <-timer.C:
-			return message.Candidate{}, errors.New("request timeout")
+			return message.Candidate{}, errors.New("request GetCandidate timeout")
 
 		// We take control of `candidateChan`, to monitor incoming
 		// candidates. There should be no race condition in reading from

@@ -432,7 +432,10 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	if err != nil {
 		// If the we can't get the block, we will fall
 		// back and catch up later.
-		log.WithError(err).Warnln("could not find winning candidate block")
+		log.
+			WithError(err).
+			WithField("height", c.highestSeen).
+			Error("could not find winning candidate block")
 		return
 	}
 	cm := resp.(message.Candidate)
@@ -445,7 +448,10 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	}
 
 	if err := c.finalizeIntermediateBlock(c.ctx, cm.Certificate); err != nil {
-		log.WithError(err).Warnln("could not accept intermediate block")
+		log.
+			WithError(err).
+			WithField("height", c.highestSeen).
+			Error("could not accept intermediate block")
 		return
 	}
 
