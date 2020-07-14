@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/dusk-network/dusk-blockchain/pkg/api"
 	"net"
 	"time"
 
@@ -131,17 +130,6 @@ func Setup() *Server {
 		} else {
 			if e := gqlServer.Start(); e != nil {
 				log.Errorf("GraphQL failed to start: %v", e)
-			}
-		}
-	}
-
-	// Instantiate API server
-	if cfg.Get().API.Enabled {
-		if apiServer, e := api.NewHTTPServer(eventBus, rpcBus); e != nil {
-			log.Errorf("API http server error: %v", e)
-		} else {
-			if e := apiServer.Start(apiServer); e != nil {
-				log.Errorf("API failed to start: %v", e)
 			}
 		}
 	}
