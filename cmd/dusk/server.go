@@ -6,6 +6,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/api"
+
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
@@ -36,15 +38,16 @@ var logServer = logrus.WithField("process", "server")
 
 // Server is the main process of the node
 type Server struct {
-	eventBus      *eventbus.EventBus
-	rpcBus        *rpcbus.RPCBus
-	loader        chain.Loader
-	dupeMap       *dupemap.DupeMap
-	counter       *chainsync.Counter
-	gossip        *processing.Gossip
-	grpcServer    *grpc.Server
-	rpcClient     *rpc.Client
-	cancelMonitor StopFunc
+	eventBus          *eventbus.EventBus
+	rpcBus            *rpcbus.RPCBus
+	loader            chain.Loader
+	dupeMap           *dupemap.DupeMap
+	counter           *chainsync.Counter
+	gossip            *processing.Gossip
+	grpcServer        *grpc.Server
+	rpcClient         *rpc.Client
+	cancelMonitor     StopFunc
+	activeConnections map[string]time.Time
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
@@ -133,16 +136,28 @@ func Setup() *Server {
 		}
 	}
 
+	// Instantiate API server
+	if cfg.Get().API.Enabled {
+		if apiServer, e := api.NewHTTPServer(eventBus, rpcBus); e != nil {
+			log.Errorf("API http server error: %v", e)
+		} else {
+			if e := apiServer.Start(apiServer); e != nil {
+				log.Errorf("API failed to start: %v", e)
+			}
+		}
+	}
+
 	// creating the Server
 	srv := &Server{
-		eventBus:   eventBus,
-		rpcBus:     rpcBus,
-		loader:     chainDBLoader,
-		dupeMap:    dupeBlacklist,
-		counter:    counter,
-		gossip:     processing.NewGossip(protocol.TestNet),
-		grpcServer: grpcServer,
-		rpcClient:  client,
+		eventBus:          eventBus,
+		rpcBus:            rpcBus,
+		loader:            chainDBLoader,
+		dupeMap:           dupeBlacklist,
+		counter:           counter,
+		gossip:            processing.NewGossip(protocol.TestNet),
+		grpcServer:        grpcServer,
+		rpcClient:         client,
+		activeConnections: make(map[string]time.Time),
 	}
 
 	// Setting up the transactor component
