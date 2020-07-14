@@ -236,21 +236,27 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	// likely just about to finalize consensus.
 	// TODO: we should probably just accept it if consensus was not
 	// started yet
+
+	// Accept the block
+	blk := m.Payload().(block.Block)
+
+	field := logger.Fields{"process": "onAcceptBlock", "height": blk.Header.Height}
+	lg := log.WithFields(field)
+
 	if !c.counter.IsSyncing() {
+		lg.Error("could not accept block since we are syncing")
 		return nil
 	}
 
 	// If we are more than one block behind, stop the consensus
-	log.Debug("topics.StopConsensus")
+	lg.Debug("topics.StopConsensus")
 	c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
-
-	// Accept the block
-	blk := m.Payload().(block.Block)
 
 	// This will decrement the sync counter
 	// TODO: a new context should be created with timeout, cancellation, etc
 	// instead of reusing the Chain global one
 	if err := c.AcceptBlock(c.ctx, blk); err != nil {
+		lg.WithError(err).Debug("could not AcceptBlock")
 		return err
 	}
 
@@ -260,6 +266,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	if !c.counter.IsSyncing() {
 		blk, cert, err := c.requestRoundResults(blk.Header.Height + 1)
 		if err != nil {
+			lg.WithError(err).Debug("could not requestRoundResults")
 			return err
 		}
 
@@ -272,7 +279,10 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 		// the first consensus loop. So, we do this in a goroutine to
 		// avoid blocking other requests to the chain.
 		go func() {
-			_ = c.sendRoundUpdate()
+			err = c.sendRoundUpdate()
+			if err != nil {
+				lg.WithError(err).Debug("could not sendRoundUpdate")
+			}
 		}()
 	}
 
@@ -281,7 +291,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 
 // AcceptBlock will accept a block if
 // 1. We have not seen it before
-// 2. All stateless and statefull checks are true
+// 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	c.mu.Lock()
@@ -409,10 +419,12 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
+		//TODO: shall this really panic ?
 		log.Panic(err)
 	}
 
 	if err := topics.Prepend(buf, topics.Inv); err != nil {
+		//TODO: shall this really panic ?
 		log.Panic(err)
 	}
 
@@ -464,7 +476,13 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 
 	// propagate round update
 	go func() {
-		_ = c.sendRoundUpdate()
+		err = c.sendRoundUpdate()
+		if err != nil {
+			log.
+				WithError(err).
+				WithField("height", c.highestSeen).
+				Error("could not sendRoundUpdate")
+		}
 	}()
 }
 
@@ -481,12 +499,14 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64LE(buf, round); err != nil {
+		//TODO: shall this really panic ?
 		log.Panic(err)
 	}
 
 	// TODO: prepending the topic should be done at the recipient end of the
 	// Gossip (together with all the other encoding)
 	if err := topics.Prepend(buf, topics.GetRoundResults); err != nil {
+		//TODO: shall this really panic ?
 		log.Panic(err)
 	}
 	msg := message.New(topics.GetRoundResults, *buf)

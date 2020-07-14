@@ -46,7 +46,10 @@ type Broker struct {
 func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
 	getCandidateChan := make(chan rpcbus.Request, 1)
-	_ = rpcBus.Register(topics.GetCandidate, getCandidateChan)
+	err := rpcBus.Register(topics.GetCandidate, getCandidateChan)
+	if err != nil {
+		log.WithError(err).Error("could not Register GetCandidate")
+	}
 	bestScoreChan := make(chan message.Message, 1)
 	broker.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
 

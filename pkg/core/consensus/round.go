@@ -308,7 +308,7 @@ func (c *Coordinator) reinstantiateStore() {
 func (c *Coordinator) CollectEvent(m message.Message) error {
 	var msg InternalPacket
 	switch p := m.Payload().(type) {
-	case message.SafeBuffer: // TODO: we should actually panic here
+	case message.SafeBuffer: // TODO: we should actually panic here (panic??)
 		_, _ = topics.Extract(&p)
 		return fmt.Errorf("trying to feed the Coordinator a bytes.Buffer for message: %s", m.Category().String())
 	case InternalPacket:
@@ -463,7 +463,7 @@ func (c *Coordinator) Compose(pf PacketFactory) InternalPacket {
 }
 
 // SendInternally publish a message for internal consumption (and therefore
-// does not carry the topic, nor needs binary de- serialization)
+// does not carry the topic, nor needs binary de-serialization)
 func (c *Coordinator) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
