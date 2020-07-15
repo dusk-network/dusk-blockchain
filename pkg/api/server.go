@@ -83,14 +83,6 @@ func (s *Server) InitRouting() *pat.Router {
 				},
 			),
 		),
-
-		//healthcheck.WithChecker(
-		//	"p2p", healthcheck.CheckerFunc(
-		//		func(ctx context.Context) error {
-		//			return s.
-		//		},
-		//	),
-		//),
 	))
 
 	// init consensus API services
