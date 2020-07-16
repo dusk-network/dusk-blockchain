@@ -112,7 +112,7 @@ start_dusk_func() {
   DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
 
   CMD="${currentDir}/bin/dusk --config ${DDIR}/dusk.toml"
-  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/dusk$i.log" 2>&1 &
+  TMPDIR=$DDIR ${CMD} >> "${currentDir}/devnet/dusk_data/logs/dusk$i.log" 2>&1 &
 
   EXEC_PID=$!
   echo "started Dusk node $i, pid=$EXEC_PID"
