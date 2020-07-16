@@ -9,6 +9,8 @@ MOCK=true
 VOUCHER=true
 FILEBEAT=false
 MOCK_ADDRESS=127.0.0.1:9191
+SEND_BID=false
+
 currentDir=$(pwd)
 
 # define command exec location
@@ -20,14 +22,15 @@ usage() {
   echo "-c <number>  -- TYPE to use. eg: release"
   echo "-q <number>  -- QTD of validators to run. eg: 5"
   echo "-s <number>  -- DUSK_VERSION version. eg: v0.3.0"
-  echo "-i <number>  -- INIT instances (true or false). eg: true"
-  echo "-m <number>  -- MOCK instances (true or false). eg: true"
-  echo "-f <number>  -- FILEBEAT instances (true or false). eg: true"
+  echo "-i <boolean>  -- INIT instances (true or false). default: true"
+  echo "-m <boolean>  -- MOCK instances (true or false). default: true"
+  echo "-f <boolean>  -- FILEBEAT instances (true or false). default: false"
+  echo "-b <boolean>  -- SEND_BID tx to instances (true or false). default: false"
 
   exit 1
 }
 
-while getopts "h?c:q:s:i:m:f:" args; do
+while getopts "h?c:q:s:i:m:f:b:" args; do
 case $args in
     h|\?)
       usage;
@@ -38,6 +41,7 @@ case $args in
     i ) INIT=${OPTARG};;
     m ) MOCK=${OPTARG};;
     f ) FILEBEAT=${OPTARG};;
+    b ) SEND_BID=${OPTARG};;
   esac
 done
 
@@ -252,6 +256,15 @@ start_dusk_mock_func() {
   echo "started Dusk Utils mock, pid=$EXEC_PID"
 }
 
+# send_bid_func
+send_bid_func(){
+  echo "Sending bid to node $i ..."
+
+  # send bid cmd
+  SENDBID_CMD="./bin/utils transactions --grpchost unix://${DDIR}/dusk-grpc.sock --txtype consensus --amount 10 --locktime 10"
+  ${SENDBID_CMD} >> "${currentDir}/devnet/dusk_data/logs/sendbid_bid$i.log" 2>&1 &
+}
+
 start_voucher_func() {
   echo "starting Dusk Voucher ..."
 
@@ -310,6 +323,12 @@ sleep 1
 for i in $(seq 0 "$QTD"); do
   start_dusk_func "$i"
 done
+
+if [ "${SEND_BID}" == "true" ]; then
+  for i in $(seq 0 "$QTD"); do
+    send_bid_func "$i"
+  done
+fi
 
 echo "done starting Dusk stack"
 exit 0
