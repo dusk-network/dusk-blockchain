@@ -35,7 +35,7 @@ func saveSeed(seed []byte, password string, file string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, seed, nil), 0777)
+	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, seed, nil), 0600)
 }
 
 //Modified from https://tutorialedge.net/golang/go-encrypt-decrypt-aes-tutorial/
