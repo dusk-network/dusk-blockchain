@@ -6,6 +6,8 @@ TYPE=branch
 DUSK_VERSION=v0.3.0
 INIT=true
 VOUCHER=true
+SEND_BID=true
+
 currentDir=$(pwd)
 
 # define command exec location
@@ -22,7 +24,7 @@ usage() {
   exit 1
 }
 
-while getopts "h?c:q:s:i:m:" args; do
+while getopts "h?c:q:s:i:" args; do
 case $args in
     h|\?)
       usage;
@@ -31,7 +33,6 @@ case $args in
     q ) QTD=${OPTARG};;
     s ) DUSK_VERSION=${OPTARG};;
     i ) INIT=${OPTARG};;
-    m ) MOCK=${OPTARG};;
   esac
 done
 
@@ -70,9 +71,6 @@ init_dusk_func() {
   network = "testnet"
   walletonly = "false"
 
-[genesis]
-  legacy = true
-
 [gql]
   address = "127.0.0.1:$((9500+$i))"
   enabled = "true"
@@ -98,12 +96,6 @@ init_dusk_func() {
   address = "${DDIR}/dusk-grpc.sock"
   enabled = "true"
   network = "unix"
-
-  [rpc.rusk]
-    address = "127.0.0.1:$((10000+$i))"
-    contracttimeout = 6000
-    defaulttimeout = 1000
-    network = "tcp"
 
 [wallet]
   file = "${currentDir}/harness/data/wallet-$((9000+$i)).dat"
@@ -132,6 +124,30 @@ start_dusk_func() {
 
 }
 
+# start blindbid
+start_blindbid_func() {
+  echo "starting Blindbid node $i ..."
+
+  DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
+
+  CMD="${currentDir}/bin/blindbid-linux-amd64"
+  TMPDIR=$DDIR ${CMD} >> "${currentDir}/devnet/dusk_data/logs/blindbid$i.log" 2>&1 &
+
+  EXEC_PID=$!
+  echo "started Blindbid node $i, pid=$EXEC_PID"
+
+}
+
+# send_bid_func
+send_bid_func(){
+  echo "Sending bid to node $i ..."
+
+  # send bid cmd
+  SENDBID_CMD="./bin/utils transactions --grpchost unix://${DDIR}/dusk-grpc.sock --txtype consensus --amount 10 --locktime 10"
+  ${SENDBID_CMD} >> "${currentDir}/devnet/dusk_data/logs/sendbid_bid$i.log" 2>&1 &
+}
+
+# start_voucher_func
 start_voucher_func() {
   echo "starting Dusk Voucher ..."
 
@@ -159,8 +175,23 @@ fi
 sleep 1
 
 for i in $(seq 0 "$QTD"); do
+  start_blindbid_func "$i"
+done
+
+for i in $(seq 0 "$QTD"); do
   start_dusk_func "$i"
 done
+
+sleep 5
+
+if [ "${SEND_BID}" == "true" ]; then
+
+#  for i in $(seq 0 "$QTD"); do
+  send_bid_func 1 #"$i"
+#  done
+
+fi
+
 
 echo "done starting Dusk stack"
 exit 0

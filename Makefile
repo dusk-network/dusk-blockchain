@@ -40,6 +40,12 @@ voucher: build
 	./bin/voucher
 wallet: build
 	./bin/wallet
+stop:
+	echo "will stop dusk app"
+	killall dusk || true
+	killall voucher || true
+	killall utils || true
+	killall /opt/gocode/src/github.com/dusk-network/dusk-blockchain/bin/blindbid-linux-amd64 || true
 ###################################CROSS#################################################
 install-tools:
 	go get -u github.com/karalabe/xgo
