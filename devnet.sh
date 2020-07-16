@@ -186,9 +186,9 @@ sleep 5
 
 if [ "${SEND_BID}" == "true" ]; then
 
-#  for i in $(seq 0 "$QTD"); do
-  send_bid_func 1 #"$i"
-#  done
+  for i in $(seq 0 "$QTD"); do
+    send_bid_func "$i"
+  done
 
 fi
 
