@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -163,6 +164,25 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 	//nolint:gosec
 	cmd := exec.Command(name, arg...)
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
+
+	// Redirect both STDOUT and STDERR to separate files
+	if len(nodeDir) > 0 {
+		id := filepath.Base(name)
+		stdOutFile, err := os.Create(nodeDir + "/" + id + "_stdout")
+		if err != nil {
+			log.Panic(err)
+		}
+
+		var stdErrFile *os.File
+		stdErrFile, err = os.Create(nodeDir + "/" + id + "_stderr")
+		if err != nil {
+			log.Panic(err)
+		}
+
+		cmd.Stdout = stdOutFile
+		cmd.Stderr = stdErrFile
+	}
+
 	if err := cmd.Start(); err != nil {
 		return err
 	}
