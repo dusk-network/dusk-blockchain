@@ -65,6 +65,11 @@ func (s *sessionlessClient) GetSessionConn(opts ...grpc.DialOption) (*grpc.Clien
 
 // GracefulClose closes the connection
 func (s *sessionlessClient) GracefulClose(options ...grpc.DialOption) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("recovered error in closing the connection", r)
+		}
+	}()
 	_ = s.conn.Close()
 }
 
