@@ -4,6 +4,8 @@ import (
 	"strconv"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
 	"github.com/machinebox/graphql"
 )
 
@@ -13,16 +15,17 @@ type DuskNode struct {
 	ConfigProfileID string
 
 	// fields represents a dusk-blockchain instance
-	Cfg config.Registry
-	Gql *graphql.Client
+	Cfg        config.Registry
+	Gql        *graphql.Client
+	Srv        *ruskmock.Server
+	GRPCClient *client.NodeClient
 
 	// dusk-blockchain node directory
 	Dir string
 }
 
 // NewDuskNode instantiates a new DuskNode
-func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
-
+func NewDuskNode(graphqlPort, nodeID int, profileID string, requireSession bool) *DuskNode {
 	node := new(DuskNode)
 	node.Id = strconv.Itoa(nodeID)
 	node.ConfigProfileID = profileID
@@ -30,6 +33,9 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
 	node.Cfg = config.Registry{}
 	node.Cfg.Gql.Address = "127.0.0.1:" + strconv.Itoa(graphqlPort)
 	node.Cfg.Gql.Network = "tcp" //nolint
+
+	node.Cfg.RPC.RequireSession = requireSession
+	node.Cfg.RPC.SessionDurationMins = 5
 
 	if *RPCNetworkType == "unix" { //nolint
 		node.Cfg.RPC.Network = "unix"

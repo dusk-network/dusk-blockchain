@@ -35,7 +35,7 @@ func saveEncrypted(text []byte, password string, file string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, text, nil), 0777)
+	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, text, nil), 0600)
 }
 
 //fetchEncrypted load encrypted from file
