@@ -459,7 +459,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 		return
 	}
 
-	if err := c.finalizeIntermediateBlock(c.ctx, cm.Certificate); err != nil {
+	if err = c.finalizeIntermediateBlock(c.ctx, cm.Certificate); err != nil {
 		log.
 			WithError(err).
 			WithField("height", c.highestSeen).

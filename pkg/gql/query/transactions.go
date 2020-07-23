@@ -3,6 +3,7 @@ package query
 import (
 	"bytes"
 	"encoding/hex"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"

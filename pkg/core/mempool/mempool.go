@@ -580,16 +580,14 @@ func toHex(id []byte) string {
 // caller should be left to format the data however they wish
 func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}, error), name string) {
 
-	//log.Tracef("Handling %s request", name)
-
 	result, err := handler(r)
 	if err != nil {
-		//log.Errorf("Failed %s request: %v", name, err)
+		log.
+			WithError(err).
+			WithField("name", name).Errorf("mempool failed to process request")
 		r.RespChan <- rpcbus.Response{Err: err}
 		return
 	}
 
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
-
-	//log.Tracef("Handled %s request", name)
 }
