@@ -36,8 +36,6 @@ $ ls /tmp/localnet-429879163/node-9001/
 chain  dusk7001.log  dusk-grpc.sock dusk.toml  pipe-channel  walletDB
 ``` 
 
-
-
 ##### HowTo
 
 ###### Configure
