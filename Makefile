@@ -29,6 +29,8 @@ dep: ## Get the dependencies
 	go mod download
 build: dep ## Build the binary file
 	GOBIN=$(PWD)/bin go run scripts/build.go install
+build-race: dep ## Build the binary file
+	GOBIN=$(PWD)/bin go run scripts/build.go install -race
 clean: ## Remove previous build
 	@rm -f ./bin
 	@go clean -testcache

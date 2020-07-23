@@ -1,5 +1,3 @@
-// +build none
-
 package main
 
 import (
@@ -37,7 +35,7 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "install":
-		install()
+		install(os.Args[2:])
 	case "lint":
 		lint()
 	default:
@@ -45,7 +43,12 @@ func main() {
 	}
 }
 
-func install() {
+func install(cmdline []string) {
+	var (
+		race = flag.Bool("race", false, "build Dusk exec with Race enabled")
+	)
+
+	flag.CommandLine.Parse(cmdline)
 
 	argsList := append([]string{"list"}, []string{"./..."}...)
 
@@ -62,6 +65,9 @@ func install() {
 	}
 
 	argsInstall := append([]string{"install"})
+	if *race {
+		argsInstall = append(argsInstall, "-race")
+	}
 	cmd = exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), argsInstall...)
 	cmd.Args = append(cmd.Args, "-v")
 	cmd.Args = append(cmd.Args, packages...)

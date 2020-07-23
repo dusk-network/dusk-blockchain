@@ -9,6 +9,7 @@ MOCK=true
 VOUCHER=true
 MOCK_ADDRESS=127.0.0.1:9191
 currentDir=$(pwd)
+RACE=false
 
 # define command exec location
 duskCMD="../bin/dusk"
@@ -21,11 +22,12 @@ usage() {
   echo "-s <number>  -- DUSK_VERSION version. eg: v0.3.0"
   echo "-i <number>  -- INIT instances (true or false). eg: true"
   echo "-m <number>  -- MOCK instances (true or false). eg: true"
+  echo "-r <number>  -- RACE enabled (true or false). eg: true"
 
   exit 1
 }
 
-while getopts "h?c:q:s:i:m:" args; do
+while getopts "h?c:q:s:i:m:r:" args; do
 case $args in
     h|\?)
       usage;
@@ -35,12 +37,14 @@ case $args in
     s ) DUSK_VERSION=${OPTARG};;
     i ) INIT=${OPTARG};;
     m ) MOCK=${OPTARG};;
+    r ) RACE=${OPTARG};;
   esac
 done
 
 set -euxo pipefail
-
-if [ "${TYPE}" == "branch" ]; then
+if [[ "${TYPE}" == "branch" && "${RACE}" == "true" ]]; then
+  GOBIN=$(pwd)/bin go run scripts/build.go install - race
+elif [[ "${TYPE}" == "branch" ]]; then
   GOBIN=$(pwd)/bin go run scripts/build.go install
 fi
 
