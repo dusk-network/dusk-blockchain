@@ -45,7 +45,8 @@ func main() {
 
 func install(cmdline []string) {
 	var (
-		race = flag.Bool("race", false, "build Dusk exec with Race enabled")
+		race  = flag.Bool("race", false, "build Dusk exec with Race enabled")
+		debug = flag.Bool("debug", false, "build Dusk exec with Debug enabled")
 	)
 
 	flag.CommandLine.Parse(cmdline)
@@ -67,6 +68,9 @@ func install(cmdline []string) {
 	argsInstall := append([]string{"install"})
 	if *race {
 		argsInstall = append(argsInstall, "-race")
+	}
+	if *debug {
+		argsInstall = append(argsInstall, "-gcflags=\"all=-N -l\"")
 	}
 	cmd = exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), argsInstall...)
 	cmd.Args = append(cmd.Args, "-v")
