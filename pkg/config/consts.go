@@ -3,11 +3,12 @@ package config
 import (
 	"bytes"
 	"encoding/hex"
+	"log"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
-	"log"
 )
 
 // A single point of constants definition
