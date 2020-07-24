@@ -119,7 +119,7 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 	}()
 
 	client := pb.NewTransactorClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	req := pb.BidRequest{Amount: amount}
