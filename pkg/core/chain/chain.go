@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"encoding/binary"
-	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -72,10 +71,6 @@ type Chain struct {
 	verifier Verifier
 
 	prevBlock block.Block
-	// protect prevBlock with mutex as it's touched out of the main chain loop
-	// by SubscribeCallback.
-	// TODO: Consider if mutex can be removed
-	mu sync.RWMutex
 
 	// Intermediate block, decided on by consensus.
 	// Used to verify a candidate against the correct previous block,
@@ -96,8 +91,10 @@ type Chain struct {
 	highestSeen uint64
 
 	// collector channels
-	certificateChan <-chan certMsg
-	highestSeenChan <-chan uint64
+	certificateChan    <-chan certMsg
+	highestSeenChan    <-chan uint64
+	blockChan          chan message.Message
+	initializationChan chan message.Message
 
 	// rusk client
 	executor transactions.Executor
@@ -200,10 +197,12 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	}
 
 	// Hook the chain up to the required topics
-	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
-	eventBus.Subscribe(topics.Block, cbListener)
-	initListener := eventbus.NewCallbackListener(chain.onInitialization)
-	eventBus.Subscribe(topics.Initialization, initListener)
+	chain.blockChan = make(chan message.Message, 10)
+	eventBus.Subscribe(topics.Block, eventbus.NewChanListener(chain.blockChan))
+
+	chain.initializationChan = make(chan message.Message, 1)
+	eventBus.Subscribe(topics.Initialization, eventbus.NewChanListener(chain.initializationChan))
+
 	return chain, nil
 }
 
@@ -211,6 +210,14 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 func (c *Chain) Listen() {
 	for {
 		select {
+		case m := <-c.blockChan:
+			if err := c.onAcceptBlock(m); err != nil {
+				log.WithError(err).Warn("Accepting block failed")
+			}
+		case m := <-c.initializationChan:
+			if err := c.onInitialization(m); err != nil {
+				log.WithError(err).Warn("Initialization failed")
+			}
 		case certificateMsg := <-c.certificateChan:
 			c.handleCertificateMessage(certificateMsg)
 		case height := <-c.highestSeenChan:
@@ -232,6 +239,7 @@ func (c *Chain) Listen() {
 }
 
 func (c *Chain) onAcceptBlock(m message.Message) error {
+
 	// Ignore blocks from peers if we are only one behind - we are most
 	// likely just about to finalize consensus.
 	// TODO: we should probably just accept it if consensus was not
@@ -283,8 +291,6 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
@@ -520,9 +526,7 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 }
 
 func (c *Chain) provideLastBlock(r rpcbus.Request) {
-	c.mu.RLock()
 	prevBlock := c.prevBlock
-	c.mu.RUnlock()
 	r.RespChan <- rpcbus.NewResponse(prevBlock, nil)
 }
 
@@ -585,10 +589,7 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 		return &node.SyncProgressResponse{Progress: 0}, nil
 	}
 
-	c.mu.RLock()
 	prevBlockHeight := c.prevBlock.Header.Height
-	c.mu.RUnlock()
-
 	progressPercentage := (float64(prevBlockHeight) / float64(c.highestSeen)) * 100
 
 	// Avoiding strange output when the chain can be ahead of the highest
@@ -604,9 +605,6 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 // RebuildChain will delete all blocks except for the genesis block,
 // to allow for a full re-sync.
 func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	// Halt consensus
 	msg := message.New(topics.StopConsensus, nil)
 	c.eventBus.Publish(topics.StopConsensus, msg)
