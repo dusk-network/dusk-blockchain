@@ -10,7 +10,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -43,7 +44,7 @@ type Server struct {
 	counter       *chainsync.Counter
 	gossip        *processing.Gossip
 	grpcServer    *grpc.Server
-	rpcClient     *rpc.Client
+	ruskConn      *grpc.ClientConn
 	cancelMonitor StopFunc
 }
 
@@ -86,8 +87,7 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 // Stake and Blind Bid channels
 func Setup() *Server {
 	ctx := context.Background()
-
-	grpcServer, err := rpc.SetupgRPCServer()
+	grpcServer, err := server.SetupGRPC(server.FromCfg())
 	if err != nil {
 		log.Panic(err)
 	}
@@ -101,11 +101,12 @@ func Setup() *Server {
 	rpcBus := rpcbus.New()
 
 	// Instantiate gRPC client
-	client := rpc.InitRPCClients(ctx, cfg.Get().RPC.Rusk.Address)
+	// TODO: get address from config
+	ruskClient, ruskConn := client.CreateRuskClient(ctx, cfg.Get().RPC.Rusk.Address)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	proxy := transactions.NewProxy(client.RuskClient, txTimeout, defaultTimeout)
+	proxy := transactions.NewProxy(ruskClient, txTimeout, defaultTimeout)
 
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()
@@ -142,7 +143,7 @@ func Setup() *Server {
 		counter:    counter,
 		gossip:     processing.NewGossip(protocol.TestNet),
 		grpcServer: grpcServer,
-		rpcClient:  client,
+		ruskConn:   ruskConn,
 	}
 
 	// Setting up the transactor component
@@ -241,6 +242,6 @@ func (s *Server) Close() {
 	_ = s.loader.Close(cfg.Get().Database.Driver)
 	s.rpcBus.Close()
 	s.grpcServer.GracefulStop()
-	_ = s.rpcClient.Close()
 	s.cancelMonitor()
+	_ = s.ruskConn.Close()
 }

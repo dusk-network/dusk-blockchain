@@ -86,7 +86,8 @@ func (pac *Packet) setNodesPayload(router *Router, targetPeer Peer) int {
 	// Serialize the Peers to get them in `wire-format`,
 	// basically, represented as bytes.
 	for _, peer := range kClosestPeers {
-		pac.payload = append(pac.payload[:], marshalPeer(&peer)...)
+		p := peer
+		pac.payload = append(pac.payload[:], marshalPeer(&p)...)
 	}
 	return len(kClosestPeers)
 }

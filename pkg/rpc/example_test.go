@@ -1,18 +1,30 @@
 package rpc_test
 
 import (
-	"context"
-	"encoding/base64"
-	"fmt"
+	"crypto/ed25519"
+	"crypto/rand"
 	"testing"
-	"time"
 
-	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
+	"github.com/stretchr/testify/require"
 )
 
+func TestSignAuthToken(t *testing.T) {
+	assert := require.New(t)
+	pk, sk, _ := ed25519.GenerateKey(rand.Reader)
+
+	tky := rpc.AuthToken{
+		AccessToken: "access",
+		Time:        149,
+	}
+
+	jb, err := tky.AsSignable()
+	assert.NoError(err)
+	tky.Sig = ed25519.Sign(sk, jb)
+	assert.True(tky.Verify(pk))
+}
+
+/*
 // ExampleInsecureSend to serve as a reference for a insecure blocking unary
 // gRPC request over unix socket
 //
@@ -130,3 +142,4 @@ func (b basicAuth) GetRequestMetadata(ctx context.Context, in ...string) (map[st
 func (b basicAuth) RequireTransportSecurity() bool {
 	return b.secured
 }
+*/

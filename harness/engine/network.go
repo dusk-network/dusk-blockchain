@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync"
 	"path/filepath"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -28,13 +31,82 @@ var (
 
 	// MOCK_ADDRESS is optional string for the mock address to listen to, eg: 127.0.0.1:8080
 	MOCK_ADDRESS = os.Getenv("MOCK_ADDRESS")
+
+	// REQUIRE_SESSION is a flag to set the GRPC  session
+	REQUIRE_SESSION = os.Getenv("REQUIRE_SESSION")
 )
+
+const yes = "true"
+
+// GrpcClient is an interface that abstracts the way to connect to the grpc
+// server (i.e. with or without a session)
+type GrpcClient interface {
+	// GetSessionConn returns a connection to the grpc server
+	GetSessionConn(options ...grpc.DialOption) (*grpc.ClientConn, error)
+	// GracefulClose closes the connection
+	GracefulClose(options ...grpc.DialOption)
+}
+
+type sessionlessClient struct {
+	network string
+	addr    string
+	conn    *grpc.ClientConn
+}
+
+// GetSessionConn returns a connection to the grpc server
+func (s *sessionlessClient) GetSessionConn(opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	var err error
+	addr := s.addr
+	if s.network == "unix" { //nolint
+		addr = "unix://" + addr
+	}
+	s.conn, err = grpc.Dial(addr, opts...)
+	return s.conn, err
+}
+
+// GracefulClose closes the connection
+func (s *sessionlessClient) GracefulClose(options ...grpc.DialOption) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("recovered error in closing the connection", r)
+		}
+	}()
+	_ = s.conn.Close()
+}
 
 // Network describes the current network configuration in terms of nodes and
 // processes
 type Network struct {
-	Nodes     []*DuskNode
-	processes []*os.Process
+	grpcClients map[string]GrpcClient
+	nodes       []*DuskNode
+	processes   []*os.Process
+}
+
+// AddNode to the network
+func (n *Network) AddNode(node *DuskNode) {
+	n.nodes = append(n.nodes, node)
+}
+
+// AddGrpcClient creates the right grpc client linked to the node through
+// the Id of the latter
+func (n *Network) AddGrpcClient(nodeID, network, addr string) {
+	if n.grpcClients == nil {
+		n.grpcClients = make(map[string]GrpcClient)
+	}
+	var c GrpcClient
+
+	if n.IsSessionRequired() {
+		c = client.New(network, addr)
+	} else {
+		c = &sessionlessClient{network: network, addr: addr}
+	}
+
+	n.grpcClients[nodeID] = c
+}
+
+// Size of the network intended as nunber of nodes
+func (n *Network) Size() int {
+	return len(n.nodes)
 }
 
 // Bootstrap performs all actions needed to initialize and start a local network
@@ -76,23 +148,46 @@ func (n *Network) Bootstrap(workspace string) error {
 	}
 
 	// Foreach node read localNet.Nodes, configure and run new nodes
-	for i, node := range n.Nodes {
-		err := n.StartNode(i, node, workspace)
-		if err != nil {
+	for i, node := range n.nodes {
+		if err := n.StartNode(i, node, workspace); err != nil {
 			return err
 		}
+
 	}
 
 	log.Infof("Local network workspace: %s", workspace)
-	log.Infof("Running %d nodes", len(n.Nodes))
+	log.Infof("Running %d nodes", len(n.nodes))
 
-	time.Sleep(20 * time.Second)
-
+	delay := len(n.nodes)
+	if delay > 20 {
+		delay = 20
+	}
+	time.Sleep(time.Duration(delay) * time.Second)
 	return nil
+}
+
+// IsSessionRequired returns whether a session is required or otherwise
+func (n *Network) IsSessionRequired() bool {
+	return REQUIRE_SESSION == yes
+}
+
+func (n *Network) closeGRPCConnections() {
+	var wg sync.WaitGroup
+	for _, grpcC := range n.grpcClients {
+		c := grpcC
+		wg.Add(1)
+		go func(cli GrpcClient) {
+			cli.GracefulClose(grpc.WithInsecure())
+			wg.Done()
+		}(c)
+	}
+	wg.Wait()
 }
 
 // Teardown the network
 func (n *Network) Teardown() {
+	n.closeGRPCConnections()
+
 	for _, p := range n.processes {
 		if err := p.Signal(os.Interrupt); err != nil {
 			log.Warn(err)
@@ -143,29 +238,41 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 		return startErr
 	}
 
+	n.AddGrpcClient(node.Id, node.Cfg.RPC.Network, node.Cfg.RPC.Address)
 	return nil
 }
 
-// generateConfig loads config profile assigned to this node
+// GetGrpcConn gets a connection to the GRPC server of a node. It delegates
+// eventual sessions to the underlying client.
+func (n *Network) GetGrpcConn(i uint, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	c := n.grpcClients[n.nodes[i].Id]
+	return c.GetSessionConn(opts...)
+}
+
+// generateConfig loads config profile assigned to the node identified by an
+// index
 // It's based on viper global var so it cannot be called concurrently
 func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, error) {
 
-	node := n.Nodes[nodeIndex]
+	node := n.nodes[nodeIndex]
 
-	// Load config profile
+	// Load config profile from the global parameter profileList
 	profileFunc, ok := profileList[node.ConfigProfileID]
 	if !ok {
 		return "", fmt.Errorf("invalid config profile for node index %d", nodeIndex)
 	}
 
+	// profileFunc mutates the configuration for a node, so inject the
+	// parameters which depend on its sandbox
 	profileFunc(nodeIndex, node, walletPath)
 
+	// setting the root directory for node's sandbox
 	configPath := node.Dir + "/dusk.toml"
 	if err := viper.WriteConfigAs(configPath); err != nil {
 		return "", fmt.Errorf("config profile err '%s' for node index %d", err.Error(), nodeIndex)
 	}
 
-	// Load back
+	// Finally load sandbox configuration and setting it in the node
 	var err error
 	node.Cfg, err = config.LoadFromFile(configPath)
 	if err != nil {
