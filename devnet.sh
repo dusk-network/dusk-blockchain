@@ -64,6 +64,7 @@ init_dusk_func() {
   defaultamount = 50
   defaultlocktime = 1000
   defaultoffset = 10
+  consensustimeout = 1
 
 [database]
   dir = "${DDIR}/chain/"
