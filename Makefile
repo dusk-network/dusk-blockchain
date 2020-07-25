@@ -17,8 +17,14 @@ test-harness-ci: build
 test-harness-alive: stop build
 	MOCK_ADDRESS=127.0.0.1:9191 NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable -keepalive
-test-harness-session: 
+test-harness-session:
 	REQUIRE_SESSION=true make test-harness-alive
+test-harness-race-alive: stop build-race
+	MOCK_ADDRESS=127.0.0.1:9191 NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+	go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable -keepalive
+test-harness-race-debug-alive: stop build-race-debug
+	MOCK_ADDRESS=127.0.0.1:9191 NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+	go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable -keepalive
 race: dep ## Run data race detector
 	@go test $(TFLAGS) -race -v ${PKG_LIST}
 coverage: ## Generate global code coverage report
@@ -31,6 +37,10 @@ dep: ## Get the dependencies
 	go mod download
 build: dep ## Build the binary file
 	GOBIN=$(PWD)/bin go run scripts/build.go install
+build-race: dep ## Build the binary file
+	GOBIN=$(PWD)/bin go run scripts/build.go install -race
+build-race-debug: dep ## Build the binary file
+	GOBIN=$(PWD)/bin go run scripts/build.go install -race -debug
 clean: ## Remove previous build
 	@rm -f ./bin
 	@go clean -testcache
