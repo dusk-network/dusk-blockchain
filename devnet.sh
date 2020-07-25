@@ -12,6 +12,7 @@ MOCK_ADDRESS=127.0.0.1:9191
 SEND_BID=false
 
 currentDir=$(pwd)
+RACE=false
 
 # define command exec location
 duskCMD="../bin/dusk"
@@ -26,11 +27,13 @@ usage() {
   echo "-m <boolean>  -- MOCK instances (true or false). default: true"
   echo "-f <boolean>  -- FILEBEAT instances (true or false). default: false"
   echo "-b <boolean>  -- SEND_BID tx to instances (true or false). default: false"
+  echo "-r <number>  -- RACE enabled (true or false). eg: true"
 
   exit 1
 }
 
-while getopts "h?c:q:s:i:m:f:b:" args; do
+
+while getopts "h?c:q:s:i:m:r:f:b:" args; do
 case $args in
     h|\?)
       usage;
@@ -42,12 +45,14 @@ case $args in
     m ) MOCK=${OPTARG};;
     f ) FILEBEAT=${OPTARG};;
     b ) SEND_BID=${OPTARG};;
+    r ) RACE=${OPTARG};;
   esac
 done
 
 set -euxo pipefail
-
-if [ "${TYPE}" == "branch" ]; then
+if [[ "${TYPE}" == "branch" && "${RACE}" == "true" ]]; then
+  GOBIN=$(pwd)/bin go run scripts/build.go install - race
+elif [[ "${TYPE}" == "branch" ]]; then
   GOBIN=$(pwd)/bin go run scripts/build.go install
 fi
 
@@ -71,6 +76,7 @@ init_dusk_func() {
   defaultamount = 50
   defaultlocktime = 1000
   defaultoffset = 10
+  consensustimeout = 1
 
 [database]
   dir = "${DDIR}/chain/"

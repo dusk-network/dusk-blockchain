@@ -128,6 +128,8 @@ type mempoolConfiguration struct {
 type consensusConfiguration struct {
 	DefaultLockTime uint64
 	DefaultAmount   uint64
+	// ConsensusTimeOut is the time out for consensus step timers.
+	ConsensusTimeOut int64
 }
 
 type genesisConfiguration struct {

@@ -1,5 +1,3 @@
-// +build none
-
 package main
 
 import (
@@ -14,6 +12,7 @@ import (
 )
 
 const (
+	// GOLANGCI_VERSION to be used for linting
 	GOLANGCI_VERSION = "github.com/golangci/golangci-lint/cmd/golangci-lint@v1.23.8"
 )
 
@@ -37,7 +36,7 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "install":
-		install()
+		install(os.Args[2:])
 	case "lint":
 		lint()
 	default:
@@ -45,7 +44,14 @@ func main() {
 	}
 }
 
-func install() {
+// #nosec
+func install(cmdline []string) {
+	var (
+		race  = flag.Bool("race", false, "build Dusk exec with Race enabled")
+		debug = flag.Bool("debug", false, "build Dusk exec with Debug enabled")
+	)
+
+	_ = flag.CommandLine.Parse(cmdline)
 
 	argsList := append([]string{"list"}, []string{"./..."}...)
 
@@ -61,7 +67,13 @@ func install() {
 		}
 	}
 
-	argsInstall := append([]string{"install"})
+	argsInstall := []string{"install"}
+	if *race {
+		argsInstall = append(argsInstall, "-race")
+	}
+	if *debug {
+		argsInstall = append(argsInstall, "-gcflags=\"all=-N -l\"")
+	}
 	cmd = exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), argsInstall...)
 	cmd.Args = append(cmd.Args, "-v")
 	cmd.Args = append(cmd.Args, packages...)
@@ -75,12 +87,13 @@ func install() {
 
 }
 
+// #nosec
 func lint() {
 
 	v := flag.Bool("v", false, "log verbosely")
 
 	// Make sure GOLANGCI is downloaded and available
-	argsGet := append([]string{"get", GOLANGCI_VERSION})
+	argsGet := []string{"get", GOLANGCI_VERSION}
 	cmd := exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), argsGet...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

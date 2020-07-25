@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"log"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
@@ -12,14 +11,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 )
 
-// A signle point of constants definition
+// A single point of constants definition
 const (
 	// GeneratorReward is the amount of Block generator default reward
 	// TODO: TBD
 	GeneratorReward = 50 * wallet.DUSK
-
-	// ConsensusTimeOut is the time out for consensus step timers.
-	ConsensusTimeOut = 5 * time.Second
 
 	MinFee = uint64(100)
 

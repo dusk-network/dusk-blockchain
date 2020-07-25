@@ -53,6 +53,8 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("consensus.defaultlocktime", 1000)
 	viper.Set("consensus.defaultoffset", 10)
 	viper.Set("consensus.defaultamount", 50)
+	viper.Set("consensus.consensustimeout", 5)
+
 }
 
 // Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing)
