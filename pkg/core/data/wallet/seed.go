@@ -35,7 +35,6 @@ func saveSeed(seed []byte, password string, file string) error {
 		return err
 	}
 
-	// TODO: check the right permission scheme
 	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, seed, nil), 0600)
 }
 
