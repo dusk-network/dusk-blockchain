@@ -135,6 +135,10 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 	r.RespChan <- rpcbus.Response{Resp: cm, Err: nil}
 }
 
+// ErrGetCandidateTimeout is an error specific to timeout happening on
+// GetCandidate calls
+var ErrGetCandidateTimeout = errors.New("request GetCandidate timeout")
+
 // requestCandidate from peers around this node. The candidate can only be
 // requested for 2 rounds (which provides some protection from keeping to
 // request bulky stuff)
@@ -155,7 +159,7 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	for {
 		select {
 		case <-timer.C:
-			return message.Candidate{}, errors.New("request GetCandidate timeout")
+			return message.Candidate{}, ErrGetCandidateTimeout
 
 		// We take control of `candidateChan`, to monitor incoming
 		// candidates. There should be no race condition in reading from

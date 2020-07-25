@@ -64,5 +64,5 @@ func TestValidHashes(t *testing.T) {
 
 	// When requesting blk2, we should get an error.
 	_, err = rb.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(blk2.Header.Hash)), 5*time.Second)
-	assert.Equal("request timeout", err.Error())
+	assert.Equal(candidate.ErrGetCandidateTimeout, err)
 }
