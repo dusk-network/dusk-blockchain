@@ -348,10 +348,15 @@ func (c *Chain) onInitialization(message.Message) error {
 
 func (c *Chain) sendRoundUpdate() error {
 	hdr := c.intermediateBlock.Header
+
+	// Duplicate bidlist to avoid race conditions
+	var bidList user.BidList
+	bidList = append(bidList, *c.bidList...)
+
 	ru := consensus.RoundUpdate{
 		Round:   hdr.Height + 1,
 		P:       *c.p,
-		BidList: *c.bidList,
+		BidList: bidList,
 		Seed:    hdr.Seed,
 		Hash:    hdr.Hash,
 	}
