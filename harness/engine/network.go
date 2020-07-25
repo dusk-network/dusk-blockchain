@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"sync"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
