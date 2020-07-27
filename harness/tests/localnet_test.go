@@ -88,11 +88,13 @@ func TestSendBidTransaction(t *testing.T) {
 
 	for i := 0; i < localNetSize; i++ {
 		t.Logf("Send request to node %d to generate and process a Bid transaction", i)
-		_, err := localNet.SendBidCmd(uint(i), 10, 10)
-		if err != nil {
-			continue
-		}
+
+		go func(i int) {
+			localNet.SendBidCmd(uint(i), 10, 10)
+		}(i)
 	}
+
+	time.Sleep(5 * time.Second)
 
 }
 
