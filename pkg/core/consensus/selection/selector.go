@@ -66,7 +66,15 @@ func NewComponent(ctx context.Context, publisher eventbus.Publisher, timeout tim
 	if CUSTOM_SELECTOR_TIMEOUT != "" {
 		customTimeout, err := strconv.Atoi(CUSTOM_SELECTOR_TIMEOUT)
 		if err == nil {
+			log.
+				WithField("customTimeout", customTimeout).
+				Info("selector will set a custom timeout")
 			selector.timeout = time.Duration(customTimeout) * time.Second
+		} else {
+			log.
+				WithError(err).
+				WithField("customTimeout", customTimeout).
+				Error("selector could not set a custom timeout")
 		}
 	}
 
