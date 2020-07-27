@@ -18,7 +18,7 @@ test-harness-alive: stop build
 	MOCK_ADDRESS=127.0.0.1:9191 NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable -keepalive
 test-harness-race-alive: stop build-race
-	MOCK_ADDRESS=127.0.0.1:9191 NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+	MOCK_ADDRESS=127.0.0.1:9191 NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable -keepalive
 race: dep ## Run data race detector
 	@go test $(TFLAGS) -race -v ${PKG_LIST}

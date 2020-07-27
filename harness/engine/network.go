@@ -68,7 +68,7 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	if MOCK_ADDRESS != "" {
 		// Run mock process
-		if bbErr := n.start("", utilsExec, "mock",
+		if bbErr := n.start(workspace, utilsExec, "mock",
 			"--grpcmockhost", MOCK_ADDRESS,
 		); bbErr != nil {
 			return bbErr
@@ -129,7 +129,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 
 	if MOCK_ADDRESS != "" {
 		// Start the mock RUSK server
-		if startErr := n.start("", utilsExec, "mockrusk",
+		if startErr := n.start(nodeDir, utilsExec, "mockrusk",
 			"--rusknetwork", node.Cfg.RPC.Rusk.Network,
 			"--ruskaddress", node.Cfg.RPC.Rusk.Address,
 			"--walletstore", node.Cfg.Wallet.Store,

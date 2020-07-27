@@ -54,7 +54,7 @@ func (e emptyScoreFactory) Create(pubkey []byte, round uint64, step uint8) conse
 // the topic BestScoreTopic
 func NewComponent(ctx context.Context, publisher eventbus.Publisher, timeout time.Duration, provisioner transactions.Provisioner) *Selector {
 	return &Selector{
-		timeout:     timeout,
+		timeout:     time.Second,
 		publisher:   publisher,
 		bestEvent:   message.EmptyScore(),
 		ctx:         ctx,
