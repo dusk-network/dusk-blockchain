@@ -2,6 +2,8 @@ package selection
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -53,13 +55,22 @@ func (e emptyScoreFactory) Create(pubkey []byte, round uint64, step uint8) conse
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
 func NewComponent(ctx context.Context, publisher eventbus.Publisher, timeout time.Duration, provisioner transactions.Provisioner) *Selector {
-	return &Selector{
+	selector := &Selector{
 		timeout:     timeout,
 		publisher:   publisher,
 		bestEvent:   message.EmptyScore(),
 		ctx:         ctx,
 		provisioner: provisioner,
 	}
+	CUSTOM_SELECTOR_TIMEOUT := os.Getenv("CUSTOM_SELECTOR_TIMEOUT")
+	if CUSTOM_SELECTOR_TIMEOUT != "" {
+		customTimeout, err := strconv.Atoi(CUSTOM_SELECTOR_TIMEOUT)
+		if err == nil {
+			selector.timeout = time.Duration(customTimeout) * time.Second
+		}
+	}
+
+	return selector
 }
 
 // Initialize the Selector, by creating the handler and returning the needed Listeners.

@@ -76,7 +76,7 @@ init_dusk_func() {
   defaultamount = 50
   defaultlocktime = 1000
   defaultoffset = 10
-  consensustimeout = 1
+  consensustimeout = 5
 
 [database]
   dir = "${DDIR}/chain/"
@@ -95,7 +95,8 @@ init_dusk_func() {
   network = "tcp"
 
 [logger]
-  output = "${DDIR}/dusk"
+  output = "stdout"
+  #output = "${DDIR}/dusk"
   level = "trace"
   format = "json"
 
@@ -240,7 +241,7 @@ start_dusk_func() {
   DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
 
   CMD="${currentDir}/bin/dusk --config ${DDIR}/dusk.toml"
-  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/dusk$i.log" 2>&1 &
+  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/dusk$i.log" 2> "${currentDir}/devnet/dusk_data/logs/dusk$i.err" &
 
   EXEC_PID=$!
   echo "started Dusk node $i, pid=$EXEC_PID"
@@ -329,6 +330,8 @@ sleep 1
 for i in $(seq 0 "$QTD"); do
   start_dusk_func "$i"
 done
+
+sleep 5
 
 if [ "${SEND_BID}" == "true" ]; then
   for i in $(seq 0 "$QTD"); do
