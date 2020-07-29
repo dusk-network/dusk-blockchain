@@ -8,6 +8,7 @@ type generalConfiguration struct {
 type loggerConfiguration struct {
 	Level   string
 	Output  string
+	Format  string
 	Monitor logMonitorConfiguration
 }
 

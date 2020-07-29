@@ -3,7 +3,6 @@ package query
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
@@ -92,27 +91,27 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 // IsNil will check for nil in a output
 func IsNil(output *core.TransactionOutput) bool {
 	if output.Pk == nil {
-		log.Warn("invalid output, Pk field is nil")
+		//log.Warn("invalid output, Pk field is nil")
 		return true
 	}
 
 	if output.Pk.AG == nil {
-		log.Warn("invalid output, Pk.AG field is nil")
+		//log.Warn("invalid output, Pk.AG field is nil")
 		return true
 	}
 
 	if output.Pk.AG.Y == nil {
-		log.Warn("invalid output, Pk.AG.Y is nil")
+		//log.Warn("invalid output, Pk.AG.Y is nil")
 		return true
 	}
 
 	if output.Pk.BG == nil {
-		log.Warn("invalid output, Pk.BG is nil")
+		//log.Warn("invalid output, Pk.BG is nil")
 		return true
 	}
 
 	if output.Pk.BG.Y == nil {
-		log.Warn("invalid output, Pk.BG.Y is nil")
+		//log.Warn("invalid output, Pk.BG.Y is nil")
 		return true
 	}
 
@@ -212,9 +211,9 @@ func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error)
 	}
 
 	if count >= txsFetchLimit {
-		msg := fmt.Sprintf("requested txs count exceeds the limit of %d", txsFetchLimit)
-		log.Warn(msg)
-
+		msg := "requested txs count exceeds the limit"
+		log.WithField("txsFetchLimit", txsFetchLimit).
+			Warn(msg)
 		return txs, errors.New(msg)
 	}
 

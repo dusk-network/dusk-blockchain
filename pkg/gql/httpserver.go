@@ -183,7 +183,7 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Errorf("Failed to set websocket upgrade: %v", err)
+			log.WithError(err).Error("Failed to set websocket upgrade")
 			return
 		}
 		s.pool.PushConn(conn)
@@ -201,7 +201,7 @@ func (s *Server) Stop() error {
 	s.started = false
 	s.pool.Close()
 	if err := s.listener.Close(); err != nil {
-		log.Errorf("error shutting down, %v", err)
+		log.WithError(err).Error("error shutting down")
 		return err
 	}
 

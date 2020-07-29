@@ -47,13 +47,13 @@ func newAggregator(
 // Collect a Reduction message, and add it's sender public key and signature to the
 // StepVotes/Set kept under the corresponding block hash.
 func (a *aggregator) collectVote(ev message.Reduction) error {
-	hdr := ev.State()
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if a.finished {
 		return nil
 	}
 
+	hdr := ev.State()
 	hash := string(hdr.BlockHash)
 	sv, found := a.voteSets[hash]
 	if !found {
@@ -62,6 +62,12 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 	}
 
 	if err := sv.StepVotes.Add(ev.SignedHash, hdr.PubKeyBLS, hdr.Step); err != nil {
+		lg.
+			WithError(err).
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			WithField("quorum", sv.Cluster.TotalOccurrences()).
+			Debug("secondstep, StepVotes.Add failed")
 		return err
 	}
 
@@ -71,9 +77,20 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 	}
 	a.voteSets[hash] = sv
 	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum(hdr.Round) {
+		lg.
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			WithField("quorum", sv.Cluster.TotalOccurrences()).
+			Debug("secondstep_quorum_reached")
 		a.finished = true
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
 		a.requestHalt(hdr.BlockHash, a.firstStepVotes, sv.StepVotes)
+	} else {
+		lg.
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			WithField("quorum", sv.Cluster.TotalOccurrences()).
+			Debug("secondstep_quorum_not_reached")
 	}
 	return nil
 }

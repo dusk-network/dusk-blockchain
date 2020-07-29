@@ -87,7 +87,7 @@ func (t *Transactor) Listen() {
 			// QUESTION: should we return the hash of the transaction back to
 			// the client?
 			if _, err := t.Stake(context.Background(), req); err != nil {
-				l.WithError(err).Errorln("error in creating a stake transaction")
+				l.WithError(err).Error("error in creating a stake transaction")
 			}
 
 		case r := <-t.bidChan:
@@ -97,7 +97,7 @@ func (t *Transactor) Listen() {
 			}
 
 			if _, err := t.Bid(context.Background(), req); err != nil {
-				l.WithError(err).Errorln("error in creating a bid transaction")
+				l.WithError(err).Error("error in creating a bid transaction")
 			}
 		}
 	}

@@ -113,7 +113,10 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	}
 
 	// // create and sign transaction
-	log.Tracef("Create a bid tx (%d,%d)", req.Amount, req.Locktime)
+	log.
+		WithField("amount", req.Amount).
+		WithField("locktime", req.Locktime).
+		Tracef("Creating a bid tx")
 
 	// TODO context should be created from the parent one
 	ctx := context.Background()
@@ -124,6 +127,10 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	// Create the Ed25519 Keypair
 	tx, err := t.proxy.Provider().NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
 	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendBidTx, failed to create NewBidTx")
 		return nil, err
 	}
 
@@ -131,6 +138,10 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 
 	hash, err := t.publishTx(&tx)
 	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendBidTx, failed to create publishTx")
 		return nil, err
 	}
 
@@ -143,7 +154,10 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 	}
 
 	// create and sign transaction
-	log.Tracef("Create a stake tx (%d,%d)", req.Amount, req.Locktime)
+	log.
+		WithField("amount", req.Amount).
+		WithField("locktime", req.Locktime).
+		Tracef("Creating a stake tx")
 
 	blsKey := t.w.Keys().BLSPubKey
 	if blsKey == nil {
@@ -158,11 +172,19 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 	var expirationHeight uint64
 	tx, err := t.proxy.Provider().NewStakeTx(ctx, blsKey.Marshal(), expirationHeight, transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
 	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendStakeTx, failed to create NewStakeTx")
 		return nil, err
 	}
 
 	hash, err := t.publishTx(&tx)
 	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendStakeTx, failed to create publishTx")
 		return nil, err
 	}
 
@@ -175,7 +197,10 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 	}
 
 	// create and sign transaction
-	log.Tracef("Create a standard tx (%d,%s)", req.Amount, string(req.Address))
+	log.
+		WithField("amount", req.Amount).
+		WithField("address", string(req.Address)).
+		Tracef("Create a standard tx")
 
 	ctx := context.Background()
 
@@ -187,12 +212,20 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 	txReq := transactions.MakeTxRequest(t.w.SecretKey, pb, req.Amount, req.Fee, false)
 	tx, err := t.proxy.Provider().NewTransactionTx(ctx, txReq)
 	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("address", string(req.Address)).
+			Error("handleSendStandardTx, failed to create NewTransactionTx")
 		return nil, err
 	}
 
 	// Publish transaction to the mempool processing
 	hash, err := t.publishTx(&tx)
 	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("address", string(req.Address)).
+			Error("handleSendStandardTx, failed to create publishTx")
 		return nil, err
 	}
 

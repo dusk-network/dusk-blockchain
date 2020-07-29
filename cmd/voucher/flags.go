@@ -7,6 +7,7 @@ var (
 	LogLevelFlag = cli.StringFlag{
 		Name:  "loglevel",
 		Usage: "log level, eg: (warn, error, fatal, panic)",
+		Value: "trace",
 	}
 )
 

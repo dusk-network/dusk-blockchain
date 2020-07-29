@@ -239,7 +239,8 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		logServer.WithError(err).Warnln("problem performing handshake")
 		return
 	}
-	logServer.WithField("address", peerWriter.Addr()).
+	address := peerWriter.Addr()
+	logServer.WithField("address", address).
 		Debugln("connection established")
 
 	exitChan := make(chan struct{}, 1)

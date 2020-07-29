@@ -79,6 +79,14 @@ func (a *handler) Verify(ev message.Agreement) error {
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
 		step := hdr.Step - 2 + uint8(i)
+
+		// FIXME: what shall we do when step overflows uint8 ?
+		if step == math.MaxInt8 {
+			err := errors.New("verify, step reached max limit")
+			lg.WithError(err).Error("step overflow")
+			return err
+		}
+
 		committee := a.Committee(hdr.Round, step)
 		subcommittee := committee.IntersectCluster(votes.BitSet)
 
@@ -99,18 +107,26 @@ func (a *handler) Verify(ev message.Agreement) error {
 	return nil
 }
 
-func (a *handler) getVoterKeys(ev message.Agreement) [][]byte {
+func (a *handler) getVoterKeys(ev message.Agreement) ([][]byte, error) {
 	hdr := ev.State()
 	keys := make([][]byte, 0)
 	for i, votes := range ev.VotesPerStep {
 		step := hdr.Step - 2 + uint8(i)
+
+		// FIXME: what shall we do when step overflows uint8 ?
+		if step >= math.MaxInt8 {
+			err := errors.New("getVoterKeys, step reached max limit")
+			lg.WithError(err).Error("step overflow")
+			return nil, err
+		}
+
 		committee := a.Committee(hdr.Round, step)
 		subcommittee := committee.IntersectCluster(votes.BitSet)
 
 		keys = append(keys, subcommittee.Unravel()...)
 	}
 
-	return keys
+	return keys, nil
 }
 
 func verifyWhole(a message.Agreement) error {
