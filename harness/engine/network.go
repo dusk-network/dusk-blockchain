@@ -140,7 +140,7 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	if MOCK_ADDRESS != "" {
 		// Run mock process
-		if bbErr := n.start("", utilsExec, "mock",
+		if bbErr := n.start(workspace, utilsExec, "mock",
 			"--grpcmockhost", MOCK_ADDRESS,
 		); bbErr != nil {
 			return bbErr
@@ -152,7 +152,6 @@ func (n *Network) Bootstrap(workspace string) error {
 		if err := n.StartNode(i, node, workspace); err != nil {
 			return err
 		}
-
 	}
 
 	log.Infof("Local network workspace: %s", workspace)
@@ -224,7 +223,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 
 	if MOCK_ADDRESS != "" {
 		// Start the mock RUSK server
-		if startErr := n.start("", utilsExec, "mockrusk",
+		if startErr := n.start(nodeDir, utilsExec, "mockrusk",
 			"--rusknetwork", node.Cfg.RPC.Rusk.Network,
 			"--ruskaddress", node.Cfg.RPC.Rusk.Address,
 			"--walletstore", node.Cfg.Wallet.Store,
@@ -284,7 +283,6 @@ func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, erro
 
 // Start an OS process with TMPDIR=nodeDir, manageable by the network
 func (n *Network) start(nodeDir string, name string, arg ...string) error {
-	//TODO: is this really required ?
 	//nolint:gosec
 	cmd := exec.Command(name, arg...)
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
