@@ -263,7 +263,7 @@ func TestFetchTip(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	loader := createLoader()
-	chain, err := New(context.Background(), eb, rpc, nil, loader, &MockVerifier{}, nil, nil)
+	chain, err := New(context.Background(), eb, rpc, nil, loader, &MockVerifier{}, nil, nil, nil)
 
 	assert.NoError(err)
 
@@ -341,7 +341,7 @@ func setupChainTest(startAtHeight uint64, includeGenesis bool) (*eventbus.EventB
 	proxy := &transactions.MockProxy{
 		E: transactions.MockExecutor(startAtHeight),
 	}
-	c, err := New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, proxy.Executor())
+	c, err := New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, proxy.Executor(), nil)
 	if err != nil {
 		panic(err)
 	}

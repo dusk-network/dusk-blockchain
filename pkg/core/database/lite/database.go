@@ -22,8 +22,8 @@ const (
 	stateInd
 	bidValuesInd
 	outputKeyInd
-	maxInd
 	provisionersInd
+	maxInd
 )
 
 var (

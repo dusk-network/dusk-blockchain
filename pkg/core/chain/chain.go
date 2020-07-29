@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"time"
 
 	"encoding/binary"
@@ -123,7 +122,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, executor transactions.Executor) (*Chain, error) {
+func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, executor transactions.Executor, memoryDB database.DB) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -149,8 +148,6 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	if err := rpcBus.Register(topics.GetLastCommittee, getLastCommitteeChan); err != nil {
 		return nil, err
 	}
-
-	_, memoryDB := lite.CreateDBConnection()
 
 	chain := &Chain{
 		eventBus:                 eventBus,
@@ -337,11 +334,13 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	// TODO: add bidList ?
 	c.p = &provisioners
 
-	err = c.memoryDB.Update(func(t database.Transaction) error {
-		return t.StoreProvisioners(c.p, blk.Header.Height)
-	})
-	if err != nil {
-		log.Warn("Could not store provisioners on memoryDB")
+	if c.memoryDB != nil {
+		err = c.memoryDB.Update(func(t database.Transaction) error {
+			return t.StoreProvisioners(c.p, blk.Header.Height)
+		})
+		if err != nil {
+			log.Warn("Could not store provisioners on memoryDB")
+		}
 	}
 
 	// 4. Store the approved block

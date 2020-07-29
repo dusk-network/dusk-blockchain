@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"net"
 	"time"
 
@@ -39,21 +41,21 @@ var logServer = logrus.WithField("process", "server")
 
 // Server is the main process of the node
 type Server struct {
-	eventBus      *eventbus.EventBus
-	rpcBus        *rpcbus.RPCBus
-	loader        chain.Loader
-	dupeMap       *dupemap.DupeMap
-	counter       *chainsync.Counter
-	gossip        *processing.Gossip
-	grpcServer    *grpc.Server
-	ruskConn      *grpc.ClientConn
-	cancelMonitor StopFunc
+	eventBus          *eventbus.EventBus
+	rpcBus            *rpcbus.RPCBus
+	loader            chain.Loader
+	dupeMap           *dupemap.DupeMap
+	counter           *chainsync.Counter
+	gossip            *processing.Gossip
+	grpcServer        *grpc.Server
+	ruskConn          *grpc.ClientConn
+	cancelMonitor     StopFunc
 	activeConnections map[string]time.Time
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server) (chain.Loader, error) {
+func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server, memoryDB database.DB) (chain.Loader, error) {
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
@@ -69,7 +71,7 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 	_, db := heavy.CreateDBConnection()
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(ctx, eventBus, rpcBus, counter, l, l, srv, proxy.Executor())
+	chainProcess, err := chain.New(ctx, eventBus, rpcBus, counter, l, l, srv, proxy.Executor(), memoryDB)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +116,19 @@ func Setup() *Server {
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()
 
-	chainDBLoader, err := LaunchChain(ctx, proxy, eventBus, rpcBus, counter, grpcServer)
+	_, memoryDB := lite.CreateDBConnection()
+	// Instantiate API server
+	if cfg.Get().API.Enabled {
+		if apiServer, e := api.NewHTTPServer(eventBus, rpcBus, memoryDB); e != nil {
+			log.Errorf("API http server error: %v", e)
+		} else {
+			if e := apiServer.Start(apiServer); e != nil {
+				log.Errorf("API failed to start: %v", e)
+			}
+		}
+	}
+
+	chainDBLoader, err := LaunchChain(ctx, proxy, eventBus, rpcBus, counter, grpcServer, memoryDB)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -137,29 +151,17 @@ func Setup() *Server {
 		}
 	}
 
-	// Instantiate API server
-	if cfg.Get().API.Enabled {
-		if apiServer, e := api.NewHTTPServer(eventBus, rpcBus); e != nil {
-			log.Errorf("API http server error: %v", e)
-		} else {
-			if e := apiServer.Start(apiServer); e != nil {
-				log.Errorf("API failed to start: %v", e)
-			}
-		}
-	}
-
 	// creating the Server
 	srv := &Server{
-		eventBus:   eventBus,
-		rpcBus:     rpcBus,
-		loader:     chainDBLoader,
-		dupeMap:    dupeBlacklist,
-		counter:    counter,
-		gossip:     processing.NewGossip(protocol.TestNet),
-		grpcServer: grpcServer,
-		ruskConn:   ruskConn,
+		eventBus:          eventBus,
+		rpcBus:            rpcBus,
+		loader:            chainDBLoader,
+		dupeMap:           dupeBlacklist,
+		counter:           counter,
+		gossip:            processing.NewGossip(protocol.TestNet),
+		grpcServer:        grpcServer,
+		ruskConn:          ruskConn,
 		activeConnections: make(map[string]time.Time),
-
 	}
 
 	// Setting up the transactor component

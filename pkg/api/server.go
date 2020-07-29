@@ -40,10 +40,11 @@ type Server struct {
 }
 
 //NewHTTPServer return pointer to new created server object
-func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server, error) {
+func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, memoryDB database.DB) (*Server, error) {
 	srv := Server{
 		eventBus: eventBus,
 		rpcBus:   rpcBus,
+		db:       memoryDB,
 	}
 	router = srv.InitRouting()
 	httpServer := &http.Server{
