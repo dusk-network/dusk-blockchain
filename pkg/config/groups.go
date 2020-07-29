@@ -59,8 +59,10 @@ type profileConfiguration struct {
 
 // pkg/rpc package configs
 type rpcConfiguration struct {
-	Network string
-	Address string
+	Network             string
+	Address             string
+	SessionDurationMins uint
+	RequireSession      bool
 
 	EnableTLS bool
 	CertFile  string
@@ -125,6 +127,8 @@ type mempoolConfiguration struct {
 type consensusConfiguration struct {
 	DefaultLockTime uint64
 	DefaultAmount   uint64
+	// ConsensusTimeOut is the time out for consensus step timers.
+	ConsensusTimeOut int64
 }
 
 type genesisConfiguration struct {

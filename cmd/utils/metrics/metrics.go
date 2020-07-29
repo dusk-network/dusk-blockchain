@@ -46,8 +46,8 @@ func RunMetrics(gqlPort, nodePort, port int, hostname string) {
 	duskInfo = new(DuskInfo)
 	duskInfo.TotalDusk = big.NewInt(0)
 
-	node = engine.NewDuskNode(gqlPort, nodePort, "default")
-	localNet.Nodes = append(localNet.Nodes, node)
+	node = engine.NewDuskNode(gqlPort, nodePort, "default", localNet.IsSessionRequired())
+	localNet.AddNode(node)
 
 	duskInfo.GQLEndpoint = "http://" + node.Cfg.Gql.Address + "/graphql"
 	fmt.Printf("Instantiate graphQL client\n")

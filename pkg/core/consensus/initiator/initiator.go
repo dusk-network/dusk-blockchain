@@ -3,6 +3,7 @@ package initiator
 import (
 	"bytes"
 	"context"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
@@ -19,7 +20,11 @@ import (
 // LaunchConsensus start the whole consensus algorithm
 func LaunchConsensus(ctx context.Context, eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, proxy transactions.Proxy) {
 	// Setting up the consensus factory
-	f := factory.New(ctx, eventBroker, rpcBus, config.ConsensusTimeOut, &w.PublicKey, w.Keys(), proxy)
+
+	settings := config.Get().Consensus
+	consensusTimeOut := time.Duration(settings.ConsensusTimeOut) * time.Second
+
+	f := factory.New(ctx, eventBroker, rpcBus, consensusTimeOut, &w.PublicKey, w.Keys(), proxy)
 	f.StartConsensus()
 
 	// If we are on genesis, we should kickstart the consensus

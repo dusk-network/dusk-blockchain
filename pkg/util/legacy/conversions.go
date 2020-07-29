@@ -396,6 +396,8 @@ func ruskInputsToInputs(inputs []*rusk.TransactionInput) (transactions.Inputs, e
 	sInputs := make(transactions.Inputs, len(inputs))
 
 	for i, input := range inputs {
+		sInputs[i] = new(transactions.Input)
+
 		buf := bytes.NewBuffer(input.Nullifier.H.Data)
 		keyImageBytes := make([]byte, 32)
 		if err := encoding.Read256(buf, keyImageBytes); err != nil {

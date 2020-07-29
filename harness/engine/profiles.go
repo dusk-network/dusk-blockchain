@@ -30,6 +30,8 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	} else {
 		viper.Set("rpc.address", node.Cfg.RPC.Address)
 	}
+	viper.Set("rpc.sessionDurationMins", node.Cfg.RPC.SessionDurationMins)
+	viper.Set("rpc.requireSession", node.Cfg.RPC.RequireSession)
 
 	viper.Set("rpc.enabled", "true")
 	viper.Set("rpc.rusk.network", node.Cfg.RPC.Rusk.Network)
@@ -51,6 +53,8 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("consensus.defaultlocktime", 1000)
 	viper.Set("consensus.defaultoffset", 10)
 	viper.Set("consensus.defaultamount", 50)
+	viper.Set("consensus.consensustimeout", 5)
+
 }
 
 // Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing)

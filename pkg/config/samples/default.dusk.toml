@@ -72,20 +72,17 @@ maxInvItems = 10000
 
 # gRPC API service
 [rpc]
-
 # network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
 network="unix"
-
 # in case the network is unix, 
 # address must be a path to a unix socket (e.g /tmp/file.sock)
 # in case the network is tcp*,
 # address must be in form of a IP address (e.g 127.0.0.1:9000)
 address="/tmp/dusk-grpc.sock"
-
-# Basic HTTP Authentication credentials
-# if empty, auth is disabled
-user=""
-pass=""
+# duration of the session for the grpc services exposed by the node
+sessionDurationMins = 5
+# do not require session
+requireSession = true
 
 enableTLS=false
 # server TLS certificate file
@@ -156,6 +153,8 @@ accumulatorWorkers = 4
 defaultlocktime = 250000
 # default amount, in whole units of DUSK, to send for consensus transactions.
 defaultamount = 5
+# the timeout for consensus step timers
+consensustimeout = 1
 
 [genesis]
 legacy = false
