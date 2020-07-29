@@ -109,6 +109,7 @@ type Transaction interface {
 	ClearDatabase() error
 
 	StoreProvisioners(*user.Provisioners, uint64) error
+	FetchProvisioners(uint64) ([]byte, error)
 
 	// Atomic storage
 	Commit() error

@@ -333,7 +333,8 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 		return err
 	}
 
-	// Caching the provisioners and bidList
+	// Caching the provisioners
+	// TODO: add bidList ?
 	c.p = &provisioners
 
 	err = c.memoryDB.Update(func(t database.Transaction) error {

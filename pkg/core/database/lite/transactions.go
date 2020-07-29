@@ -341,6 +341,19 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 }
 
+func (t transaction) FetchProvisioners(height uint64) ([]byte, error) {
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, height)
+
+	var provisioners []byte
+	var exists bool
+	if provisioners, exists = t.db.storage[blocksInd][toKey(b)]; !exists {
+		return nil, database.ErrBlockNotFound
+	}
+
+	return provisioners, nil
+}
+
 func (t transaction) StoreProvisioners(provisioners *user.Provisioners, height uint64) error {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, height)

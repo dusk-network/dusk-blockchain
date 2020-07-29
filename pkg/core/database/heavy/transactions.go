@@ -595,6 +595,10 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 }
 
+func (t transaction) FetchProvisioners(uint64) ([]byte, error) {
+	return nil, errors.New("method not implemented")
+}
+
 func (t transaction) StoreProvisioners(*user.Provisioners, uint64) error {
 	return errors.New("method not implemented")
 }
