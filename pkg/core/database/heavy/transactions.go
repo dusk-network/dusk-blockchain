@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -592,6 +593,10 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	return tip - n + pos, nil
 
+}
+
+func (t transaction) StoreProvisioners(*user.Provisioners, uint64) error {
+	return errors.New("method not implemented")
 }
 
 // ClearDatabase will wipe all of the data currently in the database.

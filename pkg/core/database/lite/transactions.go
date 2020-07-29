@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -338,6 +339,23 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	return tip - n + pos, nil
 
+}
+
+func (t transaction) StoreProvisioners(provisioners *user.Provisioners, height uint64) error {
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, height)
+
+	init := make([]byte, 8)
+	buf := bytes.NewBuffer(init)
+
+	err := user.MarshalProvisioners(buf, provisioners)
+	if err != nil {
+		return err
+	}
+
+	t.batch[provisionersInd][toKey(b)] = buf.Bytes()
+
+	return nil
 }
 
 func (t transaction) ClearDatabase() error {

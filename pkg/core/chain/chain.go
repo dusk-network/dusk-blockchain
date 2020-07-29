@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"time"
 
 	"encoding/binary"
@@ -109,6 +111,8 @@ type Chain struct {
 	getRoundResultsChan      <-chan rpcbus.Request
 	getLastCommitteeChan     <-chan rpcbus.Request
 
+	memoryDB database.DB
+
 	ctx context.Context
 }
 
@@ -146,6 +150,8 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		return nil, err
 	}
 
+	_, memoryDB := lite.CreateDBConnection()
+
 	chain := &Chain{
 		eventBus:                 eventBus,
 		rpcBus:                   rpcBus,
@@ -163,6 +169,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		verifier:                 verifier,
 		executor:                 executor,
 		ctx:                      ctx,
+		memoryDB:                 memoryDB,
 	}
 
 	prevBlock, err := loader.LoadTip()
@@ -317,6 +324,13 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 
 	// Caching the provisioners and bidList
 	c.p = &provisioners
+
+	err = c.memoryDB.Update(func(t database.Transaction) error {
+		return t.StoreProvisioners(c.p, blk.Header.Height)
+	})
+	if err != nil {
+		log.Warn("Could not store provisioners on memoryDB")
+	}
 
 	// 4. Store the approved block
 	l.Trace("storing block in db")

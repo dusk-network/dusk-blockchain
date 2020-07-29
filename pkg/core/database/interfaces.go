@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -106,6 +107,8 @@ type Transaction interface {
 
 	// ClearDatabase will remove all information from the database.
 	ClearDatabase() error
+
+	StoreProvisioners(*user.Provisioners, uint64) error
 
 	// Atomic storage
 	Commit() error

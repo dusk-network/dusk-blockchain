@@ -154,7 +154,7 @@ defaultlocktime = 250000
 # default amount, in whole units of DUSK, to send for consensus transactions.
 defaultamount = 5
 # the timeout for consensus step timers
-consensustimeout = 1
+consensustimeout = 5
 
 [genesis]
 legacy = false
