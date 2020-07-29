@@ -110,6 +110,8 @@ type Chain struct {
 	getLastCommitteeChan     <-chan rpcbus.Request
 
 	ctx context.Context
+
+	onBeginAccepting func() bool
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -164,6 +166,8 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		executor:                 executor,
 		ctx:                      ctx,
 	}
+
+	chain.onBeginAccepting = chain.beginAccepting
 
 	prevBlock, err := loader.LoadTip()
 	if err != nil {
@@ -231,17 +235,27 @@ func (c *Chain) Listen() {
 	}
 }
 
-func (c *Chain) onAcceptBlock(m message.Message) error {
+func (c *Chain) beginAccepting() bool {
+
 	// Ignore blocks from peers if we are only one behind - we are most
 	// likely just about to finalize consensus.
 	// TODO: we should probably just accept it if consensus was not
 	// started yet
 	if !c.counter.IsSyncing() {
-		return nil
+		return false
 	}
 
 	// If we are more than one block behind, stop the consensus
 	c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
+	return true
+}
+
+func (c *Chain) onAcceptBlock(m message.Message) error {
+
+	// Prepare component and the node for accepting new block
+	if !c.onBeginAccepting() {
+		return nil
+	}
 
 	// Accept the block
 	blk := m.Payload().(block.Block)
