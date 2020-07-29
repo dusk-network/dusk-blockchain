@@ -83,6 +83,7 @@ func (s *SyncState) IncrementStep() {
 	defer s.Lock.Unlock()
 	s.step++
 	s.bufRepr = recreate(s.round, s.step)
+	log.WithField("step", s.step).WithField("round", s.round).Debug("IncrementStep")
 }
 
 // ToBuffer returns a binary representation of the round and the step

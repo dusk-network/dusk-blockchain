@@ -7,7 +7,10 @@ DUSK_VERSION=v0.3.0
 INIT=true
 MOCK=true
 VOUCHER=true
+FILEBEAT=false
 MOCK_ADDRESS=127.0.0.1:9191
+SEND_BID=false
+
 currentDir=$(pwd)
 RACE=false
 
@@ -20,14 +23,17 @@ usage() {
   echo "-c <number>  -- TYPE to use. eg: release"
   echo "-q <number>  -- QTD of validators to run. eg: 5"
   echo "-s <number>  -- DUSK_VERSION version. eg: v0.3.0"
-  echo "-i <number>  -- INIT instances (true or false). eg: true"
-  echo "-m <number>  -- MOCK instances (true or false). eg: true"
+  echo "-i <boolean>  -- INIT instances (true or false). default: true"
+  echo "-m <boolean>  -- MOCK instances (true or false). default: true"
+  echo "-f <boolean>  -- FILEBEAT instances (true or false). default: false"
+  echo "-b <boolean>  -- SEND_BID tx to instances (true or false). default: false"
   echo "-r <number>  -- RACE enabled (true or false). eg: true"
 
   exit 1
 }
 
-while getopts "h?c:q:s:i:m:r:" args; do
+
+while getopts "h?c:q:s:i:m:r:f:b:" args; do
 case $args in
     h|\?)
       usage;
@@ -37,6 +43,8 @@ case $args in
     s ) DUSK_VERSION=${OPTARG};;
     i ) INIT=${OPTARG};;
     m ) MOCK=${OPTARG};;
+    f ) FILEBEAT=${OPTARG};;
+    b ) SEND_BID=${OPTARG};;
     r ) RACE=${OPTARG};;
   esac
 done
@@ -68,7 +76,7 @@ init_dusk_func() {
   defaultamount = 50
   defaultlocktime = 1000
   defaultoffset = 10
-  consensustimeout = 1
+  consensustimeout = 5
 
 [database]
   dir = "${DDIR}/chain/"
@@ -87,8 +95,10 @@ init_dusk_func() {
   network = "tcp"
 
 [logger]
-  output = "${DDIR}/dusk"
-  level = "debug"
+  output = "stdout"
+  #output = "${DDIR}/dusk"
+  level = "trace"
+  format = "json"
 
 [mempool]
   maxinvitems = "10000"
@@ -116,9 +126,98 @@ init_dusk_func() {
 [wallet]
   file = "${currentDir}/harness/data/wallet-$((9000+$i)).dat"
   store = "${DDIR}/walletDB/"
+[api]
+  enabled=false
+  enableTLS = false
+  address="127.0.0.1:9199"
+
 EOF
 
   echo "init Dusk node $i, done."
+}
+
+#init dusk
+init_filebeat_func() {
+  echo "init FILEBEAT node $i ..."
+  DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
+  rm -rf "${DDIR}"/filebeat
+
+  cat <<EOF > "${DDIR}"/filebeat.json.yml
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - ${DDIR}/dusk$((7100+$i)).log
+  exclude_files: ['\.gz$']
+  encoding: plain
+  json.keys_under_root: true
+name: dusk$((7100+$i))
+output.logstash:
+  hosts: ["0.0.0.0:5000"]
+  #index: "devnet-v1"
+  #tags: ["devnet","dusk${i}"]
+  #ignore_older: "5h"
+  #close_inactive: "4h"
+  #close_renamed: true
+  #clean_inactive: true
+  #clean_removed: true
+  #tail_files: true
+  encoding: plain
+#setup.dashboards.enabled: true
+#setup.kibana.host: "localhost:5601"
+#setup.kibana.protocol: "http"
+#setup.kibana.username: elastic
+#setup.kibana.password: changeme
+#setup.dashboards.retry.enabled: true
+#setup.dashboards.retry_interval: 10
+fields:
+  env: dusk$((7100+$i))
+#  type: node
+processors:
+#  - add_host_metadata: ~
+#  - add_cloud_metadata: ~
+#  - decode_json_fields:
+#      fields: ["field1", "field2", ...]
+#      process_array: false
+#      max_depth: 1
+#      target: ""
+#      overwrite_keys: false
+#      add_error_key: true
+  - convert:
+      fields:
+        - {from: "msg", type: "string"}
+        - {from: "level", to: "msg_level", type: "string"}
+        - {from: "category", to: "msg_category", type: "string"}
+        - {from: "process", to: "msg_process", type: "string"}
+        - {from: "topic", to: "msg_topic", type: "string"}
+        - {from: "recipients", to: "msg_recipients", type: "string"}
+        - {from: "step", to: "msg_step", type: "string"}
+        - {from: "round", to: "msg_round", type: "string"}
+        - {from: "id", to: "msg_id", type: "string"}
+        - {from: "sender", to :"msg_sender", type: "string"}
+        - {from: "agreement", to: "msg_agreement", type: "string"}
+        - {from: "quorum", to: "msg_quorum", type: "string"}
+        - {from: "new_best", to: "msg_new_best", type: "string"}
+        - {from: "block_hash", to: "msg_block_hash", type: "string"}
+        - {from: "prefix", to: "msg_prefix", type: "string"}
+        - {from: "hash", to: "msg_hash", type: "string"}
+        - {from: "error", to: "msg_error", type: "string"}
+        - {from: "score", to: "msg_score", type: "string"}
+        - {from: "count", to: "msg_count", type: "string"}
+        - {from: "last_height", to: "msg_last_height", type: "string"}
+        - {from: "height", to: "msg_height", type: "string"}
+        - {from: "sender", to: "msg_sender", type: "string"}
+      ignore_missing: true
+      fail_on_error: false
+      mode: rename
+  - drop_fields:
+      fields: ["agent", "ecs.version", "input", "log", "@metadata", "host"]
+
+EOF
+
+  chmod go-w "${DDIR}"/filebeat.json.yml
+
+  echo "init FILEBEAT node $i, done."
 }
 
 # start dusk mocks
@@ -142,7 +241,7 @@ start_dusk_func() {
   DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
 
   CMD="${currentDir}/bin/dusk --config ${DDIR}/dusk.toml"
-  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/dusk$i.log" 2>&1 &
+  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/dusk$i.log" 2> "${currentDir}/devnet/dusk_data/logs/dusk$i.err" &
 
   EXEC_PID=$!
   echo "started Dusk node $i, pid=$EXEC_PID"
@@ -164,6 +263,15 @@ start_dusk_mock_func() {
   echo "started Dusk Utils mock, pid=$EXEC_PID"
 }
 
+# send_bid_func
+send_bid_func(){
+  echo "Sending bid to node $i ..."
+
+  # send bid cmd
+  SENDBID_CMD="./bin/utils transactions --grpchost unix://${DDIR}/dusk-grpc.sock --txtype consensus --amount 10 --locktime 10"
+  ${SENDBID_CMD} >> "${currentDir}/devnet/dusk_data/logs/sendbid_bid$i.log" 2>&1 &
+}
+
 start_voucher_func() {
   echo "starting Dusk Voucher ..."
 
@@ -172,6 +280,16 @@ start_voucher_func() {
 
   EXEC_PID=$!
   echo "started Dusk Voucher, pid=$EXEC_PID"
+}
+
+start_filebeat_func() {
+  echo "starting FILEBEAT node $i ..."
+
+  DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
+  filebeat -e -path.config "${DDIR}" -path.data "${DDIR}/filebeat" -c filebeat.json.yml -d "*" >> "${currentDir}/devnet/dusk_data/logs/filebeat${i}.log" 2>&1 &
+
+  EXEC_PID=$!
+  echo "started FILEBEAT, pid=$EXEC_PID"
 }
 
 if [ "${INIT}" == "true" ]; then
@@ -198,11 +316,28 @@ if [ "${MOCK}" == "true" ]; then
   done
 fi
 
+if [ "${FILEBEAT}" == "true" ]; then
+
+  for i in $(seq 0 "$QTD"); do
+    init_filebeat_func "$i"
+    start_filebeat_func "$i"
+  done
+
+fi
+
 sleep 1
 
 for i in $(seq 0 "$QTD"); do
   start_dusk_func "$i"
 done
+
+sleep 5
+
+if [ "${SEND_BID}" == "true" ]; then
+  for i in $(seq 0 "$QTD"); do
+    send_bid_func "$i"
+  done
+fi
 
 echo "done starting Dusk stack"
 exit 0

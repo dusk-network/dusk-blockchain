@@ -115,15 +115,22 @@ func (s *roundStore) resume(id uint32) bool {
 func (s *roundStore) Dispatch(m message.Message) {
 	subscribers := s.createSubscriberQueue(m.Category())
 	lg.WithFields(log.Fields{
-		"recipients": len(subscribers),
-		"topic":      m.Category(),
+		"coordinator_round": s.coordinator.Round(),
+		"coordinator_step":  s.coordinator.Step(),
+		"recipients":        len(subscribers),
+		"topic":             m.Category().String(),
 	}).Traceln("notifying subscribers")
 	for _, sub := range subscribers {
-		if err := sub.NotifyPayload(m.Payload().(InternalPacket)); err != nil {
+		ip := m.Payload().(InternalPacket)
+		if err := sub.NotifyPayload(ip); err != nil {
 			lg.WithFields(log.Fields{
-				"topic": m.Category().String(),
-				"id":    sub.ID(),
-			}).WithError(err).Warnln("notifying subscriber failed")
+				"coordinator_round": s.coordinator.Round(),
+				"coordinator_step":  s.coordinator.Step(),
+				"topic":             m.Category().String(),
+				"round":             ip.State().Round,
+				"step":              ip.State().Step,
+				"id":                sub.ID(),
+			}).WithError(err).Error("notifying subscriber failed")
 		}
 	}
 }
@@ -277,10 +284,10 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 		return err
 	}
 	lg.WithFields(log.Fields{
-		"coordinator round": c.Round(),
-		"message round":     round,
+		"coordinator_step":  c.Step(),
+		"coordinator_round": c.Round(),
+		"message_round":     round,
 	}).Debugln("received Finalize message")
-
 	return nil
 }
 
@@ -301,9 +308,9 @@ func (c *Coordinator) reinstantiateStore() {
 func (c *Coordinator) CollectEvent(m message.Message) error {
 	var msg InternalPacket
 	switch p := m.Payload().(type) {
-	case message.SafeBuffer: // TODO: we should actually panic here
+	case message.SafeBuffer: // TODO: we should actually panic here (panic??)
 		_, _ = topics.Extract(&p)
-		return fmt.Errorf("trying to feed the Coordinator a bytes.Buffer for message: %s", m.Category())
+		return fmt.Errorf("trying to feed the Coordinator a bytes.Buffer for message: %s", m.Category().String())
 	case InternalPacket:
 		msg = p
 	default:
@@ -330,11 +337,23 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 
 	switch comparison {
 	case header.Before:
-		lg.WithField("topic", m.Category()).Debugln("discarding obsolete event")
+		lg.
+			WithFields(log.Fields{
+				"topic": m.Category().String(),
+				"round": hdr.Round,
+				"step":  hdr.Step,
+			}).
+			Debugln("discarding obsolete event")
 		c.lock.RUnlock()
 		return nil
 	case header.After:
-		lg.WithField("topic", m.Category()).Debugln("storing future event")
+		lg.
+			WithFields(log.Fields{
+				"topic": m.Category().String(),
+				"round": hdr.Round,
+				"step":  hdr.Step,
+			}).
+			Debugln("storing future event")
 
 		// If it is a future agreement event, we store it on the
 		// `roundQueue`. This means that the event will be dispatched
@@ -377,7 +396,11 @@ func (c *Coordinator) FinalizeRound() {
 // components
 func (c *Coordinator) Forward(id uint32) uint8 {
 	if c.store.hasComponent(id) {
-		lg.WithField("id", id).Traceln("incrementing step")
+		lg.
+			WithField("step", c.Step()).
+			WithField("round", c.Round()).
+			WithField("id", id).
+			Traceln("incrementing step")
 		c.IncrementStep()
 	}
 	return c.Step()
@@ -440,7 +463,7 @@ func (c *Coordinator) Compose(pf PacketFactory) InternalPacket {
 }
 
 // SendInternally publish a message for internal consumption (and therefore
-// does not carry the topic, nor needs binary de- serialization)
+// does not carry the topic, nor needs binary de-serialization)
 func (c *Coordinator) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
@@ -477,7 +500,13 @@ func (c *Coordinator) SendInternally(topic topics.Topic, hash []byte, payload *b
 
 // Pause event streaming for the listener with the specified ID.
 func (c *Coordinator) Pause(id uint32) {
-	lg.WithField("id", id).Traceln("pausing")
+	lg.
+		WithField("id", id).
+		WithFields(log.Fields{
+			"coordinator_round": c.Round(),
+			"coordinator_step":  c.Step(),
+		}).
+		Traceln("pausing")
 	c.store.pause(id)
 }
 
@@ -485,7 +514,14 @@ func (c *Coordinator) Pause(id uint32) {
 func (c *Coordinator) Play(id uint32) {
 	// Only dispatch events if a registered component asks to Resume
 	if c.store.resume(id) {
-		lg.WithField("id", id).Traceln("resumed")
+
+		lg.
+			WithField("id", id).
+			WithFields(log.Fields{
+				"coordinator_round": c.Round(),
+				"coordinator_step":  c.Step(),
+			}).
+			Traceln("resumed")
 		c.dispatchQueuedEvents()
 	}
 }

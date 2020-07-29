@@ -51,7 +51,7 @@ func (a *Accumulator) Process(ev message.Agreement) {
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
 		// FIXME: republish here to avoid race conditions for slower but safer
-		// repropagation
+		// re-propagation
 		hdr := ev.State()
 		collected := a.store.Get(hdr.Step)
 		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
@@ -62,6 +62,8 @@ func (a *Accumulator) Accumulate() {
 		}
 
 		lg.WithFields(log.Fields{
+			"step":   ev.State().Step,
+			"round":  ev.State().Round,
 			"count":  count,
 			"quorum": a.handler.Quorum(hdr.Round),
 		}).Debugln("collected agreement")

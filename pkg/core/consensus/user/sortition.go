@@ -98,12 +98,12 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 			break
 		}
 
-		hash, err := createSortitionHash(round, step, i)
+		hashSort, err := createSortitionHash(round, step, i)
 		if err != nil {
 			log.Panic(err)
 		}
 
-		score := generateSortitionScore(hash, W)
+		score := generateSortitionScore(hashSort, W)
 		blsPk := p.extractCommitteeMember(score)
 		votingCommittee.Insert(blsPk)
 
@@ -130,6 +130,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 			// handling the eventuality of an out of bound error
 			m, e = p.MemberAt(0)
 			if e != nil {
+				//FIXME: shall this panic ?
 				log.Panic(e)
 			}
 		}

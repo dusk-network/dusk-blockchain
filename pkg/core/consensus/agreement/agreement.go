@@ -88,17 +88,27 @@ func (a *agreement) CollectAgreementEvent(packet consensus.InternalPacket) error
 func (a *agreement) listen() {
 	select {
 	case evs := <-a.accumulator.CollectedVotesChan:
-		lg.WithField("id", a.agreementID).Debugln("quorum reached")
+		lg.
+			WithField("round", a.round).
+			WithField("step", evs[0].State().Step).
+			WithField("id", a.agreementID).
+			Debugln("quorum reached")
 		// Start a goroutine here to release the lock held by
 		// Coordinator.CollectEvent
 		// Send the Agreement to the Certificate Collector within the Chain
+
+		//TODO: what happens when sending the certificate fails ?
 		go a.sendCertificate(evs[0])
 	case <-a.quitChan:
 	}
 }
 
 func (a *agreement) sendCertificate(ag message.Agreement) {
-	keys := a.handler.getVoterKeys(ag)
+	keys, err := a.handler.getVoterKeys(ag)
+	if err != nil {
+		lg.WithField("agreement", ag.String()).Error("could not getVoterKeys for the agreement")
+		return
+	}
 	cert := message.NewCertificate(ag, keys)
 	msg := message.New(topics.Certificate, cert)
 	a.publisher.Publish(topics.Certificate, msg)

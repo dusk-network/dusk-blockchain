@@ -46,7 +46,10 @@ type Broker struct {
 func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
 	getCandidateChan := make(chan rpcbus.Request, 1)
-	_ = rpcBus.Register(topics.GetCandidate, getCandidateChan)
+	err := rpcBus.Register(topics.GetCandidate, getCandidateChan)
+	if err != nil {
+		log.WithError(err).Error("could not Register GetCandidate")
+	}
 	bestScoreChan := make(chan message.Message, 1)
 	broker.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
 
@@ -132,6 +135,10 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 	r.RespChan <- rpcbus.Response{Resp: cm, Err: nil}
 }
 
+// ErrGetCandidateTimeout is an error specific to timeout happening on
+// GetCandidate calls
+var ErrGetCandidateTimeout = errors.New("request GetCandidate timeout")
+
 // requestCandidate from peers around this node. The candidate can only be
 // requested for 2 rounds (which provides some protection from keeping to
 // request bulky stuff)
@@ -152,7 +159,7 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	for {
 		select {
 		case <-timer.C:
-			return message.Candidate{}, errors.New("request timeout")
+			return message.Candidate{}, ErrGetCandidateTimeout
 
 		// We take control of `candidateChan`, to monitor incoming
 		// candidates. There should be no race condition in reading from

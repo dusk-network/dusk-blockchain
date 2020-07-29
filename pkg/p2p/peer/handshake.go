@@ -12,20 +12,20 @@ import (
 )
 
 // Handshake with another peer.
-func (p *Writer) Handshake() error {
-	if err := p.writeLocalMsgVersion(p.gossip); err != nil {
+func (w *Writer) Handshake() error {
+	if err := w.writeLocalMsgVersion(w.gossip); err != nil {
 		return err
 	}
 
-	if err := p.readVerAck(); err != nil {
+	if err := w.readVerAck(); err != nil {
 		return err
 	}
 
-	if err := p.readRemoteMsgVersion(); err != nil {
+	if err := w.readRemoteMsgVersion(); err != nil {
 		return err
 	}
 
-	return p.writeVerAck(p.gossip)
+	return w.writeVerAck(w.gossip)
 }
 
 // Handshake with another peer.

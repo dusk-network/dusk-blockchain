@@ -65,6 +65,7 @@ stop:
 	killall dusk || true
 	killall voucher || true
 	killall utils || true
+	killall filebeat || true
 ###################################CROSS#################################################
 install-tools:
 	go get -u github.com/karalabe/xgo
