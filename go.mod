@@ -4,7 +4,7 @@ require (
 	github.com/bwesterb/go-ristretto v1.1.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/didip/tollbooth v4.0.2+incompatible
-	github.com/drewolson/testflight v1.0.0 // indirect
+	github.com/drewolson/testflight v1.0.0
 	github.com/dusk-network/dusk-crypto v0.1.3
 	github.com/dusk-network/dusk-protobuf v0.2.8
 	github.com/dusk-network/dusk-wallet/v2 v2.0.2
