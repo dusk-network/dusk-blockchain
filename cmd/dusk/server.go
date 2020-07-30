@@ -3,12 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"net"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -55,7 +54,7 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server, memoryDB database.DB) (chain.Loader, error) {
+func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server, db database.DB) (chain.Loader, error) {
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
@@ -68,10 +67,9 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 	} else {
 		genesis = cfg.DecodeGenesis()
 	}
-	_, db := heavy.CreateDBConnection()
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(ctx, eventBus, rpcBus, counter, l, l, srv, proxy.Executor(), memoryDB)
+	chainProcess, err := chain.New(ctx, eventBus, rpcBus, counter, l, l, srv, proxy.Executor())
 	if err != nil {
 		return nil, err
 	}
@@ -116,10 +114,11 @@ func Setup() *Server {
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()
 
-	_, memoryDB := lite.CreateDBConnection()
+	_, db := heavy.CreateDBConnection()
+
 	// Instantiate API server
 	if cfg.Get().API.Enabled {
-		if apiServer, e := api.NewHTTPServer(eventBus, rpcBus, memoryDB); e != nil {
+		if apiServer, e := api.NewHTTPServer(eventBus, rpcBus, db); e != nil {
 			log.Errorf("API http server error: %v", e)
 		} else {
 			if e := apiServer.Start(apiServer); e != nil {
@@ -128,7 +127,7 @@ func Setup() *Server {
 		}
 	}
 
-	chainDBLoader, err := LaunchChain(ctx, proxy, eventBus, rpcBus, counter, grpcServer, memoryDB)
+	chainDBLoader, err := LaunchChain(ctx, proxy, eventBus, rpcBus, counter, grpcServer, db)
 	if err != nil {
 		log.Panic(err)
 	}

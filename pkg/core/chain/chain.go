@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 
 	"encoding/binary"
 	"sync"
@@ -110,8 +111,6 @@ type Chain struct {
 	getRoundResultsChan      <-chan rpcbus.Request
 	getLastCommitteeChan     <-chan rpcbus.Request
 
-	memoryDB database.DB
-
 	ctx context.Context
 }
 
@@ -122,7 +121,7 @@ type Chain struct {
 // block
 // TODO: the counter should be encapsulated in a specific component for
 // synchronization
-func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, executor transactions.Executor, memoryDB database.DB) (*Chain, error) {
+func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, loader Loader, verifier Verifier, srv *grpc.Server, executor transactions.Executor) (*Chain, error) {
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
 	highestSeenChan := initHighestSeenCollector(eventBus)
@@ -166,7 +165,6 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		verifier:                 verifier,
 		executor:                 executor,
 		ctx:                      ctx,
-		memoryDB:                 memoryDB,
 	}
 
 	prevBlock, err := loader.LoadTip()
@@ -334,8 +332,8 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	// TODO: add bidList ?
 	c.p = &provisioners
 
-	if c.memoryDB != nil {
-		err = c.memoryDB.Update(func(t database.Transaction) error {
+	if config.Get().API.Enabled {
+		err = c.loader.(*DBLoader).db.Update(func(t database.Transaction) error {
 			return t.StoreProvisioners(c.p, blk.Header.Height)
 		})
 		if err != nil {
