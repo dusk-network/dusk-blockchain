@@ -67,6 +67,12 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 		sv.Cluster = sortedset.NewCluster()
 	}
 	if err := sv.StepVotes.Add(ev.SignedHash, hdr.PubKeyBLS, hdr.Step); err != nil {
+		lg.
+			WithError(err).
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			WithField("quorum", sv.Cluster.TotalOccurrences()).
+			Debug("firststep, StepVotes.Add failed")
 		return err
 	}
 
@@ -76,6 +82,12 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 	}
 	a.voteSets[hash] = sv
 	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum(hdr.Round) {
+		lg.
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			WithField("quorum", sv.Cluster.TotalOccurrences()).
+			Debug("firststep_quorum_reached")
+
 		a.finished = true
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
 
@@ -85,12 +97,23 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 		// StepVotes
 		if !bytes.Equal(blockHash, emptyHash[:]) {
 			if err := verifyCandidateBlock(a.rpcBus, blockHash); err != nil {
+				log.
+					WithError(err).
+					WithField("round", hdr.Round).
+					WithField("step", hdr.Step).
+					Error("firststep_verifyCandidateBlock the candidate block failed")
 				a.requestHalt(emptyHash[:])
 				return nil
 			}
 		}
 
 		a.requestHalt(blockHash, sv.StepVotes)
+	} else {
+		lg.
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			WithField("quorum", sv.Cluster.TotalOccurrences()).
+			Debug("firststep_quorum_not_reached")
 	}
 	return nil
 }
@@ -105,10 +128,11 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	req := rpcbus.NewRequest(*bytes.NewBuffer(blockHash))
 	resp, err := rpcBus.Call(topics.GetCandidate, req, 5*time.Second)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "reduction",
-			"error":   err,
-		}).Errorln("fetching the candidate block failed")
+		log.
+			WithError(err).
+			WithFields(log.Fields{
+				"process": "reduction",
+			}).Error("firststep, fetching the candidate block failed")
 		return err
 	}
 	cm := resp.(message.Candidate)
@@ -118,10 +142,11 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	if !bytes.Equal(blockHash, emptyHash[:]) {
 		req := rpcbus.NewRequest(cm)
 		if _, err := rpcBus.Call(topics.VerifyCandidateBlock, req, 5*time.Second); err != nil {
-			log.WithFields(log.Fields{
-				"process": "reduction",
-				"error":   err,
-			}).Errorln("verifying the candidate block failed")
+			log.
+				WithError(err).
+				WithFields(log.Fields{
+					"process": "reduction",
+				}).Error("firststep, verifying the candidate block failed")
 			return err
 		}
 	}

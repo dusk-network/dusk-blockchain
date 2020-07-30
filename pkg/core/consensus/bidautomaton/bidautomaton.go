@@ -68,7 +68,7 @@ func (m *BidAutomaton) Listen() {
 
 		if m.height+renewalOffset >= m.bidEndHeight {
 			if err := m.sendBid(); err != nil {
-				l.WithError(err).Warnln("could not send bid tx")
+				l.WithError(err).Error("could not send bid tx")
 				continue
 			}
 		}

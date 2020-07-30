@@ -8,6 +8,7 @@ type generalConfiguration struct {
 type loggerConfiguration struct {
 	Level   string
 	Output  string
+	Format  string
 	Monitor logMonitorConfiguration
 }
 
@@ -97,6 +98,14 @@ type gqlConfiguration struct {
 	MaxRequestLimit uint
 
 	Notification notificationConfiguration
+}
+
+type apiConfiguration struct {
+	Enabled   bool
+	Address   string
+	EnableTLS bool
+	CertFile  string
+	KeyFile   string
 }
 
 type notificationConfiguration struct {

@@ -184,7 +184,7 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 }
 
 func (w *Writer) onDisconnect() {
-	log.Infof("Connection to %s terminated", w.Connection.RemoteAddr().String())
+	log.WithField("address", w.Connection.RemoteAddr().String()).Infof("Connection terminated")
 	_ = w.Conn.Close()
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
 }

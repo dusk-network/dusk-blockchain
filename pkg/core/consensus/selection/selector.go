@@ -2,6 +2,8 @@ package selection
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -53,13 +55,30 @@ func (e emptyScoreFactory) Create(pubkey []byte, round uint64, step uint8) conse
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
 func NewComponent(ctx context.Context, publisher eventbus.Publisher, timeout time.Duration, provisioner transactions.Provisioner) *Selector {
-	return &Selector{
+	selector := &Selector{
 		timeout:     timeout,
 		publisher:   publisher,
 		bestEvent:   message.EmptyScore(),
 		ctx:         ctx,
 		provisioner: provisioner,
 	}
+	CUSTOM_SELECTOR_TIMEOUT := os.Getenv("CUSTOM_SELECTOR_TIMEOUT")
+	if CUSTOM_SELECTOR_TIMEOUT != "" {
+		customTimeout, err := strconv.Atoi(CUSTOM_SELECTOR_TIMEOUT)
+		if err == nil {
+			log.
+				WithField("customTimeout", customTimeout).
+				Info("selector will set a custom timeout")
+			selector.timeout = time.Duration(customTimeout) * time.Second
+		} else {
+			log.
+				WithError(err).
+				WithField("customTimeout", customTimeout).
+				Error("selector could not set a custom timeout")
+		}
+	}
+
+	return selector
 }
 
 // Initialize the Selector, by creating the handler and returning the needed Listeners.
@@ -126,12 +145,20 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	s.publisher.Publish(topics.ValidCandidateHash, msg)
 
 	if err := s.signer.Gossip(msg, s.ID()); err != nil {
+		lg.
+			WithError(err).
+			WithField("step", h.Step).
+			WithField("round", h.Round).
+			Error("CollectScoreEvent, failed to gossip")
 		return err
 	}
 
-	lg.WithFields(log.Fields{
-		"new best": score.Score,
-	}).Debugln("swapping best score")
+	lg.
+		WithField("step", h.Step).
+		WithField("round", h.Round).
+		WithFields(log.Fields{
+			"new_best": score.Score,
+		}).Debugln("swapping best score")
 	s.bestEvent = score
 	return nil
 }
@@ -159,6 +186,19 @@ func (s *Selector) IncreaseTimeOut() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.timeout = s.timeout * 2
+	if s.timeout > 60*time.Second {
+		lg.
+			WithField("step", s.bestEvent.State().Step).
+			WithField("round", s.bestEvent.State().Round).
+			WithField("timeout", s.timeout).
+			Error("max_timeout_reached")
+		s.timeout = 60 * time.Second
+	}
+	lg.
+		WithField("step", s.bestEvent.State().Step).
+		WithField("round", s.bestEvent.State().Round).
+		WithField("timeout", s.timeout).
+		Trace("increase_timeout")
 }
 
 //nolint:unparam
@@ -175,7 +215,10 @@ func (s *Selector) sendBestEvent() error {
 	}
 
 	msg := message.New(topics.BestScore, bestEvent)
-	_ = s.signer.SendInternally(topics.BestScore, msg, s.ID())
+	err := s.signer.SendInternally(topics.BestScore, msg, s.ID())
+	if err != nil {
+		lg.WithError(err).Error("sendBestEvent, failed to SendInternally the BestScore")
+	}
 	s.handler.LowerThreshold()
 	s.IncreaseTimeOut()
 	return nil

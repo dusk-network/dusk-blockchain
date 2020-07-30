@@ -431,6 +431,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *us
 	}
 
 	if idx > len(keys) {
+		// FIXME: shall this panic ?
 		panic("wrong iterative index: cannot iterate more than there are keys")
 	}
 
@@ -442,6 +443,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *us
 
 	whole := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(whole, a.State()); err != nil {
+		//FIXME: shall this panic ?
 		panic(err)
 	}
 
@@ -465,6 +467,7 @@ func MockCommitteeVoteSet(p *user.Provisioners, k []key.Keys, hash []byte, commi
 // Albeit random, the generation is consistent with the rules of Votes
 func GenVotes(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners) []*StepVotes {
 	if len(keys) < 2 {
+		//FIXME: shall this panic ?
 		panic("At least two votes are required to mock an Agreement")
 	}
 
@@ -520,11 +523,13 @@ func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Key
 
 			r := new(bytes.Buffer)
 			if err := header.MarshalSignableVote(r, h); err != nil {
+				//FIXME: shall this panic ?
 				panic(err)
 			}
 
 			sigma, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, r.Bytes())
 			if err := stepVotes.Add(sigma.Compress(), k.BLSPubKeyBytes, step); err != nil {
+				//FIXME: shall this panic ?
 				panic(err)
 			}
 		}

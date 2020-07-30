@@ -1,7 +1,6 @@
 package firststep
 
 import (
-	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -95,11 +94,11 @@ func (r *Reducer) Collect(e consensus.InternalPacket) error {
 
 	hdr := red.State()
 	lg.WithFields(log.Fields{
-		"round":  hdr.Round,
-		"step":   hdr.Step,
-		"sender": hex.EncodeToString(hdr.Sender()),
-		"id":     r.reductionID,
-		"hash":   hex.EncodeToString(hdr.BlockHash),
+		"round": hdr.Round,
+		"step":  hdr.Step,
+		//"sender": hex.EncodeToString(hdr.Sender()),
+		"id": r.reductionID,
+		//"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received event")
 	return r.aggregator.collectVote(red)
 }
@@ -111,6 +110,11 @@ func (r *Reducer) Filter(hdr header.Header) bool {
 }
 
 func (r *Reducer) startReduction() {
+	lg.WithFields(log.Fields{
+		"round":   r.round,
+		"id":      r.reductionID,
+		"timeout": r.timeOut / time.Second,
+	}).Debugln("firststep, startReduction")
 	r.Timer.Start(r.timeOut)
 	r.aggregator = newAggregator(r.Halt, r.handler, r.rpcBus)
 }
@@ -154,7 +158,10 @@ func (s StepVotesMsgFactory) Create(sender []byte, round uint64, step uint8) con
 // on the StepVotes topic.
 func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 	var svm message.StepVotesMsg
-	lg.WithField("id", r.reductionID).Traceln("halted")
+	lg.
+		WithField("id", r.reductionID).
+		WithField("round", r.round).
+		Traceln("firststep_halted")
 	r.Timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 
@@ -170,17 +177,38 @@ func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 		}
 		// Increase timeout if we did not have a good result
 		r.timeOut = r.timeOut * 2
+		if r.timeOut > 60*time.Second {
+			lg.
+				WithField("timeout", r.timeOut).
+				WithField("id", r.reductionID).
+				WithField("round", r.round).
+				Error("max_timeout_reached")
+			r.timeOut = 60 * time.Second
+		}
+		lg.WithField("timeout", r.timeOut).
+			WithField("id", r.reductionID).
+			WithField("round", r.round).
+			Trace("increase_timeout")
 		svm = r.signer.Compose(factory).(message.StepVotesMsg)
 	}
 
 	msg := message.New(topics.StepVotes, svm)
-	_ = r.signer.SendInternally(topics.StepVotes, msg, r.ID())
+	err := r.signer.SendInternally(topics.StepVotes, msg, r.ID())
+	if err != nil {
+		lg.WithField("timeout", r.timeOut).
+			WithField("id", r.reductionID).
+			WithField("round", r.round).
+			Error("firststep_halted, failed to SendInternally")
+	}
 }
 
 // CollectBestScore activates the 2-step reduction cycle.
 // TODO: interface - rename into CollectStartReductionSignal
 func (r *Reducer) CollectBestScore(e consensus.InternalPacket) error {
-	lg.WithField("id", r.reductionID).Traceln("starting reduction")
+	lg.
+		WithField("id", r.reductionID).
+		WithField("round", r.round).
+		Trace("starting firststep reduction")
 	r.startReduction()
 	step := r.eventPlayer.Forward(r.ID())
 	r.eventPlayer.Play(r.reductionID)
