@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/sirupsen/logrus"
@@ -14,16 +14,12 @@ import (
 // TestSuccessfulAggro tests that upon collection of a quorum of events, a valid StepVotes get produced
 func TestSuccessfulAggro(t *testing.T) {
 	eb, rbus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second)
+	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second, true)
 	evs := hlp.Spawn(hash)
 
-	res := make(chan error, 1)
-	test := func(hash []byte, svs ...*message.StepVotes) {
-		assert.Equal(t, hlp.Step(), svs[0].Step)
-		res <- hlp.Verify(hash, *svs[0], hlp.Step())
-	}
+	res := make(chan reduction.HaltMsg, 1)
 
-	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
+	aggregator := newAggregator(res, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
 		if !assert.NoError(t, aggregator.collectVote(ev)) {
@@ -31,26 +27,22 @@ func TestSuccessfulAggro(t *testing.T) {
 		}
 	}
 
-	err := <-res
-	assert.NoError(t, err)
+	m := <-res
+	assert.Equal(t, hlp.Step(), m.Sv[0].Step)
+	assert.NoError(t, hlp.Verify(m.Hash, *m.Sv[0], hlp.Step()))
 }
 
 // TestInvalidBlock tests that upon collection of a quorum of events, a valid StepVotes get produced
 func TestInvalidBlock(t *testing.T) {
 	logrus.SetLevel(logrus.FatalLevel)
 	eb, rbus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second)
+	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second, true)
 	hlp.FailOnVerification(true)
 	evs := hlp.Spawn(hash)
 
-	res := make(chan struct{}, 1)
-	test := func(hash []byte, svs ...*message.StepVotes) {
-		assert.Equal(t, emptyHash[:], hash)
-		assert.Equal(t, 0, len(svs))
-		res <- struct{}{}
-	}
+	res := make(chan reduction.HaltMsg, 1)
 
-	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
+	aggregator := newAggregator(res, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
 		if !assert.NoError(t, aggregator.collectVote(ev)) {
@@ -58,25 +50,22 @@ func TestInvalidBlock(t *testing.T) {
 		}
 	}
 
-	<-res
+	m := <-res
+	assert.Equal(t, emptyHash[:], m.Hash)
+	assert.Equal(t, 0, len(m.Sv))
 }
 
 // Test that a valid stepvotes is produced when a candidate block for
 // a given hash is not found.
 func TestCandidateNotFound(t *testing.T) {
 	eb, rbus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second)
+	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second, true)
 	hlp.FailOnFetching(true)
 	evs := hlp.Spawn(hash)
 
-	res := make(chan struct{}, 1)
-	test := func(hash []byte, svs ...*message.StepVotes) {
-		assert.Equal(t, emptyHash[:], hash)
-		assert.Equal(t, 0, len(svs))
-		res <- struct{}{}
-	}
+	res := make(chan reduction.HaltMsg, 1)
 
-	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
+	aggregator := newAggregator(res, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
 		if !assert.NoError(t, aggregator.collectVote(ev)) {
@@ -84,5 +73,7 @@ func TestCandidateNotFound(t *testing.T) {
 		}
 	}
 
-	<-res
+	m := <-res
+	assert.Equal(t, emptyHash[:], m.Hash)
+	assert.Equal(t, 0, len(m.Sv))
 }

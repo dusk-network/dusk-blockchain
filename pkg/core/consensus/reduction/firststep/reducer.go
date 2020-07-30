@@ -33,15 +33,20 @@ type Reducer struct {
 	timeOut    time.Duration
 	Timer      *reduction.Timer
 	round      uint64
+
+	haltChan chan reduction.HaltMsg
+	quitChan chan struct{}
 }
 
 // NewComponent returns an uninitialized reduction component.
 func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Keys, timeOut time.Duration) reduction.Reducer {
 	return &Reducer{
-		broker:  broker,
-		rpcBus:  rpcBus,
-		keys:    keys,
-		timeOut: timeOut,
+		broker:   broker,
+		rpcBus:   rpcBus,
+		keys:     keys,
+		timeOut:  timeOut,
+		haltChan: make(chan reduction.HaltMsg, 2),
+		quitChan: make(chan struct{}, 1),
 	}
 }
 
@@ -52,7 +57,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	r.eventPlayer = eventPlayer
 	r.signer = signer
 	r.handler = reduction.NewHandler(r.keys, ru.P)
-	r.Timer = reduction.NewTimer(r.Halt)
+	r.Timer = reduction.NewTimer(r.haltChan)
 	r.round = ru.Round
 
 	bestScoreSubscriber := consensus.TopicListener{
@@ -82,6 +87,7 @@ func (r *Reducer) ID() uint32 {
 func (r *Reducer) Finalize() {
 	r.eventPlayer.Pause(r.reductionID)
 	r.Timer.Stop()
+	r.quitChan <- struct{}{}
 }
 
 // Collect forwards Reduction to the aggregator
@@ -115,8 +121,15 @@ func (r *Reducer) startReduction() {
 		"id":      r.reductionID,
 		"timeout": r.timeOut / time.Second,
 	}).Debugln("firststep, startReduction")
+
+	// Clear out haltChan
+	for len(r.haltChan) > 0 {
+		<-r.haltChan
+	}
+
+	go r.collectHalt()
 	r.Timer.Start(r.timeOut)
-	r.aggregator = newAggregator(r.Halt, r.handler, r.rpcBus)
+	r.aggregator = newAggregator(r.haltChan, r.handler, r.rpcBus)
 }
 
 func (r *Reducer) sendReduction(step uint8, hash []byte) {
@@ -132,6 +145,16 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) {
 
 	if err := r.signer.Gossip(msg, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in sending authenticated Reduction")
+	}
+}
+
+// collectHalt is called by the Aggregator and the Timer through a channel, and ensures that only
+// one `Halt` call is made per step.
+func (r *Reducer) collectHalt() {
+	select {
+	case m := <-r.haltChan:
+		r.Halt(m.Hash, m.Sv)
+	case <-r.quitChan:
 	}
 }
 
@@ -156,7 +179,7 @@ func (s StepVotesMsgFactory) Create(sender []byte, round uint64, step uint8) con
 
 // Halt will end the first step of reduction, and forwards whatever result it received
 // on the StepVotes topic.
-func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
+func (r *Reducer) Halt(hash []byte, svs []*message.StepVotes) {
 	var svm message.StepVotesMsg
 	lg.
 		WithField("id", r.reductionID).
