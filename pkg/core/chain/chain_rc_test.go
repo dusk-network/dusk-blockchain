@@ -36,7 +36,7 @@ func TestConcurrentBlock(t *testing.T) {
 
 	// Disable counter.IsSyncing check at the beginning of block accepting
 	// by providing empty callback
-	chain.onBeginAccepting = func(blk *block.Block)) bool { return true }
+	chain.onBeginAccepting = func(blk *block.Block) bool { return true }
 
 	// Switch to syncing mode so that requestRoundResults will be called
 	chain.counter.StartSyncing(1)
