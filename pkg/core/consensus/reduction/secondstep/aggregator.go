@@ -11,11 +11,11 @@ import (
 // The aggregator acts as a de facto storage unit for Reduction messages. Any message
 // it receives will be aggregated into a StepVotes struct, organized by block hash.
 // Once the key set for a StepVotes of a certain block hash reaches quorum, this
-// StepVotes is passed on to the Reducer by use of the `requestHalt` callback.
+// StepVotes is passed on to the Reducer by use of the `haltChan` channel.
 // An aggregator should be instantiated on a per-step basis and is no longer usable
-// after reaching quorum and calling `requestHalt`.
+// after reaching quorum and sending on `haltChan`.
 type aggregator struct {
-	requestHalt    func([]byte, ...*message.StepVotes)
+	haltChan       chan<- reduction.HaltMsg
 	handler        *reduction.Handler
 	firstStepVotes *message.StepVotes
 	finished       bool
@@ -29,12 +29,12 @@ type aggregator struct {
 
 // newAggregator returns an instantiated aggregator, ready for use.
 func newAggregator(
-	requestHalt func([]byte, ...*message.StepVotes),
+	haltChan chan<- reduction.HaltMsg,
 	handler *reduction.Handler,
 	firstStepVotes *message.StepVotes) *aggregator {
 
 	return &aggregator{
-		requestHalt:    requestHalt,
+		haltChan:       haltChan,
 		handler:        handler,
 		firstStepVotes: firstStepVotes,
 		voteSets: make(map[string]struct {
@@ -84,7 +84,10 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 			Debug("secondstep_quorum_reached")
 		a.finished = true
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
-		a.requestHalt(hdr.BlockHash, a.firstStepVotes, sv.StepVotes)
+		a.haltChan <- reduction.HaltMsg{
+			Hash: hdr.BlockHash,
+			Sv:   []*message.StepVotes{a.firstStepVotes, sv.StepVotes},
+		}
 	} else {
 		lg.
 			WithField("round", hdr.Round).

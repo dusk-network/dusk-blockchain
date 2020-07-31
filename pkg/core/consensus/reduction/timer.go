@@ -13,15 +13,15 @@ var emptyHash [32]byte
 // Timer sets a timeout for collecting reduction messages if no quorum is
 // reached after a while
 type Timer struct {
-	requestHalt func([]byte, ...*message.StepVotes)
-	lock        sync.RWMutex
-	t           *time.Timer
+	haltChan chan<- HaltMsg
+	lock     sync.RWMutex
+	t        *time.Timer
 }
 
 // NewTimer instantiates a new Timer
-func NewTimer(requestHalt func([]byte, ...*message.StepVotes)) *Timer {
+func NewTimer(haltChan chan<- HaltMsg) *Timer {
 	return &Timer{
-		requestHalt: requestHalt,
+		haltChan: haltChan,
 	}
 }
 
@@ -44,5 +44,8 @@ func (t *Timer) Stop() {
 // Trigger the timeout and requests a halt with empty block hash
 func (t *Timer) Trigger() {
 	log.WithField("process", "reduction timer").Debugln("timer triggered")
-	t.requestHalt(emptyHash[:])
+	t.haltChan <- HaltMsg{
+		Hash: emptyHash[:],
+		Sv:   []*message.StepVotes{},
+	}
 }
