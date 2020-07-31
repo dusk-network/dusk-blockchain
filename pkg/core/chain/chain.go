@@ -216,11 +216,11 @@ func (c *Chain) Listen() {
 		select {
 		case m := <-c.blockChan:
 			if err := c.onAcceptBlock(m); err != nil {
-				log.WithError(err).Warnf("Handling %s failed", topics.Block.String())
+				log.WithError(err).WithField("topic", topics.Block.String()).Warn("Handling block failed")
 			}
 		case m := <-c.initializationChan:
 			if err := c.onInitialization(m); err != nil {
-				log.WithError(err).Warnf("Handling %s failed", topics.Initialization.String())
+				log.WithError(err).WithField("topic", topics.Initialization.String()).Warn("Handling initialization failed")
 			}
 		case certificateMsg := <-c.certificateChan:
 			c.handleCertificateMessage(certificateMsg)
