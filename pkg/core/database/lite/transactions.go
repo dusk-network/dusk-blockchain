@@ -371,6 +371,13 @@ func (t transaction) StoreProvisioners(provisioners *user.Provisioners, height u
 	return nil
 }
 
+func (t transaction) StoreRoundInfo([]byte, uint64) error {
+	return errors.New("method not implemented")
+}
+func (t transaction) FetchRoundInfo(uint64) ([]byte, error) {
+	return nil, errors.New("method not implemented")
+}
+
 func (t transaction) ClearDatabase() error {
 	for key := range t.db.storage {
 		t.db.storage[key] = make(table)

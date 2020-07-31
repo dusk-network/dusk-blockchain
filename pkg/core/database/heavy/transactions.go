@@ -53,6 +53,9 @@ var (
 	OutputKeyPrefix = []byte{0x07}
 	// BidValuesPrefix is the prefix to identify Bid Values
 	BidValuesPrefix = []byte{0x08}
+
+	// BidValuesPrefix is the prefix to identify Bid Values
+	ProvisionersPrefix = []byte{0x09}
 )
 
 type transaction struct {
@@ -595,12 +598,43 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 }
 
-func (t transaction) FetchProvisioners(uint64) ([]byte, error) {
-	return nil, errors.New("method not implemented")
+func (t transaction) FetchProvisioners(height uint64) ([]byte, error) {
+	var b []byte
+	binary.LittleEndian.PutUint64(b, height)
+
+	key := append(HeaderPrefix, b...)
+
+	provisioners, err := t.snapshot.Get(key, nil)
+	if err == leveldb.ErrNotFound || len(provisioners) == 0 {
+		// overwrite error message
+		err = database.ErrProvisionerNotFound
+	}
+
+	return provisioners, nil
 }
 
-func (t transaction) StoreProvisioners(*user.Provisioners, uint64) error {
+func (t transaction) StoreProvisioners(provisioners *user.Provisioners, height uint64) error {
+	var b []byte
+	binary.LittleEndian.PutUint64(b, height)
+
+	var init []byte
+	buf := bytes.NewBuffer(init)
+
+	err := user.MarshalProvisioners(buf, provisioners)
+	if err != nil {
+		return err
+	}
+
+	key := append(ProvisionersPrefix, toKey(b)...)
+	t.put(key, buf.Bytes())
+	return nil
+}
+
+func (t transaction) StoreRoundInfo([]byte, uint64) error {
 	return errors.New("method not implemented")
+}
+func (t transaction) FetchRoundInfo(uint64) ([]byte, error) {
+	return nil, errors.New("method not implemented")
 }
 
 // ClearDatabase will wipe all of the data currently in the database.
@@ -613,4 +647,10 @@ func (t transaction) ClearDatabase() error {
 	}
 
 	return iter.Error()
+}
+
+func toKey(d []byte) []byte {
+	var k []byte
+	copy(k[:], d)
+	return k
 }

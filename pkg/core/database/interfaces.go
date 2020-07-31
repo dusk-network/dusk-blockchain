@@ -25,6 +25,9 @@ var (
 	// ErrOutputNotFound returned on output lookup during tx verification
 	ErrOutputNotFound = errors.New("database: output not found")
 
+	// ErrBlockNotFound returned on a block lookup by hash or height
+	ErrProvisionerNotFound = errors.New("database: provisioner not found")
+
 	// AnyTxType is used as a filter value on FetchBlockTxByHash
 	AnyTxType = transactions.TxType(math.MaxUint8)
 )
