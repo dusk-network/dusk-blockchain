@@ -32,13 +32,17 @@ type roundStore struct {
 }
 
 func newStore(c *Coordinator) *roundStore {
-	s := &roundStore{
-		subscribers: make(map[topics.Topic][]Listener),
-		components:  make([]Component, 0),
-		coordinator: c,
-	}
-
+	s := new(roundStore)
+	s.Reset(c)
 	return s
+}
+
+func (s *roundStore) Reset(c *Coordinator) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.subscribers = make(map[topics.Topic][]Listener)
+	s.components = make([]Component, 0)
+	s.coordinator = c
 }
 
 func (s *roundStore) addComponent(component Component) {
@@ -213,6 +217,7 @@ func Start(eventBus *eventbus.EventBus, keys key.Keys, factories ...ComponentFac
 	stopListener := eventbus.NewCallbackListener(c.StopConsensus)
 	c.eventBus.Subscribe(topics.StopConsensus, stopListener)
 
+	c.store = newStore(c)
 	c.reinstantiateStore()
 	return c
 }
@@ -293,13 +298,11 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 
 // Create a new roundStore and instantiate all Components.
 func (c *Coordinator) reinstantiateStore() {
-	store := newStore(c)
+	c.store.Reset(c)
 	for _, factory := range c.factories {
 		component := factory.Instantiate()
-		store.addComponent(component)
+		c.store.addComponent(component)
 	}
-
-	c.swapStore(store)
 }
 
 // CollectEvent collects the consensus message and reroutes it to the proper
@@ -375,11 +378,6 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 	c.store.Dispatch(m)
 	c.lock.RUnlock()
 	return nil
-}
-
-// swapping stores is the only place that needs a lock as store is shared among the CollectRoundUpdate and CollectEvent
-func (c *Coordinator) swapStore(store *roundStore) {
-	c.store = store
 }
 
 // FinalizeRound triggers the store to dispatch a finalize to the Components
