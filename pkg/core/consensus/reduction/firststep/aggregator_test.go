@@ -14,7 +14,7 @@ import (
 // TestSuccessfulAggro tests that upon collection of a quorum of events, a valid StepVotes get produced
 func TestSuccessfulAggro(t *testing.T) {
 	eb, rbus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second, true)
+	hlp, hash := KickstartConcurrent(eb, rbus, 10, 1*time.Second)
 	evs := hlp.Spawn(hash)
 
 	res := make(chan reduction.HaltMsg, 1)
@@ -36,7 +36,7 @@ func TestSuccessfulAggro(t *testing.T) {
 func TestInvalidBlock(t *testing.T) {
 	logrus.SetLevel(logrus.FatalLevel)
 	eb, rbus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second, true)
+	hlp, hash := KickstartConcurrent(eb, rbus, 10, 1*time.Second)
 	hlp.FailOnVerification(true)
 	evs := hlp.Spawn(hash)
 
@@ -59,7 +59,7 @@ func TestInvalidBlock(t *testing.T) {
 // a given hash is not found.
 func TestCandidateNotFound(t *testing.T) {
 	eb, rbus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second, true)
+	hlp, hash := KickstartConcurrent(eb, rbus, 10, 1*time.Second)
 	hlp.FailOnFetching(true)
 	evs := hlp.Spawn(hash)
 

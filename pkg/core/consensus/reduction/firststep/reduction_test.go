@@ -66,7 +66,7 @@ func TestMoreSteps(t *testing.T) {
 func TestFirstStepTimeOut(t *testing.T) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
 	timeOut := 100 * time.Millisecond
-	hlp, _ := Kickstart(bus, rpcBus, 50, timeOut, true)
+	hlp, _ := KickstartConcurrent(bus, rpcBus, 50, timeOut)
 
 	// Wait for resulting StepVotes
 	svMsg := <-hlp.StepVotesChan
@@ -86,7 +86,7 @@ func TestFirstStepTimeOut(t *testing.T) {
 
 func BenchmarkFirstStep(b *testing.B) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(bus, rpcBus, 50, 1*time.Second, true)
+	hlp, hash := KickstartConcurrent(bus, rpcBus, 50, 1*time.Second)
 	b.ResetTimer()
 	b.StopTimer()
 	for i := 0; i < b.N; i++ {
@@ -109,7 +109,7 @@ func TestFinalize(t *testing.T) {
 	// Create a set of 100 agreement components, and finalize them immediately
 	for i := 0; i < 100; i++ {
 		bus, rpcBus := eventbus.New(), rpcbus.New()
-		hlp, _ := Kickstart(bus, rpcBus, 50, 1*time.Second, false)
+		hlp, _ := Kickstart(bus, rpcBus, 50, 1*time.Second)
 
 		hlp.Reducer.Finalize()
 	}
