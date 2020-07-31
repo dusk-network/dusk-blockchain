@@ -10,6 +10,7 @@ import (
 	newblock "github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	newtx "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
@@ -418,6 +419,7 @@ func ruskInputsToInputs(inputs []*rusk.TransactionInput) (transactions.Inputs, e
 		_ = sInputs[i].PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
 
 		sigBuf := bytes.NewBuffer(input.MerkleRoot.Data)
+		sInputs[i].Signature = &mlsag.Signature{}
 		if err := sInputs[i].Signature.Decode(sigBuf, true); err != nil {
 			return nil, err
 		}

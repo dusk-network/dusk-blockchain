@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,13 +13,10 @@ func TestSuccessfulAggro(t *testing.T) {
 	hlp, hash := Kickstart(10, 1*time.Second)
 	evs := hlp.Spawn(hash)
 
-	res := make(chan error, 1)
-	test := func(hash []byte, svs ...*message.StepVotes) {
-		res <- hlp.Verify(hash, *svs[1], hlp.Step())
-	}
+	res := make(chan reduction.HaltMsg, 1)
 
 	var sv *message.StepVotes
-	aggregator := newAggregator(test, hlp.Handler, sv)
+	aggregator := newAggregator(res, hlp.Handler, sv)
 
 	go func() {
 		for _, r := range evs {
@@ -28,6 +26,6 @@ func TestSuccessfulAggro(t *testing.T) {
 		}
 	}()
 
-	err := <-res
-	assert.NoError(t, err)
+	m := <-res
+	assert.NoError(t, hlp.Verify(m.Hash, *m.Sv[1], hlp.Step()))
 }

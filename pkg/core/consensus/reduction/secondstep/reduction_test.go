@@ -1,6 +1,7 @@
 package secondstep
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -38,7 +39,7 @@ func TestSecondStep(t *testing.T) {
 }
 
 func TestSecondStepAfterFailure(t *testing.T) {
-	timeOut := 1000 * time.Millisecond
+	timeOut := 100 * time.Millisecond
 	hlp, hash := Kickstart(50, timeOut)
 
 	// Start the first step
@@ -61,4 +62,26 @@ func TestSecondStepAfterFailure(t *testing.T) {
 		assert.Equal(t, timeOut*2, hlp.Reducer.(*Reducer).timeOut)
 		// Success
 	}
+}
+
+// Test that we properly clean up after calling Finalize.
+// TODO: trap eventual errors
+func TestFinalize(t *testing.T) {
+	numGRBefore := runtime.NumGoroutine()
+	// Create a set of 100 reduction components, and finalize them immediately
+	for i := 0; i < 100; i++ {
+		hlp, hash := Kickstart(50, 1*time.Second)
+
+		// Start the first step
+		if err := hlp.ActivateReduction(hash, message.StepVotes{}); err != nil {
+			t.Fatal(err)
+		}
+
+		hlp.Reducer.Finalize()
+	}
+
+	// Ensure we have freed up all of the resources associated with these components
+	numGRAfter := runtime.NumGoroutine()
+	// We should have roughly the same amount of goroutines
+	assert.InDelta(t, numGRBefore, numGRAfter, 10.0)
 }
