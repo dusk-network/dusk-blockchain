@@ -91,7 +91,7 @@ func (s *Server) InitRouting() *pat.Router {
 
 	r.HandleFunc("/consensus/bidders", capi.GetBidders).Methods("GET")
 	r.HandleFunc("/consensus/provisioners", capi.GetProvisioners).Methods("GET")
-	r.HandleFunc("/consensus/currentstep", capi.GetCurrentStep).Methods("GET")
+	r.HandleFunc("/consensus/roundinfo", capi.GetRoundInfo).Methods("GET")
 	r.HandleFunc("/consensus/eventqueuestatus", capi.GetEventQueueStatus).Methods("GET")
 
 	return r

@@ -111,6 +111,9 @@ type Transaction interface {
 	StoreProvisioners(*user.Provisioners, uint64) error
 	FetchProvisioners(uint64) ([]byte, error)
 
+	StoreRoundInfo([]byte, uint64) error
+	FetchRoundInfo(uint64) ([]byte, error)
+
 	// Atomic storage
 	Commit() error
 	Rollback() error
