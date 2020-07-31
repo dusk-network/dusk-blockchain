@@ -25,7 +25,9 @@ type Helper struct {
 	failOnVerification bool
 }
 
-// NewHelper creates a Helper
+// NewHelper creates a Helper used for testing the first step Reducer.
+// `startGoroutines` can be specified to simultaneously launch goroutines
+// that intercept RPC calls made by the first step Reducer.
 func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration, startGoroutines bool) *Helper {
 	hlp := &Helper{
 		Helper:             reduction.NewHelper(eb, rpcbus, provisioners, CreateReducer, timeOut),
