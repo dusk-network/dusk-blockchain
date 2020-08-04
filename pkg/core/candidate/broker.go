@@ -65,8 +65,8 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 		bestScoreChan:     bestScoreChan,
 	}
 
-	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.AddValidHash))
-	b.republisher = republisher.New(broker, topics.Candidate, Validate, b.Validate)
+	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewSafeCallbackListener(b.AddValidHash))
+	b.republisher = republisher.NewSafe(broker, topics.Candidate, Validate, b.Validate)
 	return b
 }
 

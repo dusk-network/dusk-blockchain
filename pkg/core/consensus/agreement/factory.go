@@ -20,7 +20,7 @@ type Factory struct {
 // NewFactory instantiates a Factory.
 func NewFactory(broker eventbus.Broker, keys key.Keys) *Factory {
 	amount := cfg.Get().Performance.AccumulatorWorkers
-	r := republisher.New(broker, topics.Agreement)
+	r := republisher.NewSafe(broker, topics.Agreement)
 
 	return &Factory{
 		broker:       broker,

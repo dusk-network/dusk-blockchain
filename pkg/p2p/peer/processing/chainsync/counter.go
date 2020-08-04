@@ -24,7 +24,7 @@ type Counter struct {
 // NewCounter returns an initialized counter. It will decrement each time we accept a new block.
 func NewCounter(subscriber eventbus.Subscriber) *Counter {
 	sc := &Counter{stopChan: make(chan struct{})}
-	subscriber.Subscribe(topics.AcceptedBlock, eventbus.NewCallbackListener(sc.decrement))
+	subscriber.Subscribe(topics.AcceptedBlock, eventbus.NewSafeCallbackListener(sc.decrement))
 	return sc
 }
 

@@ -128,7 +128,7 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 
 	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
 	m.pending = make(chan TxDesc, maxPendingLen)
-	l := eventbus.NewCallbackListener(m.CollectPending)
+	l := eventbus.NewSafeCallbackListener(m.CollectPending)
 	m.txSubscriberID = m.eventBus.Subscribe(topics.Tx, l)
 
 	if srv != nil {

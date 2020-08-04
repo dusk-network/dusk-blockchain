@@ -53,7 +53,7 @@ func (r RoundUpdate) Copy() payload.Safe {
 func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 	roundChan := make(chan RoundUpdate, 1)
 	roundCollector := &roundCollector{roundChan}
-	l := eventbus.NewCallbackListener(roundCollector.Collect)
+	l := eventbus.NewSafeCallbackListener(roundCollector.Collect)
 	subscriber.Subscribe(topics.RoundUpdate, l)
 	return roundChan
 }
@@ -70,7 +70,7 @@ func (r *roundCollector) Collect(m message.Message) error {
 func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, uint32) {
 	acceptedBlockChan := make(chan block.Block)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
-	l := eventbus.NewCallbackListener(collector.Collect)
+	l := eventbus.NewSafeCallbackListener(collector.Collect)
 	id := subscriber.Subscribe(topics.AcceptedBlock, l)
 	return acceptedBlockChan, id
 }

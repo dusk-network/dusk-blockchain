@@ -200,9 +200,9 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	}
 
 	// Hook the chain up to the required topics
-	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
+	cbListener := eventbus.NewSafeCallbackListener(chain.onAcceptBlock)
 	eventBus.Subscribe(topics.Block, cbListener)
-	initListener := eventbus.NewCallbackListener(chain.onInitialization)
+	initListener := eventbus.NewSafeCallbackListener(chain.onInitialization)
 	eventBus.Subscribe(topics.Initialization, initListener)
 	return chain, nil
 }
