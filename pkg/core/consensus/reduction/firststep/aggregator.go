@@ -16,14 +16,14 @@ import (
 // The aggregator acts as a de facto storage unit for Reduction messages. Any message
 // it receives will be aggregated into a StepVotes struct, organized by block hash.
 // Once the key set for a StepVotes of a certain block hash reaches quorum, this
-// StepVotes is passed on to the Reducer by use of the `requestHalt` callback.
+// StepVotes is passed on to the Reducer by use of the `haltChan` channel.
 // An aggregator should be instantiated on a per-step basis and is no longer usable
-// after reaching quorum and calling `requestHalt`.
+// after reaching quorum and sending on `haltChan`.
 type aggregator struct {
-	requestHalt func([]byte, ...*message.StepVotes)
-	handler     *reduction.Handler
-	rpcBus      *rpcbus.RPCBus
-	finished    bool
+	haltChan chan<- reduction.HaltMsg
+	handler  *reduction.Handler
+	rpcBus   *rpcbus.RPCBus
+	finished bool
 
 	lock     sync.RWMutex
 	voteSets map[string]struct {
@@ -34,13 +34,13 @@ type aggregator struct {
 
 // newAggregator returns an instantiated aggregator, ready for use.
 func newAggregator(
-	requestHalt func([]byte, ...*message.StepVotes),
+	haltChan chan<- reduction.HaltMsg,
 	handler *reduction.Handler,
 	rpcBus *rpcbus.RPCBus) *aggregator {
 	return &aggregator{
-		requestHalt: requestHalt,
-		handler:     handler,
-		rpcBus:      rpcBus,
+		haltChan: haltChan,
+		handler:  handler,
+		rpcBus:   rpcBus,
 		voteSets: make(map[string]struct {
 			*message.StepVotes
 			sortedset.Cluster
@@ -102,12 +102,18 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 					WithField("round", hdr.Round).
 					WithField("step", hdr.Step).
 					Error("firststep_verifyCandidateBlock the candidate block failed")
-				a.requestHalt(emptyHash[:])
+				a.haltChan <- reduction.HaltMsg{
+					Hash: emptyHash[:],
+					Sv:   []*message.StepVotes{},
+				}
 				return nil
 			}
 		}
 
-		a.requestHalt(blockHash, sv.StepVotes)
+		a.haltChan <- reduction.HaltMsg{
+			Hash: blockHash,
+			Sv:   []*message.StepVotes{sv.StepVotes},
+		}
 	} else {
 		lg.
 			WithField("round", hdr.Round).

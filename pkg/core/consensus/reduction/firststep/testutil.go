@@ -25,8 +25,10 @@ type Helper struct {
 	failOnVerification bool
 }
 
-// NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) *Helper {
+// NewHelper creates a Helper used for testing the first step Reducer.
+// `startGoroutines` can be specified to simultaneously launch goroutines
+// that intercept RPC calls made by the first step Reducer.
+func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration, startGoroutines bool) *Helper {
 	hlp := &Helper{
 		Helper:             reduction.NewHelper(eb, rpcbus, provisioners, CreateReducer, timeOut),
 		StepVotesChan:      make(chan message.Message, 1),
@@ -34,8 +36,10 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, t
 		failOnVerification: false,
 	}
 
-	go hlp.provideCandidateBlock()
-	go hlp.processCandidateVerificationRequest()
+	if startGoroutines {
+		go hlp.provideCandidateBlock()
+		go hlp.processCandidateVerificationRequest()
+	}
 	hlp.createResultChan()
 	return hlp
 }
@@ -119,19 +123,33 @@ func (hlp *Helper) NextBatch() []byte {
 	return blockHash
 }
 
-// Kickstart a Helper without sending any reduction event
+// Kickstart a Helper without sending any reduction event, and without starting goroutines to
+// intercept RPCBus calls.
 func Kickstart(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int, timeOut time.Duration) (*Helper, []byte) {
-	h := NewHelper(eb, rpcbus, nr, timeOut)
+	h := NewHelper(eb, rpcbus, nr, timeOut, false)
+	hash := kickstart(h)
+	return h, hash
+}
+
+// KickstartConcurrent kickstarts a Helper without sending any reduction event, starting
+// goroutines to intercept RPCBus calls.
+func KickstartConcurrent(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int, timeOut time.Duration) (*Helper, []byte) {
+	h := NewHelper(eb, rpcbus, nr, timeOut, true)
+	hash := kickstart(h)
+	return h, hash
+}
+
+func kickstart(h *Helper) []byte {
 	roundUpdate := consensus.MockRoundUpdate(h.Round, h.P)
 	h.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)
 	h.ActivateReduction(hash)
-	return h, hash
+	return hash
 }
 
 // ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
 func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int, timeOut time.Duration) (*Helper, []byte) {
-	hlp, hash := Kickstart(eb, rpcbus, nr, timeOut)
+	hlp, hash := KickstartConcurrent(eb, rpcbus, nr, timeOut)
 	hlp.SendBatch(hash)
 	return hlp, hash
 }

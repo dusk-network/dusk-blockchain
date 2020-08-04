@@ -61,10 +61,15 @@ func TestCorrectHeader(t *testing.T) {
 		t.FailNow()
 	}
 
-	// We discard the message in the middle, as it will be an Agreement message,
-	// as a result of the emptying of the queue resulting on quorum.
-	<-gossipChan
-	r2 := <-gossipChan
+	// There is no guaranteed order between the agreement message, and the second reduction
+	// message. So, we attempt to get the right one before moving on.
+	var r2 message.Message
+	for {
+		r2 = <-gossipChan
+		if r2.Category() == topics.Reduction {
+			break
+		}
+	}
 
 	// Retrieve headers from both reduction messages
 	p2 := r2.Payload().(message.SafeBuffer)
@@ -111,7 +116,7 @@ func collectEvents(t *testing.T, c *consensus.Coordinator, evs []message.Reducti
 }
 
 func wireReduction(t *testing.T, bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*consensus.Coordinator, *firststep.Helper) {
-	hlp := firststep.NewHelper(bus, rpcBus, 10, 1*time.Second)
+	hlp := firststep.NewHelper(bus, rpcBus, 10, 1*time.Second, true)
 	f1 := firststep.NewFactory(bus, rpcBus, hlp.Keys[0], 1*time.Second)
 	f2 := secondstep.NewFactory(bus, rpcBus, hlp.Keys[0], 1*time.Second)
 	c := consensus.Start(bus, hlp.Keys[0], f1, f2)

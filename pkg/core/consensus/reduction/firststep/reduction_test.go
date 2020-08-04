@@ -2,6 +2,7 @@ package firststep
 
 import (
 	"bytes"
+	"runtime"
 	"testing"
 	"time"
 
@@ -65,7 +66,7 @@ func TestMoreSteps(t *testing.T) {
 func TestFirstStepTimeOut(t *testing.T) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
 	timeOut := 100 * time.Millisecond
-	hlp, _ := Kickstart(bus, rpcBus, 50, timeOut)
+	hlp, _ := KickstartConcurrent(bus, rpcBus, 50, timeOut)
 
 	// Wait for resulting StepVotes
 	svMsg := <-hlp.StepVotesChan
@@ -85,7 +86,7 @@ func TestFirstStepTimeOut(t *testing.T) {
 
 func BenchmarkFirstStep(b *testing.B) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(bus, rpcBus, 50, 1*time.Second)
+	hlp, hash := KickstartConcurrent(bus, rpcBus, 50, 1*time.Second)
 	b.ResetTimer()
 	b.StopTimer()
 	for i := 0; i < b.N; i++ {
@@ -99,4 +100,22 @@ func BenchmarkFirstStep(b *testing.B) {
 		hash, _ = crypto.RandEntropy(32)
 		hlp.ActivateReduction(hash)
 	}
+}
+
+// Test that we properly clean up after calling Finalize.
+// TODO: trap eventual errors
+func TestFinalize(t *testing.T) {
+	numGRBefore := runtime.NumGoroutine()
+	// Create a set of 100 agreement components, and finalize them immediately
+	for i := 0; i < 100; i++ {
+		bus, rpcBus := eventbus.New(), rpcbus.New()
+		hlp, _ := Kickstart(bus, rpcBus, 50, 1*time.Second)
+
+		hlp.Reducer.Finalize()
+	}
+
+	// Ensure we have freed up all of the resources associated with these components
+	numGRAfter := runtime.NumGoroutine()
+	// We should have roughly the same amount of goroutines
+	assert.InDelta(t, numGRBefore, numGRAfter, 10.0)
 }
