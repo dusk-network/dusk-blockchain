@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"math"
 	"time"
 
@@ -567,7 +568,9 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 
 	// TODO: interface - marshaling should done after the Gossip, not before
 	packet := message.New(topics.Inv, *buf)
-	m.eventBus.Publish(topics.Gossip, packet)
+	errList := m.eventBus.Publish(topics.Gossip, packet)
+	diagnostics.LogPublishErrors("mempool.go, topics.Gossip, topics.Inv", errList)
+
 	return nil
 }
 

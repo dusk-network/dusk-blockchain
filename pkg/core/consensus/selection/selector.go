@@ -2,6 +2,7 @@ package selection
 
 import (
 	"context"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"os"
 	"strconv"
 	"sync"
@@ -142,7 +143,8 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	// Tell the candidate broker to allow a candidate block with this
 	// hash through.
 	msg := message.New(topics.Score, score)
-	s.publisher.Publish(topics.ValidCandidateHash, msg)
+	errList := s.publisher.Publish(topics.ValidCandidateHash, msg)
+	diagnostics.LogPublishErrors("selection/selector.go, CollectScoreEvent, topics.ValidCandidateHash, topics.Score", errList)
 
 	if err := s.signer.Gossip(msg, s.ID()); err != nil {
 		lg.

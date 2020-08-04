@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net"
 	"testing"
@@ -84,7 +85,8 @@ func TestWriteRingBuffer(t *testing.T) {
 	msg := message.New(topics.Agreement, ev)
 
 	for i := 0; i < 1000; i++ {
-		bus.Publish(topics.Gossip, msg)
+		errList := bus.Publish(topics.Gossip, msg)
+		require.Empty(t, errList)
 	}
 }
 
@@ -123,7 +125,7 @@ func TestWriteLoop(t *testing.T) {
 	assert.Equal(t, decoded, (&buf).Bytes())
 }
 
-func BenchmarkWriter(b *testing.B) {
+func BenchmarkWriter(t *testing.B) {
 	bus := eventbus.New()
 
 	for i := 0; i < 100; i++ {
@@ -133,9 +135,10 @@ func BenchmarkWriter(b *testing.B) {
 
 	msg := makeAgreementGossip(10)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		bus.Publish(topics.Gossip, msg)
+	t.ResetTimer()
+	for i := 0; i < t.N; i++ {
+		errList := bus.Publish(topics.Gossip, msg)
+		require.Empty(t, errList)
 	}
 }
 

@@ -3,6 +3,7 @@ package candidate
 import (
 	"bytes"
 	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"sync"
 	"time"
 
@@ -153,7 +154,8 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	}
 
 	msg := message.New(topics.GetCandidate, *buf)
-	b.publisher.Publish(topics.Gossip, msg)
+	errList := b.publisher.Publish(topics.Gossip, msg)
+	diagnostics.LogPublishErrors("candidate/broker.go, topics.Gossip, topics.GetCandidate", errList)
 
 	timer := time.NewTimer(2 * time.Second)
 	for {

@@ -3,6 +3,7 @@ package candidate
 import (
 	"bytes"
 	"context"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -30,12 +31,14 @@ func (m *mockSigner) Compose(pf consensus.PacketFactory) consensus.InternalPacke
 }
 
 func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
-	m.bus.Publish(msg.Category(), msg)
+	errList := m.bus.Publish(msg.Category(), msg)
+	diagnostics.LogPublishErrors("", errList)
 	return nil
 }
 
 func (m *mockSigner) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
-	m.bus.Publish(topic, msg)
+	errList := m.bus.Publish(topic, msg)
+	diagnostics.LogPublishErrors("", errList)
 	return nil
 }
 

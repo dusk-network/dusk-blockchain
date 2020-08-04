@@ -3,6 +3,7 @@ package transactor
 import (
 	"context"
 	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"os"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
@@ -278,7 +279,8 @@ func (t *Transactor) publishTx(tx transactions.ContractCall) ([]byte, error) {
 	}
 
 	msg := message.New(topics.Tx, tx)
-	t.eb.Publish(topics.Tx, msg)
+	errList := t.eb.Publish(topics.Tx, msg)
+	diagnostics.LogPublishErrors("transactor/listener.go, topics.Tx", errList)
 
 	return hash, nil
 }

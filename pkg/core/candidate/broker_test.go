@@ -37,11 +37,13 @@ func TestValidHashes(t *testing.T) {
 
 	cm := message.MakeCandidate(blk, cert)
 	msg := message.New(topics.Candidate, cm)
-	eb.Publish(topics.Candidate, msg)
+	errList := eb.Publish(topics.Candidate, msg)
+	assert.Empty(errList)
 
 	cm2 := message.MakeCandidate(blk2, cert)
 	msg2 := message.New(topics.Candidate, cm2)
-	eb.Publish(topics.Candidate, msg2)
+	errList = eb.Publish(topics.Candidate, msg2)
+	assert.Empty(errList)
 
 	// Stupid channels take a while to send something
 	time.Sleep(1000 * time.Millisecond)
@@ -49,11 +51,13 @@ func TestValidHashes(t *testing.T) {
 	// Now, add the hash to validHashes
 	score := message.MockScore(hdr, blk.Header.Hash)
 	vchMsg := message.New(topics.ValidCandidateHash, score)
-	eb.Publish(topics.ValidCandidateHash, vchMsg)
+	errList = eb.Publish(topics.ValidCandidateHash, vchMsg)
+	assert.Empty(errList)
 
 	// Now filter the queue
 	msg3 := message.New(topics.BestScore, nil)
-	eb.Publish(topics.BestScore, msg3)
+	errList = eb.Publish(topics.BestScore, msg3)
+	assert.Empty(errList)
 
 	// Broker should now be able to provide us with `blk`
 	resp, err := rb.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(blk.Header.Hash)), 5*time.Second)

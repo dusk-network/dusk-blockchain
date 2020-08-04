@@ -41,7 +41,8 @@ func TestAgreement(t *testing.T) {
 		// within the Republisher
 		message.Marshal(msg)
 
-		hlp.Bus.Publish(topics.Agreement, msg)
+		errList := hlp.Bus.Publish(topics.Agreement, msg)
+		assert.Empty(t, errList)
 	}
 
 	res := <-hlp.CertificateChan

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net"
 	"sync"
@@ -89,7 +90,8 @@ func TestPoolBasicScenario(t *testing.T) {
 		blk.Header.Hash = hash
 
 		msg := message.New(topics.AcceptedBlock, *blk)
-		eb.Publish(topics.AcceptedBlock, msg)
+		errList := eb.Publish(topics.AcceptedBlock, msg)
+		require.Empty(t, errList)
 		ctxSentMsgs = append(ctxSentMsgs, hex.EncodeToString(blk.Header.Hash))
 	}
 
