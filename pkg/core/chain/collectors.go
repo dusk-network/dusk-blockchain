@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -26,8 +27,11 @@ type (
 func initCertificateCollector(subscriber eventbus.Subscriber) <-chan certMsg {
 	certificateChan := make(chan certMsg, 10)
 	collector := &certificateCollector{certificateChan}
-	l := eventbus.NewSafeCallbackListener(collector.Collect)
-	subscriber.Subscribe(topics.Certificate, l)
+	collectListener := eventbus.NewCallbackListener(collector.Collect)
+	if config.Get().General.SafeCallbackListener {
+		collectListener = eventbus.NewSafeCallbackListener(collector.Collect)
+	}
+	subscriber.Subscribe(topics.Certificate, collectListener)
 	return certificateChan
 }
 
@@ -41,8 +45,11 @@ func (c *certificateCollector) Collect(m message.Message) error {
 func initHighestSeenCollector(sub eventbus.Subscriber) <-chan uint64 {
 	highestSeenChan := make(chan uint64, 1)
 	collector := &highestSeenCollector{highestSeenChan}
-	l := eventbus.NewSafeCallbackListener(collector.Collect)
-	sub.Subscribe(topics.HighestSeen, l)
+	collectListener := eventbus.NewCallbackListener(collector.Collect)
+	if config.Get().General.SafeCallbackListener {
+		collectListener = eventbus.NewSafeCallbackListener(collector.Collect)
+	}
+	sub.Subscribe(topics.HighestSeen, collectListener)
 	return highestSeenChan
 }
 

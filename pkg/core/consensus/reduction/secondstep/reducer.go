@@ -217,7 +217,8 @@ func (r *Reducer) Halt(hash []byte, stepVotes []*message.StepVotes) {
 			WithField("id", r.reductionID).
 			WithField("round", r.round).
 			Error("secondstep_halted, failed to SendInternally, topics.Restart")
-		panic("could not restart consensus round")
+		// FIXME: shall this panic ? is this a extreme violation ?
+		//panic("could not restart consensus round")
 	}
 }
 

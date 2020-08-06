@@ -70,10 +70,10 @@ func (s *SyncState) String() string {
 // Update the round of the SyncState.
 func (s *SyncState) Update(round uint64) {
 	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.round = round
 	s.step = 0
 	s.bufRepr = recreate(round, s.step)
-	s.Lock.Unlock()
 }
 
 // IncrementStep increments the SyncState step by 1. It also notifies any subscribers

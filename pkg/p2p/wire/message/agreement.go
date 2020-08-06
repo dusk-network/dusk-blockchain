@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"math/big"
 	"strings"
 
@@ -113,8 +114,29 @@ func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) Ste
 // Copy deeply the StepVotesMsg
 func (s StepVotesMsg) Copy() payload.Safe {
 	b := new(bytes.Buffer)
-	_ = MarshalStepVotes(b, &s.StepVotes)
-	sv, _ := UnmarshalStepVotes(b)
+
+	// #612
+	err := MarshalStepVotes(b, &s.StepVotes)
+	if err != nil {
+		log.WithError(err).Error("StepVotesMsg.Copy, could not MarshalStepVotes")
+		//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
+		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes())
+	}
+	sv, err := UnmarshalStepVotes(b)
+	if err != nil {
+		//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
+		log.WithError(err).Error("StepVotesMsg.Copy, could not UnmarshalStepVotes")
+		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes())
+	}
+
+	hdrCopy := s.hdr.Copy()
+	if hdrCopy == nil {
+		return StepVotesMsg{
+			//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
+			hdr:       NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes()).hdr,
+			StepVotes: *sv,
+		}
+	}
 
 	cpy := StepVotesMsg{
 		hdr:       s.hdr.Copy().(header.Header),
@@ -401,6 +423,15 @@ func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 // MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature
 // for an ordered set of votes
 func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
+
+	// #611
+	if vote == nil || vote.Apk == nil || vote.Signature == nil {
+		log.
+			WithField("vote", vote).
+			Error("could not MarshalStepVotes")
+		return errors.New("invalid stepVotes")
+	}
+
 	// APK
 	if err := encoding.WriteVarBytes(r, vote.Apk.Marshal()); err != nil {
 		return err

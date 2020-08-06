@@ -28,6 +28,7 @@ func LaunchConsensus(ctx context.Context, eventBroker *eventbus.EventBus, rpcBus
 	f.StartConsensus()
 
 	// If we are on genesis, we should kickstart the consensus
+	//FIXME: Add option to configure rpcBus timeout #614
 	resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.NewRequest(bytes.Buffer{}), 0)
 	if err != nil {
 		log.Panic(err)

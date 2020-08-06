@@ -80,7 +80,7 @@ func Clone(m Message) Message {
 	}
 }
 
-// CachCachedBinary complies with the Message method for returning the
+// CachedBinary complies with the Message method for returning the
 // marshaled form of the message if available
 func (m simple) CachedBinary() bytes.Buffer {
 	if m.marshaled != nil {

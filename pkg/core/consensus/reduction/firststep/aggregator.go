@@ -132,6 +132,7 @@ func (a *aggregator) addBitSet(sv *message.StepVotes, cluster sortedset.Cluster,
 func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	// Fetch the candidate block first.
 	req := rpcbus.NewRequest(*bytes.NewBuffer(blockHash))
+	//FIXME: Add option to configure rpcBus timeout #614
 	resp, err := rpcBus.Call(topics.GetCandidate, req, 5*time.Second)
 	if err != nil {
 		log.
@@ -147,6 +148,7 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	// before voting on it again
 	if !bytes.Equal(blockHash, emptyHash[:]) {
 		req := rpcbus.NewRequest(cm)
+		//FIXME: Add option to configure rpcBus timeout #614
 		if _, err := rpcBus.Call(topics.VerifyCandidateBlock, req, 5*time.Second); err != nil {
 			log.
 				WithError(err).

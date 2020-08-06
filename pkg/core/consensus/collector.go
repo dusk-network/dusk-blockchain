@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -53,8 +54,11 @@ func (r RoundUpdate) Copy() payload.Safe {
 func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 	roundChan := make(chan RoundUpdate, 1)
 	roundCollector := &roundCollector{roundChan}
-	l := eventbus.NewSafeCallbackListener(roundCollector.Collect)
-	subscriber.Subscribe(topics.RoundUpdate, l)
+	collectListener := eventbus.NewCallbackListener(roundCollector.Collect)
+	if config.Get().General.SafeCallbackListener {
+		collectListener = eventbus.NewSafeCallbackListener(roundCollector.Collect)
+	}
+	subscriber.Subscribe(topics.RoundUpdate, collectListener)
 	return roundChan
 }
 
@@ -70,8 +74,11 @@ func (r *roundCollector) Collect(m message.Message) error {
 func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, uint32) {
 	acceptedBlockChan := make(chan block.Block)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
-	l := eventbus.NewSafeCallbackListener(collector.Collect)
-	id := subscriber.Subscribe(topics.AcceptedBlock, l)
+	collectListener := eventbus.NewCallbackListener(collector.Collect)
+	if config.Get().General.SafeCallbackListener {
+		collectListener = eventbus.NewSafeCallbackListener(collector.Collect)
+	}
+	id := subscriber.Subscribe(topics.AcceptedBlock, collectListener)
 	return acceptedBlockChan, id
 }
 

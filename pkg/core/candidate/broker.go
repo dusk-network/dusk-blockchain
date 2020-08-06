@@ -3,6 +3,7 @@ package candidate
 import (
 	"bytes"
 	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"sync"
 	"time"
 
@@ -65,8 +66,12 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 		bestScoreChan:     bestScoreChan,
 	}
 
-	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewSafeCallbackListener(b.AddValidHash))
-	b.republisher = republisher.NewSafe(broker, topics.Candidate, Validate, b.Validate)
+	addValidHashListener := eventbus.NewCallbackListener(b.AddValidHash)
+	if config.Get().General.SafeCallbackListener {
+		addValidHashListener = eventbus.NewSafeCallbackListener(b.AddValidHash)
+	}
+	broker.Subscribe(topics.ValidCandidateHash, addValidHashListener)
+	b.republisher = republisher.New(broker, topics.Candidate, Validate, b.Validate)
 	return b
 }
 
@@ -155,6 +160,7 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	msg := message.New(topics.GetCandidate, *buf)
 	b.publisher.Publish(topics.Gossip, msg)
 
+	//FIXME: Add option to configure timeout #614
 	timer := time.NewTimer(2 * time.Second)
 	for {
 		select {

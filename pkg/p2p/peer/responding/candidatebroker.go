@@ -22,8 +22,12 @@ func NewCandidateBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer
 
 // ProvideCandidate for a given (m *bytes.Buffer)
 func (c *CandidateBroker) ProvideCandidate(m *bytes.Buffer) error {
+	//FIXME: Add option to configure rpcBus timeout #614
 	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*m), 5*time.Second)
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("timeout ProvideCandidate topics.GetCandidate")
 		return err
 	}
 	cm := resp.(message.Candidate)

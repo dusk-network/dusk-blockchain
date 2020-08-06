@@ -42,6 +42,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			_, _ = payload.Write(txidBytes)
 		}
 
+		//FIXME: Add option to configure rpcBus timeout #614
 		resp, err := t.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(payload), 5*time.Second)
 		if err != nil {
 			return "", err

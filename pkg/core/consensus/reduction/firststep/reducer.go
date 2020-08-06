@@ -95,12 +95,12 @@ func (r *Reducer) Finalize() {
 // Collect forwards Reduction to the aggregator
 func (r *Reducer) Collect(e consensus.InternalPacket) error {
 	reductionMessage := e.(message.Reduction)
-	hdr := reductionMessage.State()
 
 	if err := r.handler.VerifySignature(reductionMessage); err != nil {
 		return err
 	}
 
+	hdr := reductionMessage.State()
 	lg.WithFields(log.Fields{
 		"round": hdr.Round,
 		"step":  hdr.Step,
@@ -226,7 +226,8 @@ func (r *Reducer) Halt(hash []byte, stepVotes []*message.StepVotes) {
 			WithField("id", r.reductionID).
 			WithField("round", r.round).
 			Error("firststep_halted, failed to SendInternally, topics.StepVotes")
-		panic("could not SendInternally, topics.StepVotes")
+		// FIXME: shall this panic ? is this a extreme violation ?
+		//panic("could not SendInternally, topics.StepVotes")
 	}
 }
 
