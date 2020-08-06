@@ -35,9 +35,11 @@ func (h *listenerMap) Store(key topics.Topic, value Listener) uint32 {
 // Load a copy of the listeners stored for a given key
 func (h *listenerMap) Load(key topics.Topic) []idListener {
 	h.lock.RLock()
+	defer h.lock.RUnlock()
 	listeners := h.listeners[key]
-	h.lock.RUnlock()
-	return listeners
+	dup := make([]idListener, len(listeners))
+	copy(dup, listeners)
+	return dup
 }
 
 // Delete a listener using the uint32 key returned during the Store operation. Return wether the item was found or otherwise
