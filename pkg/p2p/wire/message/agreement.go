@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"math/big"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"

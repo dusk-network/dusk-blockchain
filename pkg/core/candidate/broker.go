@@ -3,9 +3,10 @@ package candidate
 import (
 	"bytes"
 	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"sync"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"

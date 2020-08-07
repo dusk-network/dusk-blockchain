@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"sort"
 	"sync"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"

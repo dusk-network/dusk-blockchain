@@ -85,7 +85,7 @@ init_dusk_func() {
 [general]
   network = "testnet"
   walletonly = "false"
-  #safecallbacklistener = "true"
+  safecallbacklistener = "true"
 
 [genesis]
   legacy = true
