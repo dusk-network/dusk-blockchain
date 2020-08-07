@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"encoding/binary"
-	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -72,11 +71,8 @@ type Chain struct {
 	// verifier performs verifications on the block
 	verifier Verifier
 
+	// prevBlock is blockchain tip
 	prevBlock block.Block
-	// protect prevBlock with mutex as it's touched out of the main chain loop
-	// by SubscribeCallback.
-	// TODO: Consider if mutex can be removed
-	mu sync.RWMutex
 
 	// Intermediate block, decided on by consensus.
 	// Used to verify a candidate against the correct previous block,
@@ -97,8 +93,10 @@ type Chain struct {
 	highestSeen uint64
 
 	// collector channels
-	certificateChan <-chan certMsg
-	highestSeenChan <-chan uint64
+	certificateChan    <-chan certMsg
+	highestSeenChan    <-chan uint64
+	blockChan          chan message.Message
+	initializationChan chan message.Message
 
 	// rusk client
 	executor transactions.Executor
@@ -111,6 +109,8 @@ type Chain struct {
 	getLastCommitteeChan     <-chan rpcbus.Request
 
 	ctx context.Context
+
+	onBeginAccepting func(*block.Block) bool
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -166,6 +166,8 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		ctx:                      ctx,
 	}
 
+	chain.onBeginAccepting = chain.beginAccepting
+
 	prevBlock, err := loader.LoadTip()
 	if err != nil {
 		return nil, err
@@ -201,10 +203,11 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	}
 
 	// Hook the chain up to the required topics
-	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
-	eventBus.Subscribe(topics.Block, cbListener)
-	initListener := eventbus.NewCallbackListener(chain.onInitialization)
-	eventBus.Subscribe(topics.Initialization, initListener)
+	chain.blockChan = make(chan message.Message, 100)
+	eventBus.Subscribe(topics.Block, eventbus.NewChanListener(chain.blockChan))
+
+	chain.initializationChan = make(chan message.Message, 1)
+	eventBus.Subscribe(topics.Initialization, eventbus.NewChanListener(chain.initializationChan))
 	return chain, nil
 }
 
@@ -212,6 +215,14 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 func (c *Chain) Listen() {
 	for {
 		select {
+		case m := <-c.blockChan:
+			if err := c.onAcceptBlock(m); err != nil {
+				log.WithError(err).WithField("topic", topics.Block.String()).Warn("Handling block failed")
+			}
+		case m := <-c.initializationChan:
+			if err := c.onInitialization(m); err != nil {
+				log.WithError(err).WithField("topic", topics.Initialization.String()).Warn("Handling initialization failed")
+			}
 		case certificateMsg := <-c.certificateChan:
 			c.handleCertificateMessage(certificateMsg)
 		case height := <-c.highestSeenChan:
@@ -232,27 +243,41 @@ func (c *Chain) Listen() {
 	}
 }
 
-func (c *Chain) onAcceptBlock(m message.Message) error {
+func (c *Chain) beginAccepting(blk *block.Block) bool {
+
+	field := logger.Fields{"process": "onAcceptBlock", "height": blk.Header.Height}
+	lg := log.WithFields(field)
+
 	// Ignore blocks from peers if we are only one behind - we are most
 	// likely just about to finalize consensus.
 	// TODO: we should probably just accept it if consensus was not
 	// started yet
 
-	// Accept the block
-	blk := m.Payload().(block.Block)
-
-	field := logger.Fields{"process": "onAcceptBlock", "height": blk.Header.Height}
-	lg := log.WithFields(field)
-
 	if !c.counter.IsSyncing() {
 		lg.Error("could not accept block since we are syncing")
-		return nil
+		return false
 	}
 
 	// If we are more than one block behind, stop the consensus
 	lg.Debug("topics.StopConsensus")
 	errList := c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
 	diagnostics.LogPublishErrors("chain/chain.go, topics.StopConsensus", errList)
+
+	return true
+}
+
+func (c *Chain) onAcceptBlock(m message.Message) error {
+
+	// Accept the block
+	blk := m.Payload().(block.Block)
+
+	// Prepare component and the node for accepting new block
+	if !c.onBeginAccepting(&blk) {
+		return nil
+	}
+
+	field := logger.Fields{"process": "onAcceptBlock", "height": blk.Header.Height}
+	lg := log.WithFields(field)
 
 	// This will decrement the sync counter
 	// TODO: a new context should be created with timeout, cancellation, etc
@@ -280,9 +305,9 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 		// round update, to re-instantiating the consensus, to setting off
 		// the first consensus loop. So, we do this in a goroutine to
 		// avoid blocking other requests to the chain.
+		ru := c.getRoundUpdate()
 		go func() {
-			err = c.sendRoundUpdate()
-			if err != nil {
+			if err := c.sendRoundUpdate(ru); err != nil {
 				lg.WithError(err).Debug("could not sendRoundUpdate")
 			}
 		}()
@@ -296,8 +321,6 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	field := logger.Fields{"process": "accept block", "height": blk.Header.Height}
 	l := log.WithFields(field)
@@ -362,21 +385,15 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 }
 
 func (c *Chain) onInitialization(message.Message) error {
-	return c.sendRoundUpdate()
+	ru := c.getRoundUpdate()
+	return c.sendRoundUpdate(ru)
 }
 
-func (c *Chain) sendRoundUpdate() error {
-	hdr := c.intermediateBlock.Header
-
-	ru := consensus.RoundUpdate{
-		Round: hdr.Height + 1,
-		P:     *c.p,
-		Seed:  hdr.Seed,
-		Hash:  hdr.Hash,
-	}
+func (c *Chain) sendRoundUpdate(ru consensus.RoundUpdate) error {
 	log.
 		WithField("round", ru.Round).
 		Debug("sendRoundUpdate, topics.RoundUpdate")
+
 	msg := message.New(topics.RoundUpdate, ru)
 	errList := c.eventBus.Publish(topics.RoundUpdate, msg)
 	diagnostics.LogPublishErrors("chain/chain.go, topics.RoundUpdate", errList)
@@ -483,15 +500,25 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	diagnostics.LogPublishErrors("chain/chain.go, topics.IntermediateBlock", errList)
 
 	// propagate round update
+	ru := c.getRoundUpdate()
 	go func() {
-		err = c.sendRoundUpdate()
-		if err != nil {
+		if err := c.sendRoundUpdate(ru); err != nil {
 			log.
 				WithError(err).
 				WithField("height", c.highestSeen).
 				Error("could not sendRoundUpdate")
 		}
 	}()
+}
+
+func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
+	hdr := c.intermediateBlock.Header
+	return consensus.RoundUpdate{
+		Round: hdr.Height + 1,
+		P:     c.p.Copy(),
+		Seed:  hdr.Seed,
+		Hash:  hdr.Hash,
+	}
 }
 
 func (c *Chain) finalizeIntermediateBlock(ctx context.Context, cert *block.Certificate) error {
@@ -560,9 +587,7 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 }
 
 func (c *Chain) provideLastBlock(r rpcbus.Request) {
-	c.mu.RLock()
 	prevBlock := c.prevBlock
-	c.mu.RUnlock()
 	r.RespChan <- rpcbus.NewResponse(prevBlock, nil)
 }
 
@@ -625,10 +650,7 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 		return &node.SyncProgressResponse{Progress: 0}, nil
 	}
 
-	c.mu.RLock()
 	prevBlockHeight := c.prevBlock.Header.Height
-	c.mu.RUnlock()
-
 	progressPercentage := (float64(prevBlockHeight) / float64(c.highestSeen)) * 100
 
 	// Avoiding strange output when the chain can be ahead of the highest
@@ -644,8 +666,6 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 // RebuildChain will delete all blocks except for the genesis block,
 // to allow for a full re-sync.
 func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	// Halt consensus
 	msg := message.New(topics.StopConsensus, nil)

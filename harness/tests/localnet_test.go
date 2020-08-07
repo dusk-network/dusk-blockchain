@@ -107,7 +107,14 @@ func TestSendBidTransaction(t *testing.T) {
 	t.Log("Send request to node 0 to generate and process a Bid transaction")
 	txidBytes, err := localNet.SendBidCmd(0, 10, 10)
 	if err != nil {
-		t.Fatal(err.Error())
+		t.Fatal(err)
+	}
+
+	for i := 1; i < localNet.Size(); i++ {
+		t.Logf("Send request to node %d to generate and process a Bid transaction", i)
+		if _, err := localNet.SendBidCmd(uint(i), 10, 10); err != nil {
+			t.Error(err)
+		}
 	}
 
 	txID := hex.EncodeToString(txidBytes)
