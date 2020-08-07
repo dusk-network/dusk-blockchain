@@ -1,9 +1,10 @@
 package reduction
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"sync"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"

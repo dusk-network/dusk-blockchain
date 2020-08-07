@@ -3,6 +3,7 @@ package republisher
 import (
 	"bytes"
 	"errors"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"

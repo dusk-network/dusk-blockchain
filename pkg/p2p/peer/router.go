@@ -3,6 +3,7 @@ package peer
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"

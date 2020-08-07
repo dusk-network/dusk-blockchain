@@ -2,11 +2,12 @@ package peer
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"

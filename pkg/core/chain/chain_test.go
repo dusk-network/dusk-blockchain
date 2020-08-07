@@ -3,9 +3,10 @@ package chain
 import (
 	"bytes"
 	"context"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"testing"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"

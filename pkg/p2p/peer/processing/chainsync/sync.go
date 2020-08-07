@@ -5,9 +5,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"sync"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"

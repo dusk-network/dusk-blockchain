@@ -3,8 +3,9 @@ package transactor
 import (
 	"context"
 	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"os"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"

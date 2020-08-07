@@ -3,8 +3,9 @@ package candidate
 import (
 	"bytes"
 	"context"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"testing"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
