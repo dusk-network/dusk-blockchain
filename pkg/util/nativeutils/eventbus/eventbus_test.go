@@ -77,7 +77,7 @@ func TestStreamer(t *testing.T) {
 //******************
 func TestDefaultListener(t *testing.T) {
 	eb := New()
-	msgChan := make(chan message.Message)
+	msgChan := make(chan message.Message, 100)
 
 	eb.AddDefaultTopic(topics.Reject)
 	eb.AddDefaultTopic(topics.Unknown)
