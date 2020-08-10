@@ -127,6 +127,8 @@ func (s *roundStore) resume(id uint32) bool {
 
 // Dispatch an event to listeners for the designated Topic.
 func (s *roundStore) Dispatch(m message.Message) []error {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	var errorList []error
 	subscribers := s.createSubscriberQueue(m.Category())
 	lg.WithFields(log.Fields{
