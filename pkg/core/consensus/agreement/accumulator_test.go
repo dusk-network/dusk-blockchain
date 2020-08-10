@@ -3,6 +3,7 @@ package agreement
 import (
 	"errors"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -144,6 +145,32 @@ func TestNotInCommittee(t *testing.T) {
 		assert.FailNow(t, "reached quorum when passed events should have been dropped")
 	case <-timer:
 	}
+}
+
+func TestSafeStop(t *testing.T) {
+	logrus.SetLevel(logrus.FatalLevel)
+	// Make an accumulator that has a quorum of 2 and fails verification
+	hdlr := &MockHandler{true, false, user.VotingCommittee{}, 3, false}
+	accumulator := newAccumulator(hdlr, 4)
+	go accumulator.Accumulate()
+
+	createAgreement := newAggroFactory(20)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for i := 1; i < 2; i++ {
+			accumulator.Process(createAgreement(1, 1, i))
+		}
+
+	}()
+
+	go func() {
+		accumulator.Stop()
+		wg.Done()
+	}()
+
+	wg.Wait()
+	time.Sleep(1 * time.Second)
 }
 
 /*
