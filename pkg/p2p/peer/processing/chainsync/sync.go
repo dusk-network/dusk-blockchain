@@ -54,6 +54,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 	if err != nil {
 		return err
 	}
+	log.WithField("height", height).Debug("Synchronize")
 
 	// Notify `Chain` of our highest seen block
 	if s.getHighestSeen() < height {
@@ -63,6 +64,9 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 
 	lastBlk, err := s.getLastBlock()
 	if err != nil {
+		log.
+			WithError(err).
+			WithField("height", height).Error("failed to getLastBlock")
 		return err
 	}
 
@@ -73,12 +77,20 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 	if !s.IsSyncing() && diff > 1 {
 
 		hash := base64.StdEncoding.EncodeToString(lastBlk.Header.Hash)
-		log.Debugf("Start syncing from %s", peerInfo)
-		log.Debugf("Local tip: height %d [%s]", lastBlk.Header.Height, hash)
+		log.
+			WithField("height", lastBlk.Header.Height).
+			WithField("hash", hash).
+			WithField("peerInfo", peerInfo).
+			Debug("Start syncing")
 
 		msg := createGetBlocksMsg(lastBlk.Header.Hash)
 		buf, err := marshalGetBlocks(msg)
 		if err != nil {
+			log.
+				WithField("height", lastBlk.Header.Height).
+				WithField("hash", hash).
+				WithField("peerInfo", peerInfo).
+				Error("could not marshalGetBlocks")
 			return err
 		}
 
@@ -92,11 +104,17 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 		// Write bufio.Reader into a bytes.Buffer and unmarshal it so we can send it over the event bus.
 		buf := new(bytes.Buffer)
 		if _, err := buf.ReadFrom(r); err != nil {
+			log.
+				WithError(err).
+				WithField("height", height).Error("failed to ReadFrom")
 			return err
 		}
 
 		blk := block.NewBlock()
 		if err := message.UnmarshalBlock(buf, blk); err != nil {
+			log.
+				WithError(err).
+				WithField("height", height).Error("failed to UnmarshalBlock")
 			return err
 		}
 
@@ -109,8 +127,12 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 
 func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
 	req := rpcbus.NewRequest(nil)
-	resp, err := s.rpcBus.Call(topics.GetLastBlock, req, 2*time.Second)
+	//FIXME: Add option to configure rpcBus timeout #614
+	resp, err := s.rpcBus.Call(topics.GetLastBlock, req, 5*time.Second)
 	if err != nil {
+		log.
+			WithError(err).
+			Error("timeout topics.GetLastBlock")
 		return block.Block{}, err
 	}
 	blk := resp.(block.Block)
@@ -149,7 +171,9 @@ func createGetBlocksMsg(latestHash []byte) *peermsg.GetBlocks {
 func marshalGetBlocks(msg *peermsg.GetBlocks) (*bytes.Buffer, error) {
 	buf := topics.GetBlocks.ToBuffer()
 	if err := msg.Encode(&buf); err != nil {
-		log.Panic(err)
+		//FIXME: shall this panic here ?  result 1 (error) is always nil (unparam)
+		//log.Panic(err)
+		return nil, err
 	}
 
 	return &buf, nil
@@ -158,10 +182,10 @@ func marshalGetBlocks(msg *peermsg.GetBlocks) (*bytes.Buffer, error) {
 func peekBlockHeight(r *bufio.Reader) (uint64, error) {
 	// The block height is a little-endian uint64, starting at index 1 of the buffer
 	// It is preceded by the version (1 byte)
-	bytes, err := r.Peek(9)
+	b, err := r.Peek(9)
 	if err != nil {
 		return 0, err
 	}
 
-	return binary.LittleEndian.Uint64(bytes[1:9]), nil
+	return binary.LittleEndian.Uint64(b[1:9]), nil
 }

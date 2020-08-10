@@ -1,6 +1,7 @@
 package agreement
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -20,13 +21,15 @@ type Factory struct {
 // NewFactory instantiates a Factory.
 func NewFactory(broker eventbus.Broker, keys key.Keys) *Factory {
 	amount := cfg.Get().Performance.AccumulatorWorkers
-	r := republisher.New(broker, topics.Agreement)
-
+	agreementRepublisher := republisher.New(broker, topics.Agreement)
+	if config.Get().General.SafeCallbackListener {
+		agreementRepublisher = republisher.NewSafe(broker, topics.Agreement)
+	}
 	return &Factory{
 		broker:       broker,
 		keys:         keys,
 		workerAmount: amount,
-		Republisher:  r,
+		Republisher:  agreementRepublisher,
 	}
 }
 

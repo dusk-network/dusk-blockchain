@@ -2,7 +2,6 @@ package secondstep
 
 import (
 	"bytes"
-	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -18,8 +17,9 @@ import (
 
 var _ consensus.Component = (*Reducer)(nil)
 
-var emptyHash = [32]byte{}
 var lg = log.WithField("process", "second-step reduction")
+var emptyHash = [32]byte{}
+var restartFactory = consensus.Restarter{}
 
 // Reducer for the second step. This reducer starts whenever it receives an internal
 // StepVotes message. It combines the contents of this message (if any) with the
@@ -100,10 +100,10 @@ func (r *Reducer) Finalize() {
 // a message.Reduction, verifies its signature and forwards it to the
 // aggregator
 func (r *Reducer) Collect(e consensus.InternalPacket) error {
-	ev := e.(message.Reduction)
-	hdr := ev.State()
+	reductionMessage := e.(message.Reduction)
+	hdr := reductionMessage.State()
 
-	if err := r.handler.VerifySignature(ev); err != nil {
+	if err := r.handler.VerifySignature(reductionMessage); err != nil {
 		return err
 	}
 
@@ -111,10 +111,10 @@ func (r *Reducer) Collect(e consensus.InternalPacket) error {
 		"round": hdr.Round,
 		"step":  hdr.Step,
 		//"sender": hex.EncodeToString(ev.Sender()),
-		"id":   r.reductionID,
-		"hash": hex.EncodeToString(hdr.BlockHash),
+		"id": r.reductionID,
+		//"hash": hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received_event")
-	return r.aggregator.collectVote(ev)
+	return r.aggregator.collectVote(reductionMessage)
 }
 
 // Filter an incoming Reduction message, by checking whether or not it was sent
@@ -123,7 +123,7 @@ func (r *Reducer) Filter(hdr header.Header) bool {
 	return !r.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
 
-func (r *Reducer) startReduction(sv message.StepVotesMsg) {
+func (r *Reducer) startReduction(firstStepVotes message.StepVotesMsg) {
 	lg.WithFields(log.Fields{
 		"round":   r.round,
 		"id":      r.reductionID,
@@ -137,7 +137,7 @@ func (r *Reducer) startReduction(sv message.StepVotesMsg) {
 
 	go r.collectHalt()
 	r.timer.Start(r.timeOut)
-	r.aggregator = newAggregator(r.haltChan, r.handler, &sv.StepVotes)
+	r.aggregator = newAggregator(r.haltChan, r.handler, &firstStepVotes.StepVotes)
 }
 
 // sendReduction creates a new Reduction message and Gossip it externally
@@ -159,8 +159,6 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) error {
 	return nil
 }
 
-var restartFactory = consensus.Restarter{}
-
 // collectHalt is called by the Aggregator and the Timer through a channel, and ensures that only
 // one `Halt` call is made per step.
 func (r *Reducer) collectHalt() {
@@ -173,9 +171,9 @@ func (r *Reducer) collectHalt() {
 
 // Halt is used by either the Aggregator in case of successful reduction or the timer in case of a timeout.
 // In the latter case no agreement message is pushed forward
-func (r *Reducer) Halt(hash []byte, b []*message.StepVotes) {
+func (r *Reducer) Halt(hash []byte, stepVotes []*message.StepVotes) {
 	lg.
-		WithField("len_step", len(b)).
+		WithField("len_step", len(stepVotes)).
 		WithField("id", r.reductionID).
 		WithField("round", r.round).
 		Trace("secondstep_halted")
@@ -184,13 +182,13 @@ func (r *Reducer) Halt(hash []byte, b []*message.StepVotes) {
 
 	// Sending of agreement happens on it's own step
 	step := r.eventPlayer.Forward(r.ID())
-	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) && r.handler.AmMember(r.round, step) {
+	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(stepVotes) && r.handler.AmMember(r.round, step) {
 		lg.
 			WithField("step", step).
 			WithField("id", r.reductionID).
 			WithField("round", r.round).
 			Debug("sending agreement")
-		r.sendAgreement(step, hash, b)
+		r.sendAgreement(step, hash, stepVotes)
 	} else {
 		// Increase timeout if we had no agreement
 		r.timeOut = r.timeOut * 2
@@ -218,7 +216,9 @@ func (r *Reducer) Halt(hash []byte, b []*message.StepVotes) {
 			WithField("step", step).
 			WithField("id", r.reductionID).
 			WithField("round", r.round).
-			Error("secondstep_halted, failed to SendInternally")
+			Error("secondstep_halted, failed to SendInternally, topics.Restart")
+		// FIXME: shall this panic ? is this a extreme violation ?
+		//panic("could not restart consensus round")
 	}
 }
 
@@ -228,9 +228,9 @@ func (r *Reducer) Halt(hash []byte, b []*message.StepVotes) {
 // StepVotesMsg and run with it anyway (to keep the security assumptions of the
 // protocol right).
 func (r *Reducer) CollectStepVotes(e consensus.InternalPacket) error {
-	sv := e.(message.StepVotesMsg)
-	hdr := sv.State()
-	r.startReduction(sv)
+	firstStepVotes := e.(message.StepVotesMsg)
+	hdr := firstStepVotes.State()
+	r.startReduction(firstStepVotes)
 	// fetch the right step
 	step := r.eventPlayer.Forward(r.ID())
 	r.eventPlayer.Play(r.reductionID)
@@ -239,13 +239,23 @@ func (r *Reducer) CollectStepVotes(e consensus.InternalPacket) error {
 		WithField("id", r.reductionID).
 		WithField("round", r.round).
 		WithField("step", step).
-		Traceln("starting secondstep reduction")
+		Trace("starting secondstep reduction")
 
 	if r.handler.AmMember(r.round, step) {
 		// propagating a new StepVoteMsg with the right step
-		return r.sendReduction(step, hdr.BlockHash)
+		hash := hdr.BlockHash
+		return r.sendReduction(step, hash)
 	}
 	return nil
+}
+
+func (r *Reducer) constructHeader(step uint8, hash []byte) header.Header {
+	return header.Header{
+		Round:     r.round,
+		Step:      step,
+		PubKeyBLS: r.keys.BLSPubKeyBytes,
+		BlockHash: hash,
+	}
 }
 
 func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*message.StepVotes) {
@@ -268,15 +278,6 @@ func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*message.StepVote
 	// then we forward the marshaled Agreement to the store to be sent
 	if err := r.signer.Gossip(msg, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Error("error in gossiping the agreement")
-	}
-}
-
-func (r *Reducer) constructHeader(step uint8, hash []byte) header.Header {
-	return header.Header{
-		Round:     r.round,
-		Step:      step,
-		PubKeyBLS: r.keys.BLSPubKeyBytes,
-		BlockHash: hash,
 	}
 }
 

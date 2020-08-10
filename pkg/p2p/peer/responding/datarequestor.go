@@ -118,6 +118,7 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.ContractCall
 
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write(txID)
+	//FIXME: Add option to configure rpcBus timeout #614
 	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
 	if err != nil {
 		return nil, err

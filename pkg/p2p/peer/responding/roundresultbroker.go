@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
+
+var lg = log.WithField("process", "RoundResultBroker")
 
 // RoundResultBroker holds RPCBus and responseChan
 type RoundResultBroker struct {
@@ -21,8 +25,12 @@ func NewRoundResultBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buff
 
 // ProvideRoundResult will call the rpc endpoint for round results and prepend it to a topic
 func (r *RoundResultBroker) ProvideRoundResult(m *bytes.Buffer) error {
+	//FIXME: Add option to configure rpcBus timeout #614
 	resp, err := r.rpcBus.Call(topics.GetRoundResults, rpcbus.NewRequest(*m), 5*time.Second)
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("timeout ProvideCandidate topics.GetRoundResults")
 		return err
 	}
 	roundResultBuf := resp.(bytes.Buffer)

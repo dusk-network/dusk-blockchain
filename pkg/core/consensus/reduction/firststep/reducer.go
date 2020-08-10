@@ -14,6 +14,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var _ consensus.Component = (*Reducer)(nil)
+
 var lg = log.WithField("process", "first-step reduction")
 var emptyHash = [32]byte{}
 
@@ -31,7 +33,7 @@ type Reducer struct {
 	handler    *reduction.Handler
 	aggregator *aggregator
 	timeOut    time.Duration
-	Timer      *reduction.Timer
+	timer      *reduction.Timer
 	round      uint64
 
 	haltChan chan reduction.HaltMsg
@@ -57,7 +59,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	r.eventPlayer = eventPlayer
 	r.signer = signer
 	r.handler = reduction.NewHandler(r.keys, ru.P)
-	r.Timer = reduction.NewTimer(r.haltChan)
+	r.timer = reduction.NewTimer(r.haltChan)
 	r.round = ru.Round
 
 	bestScoreSubscriber := consensus.TopicListener{
@@ -86,27 +88,27 @@ func (r *Reducer) ID() uint32 {
 // Implements consensus.Component.
 func (r *Reducer) Finalize() {
 	r.eventPlayer.Pause(r.reductionID)
-	r.Timer.Stop()
+	r.timer.Stop()
 	r.quitChan <- struct{}{}
 }
 
 // Collect forwards Reduction to the aggregator
 func (r *Reducer) Collect(e consensus.InternalPacket) error {
-	red := e.(message.Reduction)
+	reductionMessage := e.(message.Reduction)
 
-	if err := r.handler.VerifySignature(red); err != nil {
+	if err := r.handler.VerifySignature(reductionMessage); err != nil {
 		return err
 	}
 
-	hdr := red.State()
+	hdr := reductionMessage.State()
 	lg.WithFields(log.Fields{
 		"round": hdr.Round,
 		"step":  hdr.Step,
 		//"sender": hex.EncodeToString(hdr.Sender()),
 		"id": r.reductionID,
 		//"hash":   hex.EncodeToString(hdr.BlockHash),
-	}).Debugln("received event")
-	return r.aggregator.collectVote(red)
+	}).Debugln("received_event")
+	return r.aggregator.collectVote(reductionMessage)
 }
 
 // Filter an incoming Reduction message, by checking whether or not it was sent
@@ -120,7 +122,7 @@ func (r *Reducer) startReduction() {
 		"round":   r.round,
 		"id":      r.reductionID,
 		"timeout": r.timeOut / time.Second,
-	}).Debugln("firststep, startReduction")
+	}).Debugln("startReduction")
 
 	// Clear out haltChan
 	for len(r.haltChan) > 0 {
@@ -128,16 +130,16 @@ func (r *Reducer) startReduction() {
 	}
 
 	go r.collectHalt()
-	r.Timer.Start(r.timeOut)
+	r.timer.Start(r.timeOut)
 	r.aggregator = newAggregator(r.haltChan, r.handler, r.rpcBus)
 }
 
-func (r *Reducer) sendReduction(step uint8, hash []byte) {
+func (r *Reducer) sendReduction(step uint8, hash []byte) error {
 	hdr := r.constructHeader(step, hash)
 	sig, err := r.signer.Sign(hdr)
 	if err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in signing reduction")
-		return
+		return err
 	}
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
@@ -145,7 +147,9 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) {
 
 	if err := r.signer.Gossip(msg, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in sending authenticated Reduction")
+		return err
 	}
+	return nil
 }
 
 // collectHalt is called by the Aggregator and the Timer through a channel, and ensures that only
@@ -179,17 +183,17 @@ func (s StepVotesMsgFactory) Create(sender []byte, round uint64, step uint8) con
 
 // Halt will end the first step of reduction, and forwards whatever result it received
 // on the StepVotes topic.
-func (r *Reducer) Halt(hash []byte, svs []*message.StepVotes) {
+func (r *Reducer) Halt(hash []byte, stepVotes []*message.StepVotes) {
 	var svm message.StepVotesMsg
 	lg.
 		WithField("id", r.reductionID).
 		WithField("round", r.round).
 		Traceln("firststep_halted")
-	r.Timer.Stop()
+	r.timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 
-	if len(svs) > 0 {
-		sv := *svs[0]
+	if len(stepVotes) > 0 {
+		sv := *stepVotes[0]
 		svm = message.NewStepVotesMsg(r.round, hash, r.keys.BLSPubKeyBytes, sv)
 	} else {
 		//create a factory for empty StepVotes (necessary since we cannot get
@@ -221,26 +225,32 @@ func (r *Reducer) Halt(hash []byte, svs []*message.StepVotes) {
 		lg.WithField("timeout", r.timeOut).
 			WithField("id", r.reductionID).
 			WithField("round", r.round).
-			Error("firststep_halted, failed to SendInternally")
+			Error("firststep_halted, failed to SendInternally, topics.StepVotes")
+		// FIXME: shall this panic ? is this a extreme violation ?
+		//panic("could not SendInternally, topics.StepVotes")
 	}
 }
 
 // CollectBestScore activates the 2-step reduction cycle.
 // TODO: interface - rename into CollectStartReductionSignal
 func (r *Reducer) CollectBestScore(e consensus.InternalPacket) error {
-	lg.
-		WithField("id", r.reductionID).
-		WithField("round", r.round).
-		Trace("starting firststep reduction")
+	hdr := e.State()
 	r.startReduction()
+	// fetch the right step
 	step := r.eventPlayer.Forward(r.ID())
 	r.eventPlayer.Play(r.reductionID)
 
-	if r.handler.AmMember(r.round, step) {
-		hash := e.State().BlockHash
-		r.sendReduction(step, hash)
-	}
+	lg.
+		WithField("id", r.reductionID).
+		WithField("round", r.round).
+		WithField("step", step).
+		Trace("starting firststep reduction")
 
+	if r.handler.AmMember(r.round, step) {
+		// propagating a new StepVoteMsg with the right step
+		hash := hdr.BlockHash
+		return r.sendReduction(step, hash)
+	}
 	return nil
 }
 
