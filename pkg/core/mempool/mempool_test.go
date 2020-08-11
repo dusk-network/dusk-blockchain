@@ -162,18 +162,21 @@ func TestProcessPendingTxs(t *testing.T) {
 		// Publish valid tx
 		txMsg := prepTx(cc[i])
 		c.addTx(cc[i])
-		c.bus.Publish(topics.Tx, txMsg)
+		errList := c.bus.Publish(topics.Tx, txMsg)
+		assert.Empty(t, errList)
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
 		invalid := transactions.RandContractCall()
 		transactions.Invalidate(invalid)
 		txMsg = prepTx(invalid)
 		c.addTx(invalid)
-		c.bus.Publish(topics.Tx, txMsg)
+		errList = c.bus.Publish(topics.Tx, txMsg)
+		assert.Empty(t, errList)
 
 		// Publish a duplicated tx
 		c.addTx(invalid)
-		c.bus.Publish(topics.Tx, txMsg)
+		errList = c.bus.Publish(topics.Tx, txMsg)
+		assert.Empty(t, errList)
 	}
 
 	c.assert(t, true)
@@ -213,7 +216,8 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		go func(txs []transactions.ContractCall) {
 			for _, tx := range txs {
 				txMsg := prepTx(tx)
-				c.bus.Publish(topics.Tx, txMsg)
+				errList := c.bus.Publish(topics.Tx, txMsg)
+				assert.Empty(t, errList)
 			}
 			wg.Done()
 		}(c.verifiedTx[from:to])
@@ -226,7 +230,8 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 			for y := 0; y <= 5; y++ {
 				tx := transactions.MockInvalidTx()
 				txMsg := prepTx(tx)
-				c.bus.Publish(topics.Tx, txMsg)
+				errList := c.bus.Publish(topics.Tx, txMsg)
+				assert.Empty(t, errList)
 			}
 			wg.Done()
 		}()
@@ -263,7 +268,8 @@ func TestRemoveAccepted(t *testing.T) {
 		txMsg := prepTx(txCopy)
 
 		// Publish valid tx
-		c.bus.Publish(topics.Tx, txMsg)
+		errList := c.bus.Publish(topics.Tx, txMsg)
+		assert.Empty(errList)
 
 		// Simulate a situation where the block has accepted each 2th tx
 		counter++
@@ -281,7 +287,8 @@ func TestRemoveAccepted(t *testing.T) {
 	root, _ := b.CalculateRoot()
 	b.Header.TxRoot = root
 	blockMsg := message.New(topics.IntermediateBlock, *b)
-	c.bus.Publish(topics.IntermediateBlock, blockMsg)
+	errList := c.bus.Publish(topics.IntermediateBlock, blockMsg)
+	assert.Empty(errList)
 
 	c.assert(t, false)
 }
@@ -295,7 +302,8 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 	for _, tx := range txs {
 		txMsg := prepTx(tx)
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, txMsg)
+		errList := c.bus.Publish(topics.Tx, txMsg)
+		assert.Empty(t, errList)
 	}
 
 	c.wait()
@@ -322,7 +330,9 @@ func TestSendMempoolTx(t *testing.T) {
 		assert.NoError(err)
 		txidBytes := resp.([]byte)
 
-		txid, _ := tx.CalculateHash()
+		txid, err := tx.CalculateHash()
+		assert.Nil(err)
+
 		assert.Equal(txidBytes, txid)
 	}
 

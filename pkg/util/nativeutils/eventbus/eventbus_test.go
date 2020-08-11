@@ -45,7 +45,8 @@ func TestUnsubscribe(t *testing.T) {
 	eb, myChan, id := newEB(t)
 	eb.Unsubscribe(topics.Test, id)
 	msg := message.New(topics.Test, bytes.NewBufferString("whatever2"))
-	eb.Publish(topics.Test, msg)
+	errList := eb.Publish(topics.Test, msg)
+	assert.Empty(t, errList)
 
 	select {
 	case <-myChan:
@@ -62,7 +63,8 @@ func TestStreamer(t *testing.T) {
 	topic := topics.Gossip
 	bus, streamer := CreateFrameStreamer(topic)
 	msg := message.New(topics.Test, bytes.NewBufferString("pluto")) //nolint
-	bus.Publish(topic, msg)
+	errList := bus.Publish(topic, msg)
+	assert.Empty(t, errList)
 
 	packet, err := streamer.(*SimpleStreamer).Read()
 	assert.NoError(t, err)
@@ -75,14 +77,16 @@ func TestStreamer(t *testing.T) {
 //******************
 func TestDefaultListener(t *testing.T) {
 	eb := New()
-	msgChan := make(chan message.Message)
+	msgChan := make(chan message.Message, 100)
 
 	eb.AddDefaultTopic(topics.Reject)
 	eb.AddDefaultTopic(topics.Unknown)
 	eb.SubscribeDefault(NewChanListener(msgChan))
 
 	m := message.New(topics.Reject, *bytes.NewBufferString("pluto")) //nolint
-	eb.Publish(topics.Reject, m)
+	errList := eb.Publish(topics.Reject, m)
+	assert.Empty(t, errList)
+
 	msg := <-msgChan
 	assert.Equal(t, topics.Reject, msg.Category())
 
@@ -90,14 +94,18 @@ func TestDefaultListener(t *testing.T) {
 	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
 
 	m = message.New(topics.Unknown, bytes.NewBufferString("pluto")) //nolint
-	eb.Publish(topics.Unknown, m)
+	errList = eb.Publish(topics.Unknown, m)
+	assert.Empty(t, errList)
+
 	msg = <-msgChan
 	assert.Equal(t, topics.Unknown, msg.Category())
 	payload = msg.Payload().(message.SafeBuffer)
 	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
 
 	m = message.New(topics.Gossip, bytes.NewBufferString("pluto")) //nolint
-	eb.Publish(topics.Gossip, m)
+	errList = eb.Publish(topics.Gossip, m)
+	assert.Empty(t, errList)
+
 	select {
 	case <-msgChan:
 		t.FailNow()
@@ -118,7 +126,8 @@ func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 	assert.NotNil(t, id)
 	b := bytes.NewBufferString("whatever")
 	m := message.New(topics.Test, *b)
-	eb.Publish(topics.Test, m)
+	errList := eb.Publish(topics.Test, m)
+	assert.Empty(t, errList)
 
 	select {
 	case received := <-myChan:
@@ -145,7 +154,9 @@ func TestExitChan(t *testing.T) {
 	val := new(bytes.Buffer)
 	val.Write([]byte{0})
 	m := message.New(topic, *val)
-	eb.Publish(topic, m)
+	errList := eb.Publish(topic, m)
+	assert.Empty(t, errList)
+
 	// Wait for event to be handled
 	// NB: 'Writer' must return error to force consumer termination
 	time.Sleep(100 * time.Millisecond)

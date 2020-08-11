@@ -31,7 +31,8 @@ func TestMaintainBids(t *testing.T) {
 	// Send round update, to start the maintainer.
 	ru := consensus.MockRoundUpdate(1, nil)
 	ruMsg := message.New(topics.RoundUpdate, ru)
-	bus.Publish(topics.RoundUpdate, ruMsg)
+	errList := bus.Publish(topics.RoundUpdate, ruMsg)
+	require.Empty(t, errList)
 
 	// Ensure bid request is sent
 	<-c
@@ -39,7 +40,8 @@ func TestMaintainBids(t *testing.T) {
 	// Then, send a round update close after. No bid request should be sent
 	ru = consensus.MockRoundUpdate(2, nil)
 	ruMsg = message.New(topics.RoundUpdate, ru)
-	bus.Publish(topics.RoundUpdate, ruMsg)
+	errList = bus.Publish(topics.RoundUpdate, ruMsg)
+	require.Empty(t, errList)
 
 	catchStakeRequest(rb, c)
 
@@ -53,7 +55,8 @@ func TestMaintainBids(t *testing.T) {
 	// Send another round update that is within the 'offset', to trigger sending a new tx
 	ru = consensus.MockRoundUpdate(950, nil)
 	ruMsg = message.New(topics.RoundUpdate, ru)
-	bus.Publish(topics.RoundUpdate, ruMsg)
+	errList = bus.Publish(topics.RoundUpdate, ruMsg)
+	require.Empty(t, errList)
 
 	// Ensure bid request is sent
 	<-c

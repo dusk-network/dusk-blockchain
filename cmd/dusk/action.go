@@ -114,7 +114,8 @@ func action(ctx *cli.Context) error {
 
 	// Graceful shutdown of listening components
 	msg := message.New(topics.Quit, bytes.Buffer{})
-	srv.eventBus.Publish(topics.Quit, msg)
+	errList := srv.eventBus.Publish(topics.Quit, msg)
+	diagnostics.LogPublishErrors("dusk/action.go, topics.Quit", errList)
 
 	log.WithField("prefix", "main").Info("Terminated")
 

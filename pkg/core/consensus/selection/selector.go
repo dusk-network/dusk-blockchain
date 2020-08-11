@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -142,7 +144,8 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	// Tell the candidate broker to allow a candidate block with this
 	// hash through.
 	msg := message.New(topics.Score, score)
-	s.publisher.Publish(topics.ValidCandidateHash, msg)
+	errList := s.publisher.Publish(topics.ValidCandidateHash, msg)
+	diagnostics.LogPublishErrors("selection/selector.go, CollectScoreEvent, topics.ValidCandidateHash, topics.Score", errList)
 
 	if err := s.signer.Gossip(msg, s.ID()); err != nil {
 		lg.

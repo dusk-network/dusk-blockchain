@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -119,7 +121,9 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 		}
 
 		msg := message.New(topics.Block, *blk)
-		s.publisher.Publish(topics.Block, msg)
+		errList := s.publisher.Publish(topics.Block, msg)
+		diagnostics.LogPublishErrors("chainsync/sync.go, topics.Block", errList)
+
 	}
 
 	return nil
@@ -154,7 +158,8 @@ func (s *ChainSynchronizer) setHighestSeen(height uint64) {
 
 func (s *ChainSynchronizer) publishHighestSeen(height uint64) {
 	msg := message.New(topics.HighestSeen, height)
-	s.publisher.Publish(topics.HighestSeen, msg)
+	errList := s.publisher.Publish(topics.HighestSeen, msg)
+	diagnostics.LogPublishErrors("", errList)
 }
 
 func compareHeights(ourHeight, theirHeight uint64) int64 {

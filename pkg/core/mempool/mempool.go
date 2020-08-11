@@ -9,6 +9,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -570,7 +572,9 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 
 	// TODO: interface - marshaling should done after the Gossip, not before
 	packet := message.New(topics.Inv, *buf)
-	m.eventBus.Publish(topics.Gossip, packet)
+	errList := m.eventBus.Publish(topics.Gossip, packet)
+	diagnostics.LogPublishErrors("mempool.go, topics.Gossip, topics.Inv", errList)
+
 	return nil
 }
 

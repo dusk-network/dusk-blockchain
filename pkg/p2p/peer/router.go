@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
@@ -89,11 +91,15 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) error {
 		// as it could deprive of us receiving a candidate we might
 		// need later, but which was discarded initially.
 		// The candidate component will use it's own repropagation rules.
-		m.publisher.Publish(category, msg)
+		errList := m.publisher.Publish(category, msg)
+		diagnostics.LogPublishErrors("peer/router.go, topics.Candidate", errList)
+
 	default:
 		if m.CanRoute(category) {
 			if m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
-				m.publisher.Publish(category, msg)
+				errList := m.publisher.Publish(category, msg)
+				diagnostics.LogPublishErrors("peer/router.go, default", errList)
+
 			}
 		} else {
 			err = fmt.Errorf("%s topic not routable", category.String())

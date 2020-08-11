@@ -113,7 +113,9 @@ func TestRequestCandidate(t *testing.T) {
 	// Send genesis back as a Candidate message
 	cm := mockCandidate()
 	msg := message.New(topics.Candidate, cm)
-	eb.Publish(topics.Candidate, msg)
+	errList := eb.Publish(topics.Candidate, msg)
+	assert.Empty(errList)
+
 	require.NoError(<-doneChan)
 }
 

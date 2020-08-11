@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -159,7 +160,8 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	}
 
 	msg := message.New(topics.GetCandidate, *buf)
-	b.publisher.Publish(topics.Gossip, msg)
+	errList := b.publisher.Publish(topics.Gossip, msg)
+	diagnostics.LogPublishErrors("candidate/broker.go, topics.Gossip, topics.GetCandidate", errList)
 
 	//FIXME: Add option to configure timeout #614
 	timer := time.NewTimer(2 * time.Second)
