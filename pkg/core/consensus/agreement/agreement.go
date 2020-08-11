@@ -1,6 +1,8 @@
 package agreement
 
 import (
+	"sync/atomic"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -50,7 +52,8 @@ func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consens
 		Topic:    topics.Agreement,
 		Listener: consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter, consensus.LowPriority, false),
 	}
-	a.agreementID = agreementSubscriber.Listener.ID()
+
+	atomic.StoreUint32(&a.agreementID, agreementSubscriber.Listener.ID())
 
 	go a.listen()
 	return []consensus.TopicListener{agreementSubscriber}
@@ -59,7 +62,7 @@ func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consens
 // Returns the listener ID for the agreement component.
 // Implements consensus.Component.
 func (a *agreement) ID() uint32 {
-	return a.agreementID
+	return atomic.LoadUint32(&a.agreementID)
 }
 
 // Filter an incoming Agreement message, by checking whether it was sent by a valid
@@ -76,7 +79,7 @@ func (a *agreement) CollectAgreementEvent(packet consensus.InternalPacket) error
 
 	lg.WithFields(log.Fields{
 		"agreement": aggro,
-		"id":        a.agreementID,
+		"id":        a.ID(),
 	}).Debugln("received event")
 
 	// FIXME: republish here to avoid race conditions for faster but safer
@@ -92,7 +95,7 @@ func (a *agreement) listen() {
 		lg.
 			WithField("round", a.round).
 			WithField("step", evs[0].State().Step).
-			WithField("id", a.agreementID).
+			WithField("id", a.ID()).
 			Debugln("quorum reached")
 		// Start a goroutine here to release the lock held by
 		// Coordinator.CollectEvent
@@ -121,7 +124,7 @@ func (a *agreement) sendCertificate(ag message.Agreement) {
 // The agreement component is no longer usable after this method call.
 // Implements consensus.Component.
 func (a *agreement) Finalize() {
-	a.eventPlayer.Pause(a.agreementID)
+	a.eventPlayer.Pause(a.ID())
 	a.accumulator.Stop()
 	select {
 	case a.quitChan <- struct{}{}:
