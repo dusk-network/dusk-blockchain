@@ -389,7 +389,7 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 				"round":             hdr.Round,
 				"step":              hdr.Step,
 				"coordinator_round": c.Round(),
-				"coordinator_step":  c.step,
+				"coordinator_step":  c.Step(),
 			}).
 			Debugln("discarding obsolete event")
 		return nil
@@ -400,7 +400,7 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 				"round":             hdr.Round,
 				"step":              hdr.Step,
 				"coordinator_round": c.Round(),
-				"coordinator_step":  c.step,
+				"coordinator_step":  c.Step(),
 			}).
 			Debugln("storing future event")
 
