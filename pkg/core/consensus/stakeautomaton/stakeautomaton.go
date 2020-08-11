@@ -95,8 +95,8 @@ func (m *StakeAutomaton) sendStake() error {
 		Fee:      config.MinFee,
 		Locktime: lockTime,
 	}
-	//FIXME: Add option to configure rpcBus timeout #614
-	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(req), 5*time.Second)
+	timeoutSendStakeTX := time.Duration(config.Get().General.TimeoutSendStakeTX) * time.Second
+	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(req), timeoutSendStakeTX)
 	if err != nil {
 		return err
 	}

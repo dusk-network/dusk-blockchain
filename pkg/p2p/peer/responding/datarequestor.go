@@ -2,6 +2,7 @@ package responding
 
 import (
 	"bytes"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -118,8 +119,8 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.ContractCall
 
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write(txID)
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
+	timeoutGetMempoolTXs := time.Duration(config.Get().General.TimeoutGetMempoolTXs) * time.Second
+	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), timeoutGetMempoolTXs)
 	if err != nil {
 		return nil, err
 	}

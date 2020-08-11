@@ -2,6 +2,7 @@ package responding
 
 import (
 	"bytes"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -25,8 +26,8 @@ func NewRoundResultBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buff
 
 // ProvideRoundResult will call the rpc endpoint for round results and prepend it to a topic
 func (r *RoundResultBroker) ProvideRoundResult(m *bytes.Buffer) error {
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err := r.rpcBus.Call(topics.GetRoundResults, rpcbus.NewRequest(*m), 5*time.Second)
+	timeoutGetRoundResults := time.Duration(config.Get().General.TimeoutGetRoundResults) * time.Second
+	resp, err := r.rpcBus.Call(topics.GetRoundResults, rpcbus.NewRequest(*m), timeoutGetRoundResults)
 	if err != nil {
 		lg.
 			WithError(err).

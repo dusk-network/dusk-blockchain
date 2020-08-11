@@ -4,7 +4,22 @@ type generalConfiguration struct {
 	Network              string
 	WalletOnly           bool
 	SafeCallbackListener bool
+
+	//Timeout cfg for rpcBus
+	TimeoutSendBidTX            int64
+	TimeoutGetLastCommittee     int64
+	TimeoutGetLastCertificate   int64
+	TimeoutGetMempoolTXsBySize  int64
+	TimeoutGetLastBlock         int64
+	TimeoutGetCandidate         int64
+	TimeoutClearWalletDatabase  int64
+	TimeoutVerifyCandidateBlock int64
+	TimeoutSendStakeTX          int64
+	TimeoutGetMempoolTXs        int64
+	TimeoutGetRoundResults      int64
 }
+
+// time.Duration(config.Get().General.) * time.Second
 
 type loggerConfiguration struct {
 	Level   string

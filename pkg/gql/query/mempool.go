@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"time"
 
 	txs "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -42,8 +43,8 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			_, _ = payload.Write(txidBytes)
 		}
 
-		//FIXME: Add option to configure rpcBus timeout #614
-		resp, err := t.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(payload), 5*time.Second)
+		timeoutGetMempoolTXs := time.Duration(config.Get().General.TimeoutGetMempoolTXs) * time.Second
+		resp, err := t.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(payload), timeoutGetMempoolTXs)
 		if err != nil {
 			return "", err
 		}

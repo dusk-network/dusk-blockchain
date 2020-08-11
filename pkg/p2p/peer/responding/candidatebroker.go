@@ -2,6 +2,7 @@ package responding
 
 import (
 	"bytes"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -22,8 +23,8 @@ func NewCandidateBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer
 
 // ProvideCandidate for a given (m *bytes.Buffer)
 func (c *CandidateBroker) ProvideCandidate(m *bytes.Buffer) error {
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*m), 5*time.Second)
+	timeoutGetCandidate := time.Duration(config.Get().General.TimeoutGetCandidate) * time.Second
+	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*m), timeoutGetCandidate)
 	if err != nil {
 		lg.
 			WithError(err).

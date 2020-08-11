@@ -467,8 +467,8 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	// Fetch new intermediate block and corresponding certificate
 	//TODO: start measuring how long this takes in order to be able to see if this timeout is good or not
 
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), 5*time.Second) //20 is tmp value for further checks
+	timeoutGetCandidate := time.Duration(config.Get().General.TimeoutGetCandidate) * time.Second
+	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), timeoutGetCandidate) //20 is tmp value for further checks
 	if err != nil {
 		// If the we can't get the block, we will fall
 		// back and catch up later.
@@ -706,8 +706,8 @@ func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.G
 	}
 
 	// Clear walletDB
-	//FIXME: Add option to configure rpcBus timeout #614
-	if _, err := c.rpcBus.Call(topics.ClearWalletDatabase, rpcbus.NewRequest(bytes.Buffer{}), 0*time.Second); err != nil {
+	timeoutClearWalletDatabase := time.Duration(config.Get().General.TimeoutClearWalletDatabase) * time.Second
+	if _, err := c.rpcBus.Call(topics.ClearWalletDatabase, rpcbus.NewRequest(bytes.Buffer{}), timeoutClearWalletDatabase); err != nil {
 		log.Panic(err)
 	}
 
