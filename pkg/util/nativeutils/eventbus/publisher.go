@@ -22,7 +22,10 @@ func (bus *EventBus) Publish(topic topics.Topic, m message.Message) (errorList [
 	//}).Traceln("publishing on the eventbus")
 
 	// first serve the default topic listeners as they are most likely to need more time to process topics
-	errorList = bus.defaultListener.Forward(topic, m)
+	go func() {
+		newErrorList := bus.defaultListener.Forward(topic, m)
+		errorList = append(errorList, newErrorList...)
+	}()
 
 	listeners := bus.listeners.Load(topic)
 	for _, listener := range listeners {
