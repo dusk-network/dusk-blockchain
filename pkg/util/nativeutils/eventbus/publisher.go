@@ -3,6 +3,7 @@ package eventbus
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 )
 
 // Publisher publishes serialized messages on a specific topic
@@ -23,8 +24,8 @@ func (bus *EventBus) Publish(topic topics.Topic, m message.Message) (errorList [
 
 	// first serve the default topic listeners as they are most likely to need more time to process topics
 	go func() {
-		newErrorList := bus.defaultListener.Forward(topic, m)
-		errorList = append(errorList, newErrorList...)
+		newErrList := bus.defaultListener.Forward(topic, m)
+		diagnostics.LogPublishErrors("eventbus/publisher.go, Publish", newErrList)
 	}()
 
 	listeners := bus.listeners.Load(topic)
