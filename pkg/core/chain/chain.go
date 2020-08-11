@@ -465,10 +465,14 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	c.lastCommittee = cMsg.committee
 
 	// Fetch new intermediate block and corresponding certificate
-	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), 5*time.Second)
+	//TODO: start measuring how long this takes in order to be able to see if this timeout is good or not
+
+	//FIXME: Add option to configure rpcBus timeout #614
+	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), 5*time.Second) //20 is tmp value for further checks
 	if err != nil {
 		// If the we can't get the block, we will fall
 		// back and catch up later.
+		//FIXME: restart consensus when handleCertificateMessage flow return err
 		log.
 			WithError(err).
 			WithField("height", c.highestSeen).
@@ -480,6 +484,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	if c.intermediateBlock == nil {
 		// If we're missing the intermediate block, we will also fall
 		// back and catch up later.
+		//TODO: restart consensus ? throw away everything and sync ?
 		log.Warnln("intermediate block is missing")
 		return
 	}
@@ -701,6 +706,7 @@ func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.G
 	}
 
 	// Clear walletDB
+	//FIXME: Add option to configure rpcBus timeout #614
 	if _, err := c.rpcBus.Call(topics.ClearWalletDatabase, rpcbus.NewRequest(bytes.Buffer{}), 0*time.Second); err != nil {
 		log.Panic(err)
 	}

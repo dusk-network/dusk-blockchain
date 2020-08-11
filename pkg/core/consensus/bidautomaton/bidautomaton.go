@@ -92,6 +92,8 @@ func (m *BidAutomaton) sendBid() error {
 		Fee:      config.MinFee,
 		Locktime: lockTime,
 	}
+
+	//FIXME: Add option to configure rpcBus timeout #614
 	_, err := m.rpcBus.Call(topics.SendBidTx, rpcbus.NewRequest(req), 5*time.Second)
 	if err != nil {
 		return err

@@ -100,14 +100,25 @@ func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus
 func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	sev := e.(message.ScoreProposal)
 
+	lg = lg.
+		WithField("round", sev.State().Round).
+		WithField("step", sev.State().Step)
+
+	//FIXME: Add option to configure rpcBus timeout #614
 	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), 5*time.Second)
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("failed to topics.GetLastCommittee")
 		return err
 	}
 	keys := resp.([][]byte)
 
 	blk, err := bg.Generate(sev, keys)
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("failed to bg.Generate")
 		return err
 	}
 
@@ -123,14 +134,21 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	}
 
 	// Create candidate message
+	//FIXME: Add option to configure rpcBus timeout #614
 	resp, err = bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), 5*time.Second)
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("failed to topics.GetLastCertificate")
 		return err
 	}
 	certBuf := resp.(bytes.Buffer)
 
 	cert := block.EmptyCertificate()
 	if err := message.UnmarshalCertificate(&certBuf, cert); err != nil {
+		lg.
+			WithError(err).
+			Error("failed to UnmarshalCertificate")
 		return err
 	}
 
@@ -176,6 +194,9 @@ func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 	// Update TxRoot
 	root, err := candidateBlock.CalculateRoot()
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("failed to CalculateRoot")
 		return nil, err
 	}
 	candidateBlock.Header.TxRoot = root
@@ -204,6 +225,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 			return nil, err
 		}
 
+		//FIXME: Add option to configure rpcBus timeout #614
 		resp, err := bg.rpcBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), 4*time.Second)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the chain.

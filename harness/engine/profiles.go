@@ -18,6 +18,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Reset()
 	viper.Set("general.network", "testnet")
 	viper.Set("general.walletonly", "false")
+	viper.Set("general.safecallbacklistener", "false")
 
 	viper.Set("logger.output", node.Dir+"/dusk")
 	viper.Set("gql.address", node.Cfg.Gql.Address)

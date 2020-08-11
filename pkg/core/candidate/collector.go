@@ -1,6 +1,7 @@
 package candidate
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -13,8 +14,11 @@ type candidateCollector struct {
 func initCandidateCollector(sub eventbus.Subscriber) <-chan message.Candidate {
 	candidateChan := make(chan message.Candidate, 100)
 	collector := &candidateCollector{candidateChan}
-	l := eventbus.NewCallbackListener(collector.Collect)
-	sub.Subscribe(topics.Candidate, l)
+	collectListener := eventbus.NewCallbackListener(collector.Collect)
+	if config.Get().General.SafeCallbackListener {
+		collectListener = eventbus.NewSafeCallbackListener(collector.Collect)
+	}
+	sub.Subscribe(topics.Candidate, collectListener)
 	return candidateChan
 }
 

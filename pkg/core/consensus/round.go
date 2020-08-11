@@ -7,6 +7,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -42,6 +43,14 @@ func newStore(c *Coordinator) *roundStore {
 func (s *roundStore) Reset(c *Coordinator) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	// FIXME: should we pause the subscribers here ?
+	//for _, listeners := range s.subscribers {
+	//	for _, listener := range listeners {
+	//		listener.Pause()
+	//	}
+	//}
+
 	s.subscribers = make(map[topics.Topic][]Listener)
 	s.components = make([]Component, 0)
 	s.coordinator = c
@@ -118,7 +127,8 @@ func (s *roundStore) resume(id uint32) bool {
 }
 
 // Dispatch an event to listeners for the designated Topic.
-func (s *roundStore) Dispatch(m message.Message) {
+func (s *roundStore) Dispatch(m message.Message) []error {
+	var errorList []error
 	subscribers := s.createSubscriberQueue(m.Category())
 	lg.WithFields(log.Fields{
 		"coordinator_round": s.coordinator.Round(),
@@ -136,9 +146,12 @@ func (s *roundStore) Dispatch(m message.Message) {
 				"round":             ip.State().Round,
 				"step":              ip.State().Step,
 				"id":                sub.ID(),
-			}).WithError(err).Error("notifying subscriber failed")
+			}).WithError(err).Error("notifying subscriber failed, will panic")
+			errorList = append(errorList, err)
 		}
 	}
+
+	return errorList
 }
 
 // order subscribers by priority for event dispatch
@@ -210,13 +223,18 @@ func Start(eventBus *eventbus.EventBus, keys key.Keys, factories ...ComponentFac
 	}
 
 	// completing the initialization
-	listener := eventbus.NewCallbackListener(c.CollectEvent)
-	c.eventBus.SubscribeDefault(listener)
-
-	l := eventbus.NewCallbackListener(c.CollectRoundUpdate)
-	c.eventBus.Subscribe(topics.RoundUpdate, l)
-
+	collectEventListener := eventbus.NewCallbackListener(c.CollectEvent)
+	collectRoundListener := eventbus.NewCallbackListener(c.CollectRoundUpdate)
 	stopListener := eventbus.NewCallbackListener(c.StopConsensus)
+
+	if config.Get().General.SafeCallbackListener {
+		collectEventListener = eventbus.NewSafeCallbackListener(c.CollectEvent)
+		collectRoundListener = eventbus.NewSafeCallbackListener(c.CollectRoundUpdate)
+		stopListener = eventbus.NewSafeCallbackListener(c.StopConsensus)
+	}
+
+	c.eventBus.SubscribeDefault(collectEventListener)
+	c.eventBus.Subscribe(topics.RoundUpdate, collectRoundListener)
 	c.eventBus.Subscribe(topics.StopConsensus, stopListener)
 
 	c.store = newStore(c)
@@ -226,6 +244,9 @@ func Start(eventBus *eventbus.EventBus, keys key.Keys, factories ...ComponentFac
 
 //StopConsensus stop the consensus for this round, finalizes the Round, instantiate a new Store
 func (c *Coordinator) StopConsensus(m message.Message) error {
+	log.
+		WithField("round", c.Round()).
+		Debug("StopConsensus")
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if !c.stopped {
@@ -268,15 +289,36 @@ func (c *Coordinator) CollectRoundUpdate(m message.Message) error {
 	go c.flushRoundQueue()
 
 	// TODO: the Coordinator should not send events. Someone else should kickstart the
-	// consensus loop
-	c.store.Dispatch(message.New(topics.Generation, EmptyPacket()))
+	// start consensus loop -> topics.Initialization ?
+
+	log.
+		WithField("round", r.Round).
+		Debug("CollectRoundUpdate, Dispatch, topics.Generation")
+	errList := c.store.Dispatch(message.New(topics.Generation, EmptyPacket()))
+	if len(errList) > 0 {
+		for _, err := range errList {
+			log.
+				WithError(err).
+				WithField("round", r.Round).
+				Error("failed to kickstart the consensus loop ? -> topics.Generation")
+			//FIXME: shall this panic ? is this a extreme violation ?
+		}
+	}
 	return nil
 }
 
 func (c *Coordinator) flushRoundQueue() {
 	evs := c.roundQueue.Flush(c.Round())
 	for _, ev := range evs {
-		c.store.Dispatch(ev)
+		errList := c.store.Dispatch(ev)
+		if len(errList) > 0 {
+			for _, err := range errList {
+				log.
+					WithError(err).
+					WithField("round", c.Round()).
+					Error("failed to Dispatch flushRoundQueue")
+			}
+		}
 	}
 }
 
@@ -329,11 +371,9 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 		"step":  hdr.Step,
 	}).Traceln("collected event")
 
-	// NOTE: RUnlock is not deferred here, for performance reasons.
-	// https://medium.com/i0exception/runtime-overhead-of-using-defer-in-go-7140d5c40e32
-	// TODO: once go 1.14 is out, re-examine the overhead of using `defer`.
 	var comparison header.Phase
 	c.lock.RLock()
+	defer c.lock.RUnlock()
 	if m.Category() == topics.Agreement {
 		comparison = hdr.CompareRound(c.Round())
 	} else {
@@ -344,19 +384,22 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 	case header.Before:
 		lg.
 			WithFields(log.Fields{
-				"topic": m.Category().String(),
-				"round": hdr.Round,
-				"step":  hdr.Step,
+				"topic":             m.Category().String(),
+				"round":             hdr.Round,
+				"step":              hdr.Step,
+				"coordinator_round": c.Round(),
+				"coordinator_step":  c.step,
 			}).
 			Debugln("discarding obsolete event")
-		c.lock.RUnlock()
 		return nil
 	case header.After:
 		lg.
 			WithFields(log.Fields{
-				"topic": m.Category().String(),
-				"round": hdr.Round,
-				"step":  hdr.Step,
+				"topic":             m.Category().String(),
+				"round":             hdr.Round,
+				"step":              hdr.Step,
+				"coordinator_round": c.Round(),
+				"coordinator_step":  c.step,
 			}).
 			Debugln("storing future event")
 
@@ -366,19 +409,24 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 		// header.
 		if m.Category() == topics.Agreement {
 			c.roundQueue.PutEvent(hdr.Round, hdr.Step, m)
-			c.lock.RUnlock()
 			return nil
 		}
 
 		// Otherwise, we just queue it according to the header round
 		// and step.
 		c.eventqueue.PutEvent(hdr.Round, hdr.Step, m)
-		c.lock.RUnlock()
 		return nil
 	}
 
-	c.store.Dispatch(m)
-	c.lock.RUnlock()
+	errList := c.store.Dispatch(m)
+	if len(errList) > 0 {
+		for _, err := range errList {
+			log.
+				WithError(err).
+				WithField("round", c.Round()).
+				Error("failed to Dispatch CollectEvent")
+		}
+	}
 	return nil
 }
 
@@ -409,7 +457,15 @@ func (c *Coordinator) Forward(id uint32) uint8 {
 func (c *Coordinator) dispatchQueuedEvents() {
 	events := c.eventqueue.GetEvents(c.Round(), c.Step())
 	for _, ev := range events {
-		c.store.Dispatch(ev)
+		errList := c.store.Dispatch(ev)
+		if len(errList) > 0 {
+			for _, err := range errList {
+				log.
+					WithError(err).
+					WithField("round", c.Round()).
+					Error("failed to Dispatch dispatchQueuedEvents")
+			}
+		}
 	}
 }
 
