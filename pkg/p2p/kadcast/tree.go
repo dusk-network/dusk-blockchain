@@ -1,6 +1,12 @@
 package kadcast
 
-import "sync"
+import (
+	"encoding/hex"
+	"fmt"
+	"sync"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
+)
 
 // Tree stores `L` buckets inside of it.
 // This is basically the routing info of every peer.
@@ -21,14 +27,14 @@ func makeTree() Tree {
 }
 
 // Classifies and adds a Peer to the routing storage tree.
-func (tree *Tree) addPeer(myPeer Peer, otherPeer Peer) {
+func (tree *Tree) addPeer(myPeer encoding.PeerInfo, otherPeer encoding.PeerInfo) {
 
 	// routing state should not include myPeer
 	if myPeer.IsEqual(otherPeer) {
 		return
 	}
 
-	idl, _ := myPeer.computeDistance(otherPeer)
+	idl, _ := ComputeDistance(myPeer, otherPeer)
 
 	// addPeer allows adding any peer with distance higher than 0. It allows a
 	// peer with distance 0 only if it differs from myPeer. This is the
@@ -48,4 +54,17 @@ func (tree *Tree) getTotalPeers() uint64 {
 	}
 	tree.mu.RUnlock()
 	return count
+}
+
+func (tree *Tree) trace(myPeer encoding.PeerInfo) string {
+
+	logMsg := fmt.Sprintf("this_peer: %s, bucket peers num %d\n", myPeer.String(), tree.getTotalPeers())
+	for _, b := range tree.buckets {
+		for _, p := range b.entries {
+			_, dist := ComputeDistance(myPeer, p)
+			logMsg += fmt.Sprintf("bucket: %d, peer: %s, distance: %s\n", b.idLength, p.String(), hex.EncodeToString(dist[:]))
+		}
+	}
+
+	return logMsg
 }

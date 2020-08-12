@@ -1,4 +1,4 @@
-package processing
+package protocol
 
 import (
 	"bytes"
@@ -7,18 +7,24 @@ import (
 	"io"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
 type (
-	// Gossip is a preprocessor for gossip messages.
+	// Gossip is a preprocessor/reader for gossip messages.
 	Gossip struct {
-		Magic protocol.Magic
+		Magic Magic
 	}
 )
 
+/*
+Gossip message/frame
+
+TODO:
+
+*/
+
 // NewGossip returns a gossip preprocessor with the specified magic.
-func NewGossip(magic protocol.Magic) *Gossip {
+func NewGossip(magic Magic) *Gossip {
 	return &Gossip{
 		Magic: magic,
 	}
@@ -38,7 +44,7 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 		return 0, err
 	}
 
-	magic, err := protocol.Extract(r)
+	magic, err := Extract(r)
 	if err != nil {
 		return 0, err
 	}
@@ -56,4 +62,48 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 	}
 
 	return ln, nil
+}
+
+// ReadMessage reads from the connection
+// TODO: Replace ReadMessage with ReadFrame
+func (g *Gossip) ReadMessage(src io.Reader) ([]byte, error) {
+	length, err := g.UnpackLength(src)
+	if err != nil {
+		return nil, err
+	}
+
+	// read a [length]byte from connection
+	buf := make([]byte, int(length))
+	_, err = io.ReadFull(src, buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, err
+}
+
+// ReadFrame extract message from gossip frame, if no errors found
+func (g *Gossip) ReadFrame(src io.Reader) ([]byte, error) {
+	length, err := g.UnpackLength(src)
+	if err != nil {
+		return nil, err
+	}
+
+	// read a [length]byte from connection
+	buf := make([]byte, int(length))
+	_, err = io.ReadFull(src, buf)
+	if err != nil {
+		return nil, err
+	}
+
+	message, cs, err := checksum.Extract(buf)
+	if err != nil {
+		return nil, fmt.Errorf("extracting checksum: %s", err.Error())
+	}
+
+	if !checksum.Verify(message, cs) {
+		return nil, fmt.Errorf("invalid checksum: %s", err.Error())
+	}
+
+	return message, nil
 }

@@ -3,7 +3,6 @@ package peer
 import (
 	"bytes"
 	"errors"
-	"io"
 	"net"
 	"sync"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -32,14 +32,14 @@ var l = log.WithField("process", "peer")
 type Connection struct {
 	lock sync.Mutex
 	net.Conn
-	gossip *processing.Gossip
+	gossip *protocol.Gossip
 }
 
 // GossipConnector calls Gossip.Process on the message stream incoming from the
 // ringbuffer
 // It absolves the function previously carried over by the Gossip preprocessor.
 type GossipConnector struct {
-	gossip *processing.Gossip
+	gossip *protocol.Gossip
 	*Connection
 }
 
@@ -74,7 +74,7 @@ type Reader struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
+func NewWriter(conn net.Conn, gossip *protocol.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
 	kas := 30 * time.Second
 	if len(keepAlive) > 0 {
 		kas = keepAlive[0]
@@ -93,7 +93,7 @@ func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Sub
 
 // NewReader returns a Reader. It will still need to be initialized by
 // running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
+func NewReader(conn net.Conn, gossip *protocol.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
 	pconn := &Connection{
 		Conn:   conn,
 		gossip: gossip,
@@ -129,23 +129,6 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 	}()
 
 	return reader, nil
-}
-
-// ReadMessage reads from the connection
-func (c *Connection) ReadMessage() ([]byte, error) {
-	length, err := c.gossip.UnpackLength(c.Conn)
-	if err != nil {
-		return nil, err
-	}
-
-	// read a [length]byte from connection
-	buf := make([]byte, int(length))
-	_, err = io.ReadFull(c.Conn, buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf, err
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
@@ -247,7 +230,7 @@ func (p *Reader) readLoop() {
 			l.WithError(err).Warnf("error setting read timeout")
 		}
 
-		b, err := p.ReadMessage()
+		b, err := p.gossip.ReadMessage(p.Conn)
 		if err != nil {
 			l.WithError(err).Warnln("error reading message")
 			return

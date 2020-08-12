@@ -1,4 +1,4 @@
-package processing
+package protocol
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
 const (
@@ -17,7 +16,7 @@ const (
 )
 
 //WriteFrame mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message
-func WriteFrame(buf *bytes.Buffer, magic protocol.Magic, cs []byte) error {
+func WriteFrame(buf *bytes.Buffer, magic Magic, cs []byte) error {
 	ln := uint64(magic.Len() + checksum.Length + buf.Len())
 	if ln > MaxFrameSize {
 		return fmt.Errorf("message size exceeds MaxFrameSize (%d)", MaxFrameSize)

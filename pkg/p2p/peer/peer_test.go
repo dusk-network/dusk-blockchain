@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -30,7 +29,7 @@ var receiveFn = func(c net.Conn) {
 
 // Test the functionality of the peer.Reader through the ReadLoop.
 func TestReader(t *testing.T) {
-	g := processing.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip(protocol.TestNet)
 	client, srv := net.Pipe()
 
 	eb := eventbus.New()
@@ -93,14 +92,14 @@ func TestWriteLoop(t *testing.T) {
 	bus := eventbus.New()
 	client, srv := net.Pipe()
 
-	g := processing.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip(protocol.TestNet)
 	msg := makeAgreementGossip(10)
 	buf, err := message.Marshal(msg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	go func(g *processing.Gossip) {
+	go func(g *protocol.Gossip) {
 		responseChan := make(chan *bytes.Buffer)
 		writer := NewWriter(client, g, bus, 30*time.Millisecond)
 		go writer.Serve(responseChan, make(chan struct{}, 1))
@@ -148,7 +147,7 @@ func makeAgreementGossip(keyAmount int) message.Message {
 
 func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *Writer {
 	client, srv := net.Pipe()
-	g := processing.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip(protocol.TestNet)
 	pw := NewWriter(client, g, bus)
 	go receiveFunc(srv)
 	return pw

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -70,12 +69,15 @@ func (n *Network) Bootstrap(workspace string) error {
 		if err != nil {
 			return err
 		}
+
+		// Minor delay between nodes bootstrap to ease seeder handling
+		time.Sleep(30 * time.Millisecond)
 	}
 
 	log.Infof("Local network workspace: %s", workspace)
 	log.Infof("Running %d nodes", len(n.Nodes))
 
-	time.Sleep(20 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	return nil
 }
@@ -163,25 +165,26 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 	//TODO: is this really required ?
 	//nolint:gosec
 	cmd := exec.Command(name, arg...)
+	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
 
-	// Redirect both STDOUT and STDERR to separate files
-	if len(nodeDir) > 0 {
-		id := filepath.Base(name)
-		stdOutFile, err := os.Create(nodeDir + "/" + id + "_stdout")
-		if err != nil {
-			log.Panic(err)
-		}
+	// // Redirect both STDOUT and STDERR to separate files
+	// if len(nodeDir) > 0 {
+	// 	id := filepath.Base(name)
+	// 	stdOutFile, err := os.Create(nodeDir + "/" + id + "_stdout")
+	// 	if err != nil {
+	// 		log.Panic(err)
+	// 	}
 
-		var stdErrFile *os.File
-		stdErrFile, err = os.Create(nodeDir + "/" + id + "_stderr")
-		if err != nil {
-			log.Panic(err)
-		}
+	// 	var stdErrFile *os.File
+	// 	stdErrFile, err = os.Create(nodeDir + "/" + id + "_stderr")
+	// 	if err != nil {
+	// 		log.Panic(err)
+	// 	}
 
-		cmd.Stdout = stdOutFile
-		cmd.Stderr = stdErrFile
-	}
+	// 	cmd.Stdout = stdOutFile
+	// 	cmd.Stderr = stdErrFile
+	// }
 
 	if err := cmd.Start(); err != nil {
 		return err

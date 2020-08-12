@@ -1,17 +1,16 @@
-package processing_test
+package protocol_test
 
 import (
 	"bytes"
 	"fmt"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestProcess(t *testing.T) {
-	g := processing.NewGossip(protocol.DevNet)
+	g := protocol.NewGossip(protocol.DevNet)
 
 	m := bytes.NewBufferString("pippo")
 
@@ -19,7 +18,7 @@ func TestProcess(t *testing.T) {
 		assert.FailNow(t, "error in processing buffer")
 	}
 
-	length, err := processing.ReadFrame(m)
+	length, err := protocol.ReadFrame(m)
 	if !assert.NoError(t, err) {
 		assert.FailNow(t, "error in reading frame")
 	}
@@ -39,7 +38,7 @@ func TestUnpackLength(t *testing.T) {
 	test := "pippo"
 	b := bytes.NewBufferString(test)
 
-	g := processing.NewGossip(protocol.DevNet)
+	g := protocol.NewGossip(protocol.DevNet)
 	assert.NoError(t, g.Process(b))
 
 	length, err := g.UnpackLength(b)

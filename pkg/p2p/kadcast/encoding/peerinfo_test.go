@@ -1,4 +1,4 @@
-package kadcast
+package encoding
 
 import (
 	"bytes"
@@ -9,27 +9,27 @@ import (
 
 func TestPeerMarshaling(t *testing.T) {
 
-	ip := [4]byte{127, 0, 0, 1}
-	id := [16]byte{}
-
+	var id [16]byte
 	seed, _ := crypto.RandEntropy(16)
 	copy(id[:], seed[:])
 
-	p := Peer{ip, 1234, id}
+	p := PeerInfo{
+		[4]byte{127, 0, 0, 1},
+		1234,
+		id}
 
-	buf := marshalPeer(&p)
-	p2 := unmarshalPeer(buf)
-
-	if !bytes.Equal(p2.id[:], p.id[:]) {
-		t.Error("ids not equal")
+	var buf bytes.Buffer
+	if err := p.MarshalBinary(&buf); err != nil {
+		t.Error(err)
 	}
 
-	if !bytes.Equal(p2.ip[:], p.ip[:]) {
-		t.Error("ip addresses not equal")
+	var p2 PeerInfo
+	if err := p2.UnmarshalBinary(&buf); err != nil {
+		t.Error(err)
 	}
 
-	if p2.port != p.port {
-		t.Error("port numbers not equal")
+	if !p.IsEqual(p2) {
+		t.Error("marshal/unmarshal peer tuple failed")
 	}
 }
 
@@ -39,14 +39,14 @@ func TestPeerIsEqual(t *testing.T) {
 	id := [16]byte{1, 2, 3, 4}
 	var port uint16 = 9876
 
-	p1 := Peer{ip, port, id}
-	p2 := Peer{ip, port, id}
+	p1 := PeerInfo{ip, port, id}
+	p2 := PeerInfo{ip, port, id}
 
 	if !p1.IsEqual(p2) {
 		t.Error("expect they are equal")
 	}
 
-	p2.port = 0
+	p2.Port = 0
 	if p1.IsEqual(p2) {
 		t.Error("expect they are not equal")
 	}

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -45,7 +44,7 @@ func (p *Reader) Handshake() error {
 	return p.readVerAck()
 }
 
-func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
+func (p *Connection) writeLocalMsgVersion(g *protocol.Gossip) error {
 	message, e := p.createVersionBuffer()
 	if e != nil {
 		return e
@@ -64,7 +63,7 @@ func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
 }
 
 func (p *Connection) readRemoteMsgVersion() error {
-	msgBytes, err := p.ReadMessage()
+	msgBytes, err := p.gossip.ReadMessage(p.Conn)
 	if err != nil {
 		return err
 	}
@@ -98,7 +97,7 @@ func (p *Connection) readRemoteMsgVersion() error {
 }
 
 func (p *Connection) readVerAck() error {
-	msgBytes, err := p.ReadMessage()
+	msgBytes, err := p.gossip.ReadMessage(p.Conn)
 	if err != nil {
 		return err
 	}
@@ -126,7 +125,7 @@ func (p *Connection) readVerAck() error {
 	return nil
 }
 
-func (p *Connection) writeVerAck(g *processing.Gossip) error {
+func (p *Connection) writeVerAck(g *protocol.Gossip) error {
 	verAckMsg := new(bytes.Buffer)
 	if err := topics.Prepend(verAckMsg, topics.VerAck); err != nil {
 		return err

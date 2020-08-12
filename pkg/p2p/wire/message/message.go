@@ -20,6 +20,7 @@ type Message interface {
 	Payload() interface{}
 	Equal(Message) bool
 	Id() []byte
+	Header() []byte
 }
 
 // Serializable allows to set a payload
@@ -47,6 +48,8 @@ type simple struct {
 	payload interface{}
 	// cached marshaled form with Category
 	marshaled *bytes.Buffer
+	// header used as metadata (e.g kadcast.height)
+	header []byte
 }
 
 func (m simple) String() string {
@@ -69,6 +72,10 @@ func (m simple) String() string {
 	_, _ = sb.WriteString("\n")
 	return sb.String()
 
+}
+
+func (m simple) Header() []byte {
+	return m.header
 }
 
 // Id is the Id the Message
@@ -103,7 +110,12 @@ func (m simple) Equal(other Message) bool {
 
 // New creates a new Message
 func New(t topics.Topic, payload interface{}) Message {
-	return &simple{category: t, payload: payload}
+	return &simple{category: t, payload: payload, header: nil}
+}
+
+// NewWithHeader creates a new Message with non-nil header
+func NewWithHeader(t topics.Topic, payload interface{}, header []byte) Message {
+	return &simple{category: t, payload: payload, header: header}
 }
 
 //func newMsg(t topics.Topic) *simple {

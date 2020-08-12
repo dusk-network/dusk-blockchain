@@ -6,7 +6,6 @@ import (
 	"time"
 
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -32,7 +31,7 @@ func TestHandshake(t *testing.T) {
 	}()
 
 	time.Sleep(500 * time.Millisecond)
-	g := processing.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip(protocol.TestNet)
 	pw := NewWriter(client, g, eb)
 	defer func() {
 		_ = pw.Conn.Close()

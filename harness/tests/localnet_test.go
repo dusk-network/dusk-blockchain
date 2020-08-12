@@ -16,14 +16,16 @@ import (
 )
 
 var (
-	localNetSizeStr = os.Getenv("NETWORK_SIZE")
+	localNetSizeStr = os.Getenv("DUSK_NETWORK_SIZE")
 	localNetSize    = 10
 )
 
 var localNet engine.Network
 var workspace string
 
-// TestMain sets up a temporarily local network of N nodes running from genesis block
+// TestMain sets up a temporarily local network of N nodes running from genesis
+// block
+//
 // The network should be fully functioning and ready to accept messaging
 func TestMain(m *testing.M) {
 
@@ -38,14 +40,21 @@ func TestMain(m *testing.M) {
 	if localNetSizeStr != "" {
 		currentLocalNetSize, currentErr := strconv.Atoi(localNetSizeStr)
 		if currentErr == nil {
-			fmt.Println("Going to setup NETWORK_SIZE with custom value", "currentLocalNetSize", currentLocalNetSize)
+			fmt.Println("Going to setup DUSK_NETWORK_SIZE with custom value", "currentLocalNetSize", currentLocalNetSize)
 			localNetSize = currentLocalNetSize
 		}
 	}
 
+	profileID := os.Getenv("DUSK_PROFILE")
+	if len(profileID) == 0 {
+		profileID = "default"
+	}
+
+	log.Infof("Selected profile: %s", profileID)
+
 	// Create a network of N nodes
 	for i := 0; i < localNetSize; i++ {
-		node := engine.NewDuskNode(9500+i, 9000+i, "default")
+		node := engine.NewDuskNode(9500+i, 9000+i, profileID)
 		localNet.Nodes = append(localNet.Nodes, node)
 	}
 
@@ -76,14 +85,17 @@ func TestMain(m *testing.M) {
 }
 
 // TestSendBidTransaction ensures that a valid bid transaction has been accepted
-// by all nodes in the network within a particular time frame and within
-// the same block
+// by all nodes in the network within a particular time frame and within the
+// same block
 func TestSendBidTransaction(t *testing.T) {
 
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 
-	t.Log("Send request to all nodes to loadWallet")
-	for i := 0; i < localNetSize; i++ {
+	// Half of the network is supposed to run the consensus, the rest should be
+	// light nodes
+	t.Log("Send request to half of the network nodes to loadWallet")
+	halfNetwork := localNetSize / 2
+	for i := 0; i < halfNetwork; i++ {
 		_, err := localNet.LoadWalletCmd(uint(i), walletsPass)
 		if err != nil {
 			t.Fatal(err.Error())
@@ -121,8 +133,8 @@ func TestSendBidTransaction(t *testing.T) {
 	}
 }
 
-// TestCatchup tests that a node which falls behind during consensus
-// will properly catch up and re-join the consensus execution trace.
+// TestCatchup tests that a node which falls behind during consensus will
+// properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
 	t.Skip()
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
@@ -155,4 +167,52 @@ func TestCatchup(t *testing.T) {
 
 	t.Log("Ensure the new node has been synced up")
 	localNet.WaitUntil(t, uint(ind), 5, 2*time.Minute, 5*time.Second)
+}
+
+// TestMeasureNetworkTPS is a placeholder for a simple test definition on top of
+// which network TPS metric should be collected
+func TestMeasureNetworkTPS(t *testing.T) {
+
+	// Disabled by default not to messup the CI
+	_, presented := os.LookupEnv("DUSK_ENABLE_TPS_TEST")
+	if !presented {
+		t.SkipNow()
+	}
+
+	log.Info("60sec Wait for network nodes to complete bootstrapping procedure")
+	time.Sleep(60 * time.Second)
+
+	walletsPass := os.Getenv("DUSK_WALLET_PASS")
+	consensusNodes := os.Getenv("DUSK_CONSENSUS_NODES")
+	if len(consensusNodes) == 0 {
+		consensusNodes = "10"
+	}
+
+	nodesNum, err := strconv.Atoi(consensusNodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//Send to all consensus-running nodes a request for wallet loading. This
+	//will trigger consensus as well
+	for i := 0; i < nodesNum; i++ {
+		_, _ = localNet.LoadWalletCmd(uint(i), walletsPass)
+	}
+
+	log.Info("10sec Wait for consensus-nodes to kick off consensus")
+	time.Sleep(10 * time.Second)
+
+	// Send to all consensus-running nodes a bid tx
+	for i := 0; i < nodesNum; i++ {
+		txidBytes, err := localNet.SendBidCmd(uint(i), 10, 10)
+		if err != nil {
+			continue
+		}
+		txID := hex.EncodeToString(txidBytes)
+		t.Logf("Bid transaction id: %s", txID)
+
+		time.Sleep(3 * time.Second)
+	}
+
+	time.Sleep(20 * time.Second)
 }

@@ -8,7 +8,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -125,7 +124,7 @@ type SimpleStreamer struct {
 	seenTopics []topics.Topic
 	*bufio.Reader
 	*bufio.Writer
-	gossip *processing.Gossip
+	gossip *protocol.Gossip
 }
 
 // NewSimpleStreamer returns an initialized SimpleStreamer.
@@ -135,7 +134,7 @@ func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
 		seenTopics: make([]topics.Topic, 0),
 		Reader:     bufio.NewReader(r),
 		Writer:     bufio.NewWriter(w),
-		gossip:     processing.NewGossip(magic),
+		gossip:     protocol.NewGossip(magic),
 	}
 }
 
