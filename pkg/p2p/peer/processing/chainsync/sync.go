@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -131,8 +133,8 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 
 func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
 	req := rpcbus.NewRequest(nil)
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err := s.rpcBus.Call(topics.GetLastBlock, req, 5*time.Second)
+	timeoutGetLastBlock := time.Duration(config.Get().Timeout.TimeoutGetLastBlock) * time.Second
+	resp, err := s.rpcBus.Call(topics.GetLastBlock, req, timeoutGetLastBlock)
 	if err != nil {
 		log.
 			WithError(err).

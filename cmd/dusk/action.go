@@ -50,6 +50,20 @@ func action(ctx *cli.Context) error {
 	if err != nil {
 		log.WithError(err).Fatal("Could not load config ")
 	}
+	log.WithFields(logrus.Fields{
+		"config.timeout.timeoutsendbidtx":            cfg.Get().Timeout.TimeoutSendBidTX,
+		"config.timeout.timeoutgetlastcommittee":     cfg.Get().Timeout.TimeoutGetLastCommittee,
+		"config.timeout.timeoutgetlastcertificate":   cfg.Get().Timeout.TimeoutGetLastCertificate,
+		"config.timeout.timeoutgetmempooltxsbysize":  cfg.Get().Timeout.TimeoutGetMempoolTXsBySize,
+		"config.timeout.timeoutgetlastblock":         cfg.Get().Timeout.TimeoutGetLastBlock,
+		"config.timeout.timeoutgetcandidate":         cfg.Get().Timeout.TimeoutGetCandidate,
+		"config.timeout.timeoutclearwalletdatabase":  cfg.Get().Timeout.TimeoutClearWalletDatabase,
+		"config.timeout.timeoutverifycandidateblock": cfg.Get().Timeout.TimeoutVerifyCandidateBlock,
+		"config.timeout.timeoutsendstaketx":          cfg.Get().Timeout.TimeoutSendStakeTX,
+		"config.timeout.timeoutgetmempooltxs":        cfg.Get().Timeout.TimeoutGetMempoolTXs,
+		"config.timeout.timeoutgetroundresults":      cfg.Get().Timeout.TimeoutGetRoundResults,
+	}).
+		Info("Timeout config...")
 
 	port := cfg.Get().Network.Port
 	rand.Seed(time.Now().UnixNano())
