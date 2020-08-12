@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -19,6 +21,15 @@ import (
 // Test that the maintainer will properly send new stake transactions, when
 // one is about to expire, or if none exist.
 func TestMaintainStakes(t *testing.T) {
+
+	//setup viper timeout
+	cwd, err := os.Getwd()
+	require.Nil(t, err)
+
+	r, err := cfg.LoadFromFile(cwd + "/../../../../dusk.toml")
+	require.Nil(t, err)
+	cfg.Mock(&r)
+
 	bus, rb := setupMaintainerTest(t)
 	defer func() {
 		_ = os.Remove("wallet.dat")
