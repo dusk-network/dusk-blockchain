@@ -9,6 +9,9 @@ require (
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/go-chi/render v1.0.1
 	github.com/golangci/golangci-lint v1.24.0 // indirect
+	github.com/google/gofountain v0.0.0-20160820054803-4928733085e9
+	github.com/gorilla/mux v1.7.4
+	github.com/gorilla/rpc v1.2.0
 	github.com/gorilla/websocket v1.4.0
 	github.com/graphql-go/graphql v0.7.8
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
