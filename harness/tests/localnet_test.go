@@ -136,7 +136,7 @@ func TestSendBidTransaction(t *testing.T) {
 // TestCatchup tests that a node which falls behind during consensus will
 // properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
-
+	t.Skip()
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 
 	t.Log("Send request to all nodes to loadWallet. This will start consensus")
