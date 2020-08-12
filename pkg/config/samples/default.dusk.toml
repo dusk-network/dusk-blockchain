@@ -5,6 +5,20 @@
 network = "testnet"
 # walletonly will prevent the node from starting consensus components when the wallet is loaded
 walletonly = false
+# configure callback listeners
+safecallbacklistener = "true"
+# Timeout cfg for rpcBus calls
+timeoutsendbidtx = 5
+timeoutgetlastcommittee = 5
+timeoutgetlastcertificate = 5
+timeoutgetmempooltxsbysize = 4
+timeoutgetlastblock = 5
+timeoutgetcandidate = 5
+timeoutclearwalletdatabase = 0
+timeoutverifycandidateblock = 5
+timeoutsendstaketx = 5
+timeoutgetmempooltxs = 3
+timeoutgetroundresults = 5
 
 # logger configs
 [logger]

@@ -2,8 +2,9 @@ package responding
 
 import (
 	"bytes"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"

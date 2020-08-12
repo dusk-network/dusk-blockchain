@@ -2,8 +2,9 @@ package responding
 
 import (
 	"bytes"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	log "github.com/sirupsen/logrus"
 

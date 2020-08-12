@@ -86,7 +86,7 @@ init_dusk_func() {
   network = "testnet"
   walletonly = "false"
   safecallbacklistener = "true"
-  # Timeout cfg for rpcBus
+  # Timeout cfg for rpcBus calls
   timeoutsendbidtx = 5
   timeoutgetlastcommittee = 5
   timeoutgetlastcertificate = 5

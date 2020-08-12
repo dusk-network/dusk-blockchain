@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	txs "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
