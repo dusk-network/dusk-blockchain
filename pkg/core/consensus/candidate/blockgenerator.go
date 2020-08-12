@@ -104,7 +104,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 		WithField("round", sev.State().Round).
 		WithField("step", sev.State().Step)
 
-	timeoutGetLastCommittee := time.Duration(config.Get().General.TimeoutGetLastCommittee) * time.Second
+	timeoutGetLastCommittee := time.Duration(config.Get().Timeout.TimeoutGetLastCommittee) * time.Second
 	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), timeoutGetLastCommittee)
 	if err != nil {
 		lg.
@@ -134,7 +134,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	}
 
 	// Create candidate message
-	timeoutGetLastCertificate := time.Duration(config.Get().General.TimeoutGetLastCertificate) * time.Second
+	timeoutGetLastCertificate := time.Duration(config.Get().Timeout.TimeoutGetLastCertificate) * time.Second
 	resp, err = bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), timeoutGetLastCertificate)
 	if err != nil {
 		lg.
@@ -225,7 +225,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 			return nil, err
 		}
 
-		timeoutGetMempoolTXsBySize := time.Duration(config.Get().General.TimeoutGetMempoolTXsBySize) * time.Second
+		timeoutGetMempoolTXsBySize := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXsBySize) * time.Second
 		resp, err := bg.rpcBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), timeoutGetMempoolTXsBySize)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the chain.

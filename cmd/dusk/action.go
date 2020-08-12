@@ -51,17 +51,17 @@ func action(ctx *cli.Context) error {
 		log.WithError(err).Fatal("Could not load config ")
 	}
 	log.WithFields(logrus.Fields{
-		"config.general.timeoutsendbidtx":            cfg.Get().General.TimeoutSendBidTX,
-		"config.general.timeoutgetlastcommittee":     cfg.Get().General.TimeoutGetLastCommittee,
-		"config.general.timeoutgetlastcertificate":   cfg.Get().General.TimeoutGetLastCertificate,
-		"config.general.timeoutgetmempooltxsbysize":  cfg.Get().General.TimeoutGetMempoolTXsBySize,
-		"config.general.timeoutgetlastblock":         cfg.Get().General.TimeoutGetLastBlock,
-		"config.general.timeoutgetcandidate":         cfg.Get().General.TimeoutGetCandidate,
-		"config.general.timeoutclearwalletdatabase":  cfg.Get().General.TimeoutClearWalletDatabase,
-		"config.general.timeoutverifycandidateblock": cfg.Get().General.TimeoutVerifyCandidateBlock,
-		"config.general.timeoutsendstaketx":          cfg.Get().General.TimeoutSendStakeTX,
-		"config.general.timeoutgetmempooltxs":        cfg.Get().General.TimeoutGetMempoolTXs,
-		"config.general.timeoutgetroundresults":      cfg.Get().General.TimeoutGetRoundResults,
+		"config.general.timeoutsendbidtx":            cfg.Get().Timeout.TimeoutSendBidTX,
+		"config.general.timeoutgetlastcommittee":     cfg.Get().Timeout.TimeoutGetLastCommittee,
+		"config.general.timeoutgetlastcertificate":   cfg.Get().Timeout.TimeoutGetLastCertificate,
+		"config.general.timeoutgetmempooltxsbysize":  cfg.Get().Timeout.TimeoutGetMempoolTXsBySize,
+		"config.general.timeoutgetlastblock":         cfg.Get().Timeout.TimeoutGetLastBlock,
+		"config.general.timeoutgetcandidate":         cfg.Get().Timeout.TimeoutGetCandidate,
+		"config.general.timeoutclearwalletdatabase":  cfg.Get().Timeout.TimeoutClearWalletDatabase,
+		"config.general.timeoutverifycandidateblock": cfg.Get().Timeout.TimeoutVerifyCandidateBlock,
+		"config.general.timeoutsendstaketx":          cfg.Get().Timeout.TimeoutSendStakeTX,
+		"config.general.timeoutgetmempooltxs":        cfg.Get().Timeout.TimeoutGetMempoolTXs,
+		"config.general.timeoutgetroundresults":      cfg.Get().Timeout.TimeoutGetRoundResults,
 	}).
 		Info("Timeout config...")
 

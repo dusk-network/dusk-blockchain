@@ -46,6 +46,7 @@ type Registry struct {
 
 	// All configuration groups
 	General   generalConfiguration
+	Timeout   timeoutConfiguration
 	Database  databaseConfiguration
 	Wallet    walletConfiguration
 	Network   networkConfiguration

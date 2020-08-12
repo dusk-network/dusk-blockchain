@@ -30,7 +30,7 @@ func LaunchConsensus(ctx context.Context, eventBroker *eventbus.EventBus, rpcBus
 	f.StartConsensus()
 
 	// If we are on genesis, we should kickstart the consensus
-	timeoutGetLastBlock := time.Duration(config.Get().General.TimeoutGetLastBlock) * time.Second
+	timeoutGetLastBlock := time.Duration(config.Get().Timeout.TimeoutGetLastBlock) * time.Second
 	resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.NewRequest(bytes.Buffer{}), timeoutGetLastBlock)
 	if err != nil {
 		log.Panic(err)

@@ -44,7 +44,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			_, _ = payload.Write(txidBytes)
 		}
 
-		timeoutGetMempoolTXs := time.Duration(config.Get().General.TimeoutGetMempoolTXs) * time.Second
+		timeoutGetMempoolTXs := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXs) * time.Second
 		resp, err := t.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(payload), timeoutGetMempoolTXs)
 		if err != nil {
 			return "", err

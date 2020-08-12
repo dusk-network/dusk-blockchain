@@ -133,7 +133,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 
 func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
 	req := rpcbus.NewRequest(nil)
-	timeoutGetLastBlock := time.Duration(config.Get().General.TimeoutGetLastBlock) * time.Second
+	timeoutGetLastBlock := time.Duration(config.Get().Timeout.TimeoutGetLastBlock) * time.Second
 	resp, err := s.rpcBus.Call(topics.GetLastBlock, req, timeoutGetLastBlock)
 	if err != nil {
 		log.

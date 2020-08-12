@@ -24,7 +24,7 @@ func NewCandidateBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer
 
 // ProvideCandidate for a given (m *bytes.Buffer)
 func (c *CandidateBroker) ProvideCandidate(m *bytes.Buffer) error {
-	timeoutGetCandidate := time.Duration(config.Get().General.TimeoutGetCandidate) * time.Second
+	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
 	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*m), timeoutGetCandidate)
 	if err != nil {
 		lg.

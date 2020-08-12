@@ -120,7 +120,7 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.ContractCall
 
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write(txID)
-	timeoutGetMempoolTXs := time.Duration(config.Get().General.TimeoutGetMempoolTXs) * time.Second
+	timeoutGetMempoolTXs := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXs) * time.Second
 	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), timeoutGetMempoolTXs)
 	if err != nil {
 		return nil, err
