@@ -128,6 +128,8 @@ func (s *roundStore) resume(id uint32) bool {
 
 // Dispatch an event to listeners for the designated Topic.
 func (s *roundStore) Dispatch(m message.Message) []error {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	var errorList []error
 	subscribers := s.createSubscriberQueue(m.Category())
 	lg.WithFields(log.Fields{
@@ -388,7 +390,7 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 				"round":             hdr.Round,
 				"step":              hdr.Step,
 				"coordinator_round": c.Round(),
-				"coordinator_step":  c.step,
+				"coordinator_step":  c.Step(),
 			}).
 			Debugln("discarding obsolete event")
 		return nil
@@ -399,7 +401,7 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 				"round":             hdr.Round,
 				"step":              hdr.Step,
 				"coordinator_round": c.Round(),
-				"coordinator_step":  c.step,
+				"coordinator_step":  c.Step(),
 			}).
 			Debugln("storing future event")
 
