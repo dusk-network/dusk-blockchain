@@ -24,7 +24,8 @@ func TestStopTimerGoroutine(t *testing.T) {
 	msg := message.New(topics.AcceptedBlock, message.SafeBuffer{})
 	// Decrement to 0. This should stop the running `listenForTimer` goroutine
 	// that's related to the current sync session.
-	bus.Publish(topics.AcceptedBlock, msg)
+	errList := bus.Publish(topics.AcceptedBlock, msg)
+	assert.Empty(t, errList)
 
 	// Set syncTime back to original value, so we can easily check the effects of the previous timer
 	syncTime = 30 * time.Second

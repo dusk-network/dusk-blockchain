@@ -6,6 +6,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
 	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -259,7 +261,9 @@ func (c *Chain) beginAccepting(blk *block.Block) bool {
 
 	// If we are more than one block behind, stop the consensus
 	lg.Debug("topics.StopConsensus")
-	c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
+	errList := c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
+	diagnostics.LogPublishErrors("chain/chain.go, topics.StopConsensus", errList)
+
 	return true
 }
 
@@ -374,7 +378,8 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	l.Trace("notifying internally")
 
 	msg := message.New(topics.AcceptedBlock, blk)
-	c.eventBus.Publish(topics.AcceptedBlock, msg)
+	errList := c.eventBus.Publish(topics.AcceptedBlock, msg)
+	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
 
 	l.Trace("procedure ended")
 	return nil
@@ -391,7 +396,9 @@ func (c *Chain) sendRoundUpdate(ru consensus.RoundUpdate) error {
 		Debug("sendRoundUpdate, topics.RoundUpdate")
 
 	msg := message.New(topics.RoundUpdate, ru)
-	c.eventBus.Publish(topics.RoundUpdate, msg)
+	errList := c.eventBus.Publish(topics.RoundUpdate, msg)
+	diagnostics.LogPublishErrors("chain/chain.go, topics.RoundUpdate", errList)
+
 	return nil
 }
 
@@ -445,7 +452,9 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	}
 
 	m := message.New(topics.Inv, *buf)
-	c.eventBus.Publish(topics.Gossip, m)
+	errList := c.eventBus.Publish(topics.Gossip, m)
+	diagnostics.LogPublishErrors("chain/chain.go, topics.Gossip, topics.Inv", errList)
+
 	return nil
 }
 
@@ -458,8 +467,8 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	// Fetch new intermediate block and corresponding certificate
 	//TODO: start measuring how long this takes in order to be able to see if this timeout is good or not
 
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), 5*time.Second) //20 is tmp value for further checks
+	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
+	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), timeoutGetCandidate) //20 is tmp value for further checks
 	if err != nil {
 		// If the we can't get the block, we will fall
 		// back and catch up later.
@@ -493,7 +502,8 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 
 	// Notify mempool
 	msg := message.New(topics.IntermediateBlock, *cm.Block)
-	c.eventBus.Publish(topics.IntermediateBlock, msg)
+	errList := c.eventBus.Publish(topics.IntermediateBlock, msg)
+	diagnostics.LogPublishErrors("chain/chain.go, topics.IntermediateBlock", errList)
 
 	// propagate round update
 	ru := c.getRoundUpdate()
@@ -541,7 +551,9 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 		log.Panic(err)
 	}
 	msg := message.New(topics.GetRoundResults, *buf)
-	c.eventBus.Publish(topics.Gossip, msg)
+	errList := c.eventBus.Publish(topics.Gossip, msg)
+	diagnostics.LogPublishErrors("chain/chain.go, topics.Gossip, topics.GetRoundResults", errList)
+
 	// We wait 5 seconds for a response. We time out otherwise and
 	// attempt catching up later.
 	timer := time.NewTimer(5 * time.Second)
@@ -663,7 +675,8 @@ func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.G
 
 	// Halt consensus
 	msg := message.New(topics.StopConsensus, nil)
-	c.eventBus.Publish(topics.StopConsensus, msg)
+	errList := c.eventBus.Publish(topics.StopConsensus, msg)
+	diagnostics.LogPublishErrors("chain/chain.go, topics.StopConsensus", errList)
 
 	// Remove EVERYTHING from the database. This includes the genesis
 	// block, so we need to add it afterwards.
@@ -693,8 +706,8 @@ func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.G
 	}
 
 	// Clear walletDB
-	//FIXME: Add option to configure rpcBus timeout #614
-	if _, err := c.rpcBus.Call(topics.ClearWalletDatabase, rpcbus.NewRequest(bytes.Buffer{}), 0*time.Second); err != nil {
+	timeoutClearWalletDatabase := time.Duration(config.Get().Timeout.TimeoutClearWalletDatabase) * time.Second
+	if _, err := c.rpcBus.Call(topics.ClearWalletDatabase, rpcbus.NewRequest(bytes.Buffer{}), timeoutClearWalletDatabase); err != nil {
 		log.Panic(err)
 	}
 

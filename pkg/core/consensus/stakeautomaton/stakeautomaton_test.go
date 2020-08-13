@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -19,6 +21,15 @@ import (
 // Test that the maintainer will properly send new stake transactions, when
 // one is about to expire, or if none exist.
 func TestMaintainStakes(t *testing.T) {
+
+	//setup viper timeout
+	cwd, err := os.Getwd()
+	require.Nil(t, err)
+
+	r, err := cfg.LoadFromFile(cwd + "/../../../../dusk.toml")
+	require.Nil(t, err)
+	cfg.Mock(&r)
+
 	bus, rb := setupMaintainerTest(t)
 	defer func() {
 		_ = os.Remove("wallet.dat")
@@ -31,7 +42,8 @@ func TestMaintainStakes(t *testing.T) {
 	// Send round update, to start the maintainer.
 	ru := consensus.MockRoundUpdate(1, nil)
 	ruMsg := message.New(topics.RoundUpdate, ru)
-	bus.Publish(topics.RoundUpdate, ruMsg)
+	errList := bus.Publish(topics.RoundUpdate, ruMsg)
+	require.Empty(t, errList)
 
 	// Ensure stake request is sent
 	<-c
@@ -39,7 +51,8 @@ func TestMaintainStakes(t *testing.T) {
 	// Then, send a round update close after. No stake request should be sent
 	ru = consensus.MockRoundUpdate(2, nil)
 	ruMsg = message.New(topics.RoundUpdate, ru)
-	bus.Publish(topics.RoundUpdate, ruMsg)
+	errList = bus.Publish(topics.RoundUpdate, ruMsg)
+	require.Empty(t, errList)
 
 	catchStakeRequest(rb, c)
 
@@ -53,7 +66,8 @@ func TestMaintainStakes(t *testing.T) {
 	// Send another round update that is within the 'offset', to trigger sending a new tx
 	ru = consensus.MockRoundUpdate(950, nil)
 	ruMsg = message.New(topics.RoundUpdate, ru)
-	bus.Publish(topics.RoundUpdate, ruMsg)
+	errList = bus.Publish(topics.RoundUpdate, ruMsg)
+	require.Empty(t, errList)
 
 	// Ensure stake request is sent
 	<-c

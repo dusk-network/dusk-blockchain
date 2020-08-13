@@ -5,6 +5,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -28,8 +30,8 @@ func LaunchConsensus(ctx context.Context, eventBroker *eventbus.EventBus, rpcBus
 	f.StartConsensus()
 
 	// If we are on genesis, we should kickstart the consensus
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	timeoutGetLastBlock := time.Duration(config.Get().Timeout.TimeoutGetLastBlock) * time.Second
+	resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.NewRequest(bytes.Buffer{}), timeoutGetLastBlock)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -37,6 +39,8 @@ func LaunchConsensus(ctx context.Context, eventBroker *eventbus.EventBus, rpcBus
 
 	if blk.Header.Height == 0 {
 		msg := message.New(topics.Initialization, bytes.Buffer{})
-		eventBroker.Publish(topics.Initialization, msg)
+		errList := eventBroker.Publish(topics.Initialization, msg)
+		diagnostics.LogPublishErrors("initiator/initiator.go, LaunchConsensus, topics.Initialization", errList)
+
 	}
 }

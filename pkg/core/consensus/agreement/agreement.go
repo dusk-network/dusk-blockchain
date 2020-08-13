@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
@@ -114,7 +115,8 @@ func (a *agreement) sendCertificate(ag message.Agreement) {
 	}
 	cert := message.NewCertificate(ag, keys)
 	msg := message.New(topics.Certificate, cert)
-	a.publisher.Publish(topics.Certificate, msg)
+	errList := a.publisher.Publish(topics.Certificate, msg)
+	diagnostics.LogPublishErrors("consensus/agreement.go, sendCertificate, topics.Certificate", errList)
 }
 
 // Finalize the agreement component, by pausing event streaming, and shutting down

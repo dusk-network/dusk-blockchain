@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -508,7 +509,8 @@ func (c *Coordinator) Gossip(msg message.Message, id uint32) error {
 	serialized := message.New(msg.Category(), buf)
 
 	// gossip away
-	c.eventBus.Publish(topics.Gossip, serialized)
+	errList := c.eventBus.Publish(topics.Gossip, serialized)
+	diagnostics.LogPublishErrors("consensus/round.go, Coordinator, topics.Gossip", errList)
 	return nil
 }
 
@@ -525,8 +527,8 @@ func (c *Coordinator) SendInternally(topic topics.Topic, msg message.Message, id
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}
-
-	c.eventBus.Publish(topic, msg)
+	errList := c.eventBus.Publish(topic, msg)
+	diagnostics.LogPublishErrors("consensus/round.go, Coordinator, SendInternally", errList)
 	return nil
 }
 

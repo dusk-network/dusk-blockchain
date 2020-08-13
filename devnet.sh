@@ -87,6 +87,20 @@ init_dusk_func() {
   walletonly = "false"
   safecallbacklistener = "true"
 
+# Timeout cfg for rpcBus calls
+[timeout]
+  timeoutsendbidtx = 5
+  timeoutgetlastcommittee = 5
+  timeoutgetlastcertificate = 5
+  timeoutgetmempooltxsbysize = 4
+  timeoutgetlastblock = 5
+  timeoutgetcandidate = 5
+  timeoutclearwalletdatabase = 0
+  timeoutverifycandidateblock = 5
+  timeoutsendstaketx = 5
+  timeoutgetmempooltxs = 3
+  timeoutgetroundresults = 5
+
 [genesis]
   legacy = true
 

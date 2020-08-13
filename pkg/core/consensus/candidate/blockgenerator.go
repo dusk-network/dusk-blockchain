@@ -104,8 +104,8 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 		WithField("round", sev.State().Round).
 		WithField("step", sev.State().Step)
 
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), 5*time.Second)
+	timeoutGetLastCommittee := time.Duration(config.Get().Timeout.TimeoutGetLastCommittee) * time.Second
+	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), timeoutGetLastCommittee)
 	if err != nil {
 		lg.
 			WithError(err).
@@ -134,8 +134,8 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	}
 
 	// Create candidate message
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err = bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), 5*time.Second)
+	timeoutGetLastCertificate := time.Duration(config.Get().Timeout.TimeoutGetLastCertificate) * time.Second
+	resp, err = bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), timeoutGetLastCertificate)
 	if err != nil {
 		lg.
 			WithError(err).
@@ -225,8 +225,8 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 			return nil, err
 		}
 
-		//FIXME: Add option to configure rpcBus timeout #614
-		resp, err := bg.rpcBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), 4*time.Second)
+		timeoutGetMempoolTXsBySize := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXsBySize) * time.Second
+		resp, err := bg.rpcBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), timeoutGetMempoolTXsBySize)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the chain.
 		if err != nil {

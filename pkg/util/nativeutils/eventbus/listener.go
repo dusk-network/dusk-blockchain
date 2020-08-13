@@ -169,18 +169,21 @@ func (m *multiListener) Add(topic topics.Topic) {
 	m.Set.Add([]byte{byte(topic)})
 }
 
-func (m *multiListener) Forward(topic topics.Topic, msg message.Message) {
+func (m *multiListener) Forward(topic topics.Topic, msg message.Message) (errorList []error) {
 	m.RLock()
 	defer m.RUnlock()
 	if !m.Has([]byte{byte(topic)}) {
-		return
+		return errorList
 	}
 
 	for _, dispatcher := range m.dispatchers {
 		if err := dispatcher.Notify(msg); err != nil {
 			logEB.WithError(err).WithField("type", "multilistener").Warnln("notifying subscriber failed")
+			errorList = append(errorList, err)
 		}
 	}
+
+	return errorList
 }
 
 func (m *multiListener) Store(value Listener) uint32 {

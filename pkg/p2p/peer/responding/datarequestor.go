@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
@@ -118,8 +120,8 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.ContractCall
 
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write(txID)
-	//FIXME: Add option to configure rpcBus timeout #614
-	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
+	timeoutGetMempoolTXs := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXs) * time.Second
+	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), timeoutGetMempoolTXs)
 	if err != nil {
 		return nil, err
 	}
