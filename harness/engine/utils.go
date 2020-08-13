@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -15,8 +16,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/status"
 )
 
 // PublishTopic publishes an event bus topic to the specified node via
@@ -99,6 +102,22 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 	}
 
 	return string(resp.GetKey().PublicKey), nil
+}
+
+// LoadNetworkWallets sends a LoadWallet request to N nodes of the network
+func (n *Network) LoadNetworkWallets(t *testing.T, nodesNum int) {
+
+	walletsPass := os.Getenv("DUSK_WALLET_PASS")
+	t.Logf("Send request to %d nodes to loadWallet", nodesNum)
+	for i := 0; i < nodesNum; i++ {
+		_, err := n.LoadWalletCmd(uint(i), walletsPass)
+		if err != nil {
+			st := status.Convert(err)
+			if st.Message() != "wallet is already loaded" {
+				t.Fatal(err)
+			}
+		}
+	}
 }
 
 // SendBidCmd sends gRPC command SendBid and returns tx hash
@@ -267,4 +286,85 @@ func (n *Network) SendStakeCmd(ind uint, amount, locktime uint64) ([]byte, error
 	}
 
 	return resp.Hash, nil
+}
+
+// GetLastBlockHeight makes an attempt to fetch last block height of a specified node
+func (n *Network) GetLastBlockHeight(ind uint) (uint64, error) {
+
+	// Construct query to fetch block height
+	query := "{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}"
+	var result map[string]map[string][]map[string]map[string]int
+	if err := n.SendQuery(ind, query, &result); err != nil {
+		return 0, err
+	}
+	return uint64(result["data"]["blocks"][0]["header"]["height"]), nil
+}
+
+//IsSynced checks if each node blockchain tip is close to the blockchain tip of node 0.
+// threshold param is the number of blocks the last block can differ
+func (n *Network) IsSynced(threshold uint64) (uint64, error) {
+
+	forks := make(map[uint64][]int)
+	primaryHeight := uint64(0)
+	for nodeID := 0; nodeID < n.Size(); nodeID++ {
+		h, err := n.GetLastBlockHeight(uint(nodeID))
+		if err != nil {
+			logrus.WithField("nodeID", nodeID).WithError(err).Warn("fetch last block height failed")
+			continue
+		}
+
+		if len(forks) == 0 {
+			primaryHeight = h
+			forks[h] = make([]int, 1)
+			forks[h][0] = nodeID
+			continue
+		}
+
+		// Check if this node tip is close to the network tip
+		var nofork bool
+		for tip := range forks {
+			lowerBound := tip - threshold
+			if lowerBound > tip {
+				lowerBound = 0
+			}
+			upperBound := tip + threshold
+
+			if h >= lowerBound && h < upperBound {
+				// Good. Within the range
+				forks[tip] = append(forks[tip], nodeID)
+				nofork = true
+				break
+			}
+		}
+
+		if nofork {
+			continue
+		}
+
+		// Bad. Not in the range
+		// If the difference is higher than the specified threshold, we assume a forking has happened
+		// NB Such situation could be observed also in case of a subset of the network getting stalled
+		forks[h] = make([]int, 1)
+		forks[h][0] = nodeID
+	}
+
+	// If more than 1 forks are found,
+	if len(forks) > 1 {
+		// Trace network status
+		for tip := range forks {
+			logMsg := fmt.Sprintf("Network at round [%d] driven by nodes [", tip)
+			for nodeID := range forks[tip] {
+				logMsg += fmt.Sprintf(" %d,", nodeID)
+			}
+			logMsg += "]"
+			logrus.WithField("process", "monitor").Info(logMsg)
+		}
+		return 0, errors.New("potential network inconsistency recoreded")
+	}
+
+	if len(forks) == 0 {
+		return 0, errors.New("network unreachable")
+	}
+
+	return primaryHeight, nil
 }
