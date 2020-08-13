@@ -94,15 +94,8 @@ func exit(localNet engine.Network, workspace string, code int) {
 // by all nodes in the network within a particular time frame and within
 // the same block
 func TestSendBidTransaction(t *testing.T) {
-	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 
-	t.Log("Send request to all nodes to loadWallet")
-	for i := 0; i < localNet.Size(); i++ {
-		_, err := localNet.LoadWalletCmd(uint(i), walletsPass)
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-	}
+	loadWallets(t, localNet.Size())
 
 	t.Log("Send request to node 0 to generate and process a Bid transaction")
 	txidBytes, err := localNet.SendBidCmd(0, 10, 10)
@@ -146,18 +139,7 @@ func TestSendBidTransaction(t *testing.T) {
 // will properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
 
-	walletsPass := os.Getenv("DUSK_WALLET_PASS")
-
-	t.Log("Send request to all nodes to loadWallet. This will start consensus")
-	for i := 0; i < localNet.Size(); i++ {
-		if _, err := localNet.LoadWalletCmd(uint(i), walletsPass); err != nil {
-			st := status.Convert(err)
-			if st.Message() != "wallet is already loaded" {
-				// Better use of gRPC code 'st.Code()' later
-				log.Fatal(err)
-			}
-		}
-	}
+	loadWallets(t, localNet.Size())
 
 	t.Log("Wait till we are at height 3")
 	localNet.WaitUntil(t, 0, 3, 3*time.Minute, 5*time.Second)
@@ -176,4 +158,54 @@ func TestCatchup(t *testing.T) {
 
 	t.Log("Ensure the new node has been synced up")
 	localNet.WaitUntil(t, uint(ind), 5, 2*time.Minute, 5*time.Second)
+}
+
+func TestSendStakeTransaction(t *testing.T) {
+
+	loadWallets(t, localNet.Size())
+
+	t.Log("Send request to node 1 to generate and process a Bid transaction")
+	txidBytes, err := localNet.SendStakeCmd(1, 10, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	txID := hex.EncodeToString(txidBytes)
+	t.Logf("Stake transaction id: %s", txID)
+
+	t.Log("Ensure all nodes have accepted this transaction at the same height")
+	blockhash := ""
+	for i := 0; i < localNet.Size(); i++ {
+
+		bh := localNet.WaitUntilTx(t, uint(i), txID)
+
+		if len(bh) == 0 {
+			t.Fatal("empty blockhash")
+		}
+
+		if len(blockhash) != 0 && blockhash != bh {
+			// the case where the network has inconsistency and same tx has been
+			// accepted within different blocks
+			t.Fatal("same tx hash has been accepted within different blocks")
+		}
+
+		if i == 0 {
+			blockhash = bh
+		}
+	}
+}
+
+func loadWallets(t *testing.T, nodesNum int) {
+
+	walletsPass := os.Getenv("DUSK_WALLET_PASS")
+	t.Logf("Send request to %d nodes to loadWallet", nodesNum)
+	for i := 0; i < nodesNum; i++ {
+		_, err := localNet.LoadWalletCmd(uint(i), walletsPass)
+		if err != nil {
+			st := status.Convert(err)
+			if st.Message() != "wallet is already loaded" {
+				t.Fatal(err)
+			}
+		}
+	}
 }

@@ -245,3 +245,26 @@ func (n *Network) WaitUntilTx(t *testing.T, ind uint, txID string) string {
 
 	return blockhash
 }
+
+// SendStakeCmd sends gRPC command SendStake and returns tx hash
+func (n *Network) SendStakeCmd(ind uint, amount, locktime uint64) ([]byte, error) {
+	// session has been setup already in the TestMain, so here the client is
+	// returning the permanent connection
+	c := n.grpcClients[n.nodes[ind].Id]
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return nil, err
+	}
+
+	client := pb.NewTransactorClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req := pb.StakeRequest{Amount: amount, Locktime: locktime}
+	resp, err := client.Stake(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Hash, nil
+}
