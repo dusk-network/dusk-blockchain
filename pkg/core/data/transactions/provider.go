@@ -316,6 +316,7 @@ func (p *provider) NewStakeTx(ctx context.Context, pubKeyBLS []byte, expirationH
 	MTxRequest(tr, tx)
 
 	str := new(rusk.StakeTransactionRequest)
+	str.Tx = tr
 	str.BlsKey = make([]byte, len(pubKeyBLS))
 	copy(str.BlsKey, pubKeyBLS)
 	str.ExpirationHeight = expirationHeight

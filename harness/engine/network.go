@@ -152,12 +152,16 @@ func (n *Network) Bootstrap(workspace string) error {
 		if err := n.StartNode(i, node, workspace); err != nil {
 			return err
 		}
+
+		// avoid stressing dusk-seeder
+		time.Sleep(time.Duration(1) * time.Second)
 	}
 
 	log.Infof("Local network workspace: %s", workspace)
 	log.Infof("Running %d nodes", len(n.nodes))
 
-	delay := len(n.nodes)
+	// Allow network nodes to complete their startup procedures
+	delay := 2 * len(n.nodes)
 	if delay > 20 {
 		delay = 20
 	}
