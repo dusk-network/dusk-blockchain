@@ -125,16 +125,16 @@ func (hlp *Helper) NextBatch() []byte {
 
 // Kickstart a Helper without sending any reduction event, and without starting goroutines to
 // intercept RPCBus calls.
-func Kickstart(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int, timeOut time.Duration) (*Helper, []byte) {
-	h := NewHelper(eb, rpcbus, nr, timeOut, false)
+func Kickstart(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) (*Helper, []byte) {
+	h := NewHelper(eb, rpcbus, provisioners, timeOut, false)
 	hash := kickstart(h)
 	return h, hash
 }
 
 // KickstartConcurrent kickstarts a Helper without sending any reduction event, starting
 // goroutines to intercept RPCBus calls.
-func KickstartConcurrent(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int, timeOut time.Duration) (*Helper, []byte) {
-	h := NewHelper(eb, rpcbus, nr, timeOut, true)
+func KickstartConcurrent(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) (*Helper, []byte) {
+	h := NewHelper(eb, rpcbus, provisioners, timeOut, true)
 	hash := kickstart(h)
 	return h, hash
 }
@@ -148,8 +148,8 @@ func kickstart(h *Helper) []byte {
 }
 
 // ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
-func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int, timeOut time.Duration) (*Helper, []byte) {
-	hlp, hash := KickstartConcurrent(eb, rpcbus, nr, timeOut)
+func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) (*Helper, []byte) {
+	hlp, hash := KickstartConcurrent(eb, rpcbus, provisioners, timeOut)
 	hlp.SendBatch(hash)
 	return hlp, hash
 }
