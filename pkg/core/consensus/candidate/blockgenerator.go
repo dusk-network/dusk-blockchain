@@ -77,9 +77,10 @@ func (bg *Generator) Finalize() {}
 
 // ScoreFactory is the PacketFactory implementation to let the signer  scores
 type ScoreFactory struct {
-	sp       message.ScoreProposal
-	prevHash []byte
-	voteHash []byte
+	sp        message.ScoreProposal
+	prevHash  []byte
+	voteHash  []byte
+	voteBlock []byte
 }
 
 // Create a score message by setting the right header. It complies with the
@@ -89,7 +90,7 @@ func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus
 	if hdr.Round != round || hdr.Step != step {
 		lg.Panicf("mismatch of Header round and step in score creation. ScoreProposal has a different Round and Step (%d, %d) than the Coordinator (%d, %d)", hdr.Round, hdr.Step, round, step)
 	}
-	score := message.NewScore(sf.sp, sender, sf.prevHash, sf.voteHash)
+	score := message.NewScore(sf.sp, sender, sf.prevHash, sf.voteHash, sf.voteBlock)
 	return *score
 }
 
@@ -122,7 +123,15 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 		return err
 	}
 
-	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, blk.Header.Hash}
+	blockBytes := new(bytes.Buffer)
+	if err = message.MarshalBlock(blockBytes, blk); err != nil {
+		lg.
+			WithError(err).
+			Error("failed to MarshalBlock")
+		return err
+	}
+
+	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, blk.Header.Hash, blockBytes.Bytes()}
 	score := bg.signer.Compose(scoreFactory)
 	lg.
 		WithField("step", score.State().Step).

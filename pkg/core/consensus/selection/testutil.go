@@ -104,7 +104,7 @@ func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 }
 
 // Spawn 10 score events.
-func (h *Helper) Spawn(hash []byte) []message.Score {
+func (h *Helper) Spawn(hash, block []byte) []message.Score {
 	evs := make([]message.Score, 0, h.scoreToSpawn)
 	for i := 0; i < h.scoreToSpawn; i++ {
 		keys, _ := key.NewRandKeys()
@@ -114,7 +114,7 @@ func (h *Helper) Spawn(hash []byte) []message.Score {
 			PubKeyBLS: keys.BLSPubKeyBytes,
 			BlockHash: hash,
 		}
-		evs = append(evs, message.MockScore(hdr, hash))
+		evs = append(evs, message.MockScore(hdr, hash, block))
 	}
 	return evs
 }
@@ -126,7 +126,7 @@ func (h *Helper) StartSelection() {
 
 // SendBatch generates a batch of score events and sends them to the selector.
 func (h *Helper) SendBatch(hash []byte) {
-	batch := h.Spawn(hash)
+	batch := h.Spawn(hash, hash)
 	var wg sync.WaitGroup
 	// Tell the 'wg' WaitGroup how many threads/goroutines
 	//   that are about to run concurrently.

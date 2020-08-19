@@ -28,8 +28,9 @@ type (
 	// created and it gets forwarded to the other nodes
 	Score struct {
 		ScoreProposal
-		PrevHash []byte
-		VoteHash []byte
+		PrevHash  []byte
+		VoteHash  []byte
+		VoteBlock []byte
 	}
 )
 
@@ -105,11 +106,12 @@ func (e ScoreProposal) String() string {
 }
 
 // NewScore creates a new Score from a proposal
-func NewScore(proposal ScoreProposal, pubkey, prevHash, voteHash []byte) *Score {
+func NewScore(proposal ScoreProposal, pubkey, prevHash, voteHash, voteBlock []byte) *Score {
 	score := &Score{
 		ScoreProposal: proposal,
 		PrevHash:      prevHash,
 		VoteHash:      voteHash,
+		VoteBlock:     voteBlock,
 	}
 	score.ScoreProposal.hdr.PubKeyBLS = pubkey
 	score.ScoreProposal.hdr.BlockHash = voteHash
@@ -123,10 +125,12 @@ func (e Score) Copy() payload.Safe {
 		ScoreProposal: e.ScoreProposal.Copy().(ScoreProposal),
 		PrevHash:      make([]byte, len(e.PrevHash)),
 		VoteHash:      make([]byte, len(e.VoteHash)),
+		VoteBlock:     make([]byte, len(e.VoteBlock)),
 	}
 
 	copy(cpy.PrevHash, e.PrevHash)
 	copy(cpy.VoteHash, e.VoteHash)
+	copy(cpy.VoteBlock, e.VoteBlock)
 	return cpy
 }
 
@@ -150,6 +154,8 @@ func (e Score) String() string {
 	_, _ = sb.WriteString(" prev_hash='")
 	_, _ = sb.WriteString(util.StringifyBytes(e.PrevHash))
 	_, _ = sb.WriteString(" vote_hash='")
+	_, _ = sb.WriteString(util.StringifyBytes(e.VoteHash))
+	_, _ = sb.WriteString(" vote_block='")
 	_, _ = sb.WriteString(util.StringifyBytes(e.VoteHash))
 	return sb.String()
 }
@@ -210,6 +216,11 @@ func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
 		return err
 	}
 
+	sev.VoteBlock = make([]byte, 32)
+	if err := encoding.Read256(r, sev.VoteBlock); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -250,6 +261,11 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 	if err := encoding.Write256(r, sev.VoteHash); err != nil {
 		return err
 	}
+
+	// CandidateBlock
+	if err := encoding.Write256(r, sev.VoteBlock); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -269,12 +285,13 @@ func MockScoreProposal(hdr header.Header) ScoreProposal {
 }
 
 // MockScore mocks a Score and returns it.
-func MockScore(hdr header.Header, hash []byte) Score {
+func MockScore(hdr header.Header, hash, block []byte) Score {
 	prevHash, _ := crypto.RandEntropy(32)
 
 	return Score{
 		ScoreProposal: MockScoreProposal(hdr),
 		PrevHash:      prevHash,
 		VoteHash:      hash,
+		VoteBlock:     block,
 	}
 }

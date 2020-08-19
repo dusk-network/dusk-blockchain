@@ -16,7 +16,9 @@ func TestUnMarshal(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
 	hdr := header.Mock()
 	hdr.BlockHash = hash
-	se := message.MockScore(hdr, hash)
+
+	block, _ := crypto.RandEntropy(32)
+	se := message.MockScore(hdr, hash, block)
 
 	buf := new(bytes.Buffer)
 	assert.NoError(t, message.MarshalScore(buf, se))

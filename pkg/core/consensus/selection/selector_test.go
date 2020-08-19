@@ -57,7 +57,8 @@ func TestMultipleVerification(t *testing.T) {
 
 	// Create some score messages
 	hash, _ := crypto.RandEntropy(32)
-	scores := hlp.Spawn(hash)
+	block, _ := crypto.RandEntropy(32)
+	scores := hlp.Spawn(hash, block)
 
 	// Sort the slice so that the highest scoring message is first
 	sort.Slice(scores, func(i, j int) bool { return bytes.Compare(scores[i].Score, scores[j].Score) == 1 })
@@ -98,7 +99,8 @@ func TestCollectNoGeneration(t *testing.T) {
 
 		// Create some score messages
 		hash, _ := crypto.RandEntropy(32)
-		evs := hlp.Spawn(hash)
+		block, _ := crypto.RandEntropy(32)
+		evs := hlp.Spawn(hash, block)
 
 		hlp.Selector.CollectScoreEvent(evs[0])
 	})

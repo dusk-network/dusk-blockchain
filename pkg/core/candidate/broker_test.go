@@ -45,11 +45,15 @@ func TestValidHashes(t *testing.T) {
 	errList = eb.Publish(topics.Candidate, msg2)
 	assert.Empty(errList)
 
+	blockBytes := new(bytes.Buffer)
+	err := message.MarshalBlock(blockBytes, blk)
+	assert.Nil(err)
+
 	// Stupid channels take a while to send something
 	time.Sleep(1000 * time.Millisecond)
 
 	// Now, add the hash to validHashes
-	score := message.MockScore(hdr, blk.Header.Hash)
+	score := message.MockScore(hdr, blk.Header.Hash, blockBytes.Bytes())
 	vchMsg := message.New(topics.ValidCandidateHash, score)
 	errList = eb.Publish(topics.ValidCandidateHash, vchMsg)
 	assert.Empty(errList)

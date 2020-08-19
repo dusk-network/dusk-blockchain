@@ -12,7 +12,9 @@ import (
 func TestPriority(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
 	hdr := header.Mock()
-	ev := message.MockScore(hdr, hash)
+	blk, _ := crypto.RandEntropy(32)
+
+	ev := message.MockScore(hdr, hash, blk)
 
 	// Comparing the same event should return true
 	handler := NewScoreHandler(nil)
