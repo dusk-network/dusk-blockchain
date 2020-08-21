@@ -5,11 +5,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -114,7 +116,10 @@ func (h *Helper) Spawn(hash []byte) []message.Score {
 			PubKeyBLS: keys.BLSPubKeyBytes,
 			BlockHash: hash,
 		}
-		evs = append(evs, message.MockScore(hdr, hash))
+		genesis := config.DecodeGenesis()
+		cert := block.EmptyCertificate()
+		candidate := message.MakeCandidate(genesis, cert)
+		evs = append(evs, message.MockScore(hdr, candidate))
 	}
 	return evs
 }

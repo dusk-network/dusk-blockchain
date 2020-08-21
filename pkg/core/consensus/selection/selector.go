@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -141,20 +139,7 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 		return err
 	}
 
-	// Tell the candidate broker to allow a candidate block with this
-	// hash through.
-	msg := message.New(topics.Score, score)
-	errList := s.publisher.Publish(topics.ValidCandidateHash, msg)
-	diagnostics.LogPublishErrors("selection/selector.go, CollectScoreEvent, topics.ValidCandidateHash, topics.Score", errList)
-
-	if err := s.signer.Gossip(msg, s.ID()); err != nil {
-		lg.
-			WithError(err).
-			WithField("step", h.Step).
-			WithField("round", h.Round).
-			Error("CollectScoreEvent, failed to gossip")
-		return err
-	}
+	// TODO: score.Candidate.Block sanity
 
 	lg.
 		WithField("step", h.Step).
@@ -162,6 +147,7 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 		WithFields(log.Fields{
 			"new_best": score.Score,
 		}).Debugln("swapping best score")
+
 	s.bestEvent = score
 	return nil
 }
@@ -209,12 +195,20 @@ func (s *Selector) sendBestEvent() error {
 	var bestEvent consensus.InternalPacket
 	s.eventPlayer.Pause(s.scoreID)
 	s.lock.RLock()
-	bestEvent = s.bestEvent
+	bestEvent = s.bestEvent.Copy().(message.Score)
 	s.lock.RUnlock()
 
 	// If we had no best event, we should send an empty hash
 	if bestEvent.(message.Score).IsEmpty() {
 		bestEvent = s.signer.Compose(emptyScoreFactory{})
+	} else {
+		// Publish internally topics.Candidate with bestEvent(highest score candidate block)
+		score := bestEvent.(message.Score)
+		msg := message.New(topics.Candidate, score.Candidate)
+		err := s.signer.SendInternally(topics.Candidate, msg, s.ID())
+		if err != nil {
+			lg.WithError(err).Error("sendBestEvent, failed to SendInternally the Candidate")
+		}
 	}
 
 	msg := message.New(topics.BestScore, bestEvent)
