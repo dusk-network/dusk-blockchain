@@ -77,9 +77,9 @@ func (bg *Generator) Finalize() {}
 
 // ScoreFactory is the PacketFactory implementation to let the signer  scores
 type ScoreFactory struct {
-	sp       message.ScoreProposal
-	prevHash []byte
-	voteHash []byte
+	sp        message.ScoreProposal
+	prevHash  []byte
+	candidate message.Candidate
 }
 
 // Create a score message by setting the right header. It complies with the
@@ -89,7 +89,7 @@ func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus
 	if hdr.Round != round || hdr.Step != step {
 		lg.Panicf("mismatch of Header round and step in score creation. ScoreProposal has a different Round and Step (%d, %d) than the Coordinator (%d, %d)", hdr.Round, hdr.Step, round, step)
 	}
-	score := message.NewScore(sf.sp, sender, sf.prevHash, sf.voteHash)
+	score := message.NewScore(sf.sp, sender, sf.prevHash, sf.candidate)
 	return *score
 }
 
@@ -112,25 +112,14 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 			Error("failed to topics.GetLastCommittee")
 		return err
 	}
-	keys := resp.([][]byte)
 
+	keys := resp.([][]byte)
 	blk, err := bg.Generate(sev, keys)
 	if err != nil {
 		lg.
 			WithError(err).
 			Error("failed to bg.Generate")
 		return err
-	}
-
-	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, blk.Header.Hash}
-	score := bg.signer.Compose(scoreFactory)
-	lg.
-		WithField("step", score.State().Step).
-		WithField("round", score.State().Round).
-		Debugln("sending score")
-	msg := message.New(topics.Score, score)
-	if e := bg.signer.Gossip(msg, bg.ID()); e != nil {
-		return e
 	}
 
 	// Create candidate message
@@ -155,10 +144,23 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	// Since the Candidate message goes straight to the Chain, there is
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
-	lg.WithField("candidate_height", blk.Header.Height).Debugln("sending candidate")
-	candidateMsg := message.MakeCandidate(blk, cert)
-	msg = message.New(topics.Candidate, candidateMsg)
-	return bg.signer.Gossip(msg, bg.ID())
+	candidate := message.MakeCandidate(blk, cert)
+
+	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, candidate}
+	score := bg.signer.Compose(scoreFactory)
+
+	lg.
+		WithField("step", score.State().Step).
+		WithField("round", score.State().Round).
+		Debugln("sending score")
+
+	msg := message.New(topics.Score, score)
+	if err := bg.signer.Gossip(msg, bg.ID()); err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 // Generate a Block
