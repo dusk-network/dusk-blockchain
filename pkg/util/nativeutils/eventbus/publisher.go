@@ -34,7 +34,6 @@ func (bus *EventBus) Publish(topic topics.Topic, m message.Message) (errorList [
 			logEB.
 				WithError(err).
 				WithField("topic", topic.String()).
-				WithField("id", m.Id()).
 				Warnln("listener failed to notify buffer")
 			errorList = append(errorList, err)
 		}
