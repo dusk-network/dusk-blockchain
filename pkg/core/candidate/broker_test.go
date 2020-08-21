@@ -49,7 +49,7 @@ func TestValidHashes(t *testing.T) {
 	time.Sleep(1000 * time.Millisecond)
 
 	// Now, add the hash to validHashes
-	score := message.MockScore(hdr, blk.Header.Hash)
+	score := message.MockScore(hdr, cm)
 	vchMsg := message.New(topics.ValidCandidateHash, score)
 	errList = eb.Publish(topics.ValidCandidateHash, vchMsg)
 	assert.Empty(errList)

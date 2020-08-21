@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -33,15 +32,13 @@ type Broker struct {
 	publisher   eventbus.Publisher
 	republisher *republisher.Republisher
 	*store
-	lock        sync.RWMutex
-	queue       map[string]message.Candidate
-	validHashes map[string]struct{}
+	lock sync.RWMutex
+
 	republished map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
 	candidateChan     <-chan message.Candidate
 	getCandidateChan  <-chan rpcbus.Request
-	bestScoreChan     <-chan message.Message
 }
 
 // NewBroker returns an initialized Broker struct. It will still need
@@ -53,26 +50,16 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	if err != nil {
 		log.WithError(err).Error("could not Register GetCandidate")
 	}
-	bestScoreChan := make(chan message.Message, 1)
-	broker.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
 
 	b := &Broker{
 		publisher:         broker,
 		store:             newStore(),
-		queue:             make(map[string]message.Candidate),
-		validHashes:       make(map[string]struct{}),
 		republished:       make(map[string]struct{}),
 		acceptedBlockChan: acceptedBlockChan,
 		candidateChan:     initCandidateCollector(broker),
 		getCandidateChan:  getCandidateChan,
-		bestScoreChan:     bestScoreChan,
 	}
 
-	addValidHashListener := eventbus.NewCallbackListener(b.AddValidHash)
-	if config.Get().General.SafeCallbackListener {
-		addValidHashListener = eventbus.NewSafeCallbackListener(b.AddValidHash)
-	}
-	broker.Subscribe(topics.ValidCandidateHash, addValidHashListener)
 	b.republisher = republisher.New(broker, topics.Candidate, Validate, b.Validate)
 	return b
 }
@@ -83,52 +70,23 @@ func (b *Broker) Listen() {
 	for {
 		select {
 		case cm := <-b.candidateChan:
-			b.lock.Lock()
-			b.queue[string(cm.Block.Header.Hash)] = cm
-			b.lock.Unlock()
+			b.storeCandidateMessage(cm)
 		case r := <-b.getCandidateChan:
 			// candidate requests from the RPCBus
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
 			// accepted blocks come from the consensus
-			b.lock.Lock()
-			b.clearEligibleHashes()
 			b.clearRepublishedHashes()
-			b.lock.Unlock()
 			b.Clear(blk.Header.Height)
-		case <-b.bestScoreChan:
-			b.filterWinningCandidates()
 		}
 	}
-}
-
-// Filter through the queue with the valid hashes, storing the Candidate
-// messages which for which a hash is known, and deleting
-// everything else.
-func (b *Broker) filterWinningCandidates() {
-	b.lock.Lock()
-	for k, cm := range b.queue {
-		if _, ok := b.validHashes[k]; ok {
-			b.storeCandidateMessage(cm)
-		}
-
-		delete(b.queue, k)
-	}
-	b.lock.Unlock()
 }
 
 // TODO: interface - rpcBus encoding will be removed
 func (b *Broker) provideCandidate(r rpcbus.Request) {
-	b.lock.RLock()
-	params := r.Params.(bytes.Buffer)
-	cm, ok := b.queue[params.String()]
-	b.lock.RUnlock()
-	if ok {
-		r.RespChan <- rpcbus.Response{Resp: cm, Err: nil}
-		return
-	}
 
-	cm = b.store.fetchCandidateMessage(params.Bytes())
+	params := r.Params.(bytes.Buffer)
+	cm := b.store.fetchCandidateMessage(params.Bytes())
 	if cm.Block == nil {
 		// If we don't have the candidate message, we should ask the network for it.
 		var err error
@@ -180,9 +138,7 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 				return cm, nil
 			}
 
-			b.lock.Lock()
-			b.queue[string(cm.Block.Header.Hash)] = cm
-			b.lock.Unlock()
+			b.storeCandidateMessage(cm)
 		}
 	}
 }
@@ -201,23 +157,9 @@ func (b *Broker) Validate(m message.Message) error {
 	return nil
 }
 
-// AddValidHash to the local cache for a score. Broker.validHashes uses a map
-// to implement a HashSet
-func (b *Broker) AddValidHash(m message.Message) error {
-	s := m.Payload().(message.Score)
-	b.lock.Lock()
-	b.validHashes[string(s.VoteHash)] = struct{}{}
-	b.lock.Unlock()
-	return nil
-}
-
-func (b *Broker) clearEligibleHashes() {
-	for k := range b.validHashes {
-		delete(b.validHashes, k)
-	}
-}
-
 func (b *Broker) clearRepublishedHashes() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	for k := range b.republished {
 		delete(b.republished, k)
 	}
