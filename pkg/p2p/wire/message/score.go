@@ -141,9 +141,10 @@ func EmptyScore() Score {
 
 // Equal tests if two Scores are equal
 func (e Score) Equal(s Score) bool {
-	return e.hdr.Equal(s.hdr) && bytes.Equal(e.VoteHash(), s.VoteHash())
+	return e.hdr.Equal(s.hdr) && bytes.Equal(e.VoteHash(), s.VoteHash()) && e.VoteHash() != nil
 }
 
+// VoteHash returns hash of the Candidate block
 func (e Score) VoteHash() []byte {
 	return e.Candidate.Block.Header.Hash
 }
