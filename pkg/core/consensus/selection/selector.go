@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -139,7 +140,11 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 		return err
 	}
 
-	// TODO: score.Candidate.Block sanity
+	// Sanity-check the candidate message
+	if err := candidate.ValidateCandidate(score.Candidate); err != nil {
+		lg.Warn("Invalid candidate message")
+		return nil
+	}
 
 	lg.
 		WithField("step", h.Step).
