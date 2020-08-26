@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"testing"
 
 	"github.com/drewolson/testflight"
@@ -11,10 +12,11 @@ import (
 
 func TestConsensusAPI(t *testing.T) {
 
+	_, dbheavy := heavy.CreateDBConnection()
 	_, db := lite.CreateDBConnection()
 	targetURL := "/consensus/provisioners"
 
-	apiServer, err := api.NewHTTPServer(nil, nil, db)
+	apiServer, err := api.NewHTTPServer(nil, nil, dbheavy, db)
 	if err != nil {
 		t.Errorf("API http server error: %v", err)
 	}
