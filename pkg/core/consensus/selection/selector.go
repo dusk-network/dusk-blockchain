@@ -128,6 +128,20 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	// at a time. Consequently, any lower scores are discarded.
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	// Sanity-check the candidate message
+	if err := candidate.ValidateCandidate(score.Candidate); err != nil {
+		lg.Warn("Invalid candidate message")
+		return nil
+	}
+
+	// Publish internally topics.Candidate with bestEvent(highest score candidate block)
+	msg := message.New(topics.Candidate, score.Candidate)
+	err := s.signer.SendInternally(topics.Candidate, msg, s.ID())
+	if err != nil {
+		lg.WithError(err).Error("CollectScoreEvent, failed to SendInternally the Candidate")
+	}
+
 	// Only check for priority if we already have a best event
 	if !s.bestEvent.IsEmpty() {
 		if s.handler.Priority(s.bestEvent, score) {
@@ -138,12 +152,6 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 
 	if err := s.handler.Verify(s.ctx, h.Round, h.Step, score); err != nil {
 		return err
-	}
-
-	// Sanity-check the candidate message
-	if err := candidate.ValidateCandidate(score.Candidate); err != nil {
-		lg.Warn("Invalid candidate message")
-		return nil
 	}
 
 	lg.
@@ -206,14 +214,6 @@ func (s *Selector) sendBestEvent() error {
 	// If we had no best event, we should send an empty hash
 	if bestEvent.(message.Score).IsEmpty() {
 		bestEvent = s.signer.Compose(emptyScoreFactory{})
-	} else {
-		// Publish internally topics.Candidate with bestEvent(highest score candidate block)
-		score := bestEvent.(message.Score)
-		msg := message.New(topics.Candidate, score.Candidate)
-		err := s.signer.SendInternally(topics.Candidate, msg, s.ID())
-		if err != nil {
-			lg.WithError(err).Error("sendBestEvent, failed to SendInternally the Candidate")
-		}
 	}
 
 	msg := message.New(topics.BestScore, bestEvent)
