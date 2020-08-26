@@ -261,7 +261,7 @@ func (c *Chain) beginAccepting(blk *block.Block) bool {
 
 	// If we are more than one block behind, stop the consensus
 	lg.Debug("topics.StopConsensus")
-	errList := c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
+	errList := c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, message.EMPTY))
 	diagnostics.LogPublishErrors("chain/chain.go, topics.StopConsensus", errList)
 
 	return true

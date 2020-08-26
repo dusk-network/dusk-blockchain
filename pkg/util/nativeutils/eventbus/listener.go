@@ -31,7 +31,7 @@ func (c *CallbackListener) Notify(m message.Message) error {
 	if !c.safe {
 		return c.callback(m)
 	}
-
+	//FIXME: What shall we do if we get a message here with empty payload ? how can we prevent a panic ?
 	clone := message.Clone(m)
 	return c.callback(clone)
 }

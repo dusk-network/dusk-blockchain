@@ -11,6 +11,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
+// EMPTY represents a empty message, used by the StopConsensus call
+const EMPTY = "EMPTY"
+
 // SafeBuffer is a byte.Buffer wrapper that let the Buffer implement
 // Safe
 type SafeBuffer struct {
