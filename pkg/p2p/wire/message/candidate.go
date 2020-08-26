@@ -43,11 +43,19 @@ func MakeCandidate(blk *block.Block, cert *block.Certificate) Candidate {
 // that can be handy when publishing this Payload for multiple subscribers to
 // consume
 func (c Candidate) Copy() payload.Safe {
-	blk := c.Block.Copy().(block.Block)
-	return Candidate{
-		Block:       &blk,
-		Certificate: c.Certificate.Copy(),
+
+	r := Candidate{}
+
+	if c.Block != nil {
+		blk := c.Block.Copy().(block.Block)
+		r.Block = &blk
 	}
+
+	if c.Certificate != nil {
+		r.Certificate = c.Certificate.Copy()
+	}
+
+	return r
 }
 
 // State is for complying to the consensus.Message interface. In the case of
