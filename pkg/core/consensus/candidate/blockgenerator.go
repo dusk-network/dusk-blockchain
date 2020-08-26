@@ -100,14 +100,25 @@ func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus
 func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	sev := e.(message.ScoreProposal)
 
-	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), 5*time.Second)
+	lg = lg.
+		WithField("round", sev.State().Round).
+		WithField("step", sev.State().Step)
+
+	timeoutGetLastCommittee := time.Duration(config.Get().Timeout.TimeoutGetLastCommittee) * time.Second
+	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), timeoutGetLastCommittee)
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("failed to topics.GetLastCommittee")
 		return err
 	}
 	keys := resp.([][]byte)
 
 	blk, err := bg.Generate(sev, keys)
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("failed to bg.Generate")
 		return err
 	}
 
@@ -123,14 +134,21 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	}
 
 	// Create candidate message
-	resp, err = bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), 5*time.Second)
+	timeoutGetLastCertificate := time.Duration(config.Get().Timeout.TimeoutGetLastCertificate) * time.Second
+	resp, err = bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), timeoutGetLastCertificate)
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("failed to topics.GetLastCertificate")
 		return err
 	}
 	certBuf := resp.(bytes.Buffer)
 
 	cert := block.EmptyCertificate()
 	if err := message.UnmarshalCertificate(&certBuf, cert); err != nil {
+		lg.
+			WithError(err).
+			Error("failed to UnmarshalCertificate")
 		return err
 	}
 
@@ -176,6 +194,9 @@ func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 	// Update TxRoot
 	root, err := candidateBlock.CalculateRoot()
 	if err != nil {
+		lg.
+			WithError(err).
+			Error("failed to CalculateRoot")
 		return nil, err
 	}
 	candidateBlock.Header.TxRoot = root
@@ -204,7 +225,8 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 			return nil, err
 		}
 
-		resp, err := bg.rpcBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), 4*time.Second)
+		timeoutGetMempoolTXsBySize := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXsBySize) * time.Second
+		resp, err := bg.rpcBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), timeoutGetMempoolTXsBySize)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the chain.
 		if err != nil {

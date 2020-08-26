@@ -3,6 +3,8 @@ package firststep
 import (
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
@@ -23,13 +25,16 @@ type Factory struct {
 
 // NewFactory instantiates a Factory
 func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Keys, timeout time.Duration) *Factory {
-	r := republisher.New(broker, topics.Reduction)
+	reductionRepublisher := republisher.New(broker, topics.Reduction)
+	if config.Get().General.SafeCallbackListener {
+		reductionRepublisher = republisher.NewSafe(broker, topics.Reduction)
+	}
 	return &Factory{
 		broker,
 		rpcBus,
 		keys,
 		timeout,
-		r,
+		reductionRepublisher,
 	}
 }
 

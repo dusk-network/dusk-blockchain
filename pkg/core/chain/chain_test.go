@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -71,7 +73,8 @@ func mutateFirstChan(propagatedHeight uint64, eb eventbus.Publisher, acceptedBlo
 
 	// shadow copy here as block.Header is a reference
 	msg := message.New(topics.AcceptedBlock, *propagatedBlock)
-	eb.Publish(topics.AcceptedBlock, msg)
+	errList := eb.Publish(topics.AcceptedBlock, msg)
+	diagnostics.LogPublishErrors("mutateFirstChan, topics.AcceptedBlock", errList)
 
 	// subscriber_1 collecting propagated block
 	blkMsg1 := <-acceptedBlock1Chan
@@ -213,7 +216,8 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	cm := message.MakeCandidate(blk, cert)
 
 	// Store it
-	eb.Publish(topics.Candidate, message.New(topics.Candidate, cm))
+	errList := eb.Publish(topics.Candidate, message.New(topics.Candidate, cm))
+	assert.Empty(errList)
 
 	// Save current prevBlock
 	currPrevBlock := c.prevBlock

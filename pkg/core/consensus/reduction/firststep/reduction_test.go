@@ -16,7 +16,7 @@ import (
 
 func TestFirstStep(t *testing.T) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp, hash := ProduceFirstStepVotes(bus, rpcBus, 50, 1*time.Second)
+	hlp, hash := ProduceFirstStepVotes(bus, rpcBus, 50, 2*time.Second)
 	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(1), hlp.Step())
 
@@ -37,7 +37,7 @@ func TestFirstStep(t *testing.T) {
 	// test that the Player is PAUSED
 	assert.Equal(t, consensus.PAUSED, hlp.State())
 	// test that the timeout is still 1 second
-	assert.Equal(t, 1*time.Second, hlp.Reducer.(*Reducer).timeOut)
+	assert.Equal(t, 2*time.Second, hlp.Reducer.(*Reducer).timeOut)
 }
 
 func TestMoreSteps(t *testing.T) {

@@ -95,7 +95,8 @@ func (m *StakeAutomaton) sendStake() error {
 		Fee:      config.MinFee,
 		Locktime: lockTime,
 	}
-	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(req), 5*time.Second)
+	timeoutSendStakeTX := time.Duration(config.Get().Timeout.TimeoutSendStakeTX) * time.Second
+	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(req), timeoutSendStakeTX)
 	if err != nil {
 		return err
 	}

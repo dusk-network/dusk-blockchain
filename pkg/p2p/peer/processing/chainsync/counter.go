@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -24,7 +26,11 @@ type Counter struct {
 // NewCounter returns an initialized counter. It will decrement each time we accept a new block.
 func NewCounter(subscriber eventbus.Subscriber) *Counter {
 	sc := &Counter{stopChan: make(chan struct{})}
-	subscriber.Subscribe(topics.AcceptedBlock, eventbus.NewCallbackListener(sc.decrement))
+	decrementListener := eventbus.NewCallbackListener(sc.decrement)
+	if config.Get().General.SafeCallbackListener {
+		decrementListener = eventbus.NewSafeCallbackListener(sc.decrement)
+	}
+	subscriber.Subscribe(topics.AcceptedBlock, decrementListener)
 	return sc
 }
 

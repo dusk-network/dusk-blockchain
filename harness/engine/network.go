@@ -140,7 +140,7 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	if MOCK_ADDRESS != "" {
 		// Run mock process
-		if bbErr := n.start("", utilsExec, "mock",
+		if bbErr := n.start(workspace, utilsExec, "mock",
 			"--grpcmockhost", MOCK_ADDRESS,
 		); bbErr != nil {
 			return bbErr
@@ -153,12 +153,15 @@ func (n *Network) Bootstrap(workspace string) error {
 			return err
 		}
 
+		// avoid stressing dusk-seeder
+		time.Sleep(time.Duration(1) * time.Second)
 	}
 
 	log.Infof("Local network workspace: %s", workspace)
 	log.Infof("Running %d nodes", len(n.nodes))
 
-	delay := len(n.nodes)
+	// Allow network nodes to complete their startup procedures
+	delay := 2 * len(n.nodes)
 	if delay > 20 {
 		delay = 20
 	}
@@ -224,7 +227,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 
 	if MOCK_ADDRESS != "" {
 		// Start the mock RUSK server
-		if startErr := n.start("", utilsExec, "mockrusk",
+		if startErr := n.start(nodeDir, utilsExec, "mockrusk",
 			"--rusknetwork", node.Cfg.RPC.Rusk.Network,
 			"--ruskaddress", node.Cfg.RPC.Rusk.Address,
 			"--walletstore", node.Cfg.Wallet.Store,
@@ -284,7 +287,6 @@ func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, erro
 
 // Start an OS process with TMPDIR=nodeDir, manageable by the network
 func (n *Network) start(nodeDir string, name string, arg ...string) error {
-	//TODO: is this really required ?
 	//nolint:gosec
 	cmd := exec.Command(name, arg...)
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)

@@ -104,7 +104,9 @@ func sendBestScore(t *testing.T, bus *eventbus.EventBus, round uint64, step uint
 
 	msg := message.New(topics.BestScore, hdr)
 	require.NotNil(t, msg)
-	bus.Publish(topics.BestScore, msg)
+	errList := bus.Publish(topics.BestScore, msg)
+	require.Empty(t, errList)
+
 }
 
 func collectEvents(t *testing.T, c *consensus.Coordinator, evs []message.Reduction) {

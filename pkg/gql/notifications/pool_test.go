@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -89,7 +91,8 @@ func TestPoolBasicScenario(t *testing.T) {
 		blk.Header.Hash = hash
 
 		msg := message.New(topics.AcceptedBlock, *blk)
-		eb.Publish(topics.AcceptedBlock, msg)
+		errList := eb.Publish(topics.AcceptedBlock, msg)
+		require.Empty(t, errList)
 		ctxSentMsgs = append(ctxSentMsgs, hex.EncodeToString(blk.Header.Hash))
 	}
 

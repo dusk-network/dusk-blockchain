@@ -92,7 +92,8 @@ func (m *BidAutomaton) sendBid() error {
 		Fee:      config.MinFee,
 		Locktime: lockTime,
 	}
-	_, err := m.rpcBus.Call(topics.SendBidTx, rpcbus.NewRequest(req), 5*time.Second)
+	timeoutSendBidTX := time.Duration(config.Get().Timeout.TimeoutSendBidTX) * time.Second
+	_, err := m.rpcBus.Call(topics.SendBidTx, rpcbus.NewRequest(req), timeoutSendBidTX)
 	if err != nil {
 		return err
 	}

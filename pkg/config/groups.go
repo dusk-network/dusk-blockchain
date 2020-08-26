@@ -1,8 +1,23 @@
 package config
 
 type generalConfiguration struct {
-	Network    string
-	WalletOnly bool
+	Network              string
+	WalletOnly           bool
+	SafeCallbackListener bool
+}
+
+type timeoutConfiguration struct {
+	TimeoutSendBidTX            int64
+	TimeoutGetLastCommittee     int64
+	TimeoutGetLastCertificate   int64
+	TimeoutGetMempoolTXsBySize  int64
+	TimeoutGetLastBlock         int64
+	TimeoutGetCandidate         int64
+	TimeoutClearWalletDatabase  int64
+	TimeoutVerifyCandidateBlock int64
+	TimeoutSendStakeTX          int64
+	TimeoutGetMempoolTXs        int64
+	TimeoutGetRoundResults      int64
 }
 
 type loggerConfiguration struct {

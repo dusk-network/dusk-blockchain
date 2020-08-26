@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -138,7 +140,9 @@ func (r *Republisher) Republish(m message.Message) error {
 	serialized := message.New(m.Category(), marshaled)
 
 	// gossip away
-	r.broker.Publish(topics.Gossip, serialized)
+	errList := r.broker.Publish(topics.Gossip, serialized)
+	diagnostics.LogPublishErrors("republisher.go, topics.Gossip", errList)
+
 	return nil
 	//r.broker.Publish(topics.Gossip, m)
 	//return nil

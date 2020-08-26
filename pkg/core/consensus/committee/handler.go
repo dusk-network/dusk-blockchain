@@ -65,6 +65,9 @@ func (b *Handler) generateCommittees(round uint64, step uint8, maxSize int) {
 	defer b.lock.Unlock()
 	committees := b.Provisioners.GenerateCommittees(round, PregenerationAmount, step, size)
 	for i, committee := range committees {
+		if step == math.MaxUint8 {
+			panic("Consensus reached max steps")
+		}
 		b.Committees[int(step)+i] = committee
 	}
 }
@@ -85,5 +88,9 @@ func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 func (b *Handler) membersAt(idx uint8) int {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
+
+	if idx == math.MaxUint8 {
+		panic("Consensus reached max steps")
+	}
 	return b.Committees[idx].Set.Len()
 }

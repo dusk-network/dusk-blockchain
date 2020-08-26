@@ -63,7 +63,8 @@ func TestWebsocketEndpoint(t *testing.T) {
 	hash, _ := blk.CalculateHash()
 	blk.Header.Hash = hash
 	msg := message.New(topics.AcceptedBlock, *blk)
-	eb.Publish(topics.AcceptedBlock, msg)
+	errList := eb.Publish(topics.AcceptedBlock, msg)
+	assert.Empty(errList)
 
 	message := <-response
 

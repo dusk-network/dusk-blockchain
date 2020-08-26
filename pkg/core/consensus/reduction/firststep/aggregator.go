@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -132,7 +134,8 @@ func (a *aggregator) addBitSet(sv *message.StepVotes, cluster sortedset.Cluster,
 func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	// Fetch the candidate block first.
 	req := rpcbus.NewRequest(*bytes.NewBuffer(blockHash))
-	resp, err := rpcBus.Call(topics.GetCandidate, req, 5*time.Second)
+	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
+	resp, err := rpcBus.Call(topics.GetCandidate, req, timeoutGetCandidate)
 	if err != nil {
 		log.
 			WithError(err).
@@ -147,7 +150,8 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	// before voting on it again
 	if !bytes.Equal(blockHash, emptyHash[:]) {
 		req := rpcbus.NewRequest(cm)
-		if _, err := rpcBus.Call(topics.VerifyCandidateBlock, req, 5*time.Second); err != nil {
+		timeoutVerifyCandidateBlock := time.Duration(config.Get().Timeout.TimeoutVerifyCandidateBlock) * time.Second
+		if _, err := rpcBus.Call(topics.VerifyCandidateBlock, req, timeoutVerifyCandidateBlock); err != nil {
 			log.
 				WithError(err).
 				WithFields(log.Fields{

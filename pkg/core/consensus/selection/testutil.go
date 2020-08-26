@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -38,7 +40,9 @@ func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
 	serialized := message.New(msg.Category(), buf)
 
 	// gossip away
-	m.bus.Publish(topics.Gossip, serialized)
+	errList := m.bus.Publish(topics.Gossip, serialized)
+	diagnostics.LogPublishErrors("(m *mockSigner) Gossip", errList)
+
 	return nil
 }
 
@@ -47,7 +51,9 @@ func (m *mockSigner) Compose(pf consensus.PacketFactory) consensus.InternalPacke
 }
 
 func (m *mockSigner) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
-	m.bus.Publish(topic, msg)
+	errList := m.bus.Publish(topic, msg)
+	diagnostics.LogPublishErrors("(m *mockSigner) SendInternally", errList)
+
 	return nil
 }
 
