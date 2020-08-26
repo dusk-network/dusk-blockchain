@@ -2,8 +2,8 @@ package candidate
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
@@ -13,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	lg "github.com/sirupsen/logrus"
 )
@@ -29,12 +28,9 @@ var log = lg.WithField("process", "candidate-broker")
 // of the network, and will attempt to provide the requesting component
 // with it's needed `Candidate`.
 type Broker struct {
-	publisher   eventbus.Publisher
-	republisher *republisher.Republisher
-	*store
-	lock sync.RWMutex
+	publisher eventbus.Publisher
 
-	republished map[string]struct{}
+	*store
 
 	acceptedBlockChan <-chan block.Block
 	candidateChan     <-chan message.Candidate
@@ -54,13 +50,10 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	b := &Broker{
 		publisher:         broker,
 		store:             newStore(),
-		republished:       make(map[string]struct{}),
 		acceptedBlockChan: acceptedBlockChan,
 		candidateChan:     initCandidateCollector(broker),
 		getCandidateChan:  getCandidateChan,
 	}
-
-	b.republisher = republisher.New(broker, topics.Candidate, Validate, b.Validate)
 	return b
 }
 
@@ -75,8 +68,7 @@ func (b *Broker) Listen() {
 			// candidate requests from the RPCBus
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
-			// accepted blocks come from the consensus
-			b.clearRepublishedHashes()
+			// Remove all candidates with lower or equal round
 			b.Clear(blk.Header.Height)
 		}
 	}
@@ -86,8 +78,8 @@ func (b *Broker) Listen() {
 func (b *Broker) provideCandidate(r rpcbus.Request) {
 
 	params := r.Params.(bytes.Buffer)
-	cm := b.store.fetchCandidateMessage(params.Bytes())
-	if cm.Block == nil {
+	cm, err := b.store.fetchCandidateMessage(params.Bytes())
+	if err != nil {
 		// If we don't have the candidate message, we should ask the network for it.
 		var err error
 		cm, err = b.requestCandidate(params.Bytes())
@@ -110,6 +102,8 @@ var ErrGetCandidateTimeout = errors.New("request GetCandidate timeout")
 // TODO: encoding the category within the packet and specifying it as category
 // is ugly af
 func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
+
+	lg.WithField("hash", hex.EncodeToString(hash)).Trace("Request Candidate from peers")
 	// Send a request for this specific candidate
 	buf := bytes.NewBuffer(hash)
 	// Ugh! Move encoding after the Gossip ffs
@@ -126,6 +120,7 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	for {
 		select {
 		case <-timer.C:
+			lg.WithField("hash", hex.EncodeToString(hash)).Trace("Request Candidate from peers failed")
 			return message.Candidate{}, ErrGetCandidateTimeout
 
 		// We take control of `candidateChan`, to monitor incoming
@@ -134,33 +129,14 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 		// be through `Listen`. Any incoming candidates which don't match
 		// our request will be passed down to the queue.
 		case cm := <-b.candidateChan:
+
+			b.storeCandidateMessage(cm)
+
 			if bytes.Equal(cm.Block.Header.Hash, hash) {
+				lg.WithField("hash", hex.EncodeToString(hash)).Trace("Request Candidate from peers succeeded")
 				return cm, nil
 			}
 
-			b.storeCandidateMessage(cm)
 		}
-	}
-}
-
-// Validate that the candidate block carried by a message has not been already republished.
-// This function complies to the republisher.Validator interface
-func (b *Broker) Validate(m message.Message) error {
-	cm := m.Payload().(message.Candidate)
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	if _, ok := b.republished[string(cm.Block.Header.Hash)]; ok {
-		return republisher.DuplicatePayloadError
-	}
-
-	b.republished[string(cm.Block.Header.Hash)] = struct{}{}
-	return nil
-}
-
-func (b *Broker) clearRepublishedHashes() {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	for k := range b.republished {
-		delete(b.republished, k)
 	}
 }
