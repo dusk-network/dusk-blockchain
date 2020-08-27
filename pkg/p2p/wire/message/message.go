@@ -74,13 +74,16 @@ type simple struct {
 }
 
 // Clone creates a new Message which carries a copy of the payload
-func Clone(m Message) Message {
+func Clone(m Message) (Message, error) {
 	b := m.CachedBinary()
+	if m.Payload() == nil {
+		return nil, fmt.Errorf("could not clone message, topic: %s", m.Category())
+	}
 	return simple{
 		category:  m.Category(),
 		marshaled: &b,
 		payload:   m.Payload().Copy(),
-	}
+	}, nil
 }
 
 // CachedBinary complies with the Message method for returning the

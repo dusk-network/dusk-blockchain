@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"sync"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -32,8 +34,11 @@ func (c *CallbackListener) Notify(m message.Message) error {
 		return c.callback(m)
 	}
 
-	//FIXME: What shall we do if we get a message here with empty payload ? how can we prevent a panic ?
-	clone := message.Clone(m)
+	clone, err := message.Clone(m)
+	if err != nil {
+		log.WithError(err).Error("CallbackListener, failed to clone message")
+		return err
+	}
 	return c.callback(clone)
 }
 
@@ -129,8 +134,11 @@ func (c *ChanListener) Notify(m message.Message) error {
 		return forward(c.messageChannel, m)
 	}
 
-	//FIXME: What shall we do if we get a message here with empty payload ? how can we prevent a panic ?
-	clone := message.Clone(m)
+	clone, err := message.Clone(m)
+	if err != nil {
+		log.WithError(err).Error("ChanListener, failed to clone message")
+		return err
+	}
 	return forward(c.messageChannel, clone)
 }
 
