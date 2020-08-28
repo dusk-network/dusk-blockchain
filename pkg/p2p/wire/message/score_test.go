@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +18,13 @@ func TestUnMarshal(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
 	hdr := header.Mock()
 	hdr.BlockHash = hash
-	se := message.MockScore(hdr, hash)
+
+	// mock candidate
+	genesis := config.DecodeGenesis()
+	cert := block.EmptyCertificate()
+	c := message.MakeCandidate(genesis, cert)
+
+	se := message.MockScore(hdr, c)
 
 	buf := new(bytes.Buffer)
 	assert.NoError(t, message.MarshalScore(buf, se))
@@ -24,4 +32,26 @@ func TestUnMarshal(t *testing.T) {
 	other := &message.Score{}
 	assert.NoError(t, message.UnmarshalScore(buf, other))
 	assert.True(t, se.Equal(*other))
+}
+
+func TestDeepCopy(t *testing.T) {
+	hash, _ := crypto.RandEntropy(32)
+	hdr := header.Mock()
+	hdr.BlockHash = hash
+
+	// mock candidate
+	genesis := config.DecodeGenesis()
+	cert := block.EmptyCertificate()
+	c := message.MakeCandidate(genesis, cert)
+
+	se := message.MockScore(hdr, c)
+
+	buf := new(bytes.Buffer)
+	assert.NoError(t, message.MarshalScore(buf, se))
+
+	deepCopy := se.Copy().(message.Score)
+	buf2 := new(bytes.Buffer)
+	assert.NoError(t, message.MarshalScore(buf2, deepCopy))
+
+	assert.Equal(t, buf.Bytes(), buf2.Bytes())
 }

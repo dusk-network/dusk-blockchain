@@ -1,6 +1,7 @@
 package candidate
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -26,11 +27,16 @@ func (c *store) storeCandidateMessage(cm message.Candidate) {
 	c.lock.Unlock()
 }
 
-func (c *store) fetchCandidateMessage(hash []byte) message.Candidate {
+// fetchCandidateMessage returns a deep copy of the Candidate of this hash or an error if not found.
+func (c *store) fetchCandidateMessage(hash []byte) (message.Candidate, error) {
 	c.lock.RLock()
-	cm := c.messages[string(hash)]
+	cm, ok := c.messages[string(hash)]
 	c.lock.RUnlock()
-	return cm
+
+	if ok {
+		return cm.Copy().(message.Candidate), nil
+	}
+	return cm, errors.New("not found")
 }
 
 // Clear removes all candidate messages from or before a given round.
