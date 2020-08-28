@@ -26,8 +26,23 @@ func TestConsensusAPI(t *testing.T) {
 		ExpectSuccess bool
 	}{
 		{
+			targetURL:     "/consensus/bidders",
+			name:          "Get bidders",
+			ExpectSuccess: true,
+		},
+		{
 			targetURL:     "/consensus/provisioners",
 			name:          "Get provisioners",
+			ExpectSuccess: true,
+		},
+		{
+			targetURL:     "/consensus/roundinfo",
+			name:          "Get round info",
+			ExpectSuccess: true,
+		},
+		{
+			targetURL:     "/consensus/eventqueuestatus",
+			name:          "Get event queue status",
 			ExpectSuccess: true,
 		},
 	}
