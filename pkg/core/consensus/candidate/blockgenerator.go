@@ -100,14 +100,14 @@ func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus
 func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	sev := e.(message.ScoreProposal)
 
-	lg = lg.
+	log := lg.
 		WithField("round", sev.State().Round).
 		WithField("step", sev.State().Step)
 
 	timeoutGetLastCommittee := time.Duration(config.Get().Timeout.TimeoutGetLastCommittee) * time.Second
 	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), timeoutGetLastCommittee)
 	if err != nil {
-		lg.
+		log.
 			WithError(err).
 			Error("failed to topics.GetLastCommittee")
 		return err
@@ -116,7 +116,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	keys := resp.([][]byte)
 	blk, err := bg.Generate(sev, keys)
 	if err != nil {
-		lg.
+		log.
 			WithError(err).
 			Error("failed to bg.Generate")
 		return err
@@ -126,7 +126,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	timeoutGetLastCertificate := time.Duration(config.Get().Timeout.TimeoutGetLastCertificate) * time.Second
 	resp, err = bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), timeoutGetLastCertificate)
 	if err != nil {
-		lg.
+		log.
 			WithError(err).
 			Error("failed to topics.GetLastCertificate")
 		return err
@@ -135,7 +135,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 
 	cert := block.EmptyCertificate()
 	if err := message.UnmarshalCertificate(&certBuf, cert); err != nil {
-		lg.
+		log.
 			WithError(err).
 			Error("failed to UnmarshalCertificate")
 		return err
@@ -149,7 +149,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, candidate}
 	score := bg.signer.Compose(scoreFactory)
 
-	lg.
+	log.
 		WithField("step", score.State().Step).
 		WithField("round", score.State().Round).
 		Debugln("sending score")
