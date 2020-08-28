@@ -11,6 +11,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
+// EMPTY represents a empty message, used by the StopConsensus call
+const EMPTY = "EMPTY"
+
 // SafeBuffer is a byte.Buffer wrapper that let the Buffer implement
 // Safe
 type SafeBuffer struct {
@@ -71,13 +74,16 @@ type simple struct {
 }
 
 // Clone creates a new Message which carries a copy of the payload
-func Clone(m Message) Message {
+func Clone(m Message) (Message, error) {
 	b := m.CachedBinary()
+	if m.Payload() == nil {
+		return nil, fmt.Errorf("could not clone message, topic: %s", m.Category())
+	}
 	return simple{
 		category:  m.Category(),
 		marshaled: &b,
 		payload:   m.Payload().Copy(),
-	}
+	}, nil
 }
 
 // CachedBinary complies with the Message method for returning the
