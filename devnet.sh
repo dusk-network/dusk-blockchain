@@ -145,6 +145,9 @@ init_dusk_func() {
   enabled=false
   enableTLS = false
   address="127.0.0.1:9199"
+  dbfile="${DDIR}/chain/api.db"
+  expirationtime=300 #5 mins
+
 
 EOF
 

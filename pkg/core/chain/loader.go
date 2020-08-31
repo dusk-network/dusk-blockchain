@@ -63,11 +63,6 @@ func NewDBLoader(db database.DB, genesis *block.Block) *DBLoader {
 	return &DBLoader{db: db, genesis: genesis}
 }
 
-// NewDBLoader returns a Loader which gets the Chain Tip from the DB
-func NewDBLoaderWithMem(db database.DB, memoryDB database.DB, genesis *block.Block) *DBLoader {
-	return &DBLoader{db: db, memoryDB: memoryDB, genesis: genesis}
-}
-
 // Height returns the height of the blockchain stored in the DB
 func (l *DBLoader) Height() (uint64, error) {
 	var height uint64

@@ -6,7 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"encoding/binary"
@@ -358,9 +359,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	c.p = &provisioners
 
 	if config.Get().API.Enabled {
-		err = c.loader.(*DBLoader).db.Update(func(t database.Transaction) error {
-			return t.StoreProvisioners(c.p, blk.Header.Height)
-		})
+		err := capi.StoreProvisioners(c.p, blk.Header.Height)
 		if err != nil {
 			log.Warn("Could not store provisioners on memoryDB")
 		}

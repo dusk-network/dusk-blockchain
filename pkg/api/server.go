@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/tidwall/buntdb"
+
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
@@ -34,19 +35,31 @@ type Server struct {
 	// Node components
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
-	db       database.DB
-	memoryDB database.DB
 
 	Server *http.Server
 }
 
 //NewHTTPServer return pointer to new created server object
-func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, db database.DB, memoryDB database.DB) (*Server, error) {
+func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server, error) {
+
+	dbFile := cfg.Get().API.DBFile
+	if dbFile == "" {
+		log.Info("Will start monitoring db with in-memory since DBFile cfg is not set")
+		dbFile = ":memory:"
+	}
+
+	// Open the data.db file. It will be created if it doesn't exist.
+	db, err := buntdb.Open(dbFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//Set DB instance
+	capi.DBInstance = db
+
 	srv := Server{
 		eventBus: eventBus,
 		rpcBus:   rpcBus,
-		db:       db,
-		memoryDB: memoryDB,
 	}
 	router = srv.InitRouting()
 	httpServer := &http.Server{
@@ -89,7 +102,7 @@ func (s *Server) InitRouting() *pat.Router {
 	))
 
 	// init consensus API services
-	capi.StartAPI(s.eventBus, s.rpcBus, s.db)
+	capi.StartAPI(s.eventBus, s.rpcBus)
 
 	r.HandleFunc("/consensus/bidders", capi.GetBidders).Methods("GET")
 	r.HandleFunc("/consensus/provisioners", capi.GetProvisioners).Methods("GET")

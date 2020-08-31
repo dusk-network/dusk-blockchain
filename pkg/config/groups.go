@@ -116,11 +116,13 @@ type gqlConfiguration struct {
 }
 
 type apiConfiguration struct {
-	Enabled   bool
-	Address   string
-	EnableTLS bool
-	CertFile  string
-	KeyFile   string
+	Enabled        bool
+	Address        string
+	EnableTLS      bool
+	CertFile       string
+	KeyFile        string
+	DBFile         string
+	ExpirationTime int
 }
 
 type notificationConfiguration struct {

@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -339,43 +338,6 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	return tip - n + pos, nil
 
-}
-
-func (t transaction) FetchProvisioners(height uint64) ([]byte, error) {
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, height)
-
-	var provisioners []byte
-	var exists bool
-	if provisioners, exists = t.db.storage[blocksInd][toKey(b)]; !exists {
-		return nil, database.ErrBlockNotFound
-	}
-
-	return provisioners, nil
-}
-
-func (t transaction) StoreProvisioners(provisioners *user.Provisioners, height uint64) error {
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, height)
-
-	init := make([]byte, 8)
-	buf := bytes.NewBuffer(init)
-
-	err := user.MarshalProvisioners(buf, provisioners)
-	if err != nil {
-		return err
-	}
-
-	t.batch[provisionersInd][toKey(b)] = buf.Bytes()
-
-	return nil
-}
-
-func (t transaction) StoreRoundInfo([]byte, uint64) error {
-	return errors.New("method not implemented")
-}
-func (t transaction) FetchRoundInfo(uint64) ([]byte, error) {
-	return nil, errors.New("method not implemented")
 }
 
 func (t transaction) ClearDatabase() error {

@@ -1,49 +1,44 @@
 package api_test
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"testing"
 
 	"github.com/drewolson/testflight"
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConsensusAPI(t *testing.T) {
 
-	_, dbheavy := heavy.CreateDBConnection()
-	_, db := lite.CreateDBConnection()
-
-	apiServer, err := api.NewHTTPServer(nil, nil, dbheavy, db)
+	apiServer, err := api.NewHTTPServer(nil, nil)
 	if err != nil {
 		t.Errorf("API http server error: %v", err)
 	}
 
 	var tt = []struct {
-		targetURL     string
-		name          string
-		ExpectSuccess bool
+		targetURL string
+		name      string
+		Data      string
 	}{
 		{
-			targetURL:     "/consensus/bidders",
-			name:          "Get bidders",
-			ExpectSuccess: true,
+			targetURL: "/consensus/bidders?height=0",
+			name:      "Get bidders",
+			Data:      `{}`,
 		},
 		{
-			targetURL:     "/consensus/provisioners",
-			name:          "Get provisioners",
-			ExpectSuccess: true,
+			targetURL: "/consensus/provisioners?height=0",
+			name:      "Get provisioners",
+			Data:      `{}`,
 		},
 		{
-			targetURL:     "/consensus/roundinfo",
-			name:          "Get round info",
-			ExpectSuccess: true,
+			targetURL: "/consensus/roundinfo?height_begin=0&height_end=0",
+			name:      "Get round info",
+			Data:      `{}`,
 		},
 		{
-			targetURL:     "/consensus/eventqueuestatus",
-			name:          "Get event queue status",
-			ExpectSuccess: true,
+			targetURL: "/consensus/eventqueuestatus",
+			name:      "Get event queue status",
+			Data:      `{}`,
 		},
 	}
 
@@ -55,6 +50,8 @@ func TestConsensusAPI(t *testing.T) {
 
 				response := r.Get(tc.targetURL)
 				require.NotNil(t, response)
+
+				require.Equal(t, 200, response.StatusCode)
 			})
 		}
 

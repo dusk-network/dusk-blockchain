@@ -2,7 +2,6 @@ package database
 
 import (
 	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -24,9 +23,6 @@ var (
 	ErrStateNotFound = errors.New("database: state not found")
 	// ErrOutputNotFound returned on output lookup during tx verification
 	ErrOutputNotFound = errors.New("database: output not found")
-
-	// ErrBlockNotFound returned on a block lookup by hash or height
-	ErrProvisionerNotFound = errors.New("database: provisioner not found")
 
 	// AnyTxType is used as a filter value on FetchBlockTxByHash
 	AnyTxType = transactions.TxType(math.MaxUint8)
@@ -110,12 +106,6 @@ type Transaction interface {
 
 	// ClearDatabase will remove all information from the database.
 	ClearDatabase() error
-
-	StoreProvisioners(*user.Provisioners, uint64) error
-	FetchProvisioners(uint64) ([]byte, error)
-
-	StoreRoundInfo([]byte, uint64) error
-	FetchRoundInfo(uint64) ([]byte, error)
 
 	// Atomic storage
 	Commit() error

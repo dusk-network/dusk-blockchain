@@ -5,26 +5,27 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/tidwall/buntdb"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	eventBus *eventbus.EventBus
-	rpcBus   *rpcbus.RPCBus
-	memoryDB database.DB
+	eventBus   *eventbus.EventBus
+	rpcBus     *rpcbus.RPCBus
+	DBInstance *buntdb.DB
 )
 
-func StartAPI(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB) {
+func StartAPI(eb *eventbus.EventBus, rb *rpcbus.RPCBus) {
 	eventBus = eb
 	rpcBus = rb
-	memoryDB = db
 }
 
 func GetBidders(res http.ResponseWriter, req *http.Request) {
-	heightStr := req.URL.Query().Get(":height")
+	heightStr := req.URL.Query().Get("height")
 	if heightStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
 	}
@@ -40,7 +41,7 @@ func GetBidders(res http.ResponseWriter, req *http.Request) {
 }
 
 func GetProvisioners(res http.ResponseWriter, req *http.Request) {
-	heightStr := req.URL.Query().Get(":height")
+	heightStr := req.URL.Query().Get("height")
 	if heightStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
 		return
@@ -54,10 +55,10 @@ func GetProvisioners(res http.ResponseWriter, req *http.Request) {
 
 	log.WithField("height", height).Debug("GetProvisioners")
 
-	var provisioners []byte
-	err = memoryDB.View(func(t database.Transaction) error {
+	var provisioners *user.Provisioners
+	err = DBInstance.View(func(t *buntdb.Tx) error {
 		var err1 error
-		provisioners, err1 = t.FetchProvisioners(uint64(height))
+		provisioners, err1 = FetchProvisioners(t, uint64(height))
 		if err1 != nil {
 			return err1
 		}
@@ -69,13 +70,14 @@ func GetProvisioners(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	_, _ = res.Write(provisioners)
+	b, err := json.Marshal(provisioners)
+	_, _ = res.Write(b)
 
 	res.WriteHeader(http.StatusOK)
 }
 
 func GetRoundInfo(res http.ResponseWriter, req *http.Request) {
-	heightBeginStr := req.URL.Query().Get(":height_begin")
+	heightBeginStr := req.URL.Query().Get("height_begin")
 	if heightBeginStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
 		return
@@ -87,7 +89,7 @@ func GetRoundInfo(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	heightEndStr := req.URL.Query().Get(":height_end")
+	heightEndStr := req.URL.Query().Get("height_end")
 	if heightEndStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
 		return
@@ -109,10 +111,10 @@ func GetRoundInfo(res http.ResponseWriter, req *http.Request) {
 	}
 	var roundInfos []RoundInfo
 
-	err = memoryDB.View(func(t database.Transaction) error {
+	err = DBInstance.View(func(t *buntdb.Tx) error {
 		count := heightEnd - heightBegin
 		for i := 0; i < count; i++ {
-			roundInfoByteArray, err1 := t.FetchRoundInfo(uint64(heightBegin + i))
+			roundInfoByteArray, err1 := FetchRoundInfo(t, uint64(heightBegin+i))
 			if err1 != nil {
 				return err1
 			}

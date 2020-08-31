@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -417,6 +418,19 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 		// Otherwise, we just queue it according to the header round
 		// and step.
 		c.eventqueue.PutEvent(hdr.Round, hdr.Step, m)
+		// store it here
+		//FIXME: this should be moved into eventqueue
+		err := capi.StoreRoundInfo(hdr.Round, hdr.Step, m)
+		if err != nil {
+			lg.
+				WithFields(log.Fields{
+					"round": hdr.Round,
+					"step":  hdr.Step,
+				}).
+				WithError(err).
+				Error("could not save eventqueue on api db")
+		}
+
 		return nil
 	}
 

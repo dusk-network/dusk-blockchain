@@ -19,8 +19,8 @@ type (
 
 	// Provisioners is a map of Members, and makes up the current set of provisioners.
 	Provisioners struct {
-		Set     sortedset.Set
-		Members map[string]*Member
+		Set     sortedset.Set      `json:"set"`
+		Members map[string]*Member `json:"members"`
 	}
 
 	// Stake represents the Provisioner's stake
