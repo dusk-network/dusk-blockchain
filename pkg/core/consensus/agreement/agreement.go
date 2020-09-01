@@ -26,8 +26,9 @@ type agreement struct {
 	workerAmount int
 	quitChan     chan struct{}
 
-	agreementID uint32
-	round       uint64
+	agreementID   uint32
+	agreementName string
+	round         uint64
 }
 
 // newComponent is used by the agreement factory to instantiate the component
@@ -54,6 +55,7 @@ func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consens
 	}
 
 	atomic.StoreUint32(&a.agreementID, agreementSubscriber.Listener.ID())
+	a.agreementName = "agreement/agreement"
 
 	go a.listen()
 	return []consensus.TopicListener{agreementSubscriber}
@@ -63,6 +65,12 @@ func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consens
 // Implements consensus.Component.
 func (a *agreement) ID() uint32 {
 	return atomic.LoadUint32(&a.agreementID)
+}
+
+// Returns the listener Name for the agreement component.
+// Implements consensus.Component.
+func (a *agreement) Name() string {
+	return a.agreementName
 }
 
 // Filter an incoming Agreement message, by checking whether it was sent by a valid

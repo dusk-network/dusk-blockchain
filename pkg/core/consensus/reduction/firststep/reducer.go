@@ -28,7 +28,8 @@ type Reducer struct {
 	eventPlayer consensus.EventPlayer
 	signer      consensus.Signer
 
-	reductionID uint32
+	reductionID   uint32
+	reductionName string
 
 	handler    *reduction.Handler
 	aggregator *aggregator
@@ -72,6 +73,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 		Listener: consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority, true),
 	}
 	r.reductionID = reductionSubscriber.Listener.ID()
+	r.reductionName = "firststep/Reducer"
 
 	return []consensus.TopicListener{bestScoreSubscriber, reductionSubscriber}
 }
@@ -80,6 +82,12 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 // Implements consensus.Component.
 func (r *Reducer) ID() uint32 {
 	return r.reductionID
+}
+
+// Name returns the listener Name of the reducer.
+// Implements consensus.Component.
+func (r *Reducer) Name() string {
+	return r.reductionName
 }
 
 // Finalize the Reducer component by killing the timer, and pausing event streaming.

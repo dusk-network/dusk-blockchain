@@ -63,11 +63,18 @@ func (s *roundStore) addComponent(component Component) {
 	s.lock.Unlock()
 }
 
-func (s *roundStore) hasComponent(id uint32) bool {
+// TODO: modify it to return also the name
+func (s *roundStore) hasComponent(id uint32) (bool, string) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
+	name := ""
+	hasComponent := false
 	i := sort.Search(len(s.components), func(i int) bool { return s.components[i].ID() >= id })
-	return i < len(s.components) && s.components[i].ID() == id
+	hasComponent = i < len(s.components) && s.components[i].ID() == id
+	if hasComponent {
+		name = s.components[i].Name()
+	}
+	return hasComponent, name
 }
 
 func (s *roundStore) initializeComponents(round RoundUpdate) []TopicListener {
@@ -247,6 +254,7 @@ func Start(eventBus *eventbus.EventBus, keys key.Keys, factories ...ComponentFac
 
 //StopConsensus stop the consensus for this round, finalizes the Round, instantiate a new Store
 func (c *Coordinator) StopConsensus(m message.Message) error {
+	// TODO: add roundinfo metric
 	log.
 		WithField("round", c.Round()).
 		Debug("StopConsensus")
@@ -461,9 +469,12 @@ func (c *Coordinator) FinalizeRound() {
 // step count and returns it. It is used as a callback by the consensus
 // components
 func (c *Coordinator) Forward(id uint32) uint8 {
-	if c.store.hasComponent(id) {
+	// TODO: add roundinfo metric
+	hasComponent, name := c.store.hasComponent(id)
+	if hasComponent {
 		lg.
 			WithField("step", c.Step()).
+			WithField("name", name).
 			WithField("round", c.Round()).
 			WithField("id", id).
 			Traceln("incrementing step")
@@ -509,7 +520,8 @@ func (c *Coordinator) Sign(h header.Header) ([]byte, error) {
 // TODO: interface - marshaling should actually be done after the Gossip to
 // respect the symmetry of the architecture
 func (c *Coordinator) Gossip(msg message.Message, id uint32) error {
-	if !c.store.hasComponent(id) {
+	hasComponent, _ := c.store.hasComponent(id)
+	if !hasComponent {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}
 
@@ -540,7 +552,8 @@ func (c *Coordinator) Compose(pf PacketFactory) InternalPacket {
 // SendInternally publish a message for internal consumption (and therefore
 // does not carry the topic, nor needs binary de-serialization)
 func (c *Coordinator) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
-	if !c.store.hasComponent(id) {
+	hasComponent, _ := c.store.hasComponent(id)
+	if !hasComponent {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}
 	errList := c.eventBus.Publish(topic, msg)

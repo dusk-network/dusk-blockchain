@@ -32,10 +32,11 @@ type Generator struct {
 	lock      sync.RWMutex
 	threshold *consensus.Threshold
 
-	signer       consensus.Signer
-	generationID uint32
-	bg           transactions.BlockGenerator
-	ctx          context.Context
+	signer         consensus.Signer
+	generationID   uint32
+	generationName string
+	bg             transactions.BlockGenerator
+	ctx            context.Context
 }
 
 // NewComponent returns an uninitialized Generator.
@@ -98,6 +99,7 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 		Listener: consensus.NewSimpleListener(g.Collect, consensus.LowPriority, false),
 	}
 	g.generationID = generationSubscriber.Listener.ID()
+	g.generationName = "score/Generator"
 
 	return []consensus.TopicListener{generationSubscriber}
 }
@@ -106,6 +108,12 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 // Implements consensus.Component.
 func (g *Generator) ID() uint32 {
 	return g.generationID
+}
+
+// Name returns the listener Name of the Generator.
+// Implements consensus.Component.
+func (g *Generator) Name() string {
+	return g.generationName
 }
 
 // Finalize implements consensus.Component.
