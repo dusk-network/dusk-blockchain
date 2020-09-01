@@ -78,13 +78,15 @@ func FetchRoundInfo(height uint64) (RoundInfoJSON, error) {
 	return targetJSON, err
 }
 
-func StoreRoundInfo(round uint64, step uint8) error {
+func StoreRoundInfo(round uint64, step uint8, methodName, name string) error {
 	err := DBInstance.Update(func(tx *buntdb.Tx) error {
 		eventQueueKey := GetKey(RoundInfoPrefix, fmt.Sprintf("%d:%d", round, step))
 
 		eventQueueJSON := RoundInfoJSON{
 			Step:      step,
 			UpdatedAt: time.Now(),
+			Method:    methodName,
+			Name:      name,
 		}
 
 		eventQueueByteArr, err := json.Marshal(eventQueueJSON)

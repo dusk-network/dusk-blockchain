@@ -63,7 +63,6 @@ func (s *roundStore) addComponent(component Component) {
 	s.lock.Unlock()
 }
 
-// TODO: modify it to return also the name
 func (s *roundStore) hasComponent(id uint32) (bool, string) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -254,7 +253,18 @@ func Start(eventBus *eventbus.EventBus, keys key.Keys, factories ...ComponentFac
 
 //StopConsensus stop the consensus for this round, finalizes the Round, instantiate a new Store
 func (c *Coordinator) StopConsensus(m message.Message) error {
-	// TODO: add roundinfo metric
+	if config.Get().API.Enabled {
+		err := capi.StoreRoundInfo(c.round, c.step, "StopConsensus", "")
+		if err != nil {
+			lg.
+				WithFields(log.Fields{
+					"round": c.Round,
+					"step":  c.Step,
+				}).
+				WithError(err).
+				Error("could not save StoreRoundInfo on api db")
+		}
+	}
 	log.
 		WithField("round", c.Round()).
 		Debug("StopConsensus")
@@ -469,7 +479,6 @@ func (c *Coordinator) FinalizeRound() {
 // step count and returns it. It is used as a callback by the consensus
 // components
 func (c *Coordinator) Forward(id uint32) uint8 {
-	// TODO: add roundinfo metric
 	hasComponent, name := c.store.hasComponent(id)
 	if hasComponent {
 		lg.
@@ -479,6 +488,10 @@ func (c *Coordinator) Forward(id uint32) uint8 {
 			WithField("id", id).
 			Traceln("incrementing step")
 		c.IncrementStep()
+	}
+
+	if config.Get().API.Enabled {
+		_ = capi.StoreRoundInfo(c.round, c.step, "Forward", name)
 	}
 	return c.Step()
 }
