@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/tidwall/buntdb"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -54,17 +53,7 @@ func GetProvisioners(res http.ResponseWriter, req *http.Request) {
 	}
 
 	log.WithField("height", height).Debug("GetProvisioners")
-
-	var provisioners *user.Provisioners
-	err = DBInstance.View(func(t *buntdb.Tx) error {
-		var err1 error
-		provisioners, err1 = FetchProvisioners(t, uint64(height))
-		if err1 != nil {
-			return err1
-		}
-		return nil
-	})
-
+	provisioners, err := FetchProvisioners(uint64(height))
 	if err != nil {
 		res.WriteHeader(http.StatusNotFound)
 		return
@@ -106,28 +95,19 @@ func GetRoundInfo(res http.ResponseWriter, req *http.Request) {
 		WithField("heightEnd", heightEnd).
 		Debug("GetRoundInfo")
 
-	type RoundInfo struct {
-		R []byte `json:"roundinfo"`
-	}
-	var roundInfos []RoundInfo
+	var roundInfos []RoundInfoJSON
 
-	err = DBInstance.View(func(t *buntdb.Tx) error {
-		count := heightEnd - heightBegin
-		for i := 0; i < count; i++ {
-			roundInfoByteArray, err1 := FetchRoundInfo(t, uint64(heightBegin+i))
-			if err1 != nil {
-				return err1
-			}
-			roundInfo := RoundInfo{
-				R: roundInfoByteArray,
-			}
-			roundInfos = append(roundInfos, roundInfo)
+	count := heightEnd - heightBegin
+	for i := 0; i < count; i++ {
+		roundInfo, err1 := FetchRoundInfo(uint64(heightBegin + i))
+		if err1 != nil {
+			res.WriteHeader(http.StatusInternalServerError)
+			return
 		}
+		roundInfos = append(roundInfos, roundInfo)
+	}
 
-		return nil
-	})
-
-	if err != nil {
+	if len(roundInfos) == 0 {
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -144,6 +124,29 @@ func GetRoundInfo(res http.ResponseWriter, req *http.Request) {
 }
 
 func GetEventQueueStatus(res http.ResponseWriter, req *http.Request) {
+	heightStr := req.URL.Query().Get("height")
+	if heightStr == "" {
+		res.WriteHeader(http.StatusBadRequest)
+	}
+	height, err := strconv.Atoi(heightStr)
+	if err != nil {
+		res.WriteHeader(http.StatusBadRequest)
+	}
+
+	log.WithField("height", height).Debug("GetEventQueueStatus")
+
+	provisioners, err := FetchEventQueue(uint64(height))
+	if err != nil {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	b, err := json.Marshal(provisioners)
+	_, _ = res.Write(b)
+
+	res.WriteHeader(http.StatusOK)
+
+	_, _ = res.Write([]byte(``))
 
 	res.WriteHeader(http.StatusOK)
 }

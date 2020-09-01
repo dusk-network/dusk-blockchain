@@ -419,16 +419,18 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 		// and step.
 		c.eventqueue.PutEvent(hdr.Round, hdr.Step, m)
 		// store it here
-		//FIXME: this should be moved into eventqueue
-		err := capi.StoreRoundInfo(hdr.Round, hdr.Step, m)
-		if err != nil {
-			lg.
-				WithFields(log.Fields{
-					"round": hdr.Round,
-					"step":  hdr.Step,
-				}).
-				WithError(err).
-				Error("could not save eventqueue on api db")
+		//TODO: should this be moved into eventqueue ?
+		if config.Get().API.Enabled {
+			err := capi.StoreEventQueue(hdr.Round, hdr.Step, m)
+			if err != nil {
+				lg.
+					WithFields(log.Fields{
+						"round": hdr.Round,
+						"step":  hdr.Step,
+					}).
+					WithError(err).
+					Error("could not save eventqueue on api db")
+			}
 		}
 
 		return nil

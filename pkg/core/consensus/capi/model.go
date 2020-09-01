@@ -11,3 +11,8 @@ type EventQueueJSON struct {
 	Message   message.Message `json:"message"`
 	UpdatedAt time.Time       `json:"updated_at"`
 }
+
+type RoundInfoJSON struct {
+	Step      uint8     `json:"step"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

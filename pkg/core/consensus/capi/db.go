@@ -3,7 +3,6 @@ package capi
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -14,26 +13,30 @@ import (
 )
 
 var (
-	HeaderPrefix       = "header"
 	ProvisionersPrefix = "provisioner"
+	RoundInfoPrefix    = "roundinfo"
+	EventQueuePrefix   = "eventqueue"
 )
 
 func GetKey(name string, value interface{}) string {
 	return fmt.Sprintf("%s:%v", name, value)
 }
 
-func FetchProvisioners(t *buntdb.Tx, height uint64) (*user.Provisioners, error) {
-	key := GetKey(ProvisionersPrefix, height)
-	provisionersStr, err := t.Get(key)
-	if err != nil || len(provisionersStr) == 0 {
-		return nil, err
-	}
+func FetchProvisioners(height uint64) (*user.Provisioners, error) {
+	var provisioners user.Provisioners
+	err := DBInstance.View(func(t *buntdb.Tx) error {
+		key := GetKey(ProvisionersPrefix, height)
+		provisionersStr, err := t.Get(key)
+		if err != nil {
+			return err
+		}
 
-	buf := new(bytes.Buffer)
-	buf.WriteString(provisionersStr)
+		buf := new(bytes.Buffer)
+		buf.WriteString(provisionersStr)
 
-	provisioners, err := user.UnmarshalProvisioners(buf)
-
+		provisioners, err = user.UnmarshalProvisioners(buf)
+		return err
+	})
 	return &provisioners, err
 }
 
@@ -56,9 +59,66 @@ func StoreProvisioners(provisioners *user.Provisioners, height uint64) error {
 	return err
 }
 
-func StoreRoundInfo(round uint64, step uint8, m message.Message) error {
+func FetchRoundInfo(height uint64) (RoundInfoJSON, error) {
+
+	var targetJSON RoundInfoJSON
+	err := DBInstance.View(func(t *buntdb.Tx) error {
+		key := GetKey(RoundInfoPrefix, height)
+		eventQueueJSONStr, err := t.Get(key)
+		if err != nil {
+			return err
+		}
+
+		buf := new(bytes.Buffer)
+		buf.WriteString(eventQueueJSONStr)
+
+		err = json.Unmarshal(buf.Bytes(), &targetJSON)
+		return err
+	})
+	return targetJSON, err
+}
+
+func StoreRoundInfo(round uint64, step uint8) error {
 	err := DBInstance.Update(func(tx *buntdb.Tx) error {
-		eventQueueKey := GetKey("eventqueue", fmt.Sprintf("%d:%d", round, step))
+		eventQueueKey := GetKey(RoundInfoPrefix, fmt.Sprintf("%d:%d", round, step))
+
+		eventQueueJSON := RoundInfoJSON{
+			Step:      step,
+			UpdatedAt: time.Now(),
+		}
+
+		eventQueueByteArr, err := json.Marshal(eventQueueJSON)
+		if err != nil {
+			return err
+		}
+
+		_, _, err = tx.Set(eventQueueKey, string(eventQueueByteArr), &buntdb.SetOptions{Expires: true, TTL: time.Duration(cfg.Get().API.ExpirationTime) * time.Second})
+		return err
+	})
+	return err
+}
+
+func FetchEventQueue(height uint64) (EventQueueJSON, error) {
+	var eventQueueJSON EventQueueJSON
+	err := DBInstance.View(func(t *buntdb.Tx) error {
+		key := GetKey(EventQueuePrefix, height)
+		eventQueueJSONStr, err := t.Get(key)
+		if err != nil {
+			return err
+		}
+
+		buf := new(bytes.Buffer)
+		buf.WriteString(eventQueueJSONStr)
+
+		err = json.Unmarshal(buf.Bytes(), &eventQueueJSON)
+		return err
+	})
+	return eventQueueJSON, err
+}
+
+func StoreEventQueue(round uint64, step uint8, m message.Message) error {
+	err := DBInstance.Update(func(tx *buntdb.Tx) error {
+		eventQueueKey := GetKey(EventQueuePrefix, fmt.Sprintf("%d:%d", round, step))
 
 		eventQueueJSON := EventQueueJSON{
 			Round:     round,
@@ -76,7 +136,4 @@ func StoreRoundInfo(round uint64, step uint8, m message.Message) error {
 		return err
 	})
 	return err
-}
-func FetchRoundInfo(*buntdb.Tx, uint64) ([]byte, error) {
-	return nil, errors.New("method not implemented")
 }
