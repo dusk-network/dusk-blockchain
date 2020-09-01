@@ -1,7 +1,6 @@
 package api
 
 import (
-	"net"
 	"net/http"
 	"time"
 
@@ -28,10 +27,6 @@ var (
 
 // Server defines the HTTP server of the API
 type Server struct {
-	started bool // Indicates whether or not server has started
-
-	listener net.Listener
-
 	// Node components
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
@@ -84,6 +79,7 @@ func (s *Server) Start(srv *Server) error {
 	return err
 }
 
+// InitRouting will init pat.Router endpoints
 func (s *Server) InitRouting() *pat.Router {
 
 	r := pat.New()
@@ -104,10 +100,10 @@ func (s *Server) InitRouting() *pat.Router {
 	// init consensus API services
 	capi.StartAPI(s.eventBus, s.rpcBus)
 
-	r.HandleFunc("/consensus/bidders", capi.GetBidders).Methods("GET")
-	r.HandleFunc("/consensus/provisioners", capi.GetProvisioners).Methods("GET")
-	r.HandleFunc("/consensus/roundinfo", capi.GetRoundInfo).Methods("GET")
-	r.HandleFunc("/consensus/eventqueuestatus", capi.GetEventQueueStatus).Methods("GET")
+	r.HandleFunc("/consensus/bidders", capi.GetBiddersHandler).Methods("GET")
+	r.HandleFunc("/consensus/provisioners", capi.GetProvisionersHandler).Methods("GET")
+	r.HandleFunc("/consensus/roundinfo", capi.GetRoundInfoHandler).Methods("GET")
+	r.HandleFunc("/consensus/eventqueuestatus", capi.GetEventQueueStatusHandler).Methods("GET")
 
 	return r
 }

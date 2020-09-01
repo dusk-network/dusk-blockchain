@@ -22,7 +22,6 @@ const (
 	stateInd
 	bidValuesInd
 	outputKeyInd
-	provisionersInd
 	maxInd
 )
 

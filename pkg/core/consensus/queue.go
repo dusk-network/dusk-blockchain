@@ -6,9 +6,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
-//TODO: entries should become buntdb instead
 // Queue is a Queue of Events grouped by rounds and steps. It is thread-safe
 // through a sync.RWMutex.
+//TODO: entries should become buntdb instead
 type Queue struct {
 	lock    sync.RWMutex
 	entries map[uint64]map[uint8][]message.Message

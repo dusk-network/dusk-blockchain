@@ -20,8 +20,6 @@ const (
 type DBLoader struct {
 	db database.DB
 
-	memoryDB database.DB
-
 	// Unsure if the genesis block needs to be here
 	genesis *block.Block
 

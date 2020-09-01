@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+
 	"github.com/tidwall/buntdb"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -13,17 +15,26 @@ import (
 )
 
 var (
-	eventBus   *eventbus.EventBus
-	rpcBus     *rpcbus.RPCBus
+	eventBus *eventbus.EventBus
+	rpcBus   *rpcbus.RPCBus
+	// DBInstance holds the instance to manipulate the API monitoring DB
 	DBInstance *buntdb.DB
 )
 
+// StartAPI init consensus API pointers
 func StartAPI(eb *eventbus.EventBus, rb *rpcbus.RPCBus) {
 	eventBus = eb
 	rpcBus = rb
+
+	log.
+		WithField("eventBus", eventBus).
+		WithField("rpcBus", rpcBus).
+		Debug("StartAPI")
 }
 
-func GetBidders(res http.ResponseWriter, req *http.Request) {
+// GetBiddersHandler will return a json response
+//FIXME this is not yet implemented since we dont have the info yet
+func GetBiddersHandler(res http.ResponseWriter, req *http.Request) {
 	heightStr := req.URL.Query().Get("height")
 	if heightStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
@@ -39,7 +50,8 @@ func GetBidders(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusOK)
 }
 
-func GetProvisioners(res http.ResponseWriter, req *http.Request) {
+// GetProvisionersHandler will return Provisioners json
+func GetProvisionersHandler(res http.ResponseWriter, req *http.Request) {
 	heightStr := req.URL.Query().Get("height")
 	if heightStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
@@ -53,19 +65,26 @@ func GetProvisioners(res http.ResponseWriter, req *http.Request) {
 	}
 
 	log.WithField("height", height).Debug("GetProvisioners")
-	provisioners, err := FetchProvisioners(uint64(height))
+	var provisioners *user.Provisioners
+	provisioners, err = FetchProvisioners(uint64(height))
 	if err != nil {
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	b, err := json.Marshal(provisioners)
+	var b []byte
+	b, err = json.Marshal(provisioners)
+	if err != nil {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
 	_, _ = res.Write(b)
 
 	res.WriteHeader(http.StatusOK)
 }
 
-func GetRoundInfo(res http.ResponseWriter, req *http.Request) {
+// GetRoundInfoHandler will return RoundInfoJSON json array
+func GetRoundInfoHandler(res http.ResponseWriter, req *http.Request) {
 	heightBeginStr := req.URL.Query().Get("height_begin")
 	if heightBeginStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
@@ -123,7 +142,8 @@ func GetRoundInfo(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusOK)
 }
 
-func GetEventQueueStatus(res http.ResponseWriter, req *http.Request) {
+// GetEventQueueStatusHandler will return EventQueueJSON json
+func GetEventQueueStatusHandler(res http.ResponseWriter, req *http.Request) {
 	heightStr := req.URL.Query().Get("height")
 	if heightStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
@@ -141,12 +161,14 @@ func GetEventQueueStatus(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	b, err := json.Marshal(provisioners)
+	var b []byte
+	b, err = json.Marshal(provisioners)
+	if err != nil {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	_, _ = res.Write(b)
-
-	res.WriteHeader(http.StatusOK)
-
-	_, _ = res.Write([]byte(``))
 
 	res.WriteHeader(http.StatusOK)
 }
