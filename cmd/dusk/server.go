@@ -121,9 +121,11 @@ func Setup() *Server {
 		if apiServer, e := api.NewHTTPServer(eventBus, rpcBus); e != nil {
 			log.Errorf("API http server error: %v", e)
 		} else {
-			if e := apiServer.Start(apiServer); e != nil {
-				log.Errorf("API failed to start: %v", e)
-			}
+			go func() {
+				if e := apiServer.Start(apiServer); e != nil {
+					log.Errorf("API failed to start: %v", e)
+				}
+			}()
 		}
 	}
 

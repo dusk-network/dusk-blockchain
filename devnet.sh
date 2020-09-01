@@ -142,9 +142,9 @@ init_dusk_func() {
   file = "${currentDir}/harness/data/wallet-$((9000+$i)).dat"
   store = "${DDIR}/walletDB/"
 [api]
-  enabled=false
+  enabled=true
   enableTLS = false
-  address="127.0.0.1:9199"
+  address="127.0.0.1:$((9490+$i))"
   dbfile="${DDIR}/chain/api.db"
   expirationtime=300 #5 mins
 

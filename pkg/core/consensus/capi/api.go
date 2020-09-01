@@ -38,16 +38,17 @@ func GetBiddersHandler(res http.ResponseWriter, req *http.Request) {
 	heightStr := req.URL.Query().Get("height")
 	if heightStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	height, err := strconv.Atoi(heightStr)
 	if err != nil {
 		res.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	log.WithField("height", height).Debug("GetBidders")
-	_, _ = res.Write([]byte(``))
+	_, _ = res.Write([]byte(`{"error":"not yet implemented"}`))
 
-	res.WriteHeader(http.StatusOK)
 }
 
 // GetProvisionersHandler will return Provisioners json
@@ -79,8 +80,6 @@ func GetProvisionersHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	_, _ = res.Write(b)
-
-	res.WriteHeader(http.StatusOK)
 }
 
 // GetRoundInfoHandler will return RoundInfoJSON json array
@@ -138,8 +137,6 @@ func GetRoundInfoHandler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	_, _ = res.Write(outputBytes)
-
-	res.WriteHeader(http.StatusOK)
 }
 
 // GetEventQueueStatusHandler will return EventQueueJSON json
@@ -147,10 +144,12 @@ func GetEventQueueStatusHandler(res http.ResponseWriter, req *http.Request) {
 	heightStr := req.URL.Query().Get("height")
 	if heightStr == "" {
 		res.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	height, err := strconv.Atoi(heightStr)
 	if err != nil {
 		res.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	log.WithField("height", height).Debug("GetEventQueueStatus")
@@ -169,6 +168,4 @@ func GetEventQueueStatusHandler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	_, _ = res.Write(b)
-
-	res.WriteHeader(http.StatusOK)
 }
