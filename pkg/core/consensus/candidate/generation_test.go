@@ -32,23 +32,22 @@ func TestGeneration(t *testing.T) {
 	h.TriggerBlockGeneration()
 
 	// Should receive a Score and Candidate message from the generator
-	<-h.ScoreChan
-	candidateMsg := <-h.CandidateChan
-	c := candidateMsg.Payload().(message.Candidate)
+	score := <-h.ScoreChan
+	b := score.Payload().(message.Score).Candidate.Block
 
 	// Check correctness for candidate
 	// Note that we skip the score, since that message is mostly mocked.
 
 	// Block height should equal the round
-	assert.Equal(round, c.Header.Height)
+	assert.Equal(round, b.Header.Height)
 
 	// Last transaction should be coinbase
-	if _, ok := c.Txs[len(c.Txs)-1].(*transactions.DistributeTransaction); !ok {
+	if _, ok := b.Txs[len(b.Txs)-1].(*transactions.DistributeTransaction); !ok {
 		t.Fatal("last transaction in candidate should be a coinbase")
 	}
 
 	// Should contain correct amount of txs
-	assert.Equal(int((txBatchCount)+1), len(c.Txs))
+	assert.Equal(int((txBatchCount)+1), len(b.Txs))
 }
 
 func provideCommittee(rb *rpcbus.RPCBus) error {

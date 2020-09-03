@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
-
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -137,6 +136,20 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	// at a time. Consequently, any lower scores are discarded.
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	// Sanity-check the candidate message
+	if err := candidate.ValidateCandidate(score.Candidate); err != nil {
+		lg.Warn("Invalid candidate message")
+		return nil
+	}
+
+	// Publish internally topics.Candidate with bestEvent(highest score candidate block)
+	msg := message.New(topics.Candidate, score.Candidate)
+	err := s.signer.SendInternally(topics.Candidate, msg, s.ID())
+	if err != nil {
+		lg.WithError(err).Error("CollectScoreEvent, failed to SendInternally the Candidate")
+	}
+
 	// Only check for priority if we already have a best event
 	if !s.bestEvent.IsEmpty() {
 		if s.handler.Priority(s.bestEvent, score) {
@@ -149,27 +162,13 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 		return err
 	}
 
-	// Tell the candidate broker to allow a candidate block with this
-	// hash through.
-	msg := message.New(topics.Score, score)
-	errList := s.publisher.Publish(topics.ValidCandidateHash, msg)
-	diagnostics.LogPublishErrors("selection/selector.go, CollectScoreEvent, topics.ValidCandidateHash, topics.Score", errList)
-
-	if err := s.signer.Gossip(msg, s.ID()); err != nil {
-		lg.
-			WithError(err).
-			WithField("step", h.Step).
-			WithField("round", h.Round).
-			Error("CollectScoreEvent, failed to gossip")
-		return err
-	}
-
 	lg.
 		WithField("step", h.Step).
 		WithField("round", h.Round).
 		WithFields(log.Fields{
 			"new_best": score.Score,
 		}).Debugln("swapping best score")
+
 	s.bestEvent = score
 	return nil
 }
@@ -217,7 +216,7 @@ func (s *Selector) sendBestEvent() error {
 	var bestEvent consensus.InternalPacket
 	s.eventPlayer.Pause(s.scoreID)
 	s.lock.RLock()
-	bestEvent = s.bestEvent
+	bestEvent = s.bestEvent.Copy().(message.Score)
 	s.lock.RUnlock()
 
 	// If we had no best event, we should send an empty hash

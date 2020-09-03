@@ -2,11 +2,10 @@ package candidate
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
-	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -14,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	lg "github.com/sirupsen/logrus"
 )
@@ -30,18 +28,13 @@ var log = lg.WithField("process", "candidate-broker")
 // of the network, and will attempt to provide the requesting component
 // with it's needed `Candidate`.
 type Broker struct {
-	publisher   eventbus.Publisher
-	republisher *republisher.Republisher
+	publisher eventbus.Publisher
+
 	*store
-	lock        sync.RWMutex
-	queue       map[string]message.Candidate
-	validHashes map[string]struct{}
-	republished map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
 	candidateChan     <-chan message.Candidate
 	getCandidateChan  <-chan rpcbus.Request
-	bestScoreChan     <-chan message.Message
 }
 
 // NewBroker returns an initialized Broker struct. It will still need
@@ -53,27 +46,14 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	if err != nil {
 		log.WithError(err).Error("could not Register GetCandidate")
 	}
-	bestScoreChan := make(chan message.Message, 1)
-	broker.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
 
 	b := &Broker{
 		publisher:         broker,
 		store:             newStore(),
-		queue:             make(map[string]message.Candidate),
-		validHashes:       make(map[string]struct{}),
-		republished:       make(map[string]struct{}),
 		acceptedBlockChan: acceptedBlockChan,
 		candidateChan:     initCandidateCollector(broker),
 		getCandidateChan:  getCandidateChan,
-		bestScoreChan:     bestScoreChan,
 	}
-
-	addValidHashListener := eventbus.NewCallbackListener(b.AddValidHash)
-	if config.Get().General.SafeCallbackListener {
-		addValidHashListener = eventbus.NewSafeCallbackListener(b.AddValidHash)
-	}
-	broker.Subscribe(topics.ValidCandidateHash, addValidHashListener)
-	b.republisher = republisher.New(broker, topics.Candidate, Validate, b.Validate)
 	return b
 }
 
@@ -83,53 +63,23 @@ func (b *Broker) Listen() {
 	for {
 		select {
 		case cm := <-b.candidateChan:
-			b.lock.Lock()
-			b.queue[string(cm.Block.Header.Hash)] = cm
-			b.lock.Unlock()
+			b.storeCandidateMessage(cm)
 		case r := <-b.getCandidateChan:
 			// candidate requests from the RPCBus
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
-			// accepted blocks come from the consensus
-			b.lock.Lock()
-			b.clearEligibleHashes()
-			b.clearRepublishedHashes()
-			b.lock.Unlock()
+			// Remove all candidates with lower or equal round
 			b.Clear(blk.Header.Height)
-		case <-b.bestScoreChan:
-			b.filterWinningCandidates()
 		}
 	}
-}
-
-// Filter through the queue with the valid hashes, storing the Candidate
-// messages which for which a hash is known, and deleting
-// everything else.
-func (b *Broker) filterWinningCandidates() {
-	b.lock.Lock()
-	for k, cm := range b.queue {
-		if _, ok := b.validHashes[k]; ok {
-			b.storeCandidateMessage(cm)
-		}
-
-		delete(b.queue, k)
-	}
-	b.lock.Unlock()
 }
 
 // TODO: interface - rpcBus encoding will be removed
 func (b *Broker) provideCandidate(r rpcbus.Request) {
-	b.lock.RLock()
-	params := r.Params.(bytes.Buffer)
-	cm, ok := b.queue[params.String()]
-	b.lock.RUnlock()
-	if ok {
-		r.RespChan <- rpcbus.Response{Resp: cm, Err: nil}
-		return
-	}
 
-	cm = b.store.fetchCandidateMessage(params.Bytes())
-	if cm.Block == nil {
+	params := r.Params.(bytes.Buffer)
+	cm, err := b.store.fetchCandidateMessage(params.Bytes())
+	if err != nil {
 		// If we don't have the candidate message, we should ask the network for it.
 		var err error
 		cm, err = b.requestCandidate(params.Bytes())
@@ -152,6 +102,8 @@ var ErrGetCandidateTimeout = errors.New("request GetCandidate timeout")
 // TODO: encoding the category within the packet and specifying it as category
 // is ugly af
 func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
+
+	lg.WithField("hash", hex.EncodeToString(hash)).Trace("Request Candidate from peers")
 	// Send a request for this specific candidate
 	buf := bytes.NewBuffer(hash)
 	// Ugh! Move encoding after the Gossip ffs
@@ -168,6 +120,7 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	for {
 		select {
 		case <-timer.C:
+			lg.WithField("hash", hex.EncodeToString(hash)).Trace("Request Candidate from peers failed")
 			return message.Candidate{}, ErrGetCandidateTimeout
 
 		// We take control of `candidateChan`, to monitor incoming
@@ -176,49 +129,14 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 		// be through `Listen`. Any incoming candidates which don't match
 		// our request will be passed down to the queue.
 		case cm := <-b.candidateChan:
+
+			b.storeCandidateMessage(cm)
+
 			if bytes.Equal(cm.Block.Header.Hash, hash) {
+				lg.WithField("hash", hex.EncodeToString(hash)).Trace("Request Candidate from peers succeeded")
 				return cm, nil
 			}
 
-			b.lock.Lock()
-			b.queue[string(cm.Block.Header.Hash)] = cm
-			b.lock.Unlock()
 		}
-	}
-}
-
-// Validate that the candidate block carried by a message has not been already republished.
-// This function complies to the republisher.Validator interface
-func (b *Broker) Validate(m message.Message) error {
-	cm := m.Payload().(message.Candidate)
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	if _, ok := b.republished[string(cm.Block.Header.Hash)]; ok {
-		return republisher.DuplicatePayloadError
-	}
-
-	b.republished[string(cm.Block.Header.Hash)] = struct{}{}
-	return nil
-}
-
-// AddValidHash to the local cache for a score. Broker.validHashes uses a map
-// to implement a HashSet
-func (b *Broker) AddValidHash(m message.Message) error {
-	s := m.Payload().(message.Score)
-	b.lock.Lock()
-	b.validHashes[string(s.VoteHash)] = struct{}{}
-	b.lock.Unlock()
-	return nil
-}
-
-func (b *Broker) clearEligibleHashes() {
-	for k := range b.validHashes {
-		delete(b.validHashes, k)
-	}
-}
-
-func (b *Broker) clearRepublishedHashes() {
-	for k := range b.republished {
-		delete(b.republished, k)
 	}
 }

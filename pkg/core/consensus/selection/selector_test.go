@@ -43,11 +43,12 @@ func TestSelection(t *testing.T) {
 }
 
 func TestMultipleVerification(t *testing.T) {
+
 	bus := eventbus.New()
 	hlp := selection.NewHelper(bus)
-	// Sub to gossip, so we can catch any outgoing events
-	gossipChan := make(chan message.Message, 10)
-	bus.Subscribe(topics.Gossip, eventbus.NewChanListener(gossipChan))
+
+	bestScoreChan := make(chan message.Message, 1)
+	bus.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
 	hlp.Initialize(consensus.MockRoundUpdate(1, nil))
 
 	// Make sure to replace the handler, to avoid zkproof verification
@@ -75,13 +76,17 @@ func TestMultipleVerification(t *testing.T) {
 				wg.Done()
 			}
 		}
+
 	}()
 
 	hlp.Selector.CollectScoreEvent(scores[0])
 	wg.Wait()
 
-	// We should only have one repropagated event
-	assert.Equal(t, 1, len(gossipChan))
+	// Collect bestScore
+	bestScoreMessage := <-bestScoreChan
+	bs := bestScoreMessage.Payload().(message.Score)
+
+	assert.True(t, bs.Equal(scores[0]))
 }
 
 // Ensure that `CollectScoreEvent` does not panic if it is called before

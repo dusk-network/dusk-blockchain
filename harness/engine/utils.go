@@ -359,7 +359,7 @@ func (n *Network) IsSynced(threshold uint64) (uint64, error) {
 			logMsg += "]"
 			logrus.WithField("process", "monitor").Info(logMsg)
 		}
-		return 0, errors.New("potential network inconsistency recoreded")
+		return 0, errors.New("potential network inconsistency detected")
 	}
 
 	if len(forks) == 0 {

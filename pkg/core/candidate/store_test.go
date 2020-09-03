@@ -30,7 +30,7 @@ func TestStoreFetchClear(t *testing.T) {
 	// Fetch it now
 	// Hash is genesis hash
 	genesis := config.DecodeGenesis()
-	fetched := c.fetchCandidateMessage(genesis.Header.Hash)
+	fetched, _ := c.fetchCandidateMessage(genesis.Header.Hash)
 	assert.NotNil(fetched)
 
 	// Correctness checks

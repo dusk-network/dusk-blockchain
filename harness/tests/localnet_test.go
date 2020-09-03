@@ -100,7 +100,7 @@ func monitorNetwork() {
 	// Pending to add more run-time assertion points
 	for {
 		// Monitor network tip
-		networkTip, err := localNet.IsSynced(3)
+		networkTip, err := localNet.IsSynced(5)
 		if err != nil {
 			// Network is not synced completely
 			logrus.Fatal(err)
