@@ -17,8 +17,7 @@ type connmgr struct {
 }
 
 //NewConnMgr creates a new connection manager
-//nolint:golint
-func NewConnMgr(cfg CmgrConfig) *connmgr {
+func newConnMgr(cfg CmgrConfig) *connmgr {
 	cnnmgr := &connmgr{
 		cfg,
 	}
@@ -27,7 +26,8 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 		addrPort := ":" + cfg.Port
 		listener, err := net.Listen("tcp", addrPort)
 		if err != nil {
-			log.Panic(err)
+			log.WithError(err).Error("newConnMgr will panic after listener returns err")
+			panic(err)
 		}
 
 		defer func() {

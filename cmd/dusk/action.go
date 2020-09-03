@@ -103,7 +103,7 @@ func action(ctx *cli.Context) error {
 	defer s.Close()
 
 	//start the connection manager
-	connMgr := NewConnMgr(CmgrConfig{
+	connMgr := newConnMgr(CmgrConfig{
 		Port:     port,
 		OnAccept: srv.OnAccept,
 		OnConn:   srv.OnConnection,

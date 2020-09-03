@@ -218,7 +218,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	exitChan := make(chan struct{}, 1)
 	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
-		logServer.Panic(err)
+		panic(err)
 	}
 
 	if err := peerReader.Accept(); err != nil {
