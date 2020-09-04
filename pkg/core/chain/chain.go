@@ -359,7 +359,8 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	c.p = &provisioners
 
 	if config.Get().API.Enabled {
-		err := capi.StoreProvisioners(c.p, blk.Header.Height)
+		store := capi.GetBuntStoreInstance()
+		err := store.StoreProvisioners(c.p, blk.Header.Height)
 		if err != nil {
 			log.Warn("Could not store provisioners on memoryDB")
 		}

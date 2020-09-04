@@ -114,6 +114,9 @@ init_dusk_func() {
   #output = "${DDIR}/dusk"
   level = "trace"
   format = "json"
+[logger.monitor]
+# enabling log based monitoring
+enabled = false
 
 [mempool]
   maxinvitems = "10000"

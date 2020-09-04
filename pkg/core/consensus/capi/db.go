@@ -17,7 +17,77 @@ var (
 	ProvisionersPrefix = "provisioner"
 	RoundInfoPrefix    = "roundinfo"
 	EventQueuePrefix   = "eventqueue"
+	buntStoreInstance  *BuntStore
 )
+
+type Level int
+
+const (
+	Low    Level = -1
+	Medium Level = 0
+	High   Level = 1
+)
+
+// BuntStore provides access to BuntDB
+type BuntStore struct {
+	// db is the handle to db
+	db *buntdb.DB
+	// The path to the BuntDB file
+	path string
+}
+
+func GetBuntStoreInstance() *BuntStore {
+	if buntStoreInstance == nil {
+		panic("BuntStore instance is nil")
+	}
+	return buntStoreInstance
+}
+
+func SetBuntStoreInstance(store *BuntStore) {
+	buntStoreInstance = store
+}
+
+// NewBuntStore takes a file path and returns a connected Raft backend.
+func NewBuntStore(path string, durability Level) (*BuntStore, error) {
+	// Try to connect
+	db, err := buntdb.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Disable the AutoShrink. Shrinking should only be manually
+	// handled following a log compaction.
+	var config buntdb.Config
+	if err := db.ReadConfig(&config); err != nil {
+		db.Close()
+		return nil, err
+	}
+	config.AutoShrinkDisabled = true
+	switch durability {
+	case Low:
+		config.SyncPolicy = buntdb.Never
+	case Medium:
+		config.SyncPolicy = buntdb.EverySecond
+	case High:
+		config.SyncPolicy = buntdb.Always
+	}
+	if err := db.SetConfig(config); err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	// Create the new store
+	store := &BuntStore{
+		db:   db,
+		path: path,
+	}
+	return store, nil
+}
+
+// Close is used to gracefully close the DB connection.
+func (b *BuntStore) Close() error {
+	return b.db.Close()
+}
 
 // GetKey will get a composed key
 func GetKey(name string, value interface{}) string {
@@ -25,9 +95,9 @@ func GetKey(name string, value interface{}) string {
 }
 
 // FetchProvisioners will get the Provisioners from db
-func FetchProvisioners(height uint64) (*user.Provisioners, error) {
+func (b *BuntStore) FetchProvisioners(height uint64) (*user.Provisioners, error) {
 	var provisioners user.Provisioners
-	err := DBInstance.View(func(t *buntdb.Tx) error {
+	err := b.db.View(func(t *buntdb.Tx) error {
 		key := GetKey(ProvisionersPrefix, height)
 		provisionersStr, err := t.Get(key)
 		if err != nil {
@@ -47,8 +117,8 @@ func FetchProvisioners(height uint64) (*user.Provisioners, error) {
 }
 
 // StoreProvisioners will store the Provisioners into db
-func StoreProvisioners(provisioners *user.Provisioners, height uint64) error {
-	err := DBInstance.Update(func(tx *buntdb.Tx) error {
+func (b *BuntStore) StoreProvisioners(provisioners *user.Provisioners, height uint64) error {
+	err := b.db.Update(func(tx *buntdb.Tx) error {
 
 		var init []byte
 		buf := bytes.NewBuffer(init)
@@ -67,10 +137,10 @@ func StoreProvisioners(provisioners *user.Provisioners, height uint64) error {
 }
 
 // FetchRoundInfo will get the RoundInfoJSON info from db
-func FetchRoundInfo(height uint64) (RoundInfoJSON, error) {
+func (b *BuntStore) FetchRoundInfo(height uint64) (RoundInfoJSON, error) {
 
 	var targetJSON RoundInfoJSON
-	err := DBInstance.View(func(t *buntdb.Tx) error {
+	err := b.db.View(func(t *buntdb.Tx) error {
 		key := GetKey(RoundInfoPrefix, height)
 		eventQueueJSONStr, err := t.Get(key)
 		if err != nil {
@@ -90,8 +160,8 @@ func FetchRoundInfo(height uint64) (RoundInfoJSON, error) {
 }
 
 // StoreRoundInfo will store the round info into db
-func StoreRoundInfo(round uint64, step uint8, methodName, name string) error {
-	err := DBInstance.Update(func(tx *buntdb.Tx) error {
+func (b *BuntStore) StoreRoundInfo(round uint64, step uint8, methodName, name string) error {
+	err := b.db.Update(func(tx *buntdb.Tx) error {
 		eventQueueKey := GetKey(RoundInfoPrefix, fmt.Sprintf("%d:%d", round, step))
 
 		eventQueueJSON := RoundInfoJSON{
@@ -113,9 +183,9 @@ func StoreRoundInfo(round uint64, step uint8, methodName, name string) error {
 }
 
 // FetchEventQueue will store the EventQueueJSON info into db
-func FetchEventQueue(height uint64) (EventQueueJSON, error) {
+func (b *BuntStore) FetchEventQueue(height uint64) (EventQueueJSON, error) {
 	var eventQueueJSON EventQueueJSON
-	err := DBInstance.View(func(t *buntdb.Tx) error {
+	err := b.db.View(func(t *buntdb.Tx) error {
 		key := GetKey(EventQueuePrefix, height)
 		eventQueueJSONStr, err := t.Get(key)
 		if err != nil {
@@ -135,8 +205,8 @@ func FetchEventQueue(height uint64) (EventQueueJSON, error) {
 }
 
 // StoreEventQueue will store the round info into db
-func StoreEventQueue(round uint64, step uint8, m message.Message) error {
-	err := DBInstance.Update(func(tx *buntdb.Tx) error {
+func (b *BuntStore) StoreEventQueue(round uint64, step uint8, m message.Message) error {
+	err := b.db.Update(func(tx *buntdb.Tx) error {
 		eventQueueKey := GetKey(EventQueuePrefix, fmt.Sprintf("%d:%d", round, step))
 
 		eventQueueJSON := EventQueueJSON{

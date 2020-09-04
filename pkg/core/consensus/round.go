@@ -254,7 +254,8 @@ func Start(eventBus *eventbus.EventBus, keys key.Keys, factories ...ComponentFac
 //StopConsensus stop the consensus for this round, finalizes the Round, instantiate a new Store
 func (c *Coordinator) StopConsensus(m message.Message) error {
 	if config.Get().API.Enabled {
-		err := capi.StoreRoundInfo(c.round, c.step, "StopConsensus", "")
+		store := capi.GetBuntStoreInstance()
+		err := store.StoreRoundInfo(c.round, c.step, "StopConsensus", "")
 		if err != nil {
 			lg.
 				WithFields(log.Fields{
@@ -439,7 +440,8 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 		// store it here
 		//TODO: should this be moved into eventqueue ?
 		if config.Get().API.Enabled {
-			err := capi.StoreEventQueue(hdr.Round, hdr.Step, m)
+			store := capi.GetBuntStoreInstance()
+			err := store.StoreEventQueue(hdr.Round, hdr.Step, m)
 			if err != nil {
 				lg.
 					WithFields(log.Fields{
@@ -491,7 +493,8 @@ func (c *Coordinator) Forward(id uint32) uint8 {
 	}
 
 	if config.Get().API.Enabled {
-		_ = capi.StoreRoundInfo(c.round, c.step, "Forward", name)
+		store := capi.GetBuntStoreInstance()
+		_ = store.StoreRoundInfo(c.round, c.step, "Forward", name)
 	}
 	return c.Step()
 }

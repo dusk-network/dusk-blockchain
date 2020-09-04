@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/tidwall/buntdb"
-
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -43,14 +41,11 @@ func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server,
 		dbFile = ":memory:"
 	}
 
-	// Open the data.db file. It will be created if it doesn't exist.
-	db, err := buntdb.Open(dbFile)
+	store, err := capi.NewBuntStore(dbFile, 1)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//Set DB instance
-	capi.DBInstance = db
+	capi.SetBuntStoreInstance(store)
 
 	srv := Server{
 		eventBus: eventBus,

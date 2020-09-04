@@ -7,8 +7,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 
-	"github.com/tidwall/buntdb"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
@@ -17,8 +15,6 @@ import (
 var (
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
-	// DBInstance holds the instance to manipulate the API monitoring DB
-	DBInstance *buntdb.DB
 )
 
 // StartAPI init consensus API pointers
@@ -67,7 +63,7 @@ func GetProvisionersHandler(res http.ResponseWriter, req *http.Request) {
 
 	log.WithField("height", height).Debug("GetProvisioners")
 	var provisioners *user.Provisioners
-	provisioners, err = FetchProvisioners(uint64(height))
+	provisioners, err = GetBuntStoreInstance().FetchProvisioners(uint64(height))
 	if err != nil {
 		res.WriteHeader(http.StatusNotFound)
 		return
@@ -117,7 +113,7 @@ func GetRoundInfoHandler(res http.ResponseWriter, req *http.Request) {
 
 	count := heightEnd - heightBegin
 	for i := 0; i < count; i++ {
-		roundInfo, err1 := FetchRoundInfo(uint64(heightBegin + i))
+		roundInfo, err1 := GetBuntStoreInstance().FetchRoundInfo(uint64(heightBegin + i))
 		if err1 != nil {
 			res.WriteHeader(http.StatusInternalServerError)
 			return
@@ -154,7 +150,7 @@ func GetEventQueueStatusHandler(res http.ResponseWriter, req *http.Request) {
 
 	log.WithField("height", height).Debug("GetEventQueueStatus")
 
-	provisioners, err := FetchEventQueue(uint64(height))
+	provisioners, err := GetBuntStoreInstance().FetchEventQueue(uint64(height))
 	if err != nil {
 		res.WriteHeader(http.StatusNotFound)
 		return
