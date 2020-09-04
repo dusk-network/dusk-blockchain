@@ -6,7 +6,8 @@ import (
 	"sync/atomic"
 )
 
-// Buffer represents a circular array of data items.
+// Buffer represents a circular array of data items
+// It is suitable for (single/multiple) consumers (single/multiple) producers data transfer
 type Buffer struct {
 	items      [][]byte
 	mu         *sync.Mutex
@@ -52,8 +53,8 @@ func (r *Buffer) Put(item []byte) {
 
 	r.mu.Unlock()
 
-	// Signal consumer we've got new item
-	r.notEmpty.Signal()
+	// Signal consumers we've got new item
+	r.notEmpty.Broadcast()
 }
 
 // Close will close the Buffer
