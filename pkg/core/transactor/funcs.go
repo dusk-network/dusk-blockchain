@@ -6,7 +6,8 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 )
 
@@ -26,7 +27,7 @@ func (t *Transactor) createWallet(seed []byte, password string) error {
 		}
 	}
 
-	sk, pk, vk, err := t.keyMaster.GenerateSecretKey(context.Background(), seed)
+	sk, pk, vk, err := t.keyMaster.GenerateKeys(context.Background(), seed)
 	if err != nil {
 		return err
 	}
@@ -34,7 +35,7 @@ func (t *Transactor) createWallet(seed []byte, password string) error {
 	t.secretKey = sk
 
 	skBuf := new(bytes.Buffer)
-	if err = transactions.MarshalSecretKey(skBuf, t.secretKey); err != nil {
+	if err = keys.MarshalSecretKey(skBuf, &t.secretKey); err != nil {
 		_ = db.Close()
 		return err
 	}
@@ -59,7 +60,7 @@ func (t *Transactor) createWallet(seed []byte, password string) error {
 	return nil
 }
 
-func (t *Transactor) loadWallet(password string) (pubKey transactions.PublicKey, err error) {
+func (t *Transactor) loadWallet(password string) (pubKey keys.PublicKey, err error) {
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
@@ -80,24 +81,24 @@ func (t *Transactor) loadWallet(password string) (pubKey transactions.PublicKey,
 }
 
 // DecodeAddressToPublicKey will decode a []byte to rusk.PublicKey
-func DecodeAddressToPublicKey(in []byte) (transactions.PublicKey, error) {
-	var pk transactions.PublicKey
+func DecodeAddressToPublicKey(in []byte) (keys.PublicKey, error) {
+	var pk keys.PublicKey
 	var buf = &bytes.Buffer{}
 	_, err := buf.Write(in)
 	if err != nil {
 		return pk, err
 	}
 
-	pk.AG = new(transactions.CompressedPoint)
-	pk.BG = new(transactions.CompressedPoint)
-	pk.AG.Y = make([]byte, 32)
-	pk.BG.Y = make([]byte, 32)
+	pk.AG = new(common.JubJubCompressed)
+	pk.BG = new(common.JubJubCompressed)
+	pk.AG.Data = make([]byte, 32)
+	pk.BG.Data = make([]byte, 32)
 
-	if _, err = buf.Read(pk.AG.Y); err != nil {
+	if _, err = buf.Read(pk.AG.Data); err != nil {
 		return pk, err
 	}
 
-	if _, err = buf.Read(pk.BG.Y); err != nil {
+	if _, err = buf.Read(pk.BG.Data); err != nil {
 		return pk, err
 	}
 

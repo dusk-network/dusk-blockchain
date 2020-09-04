@@ -21,7 +21,7 @@ import (
 
 var log = logger.WithFields(logger.Fields{"prefix": "grpc"})
 
-// CreateRuskClient opens the connection with the Rusk gRPC server, and
+// CreateStateClient opens the connection with the Rusk gRPC server, and
 // initializes the different clients which can speak to the Rusk server.
 //
 // As the Rusk server is a fundamental part of the node functionality,
@@ -31,7 +31,7 @@ var log = logger.WithFields(logger.Fields{"prefix": "grpc"})
 // channel.
 // QUESTION: should this function be triggered everytime we wanna query
 // RUSK or the client can remain connected?
-func CreateRuskClient(ctx context.Context, address string) (rusk.RuskClient, *grpc.ClientConn) {
+func CreateStateClient(ctx context.Context, address string) (rusk.StateClient, *grpc.ClientConn) {
 	// NOTE: the grpc client connections should be reused for the lifetime of
 	// the client. For this reason, we do not set a timeout at this stage
 
@@ -41,7 +41,37 @@ func CreateRuskClient(ctx context.Context, address string) (rusk.RuskClient, *gr
 		log.Panic(err)
 	}
 
-	return rusk.NewRuskClient(conn), conn
+	return rusk.NewStateClient(conn), conn
+}
+
+// CreateKeysClient creates a client for the Keys service.
+func CreateKeysClient(ctx context.Context, address string) (rusk.KeysClient, *grpc.ClientConn) {
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return rusk.NewKeysClient(conn), conn
+}
+
+// CreateBlindBidServiceClient creates a client for the Keys service.
+func CreateBlindBidServiceClient(ctx context.Context, address string) (rusk.BlindBidServiceClient, *grpc.ClientConn) {
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return rusk.NewBlindBidServiceClient(conn), conn
+}
+
+// CreateBidServiceClient creates a client for the Keys service.
+func CreateBidServiceClient(ctx context.Context, address string) (rusk.BidServiceClient, *grpc.ClientConn) {
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return rusk.NewBidServiceClient(conn), conn
 }
 
 type (

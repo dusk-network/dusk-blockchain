@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 
 	assert "github.com/stretchr/testify/require"
 )
@@ -36,7 +36,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func createRPCConn(t *testing.T) (client rusk.RuskClient, conn *grpc.ClientConn) {
+func createRPCConn(t *testing.T) (client rusk.KeysClient, conn *grpc.ClientConn) {
 	assert := assert.New(t)
 	dialCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -44,7 +44,7 @@ func createRPCConn(t *testing.T) (client rusk.RuskClient, conn *grpc.ClientConn)
 	var err error
 	conn, err = grpc.DialContext(dialCtx, address, grpc.WithInsecure())
 	assert.NoError(err)
-	return rusk.NewRuskClient(conn), conn
+	return rusk.NewKeysClient(conn), conn
 }
 
 func TestNewWallet(t *testing.T) {
@@ -64,11 +64,11 @@ func TestNewWallet(t *testing.T) {
 	assert.NoError(err)
 
 	ctx := context.Background()
-	secretKey, err := client.GenerateSecretKey(ctx, &rusk.GenerateSecretKeyRequest{B: seed})
+	secretKey, err := client.GenerateKeys(ctx, &rusk.GenerateKeysRequest{})
 	assert.NoError(err)
 
-	sk := new(transactions.SecretKey)
-	transactions.USecretKey(secretKey.Sk, sk)
+	sk := new(keys.SecretKey)
+	keys.USecretKey(secretKey.Sk, sk)
 	assert.NotNil(sk)
 	assert.NotNil(sk.A.Data)
 	assert.NotNil(sk.B.Data)
@@ -111,9 +111,9 @@ func TestCatchEOF(t *testing.T) {
 		require.Nil(t, err)
 
 		ctx := context.Background()
-		secretKey, err := client.GenerateSecretKey(ctx, &rusk.GenerateSecretKeyRequest{B: seed})
-		sk := new(transactions.SecretKey)
-		transactions.USecretKey(secretKey.Sk, sk)
+		secretKey, err := client.GenerateKeys(ctx, &rusk.GenerateKeysRequest{})
+		sk := new(keys.SecretKey)
+		keys.USecretKey(secretKey.Sk, sk)
 		require.Nil(t, err)
 
 		_, err = New(nil, seed, netPrefix, db, "pass", seedFile, sk)

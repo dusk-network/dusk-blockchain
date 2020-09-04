@@ -2,7 +2,7 @@ package ruskmock
 
 import (
 	"context"
-	"math/big"
+	"crypto/rand"
 	"net"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -17,7 +17,6 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -66,7 +65,7 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 	}
 
 	grpcServer := grpc.NewServer()
-	rusk.RegisterRuskServer(grpcServer, srv)
+	rusk.RegisterStateServer(grpcServer, srv)
 	srv.s = grpcServer
 
 	// First load the database
@@ -125,29 +124,29 @@ func (s *Server) Echo(ctx context.Context, req *rusk.EchoRequest) (*rusk.EchoRes
 	return &rusk.EchoResponse{}, nil
 }
 
-// ValidateStateTransition simulates a state transition validation. The outcome is dictated
+// VerifyStateTransition simulates a state transition validation. The outcome is dictated
 // by the server configuration.
-func (s *Server) ValidateStateTransition(ctx context.Context, req *rusk.ValidateStateTransitionRequest) (*rusk.ValidateStateTransitionResponse, error) {
-	if s.cfg.PassStateTransitionValidation {
-		indices := make([]int32, len(req.Calls))
+func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStateTransitionRequest) (*rusk.VerifyStateTransitionResponse, error) {
+	if !s.cfg.PassStateTransitionValidation {
+		indices := make([]uint64, len(req.Txs))
 		for i := range indices {
-			indices[i] = int32(i)
+			indices[i] = uint64(i)
 		}
 
-		return &rusk.ValidateStateTransitionResponse{
-			SuccessfulCalls: indices,
+		return &rusk.VerifyStateTransitionResponse{
+			FailedCalls: indices,
 		}, nil
 	}
 
-	return &rusk.ValidateStateTransitionResponse{
-		SuccessfulCalls: make([]int32, 0),
+	return &rusk.VerifyStateTransitionResponse{
+		FailedCalls: make([]uint64, 0),
 	}, nil
 }
 
 // ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
 // configuration.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
-	txs, err := legacy.ContractCallsToTxs(req.Calls)
+	txs, err := legacy.ContractCallsToTxs(req.Txs)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +164,13 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 	}
 
 	return &rusk.ExecuteStateTransitionResponse{
-		Success:   s.cfg.PassStateTransition,
-		Committee: legacy.ProvisionersToRuskCommittee(s.p),
+		Success: s.cfg.PassStateTransition,
+	}, nil
+}
+
+func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersRequest) (*rusk.GetProvisionersResponse, error) {
+	return &rusk.GetProvisionersResponse{
+		Provisioners: legacy.ProvisionersToRuskCommittee(s.p),
 	}, nil
 }
 
@@ -202,10 +206,15 @@ func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreReque
 	}
 
 	return &rusk.GenerateScoreResponse{
-		Proof:    proof,
-		Score:    score,
-		Seed:     req.Seed,
-		Identity: identity,
+		BlindbidProof: &rusk.Proof{
+			Data: proof,
+		},
+		Score: &rusk.BlsScalar{
+			Data: score,
+		},
+		ProverIdentity: &rusk.BlsScalar{
+			Data: identity,
+		},
 	}, nil
 }
 
@@ -216,15 +225,18 @@ func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) 
 	}, nil
 }
 
-// GenerateSecretKey returns a set of randomly generated keys. They will contain Ristretto
+// GenerateKeys returns a set of randomly generated keys. They will contain Ristretto
 // points under the hood.
-func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecretKeyRequest) (*rusk.GenerateSecretKeyResponse, error) {
+func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest) (*rusk.GenerateKeysResponse, error) {
 	db, err := database.New(config.Get().Wallet.Store)
 	if err != nil {
 		return nil, err
 	}
 
-	w, err := wallet.LoadFromSeed(req.B, byte(2), db, fetchDecoys, fetchInputs, "password", config.Get().Wallet.File)
+	seed := make([]byte, 32)
+	rand.Read(seed)
+
+	w, err := wallet.LoadFromSeed(seed, byte(2), db, fetchDecoys, fetchInputs, "password", config.Get().Wallet.File)
 	if err != nil {
 		return nil, err
 	}
@@ -240,67 +252,52 @@ func (s *Server) GenerateSecretKey(ctx context.Context, req *rusk.GenerateSecret
 		return nil, err
 	}
 
-	return &rusk.GenerateSecretKeyResponse{
+	return &rusk.GenerateKeysResponse{
 		Sk: &rusk.SecretKey{
-			A: &rusk.Scalar{
+			A: &rusk.JubJubScalar{
 				Data: pSpend,
 			},
-			B: &rusk.Scalar{
+			B: &rusk.JubJubScalar{
 				Data: make([]byte, 0),
 			},
 		},
 		Vk: &rusk.ViewKey{
-			A: &rusk.Scalar{
+			A: &rusk.JubJubScalar{
 				Data: make([]byte, 0),
 			},
-			BG: &rusk.CompressedPoint{
-				Y: make([]byte, 0),
+			BG: &rusk.JubJubCompressed{
+				Data: make([]byte, 0),
 			},
 		},
 		Pk: &rusk.PublicKey{
-			AG: &rusk.CompressedPoint{
-				Y: addr.P.Bytes(),
+			AG: &rusk.JubJubCompressed{
+				Data: addr.P.Bytes(),
 			},
-			BG: &rusk.CompressedPoint{
-				Y: make([]byte, 0),
+			BG: &rusk.JubJubCompressed{
+				Data: make([]byte, 0),
 			},
 		},
 	}, nil
 }
 
-// Keys returns the public key for a given secret key.
-func (s *Server) Keys(ctx context.Context, req *rusk.SecretKey) (*rusk.KeysResponse, error) {
+// GenerateStealthAddress returns a stealth address generated from a public key.
+func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey) (*rusk.StealthAddress, error) {
 	var r ristretto.Scalar
 	r.Rand()
 	pk := s.w.PublicKey()
 	addr := pk.StealthAddress(r, 0)
-	return &rusk.KeysResponse{
-		Vk: &rusk.ViewKey{
-			A: &rusk.Scalar{
-				Data: make([]byte, 0),
-			},
-			BG: &rusk.CompressedPoint{
-				Y: make([]byte, 0),
-			},
+	return &rusk.StealthAddress{
+		RG: &rusk.JubJubCompressed{
+			Data: addr.P.Bytes(),
 		},
-		Pk: &rusk.PublicKey{
-			AG: &rusk.CompressedPoint{
-				Y: addr.P.Bytes(),
-			},
-			BG: &rusk.CompressedPoint{
-				Y: make([]byte, 0),
-			},
+		PkR: &rusk.JubJubCompressed{
+			Data: make([]byte, 0),
 		},
 	}, nil
 }
 
-// FullScanOwnedNotes returns the inputs belonging to the given view key.
-// TODO: implement (if necessary)
-func (s *Server) FullScanOwnedNotes(ctx context.Context, req *rusk.ViewKey) (*rusk.OwnedNotesResponse, error) {
-	return nil, nil
-}
-
 // NewTransaction creates a transaction and returns it to the caller.
+/*
 func (s *Server) NewTransaction(ctx context.Context, req *rusk.NewTransactionRequest) (*rusk.Transaction, error) {
 	tx, err := transactions.NewStandard(0, byte(2), int64(req.Fee))
 	if err != nil {
@@ -334,89 +331,9 @@ func (s *Server) NewTransaction(ctx context.Context, req *rusk.NewTransactionReq
 		return nil, err
 	}
 
-	return legacy.StandardToRuskTx(tx)
+	return legacy.TxToRuskTx(tx)
 }
-
-// GetBalance calculates and returns the balance of the caller.
-// TODO: implement
-func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*rusk.GetBalanceResponse, error) {
-	return nil, nil
-}
-
-// VerifyTransaction will return true or false, depending on the server configuration.
-func (s *Server) VerifyTransaction(ctx context.Context, req *rusk.ContractCallTx) (*rusk.VerifyTransactionResponse, error) {
-	return &rusk.VerifyTransactionResponse{
-		Verified: s.cfg.PassTransactionValidation,
-	}, nil
-}
-
-// CalculateMempoolBalance will return the amount of DUSK that is pending in the mempool
-// for the caller.
-// TODO: implement
-func (s *Server) CalculateMempoolBalance(ctx context.Context, req *rusk.CalculateMempoolBalanceRequest) (*rusk.GetBalanceResponse, error) {
-	return nil, nil
-}
-
-// NewStake creates a staking transaction and returns it to the caller.
-func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.StakeTransaction, error) {
-	stake, err := transactions.NewStake(0, byte(2), int64(req.Tx.Fee), req.ExpirationHeight, s.w.ConsensusKeys().EdPubKeyBytes, s.w.ConsensusKeys().BLSPubKeyBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.w.Sign(stake); err != nil {
-		return nil, err
-	}
-
-	return legacy.StakeToRuskStake(stake)
-}
-
-// VerifyStake will verify a staking transaction.
-// TODO: is this method really necessary?
-func (s *Server) VerifyStake(ctx context.Context, req *rusk.StakeTransaction) (*rusk.VerifyTransactionResponse, error) {
-	return nil, nil
-}
-
-// NewWithdrawStake creates a stake withdrawal transaction and returns it to the caller.
-// TODO: implement
-func (s *Server) NewWithdrawStake(ctx context.Context, req *rusk.WithdrawStakeTransactionRequest) (*rusk.WithdrawStakeTransaction, error) {
-	return nil, nil
-}
-
-// NewBid creates a bidding transaction and returns it to the caller.
-func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*rusk.BidTransaction, error) {
-	var k ristretto.Scalar
-	_ = k.UnmarshalBinary(req.K)
-	m := zkproof.CalculateM(k)
-	bid, err := transactions.NewBid(0, byte(2), int64(req.Tx.Fee), req.ExpirationHeight, m.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.w.Sign(bid); err != nil {
-		return nil, err
-	}
-
-	return legacy.BidToRuskBid(bid)
-}
-
-// NewWithdrawBid creates a bid withdrawal transaction and returns it to the caller.
-// TODO: implement
-func (s *Server) NewWithdrawBid(ctx context.Context, req *rusk.WithdrawBidTransactionRequest) (*rusk.WithdrawBidTransaction, error) {
-	return nil, nil
-}
-
-// NewWithdrawFees creates a fee withdrawal transaction and returns it to the caller.
-// TODO: implement
-func (s *Server) NewWithdrawFees(ctx context.Context, req *rusk.WithdrawFeesTransactionRequest) (*rusk.WithdrawFeesTransaction, error) {
-	return nil, nil
-}
-
-// NewSlash creates a slashing transaction and returns it to the caller.
-// TODO: implement
-func (s *Server) NewSlash(ctx context.Context, req *rusk.SlashTransactionRequest) (*rusk.SlashTransaction, error) {
-	return nil, nil
-}
+*/
 
 func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
 	// Fetch all inputs from database that are >= totalAmount

@@ -5,7 +5,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -40,10 +41,10 @@ func NewFactory(ctx context.Context, broker eventbus.Broker, consensusKeys key.K
 // can not be kept on the Factory for this reason.
 // Implements consensus.ComponentFactory.
 func (f *Factory) Instantiate() consensus.Component {
-	var d, k, edPk []byte
+	var secret, k, seed []byte
 	err := f.db.View(func(t database.Transaction) error {
 		var err error
-		d, k, edPk, err = t.FetchBidValues()
+		secret, k, seed, err = t.FetchBidValues()
 		return err
 	})
 
@@ -51,5 +52,5 @@ func (f *Factory) Instantiate() consensus.Component {
 		log.WithField("process", "proof generator factory").WithError(err).Warnln("error retrieving bid values from database")
 	}
 
-	return NewComponent(f.ctx, f.Bus, f.Keys, d, k, edPk, f.bg)
+	return NewComponent(f.ctx, f.Bus, &common.BlsScalar{Data: k}, &common.BlsScalar{Data: seed}, &common.JubJubCompressed{Data: secret}, f.bg, f.Keys)
 }

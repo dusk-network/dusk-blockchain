@@ -11,7 +11,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -30,7 +31,7 @@ const MaxTxSetSize = 150000
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator struct {
 	publisher eventbus.Publisher
-	genPubKey *transactions.PublicKey
+	genPubKey *keys.PublicKey
 	rpcBus    *rpcbus.RPCBus
 	signer    consensus.Signer
 
@@ -42,7 +43,7 @@ type Generator struct {
 }
 
 // NewComponent returns an uninitialized candidate generator.
-func NewComponent(ctx context.Context, publisher eventbus.Publisher, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
+func NewComponent(ctx context.Context, publisher eventbus.Publisher, genPubKey *keys.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
 	return &Generator{
 		publisher: publisher,
 		rpcBus:    rpcBus,
@@ -247,8 +248,9 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 	}
 
 	// Construct and append coinbase Tx to reward the generator
-	coinbaseTx := transactions.NewDistribute(config.GeneratorReward, keys, *bg.genPubKey)
-	txs = append(txs, coinbaseTx)
+	// TODO: this needs to have the appropriate calldata
+	// coinbaseTx := transactions.NewDistribute(config.GeneratorReward, keys, *bg.genPubKey)
+	// txs = append(txs, coinbaseTx)
 
 	return txs, nil
 }

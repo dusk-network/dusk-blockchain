@@ -3,7 +3,7 @@ package mempool
 import (
 	"sort"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
 type (

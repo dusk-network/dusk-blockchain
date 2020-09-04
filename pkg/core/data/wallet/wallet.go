@@ -10,7 +10,7 @@ import (
 
 	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/txrecords"
 	"golang.org/x/crypto/sha3"
@@ -30,21 +30,21 @@ type Wallet struct {
 	//keyPair       *key.Key
 	consensusKeys *consensuskey.Keys
 
-	PublicKey transactions.PublicKey
-	ViewKey   transactions.ViewKey
-	SecretKey transactions.SecretKey
+	PublicKey keys.PublicKey
+	ViewKey   keys.ViewKey
+	SecretKey keys.SecretKey
 }
 
 // KeysJSON is a struct used to marshal / unmarshal fields to a encrypted file
 type KeysJSON struct {
-	Seed      []byte                 `json:"seed"`
-	SecretKey []byte                 `json:"secret_key"`
-	PublicKey transactions.PublicKey `json:"public_key"`
-	ViewKey   transactions.ViewKey   `json:"view_key"`
+	Seed      []byte         `json:"seed"`
+	SecretKey []byte         `json:"secret_key"`
+	PublicKey keys.PublicKey `json:"public_key"`
+	ViewKey   keys.ViewKey   `json:"view_key"`
 }
 
 // New creates a wallet instance
-func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, db *database.DB, password, seedFile string, secretKey *transactions.SecretKey) (*Wallet, error) {
+func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, db *database.DB, password, seedFile string, secretKey *keys.SecretKey) (*Wallet, error) {
 
 	//create new seed if seed comes empty
 	if len(seed) == 0 {
@@ -56,7 +56,7 @@ func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, 
 	}
 
 	skBuf := new(bytes.Buffer)
-	if err := transactions.MarshalSecretKey(skBuf, *secretKey); err != nil {
+	if err := keys.MarshalSecretKey(skBuf, secretKey); err != nil {
 		return nil, err
 	}
 
@@ -73,8 +73,8 @@ func LoadFromSeed(netPrefix byte, db *database.DB, password, seedFile string, ke
 		return nil, errors.New("seed must be at least 64 bytes in size")
 	}
 
-	secretKey := new(transactions.SecretKey)
-	err := transactions.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
+	secretKey := new(keys.SecretKey)
+	err := keys.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
 	if err != nil {
 		return nil, err
 	}
@@ -132,8 +132,8 @@ func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile str
 	}
 
 	// secretKey manipulation
-	secretKey := new(transactions.SecretKey)
-	err = transactions.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
+	secretKey := new(keys.SecretKey)
+	err = keys.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +169,8 @@ func (w *Wallet) ClearDatabase() error {
 // if still needed.
 // Old implementation can be find here
 // (https://github.com/dusk-network/dusk-wallet/blob/master/v2/key/publickey.go#L26)
-func (w *Wallet) ToKey(address string) (transactions.PublicKey, error) {
-	return transactions.PublicKey{}, nil
+func (w *Wallet) ToKey(address string) (keys.PublicKey, error) {
+	return keys.PublicKey{}, nil
 }
 
 func generateKeys(seed []byte) (consensuskey.Keys, error) {

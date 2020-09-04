@@ -7,7 +7,7 @@ import (
 	"io"
 	"math"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 )
 
@@ -70,7 +70,7 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Co
 		return nil, txIndex, e
 	}
 
-	tx, err = transactions.Unmarshal(reader)
+	err = transactions.Unmarshal(reader, tx)
 	return tx, txIndex, err
 }
 

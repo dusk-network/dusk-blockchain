@@ -14,7 +14,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -26,7 +26,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 
-	//"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	//"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -462,7 +462,7 @@ func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
 		return
 	}
 
-	calls, err := c.executor.ValidateStateTransition(c.ctx, c.intermediateBlock.Txs, c.intermediateBlock.Header.Height)
+	calls, err := c.executor.VerifyStateTransition(c.ctx, c.intermediateBlock.Txs, c.intermediateBlock.Header.Height)
 	if err != nil {
 		res.Err = err
 		r.RespChan <- res
@@ -615,7 +615,7 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 				continue
 			}
 
-			calls, err := c.executor.ValidateStateTransition(c.ctx, c.prevBlock.Txs, c.prevBlock.Header.Height)
+			calls, err := c.executor.VerifyStateTransition(c.ctx, c.prevBlock.Txs, c.prevBlock.Header.Height)
 			if err != nil {
 				continue
 			}

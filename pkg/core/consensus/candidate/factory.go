@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
@@ -13,12 +13,12 @@ import (
 type Factory struct {
 	Bus          eventbus.Broker
 	RBus         *rpcbus.RPCBus
-	walletPubKey *transactions.PublicKey
+	walletPubKey *keys.PublicKey
 	ctx          context.Context
 }
 
 // NewFactory instantiates a Factory.
-func NewFactory(ctx context.Context, broker eventbus.Broker, rpcBus *rpcbus.RPCBus, walletPubKey *transactions.PublicKey) *Factory {
+func NewFactory(ctx context.Context, broker eventbus.Broker, rpcBus *rpcbus.RPCBus, walletPubKey *keys.PublicKey) *Factory {
 	return &Factory{
 		Bus:          broker,
 		RBus:         rpcBus,

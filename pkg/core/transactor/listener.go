@@ -8,7 +8,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 
@@ -43,10 +44,12 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 }
 
 func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
-	sk := t.w.SecretKey
-	if sk.IsEmpty() {
-		return nil, errors.New("SecretKey is not set")
-	}
+	// sk := t.w.SecretKey
+	/*
+		if sk.IsEmpty() {
+			return nil, errors.New("SecretKey is not set")
+		}
+	*/
 
 	return loadResponseFromPub(t.w.PublicKey), nil
 }
@@ -110,87 +113,93 @@ func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadRe
 }
 
 func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionResponse, error) {
-	if t.w == nil {
-		return nil, errWalletNotLoaded
-	}
+	/*
+		if t.w == nil {
+			return nil, errWalletNotLoaded
+		}
 
-	// // create and sign transaction
-	log.
-		WithField("amount", req.Amount).
-		WithField("locktime", req.Locktime).
-		Tracef("Creating a bid tx")
-
-	// TODO context should be created from the parent one
-	ctx := context.Background()
-
-	txReq := transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, true)
-	// FIXME: 476 - here we need to create K, EdPk; retrieve seed somehow and decide
-	// an ExpirationHeight (most likely the last 2 should be retrieved from he DB)
-	// Create the Ed25519 Keypair
-	tx, err := t.proxy.Provider().NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
-	if err != nil {
+		// // create and sign transaction
 		log.
 			WithField("amount", req.Amount).
 			WithField("locktime", req.Locktime).
-			Error("handleSendBidTx, failed to create NewBidTx")
-		return nil, err
-	}
+			Tracef("Creating a bid tx")
 
-	// TODO: store the K and D in storage for the block generator
+		// TODO context should be created from the parent one
+		ctx := context.Background()
 
-	hash, err := t.publishTx(&tx)
-	if err != nil {
-		log.
-			WithField("amount", req.Amount).
-			WithField("locktime", req.Locktime).
-			Error("handleSendBidTx, failed to create publishTx")
-		return nil, err
-	}
+		txReq := transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, true)
+		// FIXME: 476 - here we need to create K, EdPk; retrieve seed somehow and decide
+		// an ExpirationHeight (most likely the last 2 should be retrieved from he DB)
+		// Create the Ed25519 Keypair
+		tx, err := t.proxy.Provider().NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
+		if err != nil {
+			log.
+				WithField("amount", req.Amount).
+				WithField("locktime", req.Locktime).
+				Error("handleSendBidTx, failed to create NewBidTx")
+			return nil, err
+		}
 
-	return &node.TransactionResponse{Hash: hash}, nil
+		// TODO: store the K and D in storage for the block generator
+
+		hash, err := t.publishTx(&tx)
+		if err != nil {
+			log.
+				WithField("amount", req.Amount).
+				WithField("locktime", req.Locktime).
+				Error("handleSendBidTx, failed to create publishTx")
+			return nil, err
+		}
+
+		return &node.TransactionResponse{Hash: hash}, nil
+	*/
+	return nil, nil
 }
 
 func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.TransactionResponse, error) {
-	if t.w == nil {
-		return nil, errWalletNotLoaded
-	}
+	/*
+		if t.w == nil {
+			return nil, errWalletNotLoaded
+		}
 
-	// create and sign transaction
-	log.
-		WithField("amount", req.Amount).
-		WithField("locktime", req.Locktime).
-		Tracef("Creating a stake tx")
-
-	blsKey := t.w.Keys().BLSPubKey
-	if blsKey == nil {
-		return nil, errWalletNotLoaded
-	}
-
-	// TODO: use a parent context
-	ctx := context.Background()
-	// FIXME: 476 - we should calculate the expirationHeight somehow (by asking
-	// the chain for the last block through the RPC bus and calculating the
-	// height)
-	var expirationHeight uint64
-	tx, err := t.proxy.Provider().NewStakeTx(ctx, blsKey.Marshal(), expirationHeight, transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
-	if err != nil {
+		// create and sign transaction
 		log.
 			WithField("amount", req.Amount).
 			WithField("locktime", req.Locktime).
-			Error("handleSendStakeTx, failed to create NewStakeTx")
-		return nil, err
-	}
+			Tracef("Creating a stake tx")
 
-	hash, err := t.publishTx(&tx)
-	if err != nil {
-		log.
-			WithField("amount", req.Amount).
-			WithField("locktime", req.Locktime).
-			Error("handleSendStakeTx, failed to create publishTx")
-		return nil, err
-	}
+		blsKey := t.w.Keys().BLSPubKey
+		if blsKey == nil {
+			return nil, errWalletNotLoaded
+		}
 
-	return &node.TransactionResponse{Hash: hash}, nil
+		// TODO: use a parent context
+		ctx := context.Background()
+		// FIXME: 476 - we should calculate the expirationHeight somehow (by asking
+		// the chain for the last block through the RPC bus and calculating the
+		// height)
+		var expirationHeight uint64
+		tx, err := t.proxy.Provider().NewStakeTx(ctx, blsKey.Marshal(), expirationHeight, transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
+		if err != nil {
+			log.
+				WithField("amount", req.Amount).
+				WithField("locktime", req.Locktime).
+				Error("handleSendStakeTx, failed to create NewStakeTx")
+			return nil, err
+		}
+
+		hash, err := t.publishTx(&tx)
+		if err != nil {
+			log.
+				WithField("amount", req.Amount).
+				WithField("locktime", req.Locktime).
+				Error("handleSendStakeTx, failed to create publishTx")
+			return nil, err
+		}
+
+		return &node.TransactionResponse{Hash: hash}, nil
+	*/
+	return nil, nil
 }
 
 func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.TransactionResponse, error) {
@@ -267,7 +276,7 @@ func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) 
 
 func (t *Transactor) handleIsWalletLoaded() (*node.WalletStatusResponse, error) {
 	isLoaded := false
-	if t.w != nil && !t.w.SecretKey.IsEmpty() {
+	if t.w != nil /*&& !t.w.SecretKey.IsEmpty() */ {
 		isLoaded = true
 	}
 	return &node.WalletStatusResponse{Loaded: isLoaded}, nil
@@ -309,7 +318,7 @@ func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.Tran
 	return &node.TransactionResponse{Hash: hash}, nil
 }
 
-func loadResponseFromPub(pubKey transactions.PublicKey) *node.LoadResponse {
+func loadResponseFromPub(pubKey keys.PublicKey) *node.LoadResponse {
 	pk := &node.PubKey{PublicKey: pubKey.ToAddr()}
 	return &node.LoadResponse{Key: pk}
 }

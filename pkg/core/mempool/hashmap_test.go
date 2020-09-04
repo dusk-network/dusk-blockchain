@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	assert "github.com/stretchr/testify/require"
 )

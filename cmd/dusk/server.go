@@ -6,8 +6,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 
@@ -25,7 +23,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
@@ -106,11 +105,14 @@ func Setup() *Server {
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	ruskClient, ruskConn := client.CreateRuskClient(ctx, cfg.Get().RPC.Rusk.Address)
+	ruskClient, ruskConn := client.CreateStateClient(ctx, cfg.Get().RPC.Rusk.Address)
+	keysClient, _ := client.CreateKeysClient(ctx, cfg.Get().RPC.Rusk.Address)
+	blindbidServiceClient, _ := client.CreateBlindBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
+	bidServiceClient, _ := client.CreateBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	proxy := transactions.NewProxy(ruskClient, txTimeout, defaultTimeout)
+	proxy := transactions.NewProxy(ruskClient, keysClient, blindbidServiceClient, bidServiceClient, txTimeout, defaultTimeout)
 
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()
