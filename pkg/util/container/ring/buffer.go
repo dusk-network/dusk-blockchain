@@ -54,15 +54,15 @@ func (r *Buffer) Put(item []byte) {
 	r.mu.Unlock()
 
 	// Signal consumers we've got new item
-	r.notEmpty.Broadcast()
+	r.notEmpty.Signal()
 }
 
 // Close will close the Buffer
 func (r *Buffer) Close() {
 
 	r.closed.Store(true)
-	// Signal consumer for the state change
-	r.notEmpty.Signal()
+	// Signal all consumers for the state change
+	r.notEmpty.Broadcast()
 }
 
 // GetAll get all items in a buffer
