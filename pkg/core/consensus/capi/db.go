@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -18,6 +19,7 @@ var (
 	RoundInfoPrefix    = "roundinfo"
 	EventQueuePrefix   = "eventqueue"
 	buntStoreInstance  *BuntStore
+	dbMu               sync.RWMutex
 )
 
 type Level int
@@ -96,6 +98,8 @@ func GetKey(name string, value interface{}) string {
 
 // FetchProvisioners will get the Provisioners from db
 func (b *BuntStore) FetchProvisioners(height uint64) (*user.Provisioners, error) {
+	dbMu.RLock()
+	defer dbMu.RUnlock()
 	var provisioners user.Provisioners
 	err := b.db.View(func(t *buntdb.Tx) error {
 		key := GetKey(ProvisionersPrefix, height)
@@ -118,6 +122,8 @@ func (b *BuntStore) FetchProvisioners(height uint64) (*user.Provisioners, error)
 
 // StoreProvisioners will store the Provisioners into db
 func (b *BuntStore) StoreProvisioners(provisioners *user.Provisioners, height uint64) error {
+	dbMu.Lock()
+	defer dbMu.Unlock()
 	err := b.db.Update(func(tx *buntdb.Tx) error {
 
 		var init []byte
@@ -138,7 +144,8 @@ func (b *BuntStore) StoreProvisioners(provisioners *user.Provisioners, height ui
 
 // FetchRoundInfo will get the RoundInfoJSON info from db
 func (b *BuntStore) FetchRoundInfo(height uint64) (RoundInfoJSON, error) {
-
+	dbMu.RLock()
+	defer dbMu.RUnlock()
 	var targetJSON RoundInfoJSON
 	err := b.db.View(func(t *buntdb.Tx) error {
 		key := GetKey(RoundInfoPrefix, height)
@@ -161,6 +168,8 @@ func (b *BuntStore) FetchRoundInfo(height uint64) (RoundInfoJSON, error) {
 
 // StoreRoundInfo will store the round info into db
 func (b *BuntStore) StoreRoundInfo(round uint64, step uint8, methodName, name string) error {
+	dbMu.Lock()
+	defer dbMu.Unlock()
 	err := b.db.Update(func(tx *buntdb.Tx) error {
 		eventQueueKey := GetKey(RoundInfoPrefix, fmt.Sprintf("%d:%d", round, step))
 
@@ -184,6 +193,8 @@ func (b *BuntStore) StoreRoundInfo(round uint64, step uint8, methodName, name st
 
 // FetchEventQueue will store the EventQueueJSON info into db
 func (b *BuntStore) FetchEventQueue(height uint64) (EventQueueJSON, error) {
+	dbMu.RLock()
+	defer dbMu.RUnlock()
 	var eventQueueJSON EventQueueJSON
 	err := b.db.View(func(t *buntdb.Tx) error {
 		key := GetKey(EventQueuePrefix, height)
@@ -206,6 +217,8 @@ func (b *BuntStore) FetchEventQueue(height uint64) (EventQueueJSON, error) {
 
 // StoreEventQueue will store the round info into db
 func (b *BuntStore) StoreEventQueue(round uint64, step uint8, m message.Message) error {
+	dbMu.Lock()
+	defer dbMu.Unlock()
 	err := b.db.Update(func(tx *buntdb.Tx) error {
 		eventQueueKey := GetKey(EventQueuePrefix, fmt.Sprintf("%d:%d", round, step))
 
