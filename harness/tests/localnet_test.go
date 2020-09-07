@@ -103,7 +103,7 @@ func monitorNetwork() {
 		networkTip, err := localNet.IsSynced(5)
 		if err != nil {
 			// Network is not synced completely
-			logrus.Fatal(err)
+			logrus.Error(err)
 		}
 		logrus.WithField("tip", networkTip).Info("Network status")
 

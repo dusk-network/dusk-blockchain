@@ -17,30 +17,33 @@ type Consumer struct {
 // NewConsumer returns a Consumer, which can read from the passed Buffer.
 func NewConsumer(ring *Buffer, callback func(items [][]byte, w io.WriteCloser) bool, w io.WriteCloser) *Consumer {
 	c := &Consumer{ring, w, callback}
-	go func() {
-		defer func() {
-			c.close()
-		}()
-
-		for {
-			items, close := c.ring.GetAll()
-			if len(items) > 0 {
-				if !c.consume(items, c.w) {
-					return
-				}
-			}
-
-			if close {
-				return
-			}
-		}
-	}()
+	go c.run()
 
 	return c
 }
 
+func (c *Consumer) run() {
+
+	defer c.close()
+	for {
+		items, closed := c.ring.GetAll()
+		if len(items) > 0 {
+			if !c.consume(items, c.w) {
+				return
+			}
+		}
+
+		if closed {
+			return
+		}
+	}
+}
+
 func (c *Consumer) close() {
-	c.ring.Close()
+	if c.ring != nil {
+		c.ring.Close()
+	}
+
 	if c.w != nil {
 		_ = c.w.Close()
 	}

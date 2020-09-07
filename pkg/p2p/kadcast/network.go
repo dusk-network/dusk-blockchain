@@ -39,7 +39,10 @@ func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 		// Serialize the packet.
 		encodedPack := encodeReadUDPPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
-		queue.Put(encodedPack)
+		if !queue.Put(encodedPack) {
+			log.Error("Could not push a message")
+		}
+
 		buffer = nil
 	}
 }
@@ -111,7 +114,10 @@ func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 		// Serialize the packet.
 		encodedPack := encodeReadTCPPacket(uint16(byteNum), conn.RemoteAddr(), payload[:])
 		// Send the packet to the Consumer putting it on the queue.
-		queue.Put(encodedPack)
+		if !queue.Put(encodedPack) {
+			log.Error("Could not push a message")
+		}
+
 		payload = nil
 
 		// Current impl expects only one TCPFrame per connection

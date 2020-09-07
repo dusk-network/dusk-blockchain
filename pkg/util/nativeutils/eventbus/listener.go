@@ -86,7 +86,10 @@ func (s *StreamListener) Notify(m message.Message) error {
 	// payloads rather than restricting solely to buffers
 	// TODO: interface - This panics in case payload is not a buffer
 	buf := m.Payload().(message.SafeBuffer)
-	s.ringbuffer.Put(buf.Bytes())
+	if !s.ringbuffer.Put(buf.Bytes()) {
+		return errors.New("could not push a message")
+	}
+
 	return nil
 }
 

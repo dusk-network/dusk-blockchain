@@ -21,30 +21,30 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("general.safecallbacklistener", "false")
 
 	//bidautomaton.go
-	viper.Set("general.timeoutsendbidtx", 5)
+	viper.Set("timeout.timeoutsendbidtx", 5)
 	//blockgenerator.go
-	viper.Set("general.timeoutgetlastcommittee", 5)
+	viper.Set("timeout.timeoutgetlastcommittee", 5)
 	//blockgenerator.go
-	viper.Set("general.timeoutgetlastcertificate", 5)
+	viper.Set("timeout.timeoutgetlastcertificate", 5)
 	//blockgenerator.go
-	viper.Set("general.timeoutgetmempooltxsbysize", 4)
+	viper.Set("timeout.timeoutgetmempooltxsbysize", 4)
 	//initiator.go
 	//sync.go
-	viper.Set("general.timeoutgetlastblock", 5)
+	viper.Set("timeout.timeoutgetlastblock", 5)
 	//aggregator.go
 	//candidatebroker.go
 	//chain.go
-	viper.Set("general.timeoutgetcandidate", 5)
+	viper.Set("timeout.timeoutgetcandidate", 5)
 	//chain.go
-	viper.Set("general.timeoutclearwalletdatabase", 0)
+	viper.Set("timeout.timeoutclearwalletdatabase", 0)
 	//aggregator.go
-	viper.Set("general.timeoutverifycandidateblock", 5)
+	viper.Set("timeout.timeoutverifycandidateblock", 5)
 	//stakeautomaton.go
-	viper.Set("general.timeoutsendstaketx", 5)
+	viper.Set("timeout.timeoutsendstaketx", 5)
 	//mempool.go datarequestor.go
-	viper.Set("general.timeoutgetmempooltxs", 3)
+	viper.Set("timeout.timeoutgetmempooltxs", 3)
 	//roundresultsbroker.go
-	viper.Set("general.timeoutgetroundresults", 5)
+	viper.Set("timeout.timeoutgetroundresults", 5)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
 	viper.Set("gql.address", node.Cfg.Gql.Address)
