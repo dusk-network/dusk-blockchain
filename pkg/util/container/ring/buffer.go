@@ -3,16 +3,17 @@ package ring
 import (
 	"bytes"
 	"sync"
+	"sync/atomic"
 )
 
-// Buffer represents a circular array of data items.
+// Buffer represents a circular array of data items
+// It is suitable for (single/multiple) consumers (single/multiple) producers data transfer
 type Buffer struct {
 	items      [][]byte
 	mu         *sync.Mutex
 	notEmpty   *sync.Cond
-	notFull    *sync.Cond
 	writeIndex int32
-	close      bool
+	closed     syncBool
 }
 
 // NewBuffer returns an initialized ring buffer.
@@ -20,22 +21,20 @@ func NewBuffer(length int) *Buffer {
 
 	m := &sync.Mutex{}
 	cv := sync.NewCond(m)
-	cv2 := sync.NewCond(m)
 
 	return &Buffer{
 		items:      make([][]byte, length),
 		notEmpty:   cv,
-		notFull:    cv2,
 		mu:         m,
 		writeIndex: -1,
 	}
 }
 
 // Put an item on the ring buffer.
-func (r *Buffer) Put(item []byte) {
+func (r *Buffer) Put(item []byte) bool {
 
-	if item == nil || r.close {
-		return
+	if item == nil || r.closed.Load() {
+		return false
 	}
 
 	// Protect the slice and the writeIndex
@@ -54,19 +53,18 @@ func (r *Buffer) Put(item []byte) {
 
 	r.mu.Unlock()
 
-	// Signal consumer we've got new item
+	// Signal consumers we've got new item
 	r.notEmpty.Signal()
+
+	return true
 }
 
 // Close will close the Buffer
 func (r *Buffer) Close() {
 
-	r.mu.Lock()
-	r.close = true
-	r.mu.Unlock()
-
-	// Signal consumer for the state change
-	r.notEmpty.Signal()
+	r.closed.Store(true)
+	// Signal all consumers for the state change
+	r.notEmpty.Broadcast()
 }
 
 // GetAll get all items in a buffer
@@ -74,7 +72,7 @@ func (r *Buffer) GetAll() ([][]byte, bool) {
 
 	r.mu.Lock()
 
-	for int(r.writeIndex) < 0 && !r.close {
+	for int(r.writeIndex) < 0 && !r.closed.Load() {
 		r.notEmpty.Wait()
 	}
 
@@ -90,7 +88,7 @@ func (r *Buffer) GetAll() ([][]byte, bool) {
 	r.writeIndex = -1
 	r.mu.Unlock()
 
-	return items, r.close
+	return items, r.closed.Load()
 }
 
 // Has check if item exists
@@ -101,9 +99,6 @@ func (r *Buffer) Has(item []byte) bool {
 	}
 
 	for _, existing := range r.items {
-		if existing == nil {
-			return false
-		}
 		if bytes.Equal(existing, item) {
 			return true
 		}
@@ -114,8 +109,22 @@ func (r *Buffer) Has(item []byte) bool {
 
 // Closed check if buffer is closed
 func (r *Buffer) Closed() bool {
-	r.mu.Lock()
-	closed := r.close
-	r.mu.Unlock()
-	return closed
+	return r.closed.Load()
+}
+
+// syncBool provides atomic Load/Store for bool type
+type syncBool struct {
+	value int32
+}
+
+func (s *syncBool) Store(value bool) {
+	i := int32(0)
+	if value {
+		i = 1
+	}
+	atomic.StoreInt32(&(s.value), i)
+}
+
+func (s *syncBool) Load() bool {
+	return atomic.LoadInt32(&(s.value)) != 0
 }
