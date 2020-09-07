@@ -467,8 +467,12 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	// Fetch new intermediate block and corresponding certificate
 	//TODO: start measuring how long this takes in order to be able to see if this timeout is good or not
 
+	params := new(bytes.Buffer)
+	_ = encoding.Write256(params, cMsg.hash)
+	_ = encoding.WriteBool(params, true)
+
 	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
-	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), timeoutGetCandidate) //20 is tmp value for further checks
+	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*params), timeoutGetCandidate) //20 is tmp value for further checks
 	if err != nil {
 		// If the we can't get the block, we will fall
 		// back and catch up later.
