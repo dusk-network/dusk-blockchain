@@ -177,7 +177,7 @@ legacy = false
 
 [api]
 # enable graphql service
-enabled=true
+enabled = true
 # enable/disable both HTTPS and WSS
 enableTLS = false
 address="127.0.0.1:9199"

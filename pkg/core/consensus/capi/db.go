@@ -22,8 +22,10 @@ var (
 	dbMu               sync.RWMutex
 )
 
+// Level is the database level
 type Level int
 
+//nolint
 const (
 	Low    Level = -1
 	Medium Level = 0
@@ -38,6 +40,7 @@ type BuntStore struct {
 	path string
 }
 
+// GetBuntStoreInstance will return the actual db instance or nil
 func GetBuntStoreInstance() *BuntStore {
 	if buntStoreInstance == nil {
 		panic("BuntStore instance is nil")
@@ -45,6 +48,7 @@ func GetBuntStoreInstance() *BuntStore {
 	return buntStoreInstance
 }
 
+// SetBuntStoreInstance will set a store
 func SetBuntStoreInstance(store *BuntStore) {
 	buntStoreInstance = store
 }
@@ -61,7 +65,7 @@ func NewBuntStore(path string, durability Level) (*BuntStore, error) {
 	// handled following a log compaction.
 	var config buntdb.Config
 	if err := db.ReadConfig(&config); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	config.AutoShrinkDisabled = true
@@ -74,7 +78,7 @@ func NewBuntStore(path string, durability Level) (*BuntStore, error) {
 		config.SyncPolicy = buntdb.Always
 	}
 	if err := db.SetConfig(config); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
@@ -152,7 +156,8 @@ func (b *BuntStore) FetchRoundInfo(round uint64, stepBegin, stepEnd uint8) ([]Ro
 		for i := int(stepBegin); i < int(stepEnd); i++ {
 			var targetJSON RoundInfoJSON
 			key := GetKey(RoundInfoPrefix, fmt.Sprintf("%d:%d", round, i))
-			eventQueueJSONStr, err := t.Get(key)
+			var eventQueueJSONStr string
+			eventQueueJSONStr, err = t.Get(key)
 			if err != nil {
 				break
 			}
@@ -210,7 +215,8 @@ func (b *BuntStore) FetchEventQueue(round uint64, stepBegin, stepEnd uint8) ([]E
 		for i := int(stepBegin); i < int(stepEnd); i++ {
 			var targetJSON EventQueueJSON
 			key := GetKey(EventQueuePrefix, fmt.Sprintf("%d:%d", round, i))
-			eventQueueJSONStr, err := t.Get(key)
+			var eventQueueJSONStr string
+			eventQueueJSONStr, err = t.Get(key)
 			if err != nil {
 				break
 			}
@@ -222,6 +228,9 @@ func (b *BuntStore) FetchEventQueue(round uint64, stepBegin, stepEnd uint8) ([]E
 			}
 
 			err = json.Unmarshal(buf.Bytes(), &targetJSON)
+			if err != nil {
+				return err
+			}
 
 			eventQueueJSONList = append(eventQueueJSONList, targetJSON)
 		}

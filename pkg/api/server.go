@@ -53,9 +53,11 @@ func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server,
 		rpcBus:   rpcBus,
 		store:    store,
 	}
+	addr := cfg.Get().API.Address
+	log.WithField("addr", addr).Info("Will InitRouting for Consensus API server")
 	router = srv.InitRouting()
 	httpServer := &http.Server{
-		Addr:    cfg.Get().API.Address,
+		Addr:    addr,
 		Handler: router,
 	}
 	srv.Server = httpServer

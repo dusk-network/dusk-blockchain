@@ -2,12 +2,14 @@ package api
 
 import (
 	"bytes"
+	"fmt"
+	"os"
+	"testing"
+
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"os"
-	"testing"
 
 	"github.com/drewolson/testflight"
 	"github.com/stretchr/testify/require"
@@ -118,16 +120,17 @@ func TestConsensusAPIRoundInfo(t *testing.T) {
 			require.Nil(t, err)
 			require.NotNil(t, roundInfo)
 		}
-
 	}
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
 
-		targetURL := "/consensus/roundinfo?height_begin=0&height_end=5"
-		response := r.Get(targetURL)
-		require.NotNil(t, response)
+		for i := 0; i < 5; i++ {
+			targetURL := fmt.Sprintf("/consensus/roundinfo?height_begin=%d&height_end=5", i)
+			response := r.Get(targetURL)
+			require.NotNil(t, response)
 
-		require.NotEmpty(t, response.RawBody)
+			require.NotEmpty(t, response.RawBody)
+		}
 	})
 }
 
@@ -161,10 +164,16 @@ func TestConsensusAPIEventStatus(t *testing.T) {
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
 
-		targetURL := "/consensus/eventqueuestatus?height=1"
-		response := r.Get(targetURL)
-		require.NotNil(t, response)
+		for i := 0; i < 5; i++ {
+			targetURL := fmt.Sprintf("/consensus/eventqueuestatus?height=%d", i)
+			response := r.Get(targetURL)
+			require.NotNil(t, response)
+			require.NotEmpty(t, response.RawBody)
 
-		require.NotEmpty(t, response.RawBody)
+			require.True(t, len(response.Body) > 100)
+			body := response.Body
+			fmt.Println(body)
+		}
+
 	})
 }
