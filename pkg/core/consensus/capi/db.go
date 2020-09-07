@@ -159,7 +159,7 @@ func (b *BuntStore) FetchRoundInfo(round uint64, stepBegin, stepEnd uint8) ([]Ro
 			var eventQueueJSONStr string
 			eventQueueJSONStr, err = t.Get(key)
 			if err != nil {
-				break
+				return nil
 			}
 
 			buf := new(bytes.Buffer)
@@ -218,7 +218,7 @@ func (b *BuntStore) FetchEventQueue(round uint64, stepBegin, stepEnd uint8) ([]E
 			var eventQueueJSONStr string
 			eventQueueJSONStr, err = t.Get(key)
 			if err != nil {
-				break
+				return nil
 			}
 
 			buf := new(bytes.Buffer)
@@ -247,9 +247,10 @@ func (b *BuntStore) StoreEventQueue(round uint64, step uint8, m message.Message)
 		eventQueueKey := GetKey(EventQueuePrefix, fmt.Sprintf("%d:%d", round, step))
 
 		eventQueueJSON := EventQueueJSON{
-			Round:     round,
-			Step:      step,
-			Message:   m,
+			Round: round,
+			Step:  step,
+			//TODO: find out how to use the message field and avoid err: &json.UnmarshalTypeError{Value:"object", Type:(*reflect.rtype)(0xbe6a40), Offset:31, Struct:"EventQueueJSON", Field:"message"}
+			//Message:   &m,
 			UpdatedAt: time.Now(),
 		}
 

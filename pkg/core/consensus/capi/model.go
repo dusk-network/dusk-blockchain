@@ -8,10 +8,10 @@ import (
 
 // EventQueueJSON is used as JSON rapper for eventQueue fields
 type EventQueueJSON struct {
-	Round     uint64          `json:"round"`
-	Step      uint8           `json:"step"`
-	Message   message.Message `json:"message"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	Round     uint64           `json:"round"`
+	Step      uint8            `json:"step"`
+	Message   *message.Message `json:"message"`
+	UpdatedAt time.Time        `json:"updated_at"`
 }
 
 // RoundInfoJSON is used as JSON wrapper for round info fields
