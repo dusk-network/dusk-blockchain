@@ -31,10 +31,10 @@ func NewBuffer(length int) *Buffer {
 }
 
 // Put an item on the ring buffer.
-func (r *Buffer) Put(item []byte) {
+func (r *Buffer) Put(item []byte) bool {
 
 	if item == nil || r.closed.Load() {
-		return
+		return false
 	}
 
 	// Protect the slice and the writeIndex
@@ -55,6 +55,8 @@ func (r *Buffer) Put(item []byte) {
 
 	// Signal consumers we've got new item
 	r.notEmpty.Signal()
+
+	return true
 }
 
 // Close will close the Buffer
