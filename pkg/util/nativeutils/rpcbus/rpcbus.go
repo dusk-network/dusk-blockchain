@@ -131,6 +131,7 @@ func (bus *RPCBus) callTimeout(reqChan chan<- Request, req Request, timeOut time
 	return resp.Resp, resp.Err
 }
 
+//nolint
 func (bus *RPCBus) callNoTimeout(reqChan chan<- Request, req Request) (interface{}, error) {
 	reqChan <- req
 	resp := <-req.RespChan
