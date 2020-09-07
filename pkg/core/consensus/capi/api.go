@@ -113,12 +113,12 @@ func GetRoundInfoHandler(res http.ResponseWriter, req *http.Request) {
 
 	count := heightEnd - heightBegin
 	for i := 0; i < count; i++ {
-		roundInfo, err1 := GetBuntStoreInstance().FetchRoundInfo(uint64(heightBegin + i))
-		if err1 != nil {
+		//TODO: step should be a argument for query ?
+		roundInfos, err = GetBuntStoreInstance().FetchRoundInfo(uint64(heightBegin+i), 0, 255)
+		if err != nil {
 			res.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		roundInfos = append(roundInfos, roundInfo)
 	}
 
 	if len(roundInfos) == 0 {
@@ -150,7 +150,8 @@ func GetEventQueueStatusHandler(res http.ResponseWriter, req *http.Request) {
 
 	log.WithField("height", height).Debug("GetEventQueueStatus")
 
-	provisioners, err := GetBuntStoreInstance().FetchEventQueue(uint64(height))
+	//TODO: stepBegin and stepEnd should be req parameters ?
+	provisioners, err := GetBuntStoreInstance().FetchEventQueue(uint64(height), 0, 255)
 	if err != nil {
 		res.WriteHeader(http.StatusNotFound)
 		return

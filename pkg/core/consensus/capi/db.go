@@ -135,35 +135,44 @@ func (b *BuntStore) StoreProvisioners(provisioners *user.Provisioners, height ui
 		}
 
 		key := GetKey(ProvisionersPrefix, height)
-
-		_, _, err = tx.Set(key, buf.String(), &buntdb.SetOptions{Expires: true, TTL: time.Duration(cfg.Get().API.ExpirationTime) * time.Second})
+		expirationTime := cfg.Get().API.ExpirationTime
+		_, _, err = tx.Set(key, buf.String(), &buntdb.SetOptions{Expires: true, TTL: time.Duration(expirationTime) * time.Second})
 		return err
 	})
 	return err
 }
 
 // FetchRoundInfo will get the RoundInfoJSON info from db
-func (b *BuntStore) FetchRoundInfo(height uint64) (RoundInfoJSON, error) {
+func (b *BuntStore) FetchRoundInfo(round uint64, stepBegin, stepEnd uint8) ([]RoundInfoJSON, error) {
 	dbMu.RLock()
 	defer dbMu.RUnlock()
-	var targetJSON RoundInfoJSON
+	var targetJSONList []RoundInfoJSON
 	err := b.db.View(func(t *buntdb.Tx) error {
-		key := GetKey(RoundInfoPrefix, height)
-		eventQueueJSONStr, err := t.Get(key)
-		if err != nil {
-			return err
-		}
+		var err error
+		for i := int(stepBegin); i < int(stepEnd); i++ {
+			var targetJSON RoundInfoJSON
+			key := GetKey(RoundInfoPrefix, fmt.Sprintf("%d:%d", round, i))
+			eventQueueJSONStr, err := t.Get(key)
+			if err != nil {
+				break
+			}
 
-		buf := new(bytes.Buffer)
-		_, err = buf.WriteString(eventQueueJSONStr)
-		if err != nil {
-			return err
-		}
+			buf := new(bytes.Buffer)
+			_, err = buf.WriteString(eventQueueJSONStr)
+			if err != nil {
+				return err
+			}
 
-		err = json.Unmarshal(buf.Bytes(), &targetJSON)
+			err = json.Unmarshal(buf.Bytes(), &targetJSON)
+			if err != nil {
+				return err
+			}
+
+			targetJSONList = append(targetJSONList, targetJSON)
+		}
 		return err
 	})
-	return targetJSON, err
+	return targetJSONList, err
 }
 
 // StoreRoundInfo will store the round info into db
@@ -192,27 +201,33 @@ func (b *BuntStore) StoreRoundInfo(round uint64, step uint8, methodName, name st
 }
 
 // FetchEventQueue will store the EventQueueJSON info into db
-func (b *BuntStore) FetchEventQueue(height uint64) (EventQueueJSON, error) {
+func (b *BuntStore) FetchEventQueue(round uint64, stepBegin, stepEnd uint8) ([]EventQueueJSON, error) {
 	dbMu.RLock()
 	defer dbMu.RUnlock()
-	var eventQueueJSON EventQueueJSON
+	var eventQueueJSONList []EventQueueJSON
 	err := b.db.View(func(t *buntdb.Tx) error {
-		key := GetKey(EventQueuePrefix, height)
-		eventQueueJSONStr, err := t.Get(key)
-		if err != nil {
-			return err
-		}
+		var err error
+		for i := int(stepBegin); i < int(stepEnd); i++ {
+			var targetJSON EventQueueJSON
+			key := GetKey(EventQueuePrefix, fmt.Sprintf("%d:%d", round, i))
+			eventQueueJSONStr, err := t.Get(key)
+			if err != nil {
+				break
+			}
 
-		buf := new(bytes.Buffer)
-		_, err = buf.WriteString(eventQueueJSONStr)
-		if err != nil {
-			return err
-		}
+			buf := new(bytes.Buffer)
+			_, err = buf.WriteString(eventQueueJSONStr)
+			if err != nil {
+				return err
+			}
 
-		err = json.Unmarshal(buf.Bytes(), &eventQueueJSON)
+			err = json.Unmarshal(buf.Bytes(), &targetJSON)
+
+			eventQueueJSONList = append(eventQueueJSONList, targetJSON)
+		}
 		return err
 	})
-	return eventQueueJSON, err
+	return eventQueueJSONList, err
 }
 
 // StoreEventQueue will store the round info into db

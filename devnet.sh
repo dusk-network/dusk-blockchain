@@ -149,7 +149,8 @@ enabled = false
   enableTLS = false
   address="127.0.0.1:$((9490+$i))"
   dbfile="${DDIR}/chain/api.db"
-  expirationtime=300 #5 mins
+  #5 mins
+  expirationtime=300
 
 
 EOF

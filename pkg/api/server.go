@@ -28,6 +28,7 @@ type Server struct {
 	// Node components
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
+	store    *capi.BuntStore
 
 	Server *http.Server
 }
@@ -50,6 +51,7 @@ func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server,
 	srv := Server{
 		eventBus: eventBus,
 		rpcBus:   rpcBus,
+		store:    store,
 	}
 	router = srv.InitRouting()
 	httpServer := &http.Server{
