@@ -34,8 +34,9 @@ type Generator struct {
 	rpcBus    *rpcbus.RPCBus
 	signer    consensus.Signer
 
-	roundInfo    consensus.RoundUpdate
-	scoreEventID uint32
+	roundInfo      consensus.RoundUpdate
+	scoreEventID   uint32
+	scoreEventName string
 
 	ctx context.Context
 }
@@ -62,6 +63,7 @@ func (bg *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consen
 		Listener: consensus.NewSimpleListener(bg.Collect, consensus.LowPriority, false),
 	}
 	bg.scoreEventID = scoreEventListener.Listener.ID()
+	bg.scoreEventName = "candidate/Generator"
 
 	return []consensus.TopicListener{scoreEventListener}
 }
@@ -72,7 +74,14 @@ func (bg *Generator) ID() uint32 {
 	return bg.scoreEventID
 }
 
+// Name returns the listener Name of the Generator.
+// Implements consensus.Component.
+func (bg *Generator) Name() string {
+	return bg.scoreEventName
+}
+
 // Finalize implements consensus.Component
+// Implements consensus.Component.
 func (bg *Generator) Finalize() {}
 
 // ScoreFactory is the PacketFactory implementation to let the signer  scores

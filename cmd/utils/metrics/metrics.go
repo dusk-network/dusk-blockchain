@@ -39,12 +39,14 @@ type DuskInfo struct {
 	EffectiveBlockTime int64
 	GQLEndpoint        string
 	GQLClient          *graphql.Client
+	NodeAPIPort        int
 }
 
 // RunMetrics will run the metrics collection endpoint
-func RunMetrics(gqlPort, nodePort, port int, hostname string) {
+func RunMetrics(gqlPort, nodePort, nodeAPIPort, port int, hostname string) {
 	duskInfo = new(DuskInfo)
 	duskInfo.TotalDusk = big.NewInt(0)
+	duskInfo.NodeAPIPort = nodeAPIPort
 
 	node = engine.NewDuskNode(gqlPort, nodePort, "default", localNet.IsSessionRequired())
 	localNet.AddNode(node)

@@ -170,14 +170,16 @@ defaultlocktime = 250000
 # default amount, in whole units of DUSK, to send for consensus transactions.
 defaultamount = 5
 # the timeout for consensus step timers
-consensustimeout = 1
+consensustimeout = 5
 
 [genesis]
 legacy = false
 
 [api]
 # enable graphql service
-enabled=true
+enabled = true
 # enable/disable both HTTPS and WSS
 enableTLS = false
 address="127.0.0.1:9199"
+#5 mins
+expirationtime=300

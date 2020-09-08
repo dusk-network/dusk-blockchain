@@ -40,7 +40,7 @@ type DB struct {
 // NewDatabase returns a DB instance
 // This should be the ideal situation with lowest latency on storing or fetching data
 // In-memory only (as result autoDeleted)
-// multi-instances (no singlton)
+// multi-instances (no singleton)
 func NewDatabase(path string, network protocol.Magic, readonly bool) (database.DB, error) {
 	var db *DB
 	var tables [maxInd]table

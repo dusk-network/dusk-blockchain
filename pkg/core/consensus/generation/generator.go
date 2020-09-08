@@ -13,8 +13,9 @@ var restartFactory = consensus.Restarter{}
 // Generator is the component that signals a restart of score generation and selection
 // after a Restart Event is detected
 type Generator struct {
-	signer    consensus.Signer
-	restartID uint32
+	signer      consensus.Signer
+	restartID   uint32
+	restartName string
 }
 
 // NewComponent instantiates a new Generator
@@ -32,6 +33,7 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 		Listener: consensus.NewSimpleListener(g.Collect, consensus.LowPriority, false),
 	}
 	g.restartID = restartListener.Listener.ID()
+	g.restartName = "generation/Generator"
 
 	return []consensus.TopicListener{restartListener}
 }
@@ -42,6 +44,11 @@ func (g *Generator) Finalize() {}
 // ID as part of the Component interface
 func (g *Generator) ID() uint32 {
 	return g.restartID
+}
+
+// Name as part of the Component interface
+func (g *Generator) Name() string {
+	return g.restartName
 }
 
 // Collect `Restart` events and triggers a Generation event

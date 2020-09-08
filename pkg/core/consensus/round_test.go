@@ -168,7 +168,8 @@ func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Co
 	msg := message.New(topics.RoundUpdate, ru)
 
 	// Collect the round update to initialize the state
-	c.CollectRoundUpdate(msg)
+	err = c.CollectRoundUpdate(msg)
+	assert.Nil(t, err)
 
 	return c, c.store.components
 }
@@ -197,6 +198,7 @@ type mockComponent struct {
 	topic          topics.Topic
 	receivedEvents chan InternalPacket
 	id             uint32
+	name           string
 }
 
 func newMockComponent(topic topics.Topic) *mockComponent {
@@ -212,12 +214,17 @@ func (m *mockComponent) Initialize(EventPlayer, Signer, RoundUpdate) []TopicList
 		Listener: NewSimpleListener(m.Collect, LowPriority, false),
 	}
 	m.id = listener.Listener.ID()
+	m.name = "mockComponent"
 
 	return []TopicListener{listener}
 }
 
 func (m *mockComponent) ID() uint32 {
 	return m.id
+}
+
+func (m *mockComponent) Name() string {
+	return m.name
 }
 
 func (m *mockComponent) Collect(ev InternalPacket) error {

@@ -31,7 +31,8 @@ type Selector struct {
 	timer   *timer
 	timeout time.Duration
 
-	scoreID uint32
+	scoreID   uint32
+	scoreName string
 
 	eventPlayer consensus.EventPlayer
 	signer      consensus.Signer
@@ -95,6 +96,7 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 		Listener: consensus.NewSimpleListener(s.CollectScoreEvent, consensus.LowPriority, false),
 	}
 	s.scoreID = scoreSubscriber.ID()
+	s.scoreName = "selection/Selector"
 
 	generationSubscriber := consensus.TopicListener{
 		Topic:    topics.Generation,
@@ -108,6 +110,12 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 // Implements consensus.Component
 func (s *Selector) ID() uint32 {
 	return s.scoreID
+}
+
+// Name returns the Name of the Score message Listener.
+// Implements consensus.Component
+func (s *Selector) Name() string {
+	return s.scoreName
 }
 
 // Finalize pauses event streaming and stops the timer.

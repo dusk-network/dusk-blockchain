@@ -69,6 +69,9 @@ type Component interface {
 	// ID allows the Coordinator to differentiate between components and
 	// establish relevance or problems
 	ID() uint32
+
+	// Name
+	Name() string
 }
 
 // Listener subscribes to the Coordinator and forwards consensus events to the components

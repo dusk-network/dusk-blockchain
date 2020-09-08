@@ -6,6 +6,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"encoding/binary"
@@ -352,8 +354,19 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 		return err
 	}
 
-	// Caching the provisioners and bidList
+	// Caching the provisioners
+	// TODO: add bidList ?
 	c.p = &provisioners
+
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetBuntStoreInstance()
+			err := store.StoreProvisioners(c.p, blk.Header.Height)
+			if err != nil {
+				log.Warn("Could not store provisioners on memoryDB")
+			}
+		}()
+	}
 
 	// 4. Store the approved block
 	l.Trace("storing block in db")

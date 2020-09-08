@@ -114,6 +114,9 @@ init_dusk_func() {
   #output = "${DDIR}/dusk"
   level = "trace"
   format = "json"
+[logger.monitor]
+# enabling log based monitoring
+enabled = false
 
 [mempool]
   maxinvitems = "10000"
@@ -142,9 +145,13 @@ init_dusk_func() {
   file = "${currentDir}/harness/data/wallet-$((9000+$i)).dat"
   store = "${DDIR}/walletDB/"
 [api]
-  enabled=false
+  enabled=true
   enableTLS = false
-  address="127.0.0.1:9199"
+  address="127.0.0.1:$((9490+$i))"
+  dbfile="${DDIR}/chain/api.db"
+  #5 mins
+  expirationtime=300
+
 
 EOF
 

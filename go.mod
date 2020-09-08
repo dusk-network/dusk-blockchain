@@ -4,6 +4,7 @@ require (
 	github.com/bwesterb/go-ristretto v1.1.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/didip/tollbooth v4.0.2+incompatible
+	github.com/drewolson/testflight v1.0.0
 	github.com/dusk-network/dusk-crypto v0.1.3
 	github.com/dusk-network/dusk-protobuf v0.2.8
 	github.com/dusk-network/dusk-wallet/v2 v2.0.2
@@ -37,6 +38,7 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/goleveldb v1.0.0
+	github.com/tidwall/buntdb v1.1.2
 	github.com/urfave/cli v1.22.3
 	golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58

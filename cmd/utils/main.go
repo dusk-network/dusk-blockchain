@@ -79,6 +79,12 @@ var (
 		Value: 9000,
 	}
 
+	nodeAPIPortFlag = cli.IntFlag{
+		Name:  "nodeapiport",
+		Usage: "Dusk API node PORT , eg: --nodeapiport=9490",
+		Value: 9490,
+	}
+
 	portFlag = cli.IntFlag{
 		Name:  "port",
 		Usage: "Exporter probe port , eg: --port=9099",
@@ -139,6 +145,7 @@ var (
 		Flags: []cli.Flag{
 			gqlPortFlag,
 			nodePortFlag,
+			nodeAPIPortFlag,
 			portFlag,
 			hostnameFlag,
 		},
@@ -204,10 +211,11 @@ func metricsAction(ctx *cli.Context) error {
 
 	gqlPort := ctx.Int(gqlPortFlag.Name)
 	nodePort := ctx.Int(nodePortFlag.Name)
+	nodeAPIPort := ctx.Int(nodeAPIPortFlag.Name)
 	port := ctx.Int(portFlag.Name)
 	hostname := ctx.String(hostnameFlag.Name)
 
-	metrics.RunMetrics(gqlPort, nodePort, port, hostname)
+	metrics.RunMetrics(gqlPort, nodePort, nodeAPIPort, port, hostname)
 
 	return nil
 }

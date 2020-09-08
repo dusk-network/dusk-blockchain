@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	// DriverName is the unique identifier for the heavy driver
+	// DriverName is the unique identifier for the lite driver
 	DriverName = "lite_v0.1.0"
 )
 
