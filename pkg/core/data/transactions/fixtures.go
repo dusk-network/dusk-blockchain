@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	mrand "math/rand"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -163,7 +162,10 @@ func RandContractCalls(amount, invalid int, includeCoinbase bool) []ContractCall
 	for i := 0; i < invalid; {
 		// pick a random tx within the set and invalidate it until we reach the
 		// invalid amount
-		idx := mrand.Intn(amount)
+		// #654
+		step := []byte{0}
+		_, _ = rand.Reader.Read(step)
+		idx := step[0]
 		if !IsMockInvalid(cc[idx]) {
 			Invalidate(cc[idx])
 			i++
@@ -647,6 +649,8 @@ func RandBool() bool {
 
 // RandTxType returns a random TxType
 func RandTxType() TxType {
-	t := mrand.Intn(8)
-	return TxType(uint8(t))
+	// #654
+	t := []byte{0}
+	_, _ = rand.Reader.Read(t)
+	return TxType(t[0])
 }
