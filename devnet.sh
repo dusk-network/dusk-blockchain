@@ -145,7 +145,7 @@ enabled = false
   file = "${currentDir}/harness/data/wallet-$((9000+$i)).dat"
   store = "${DDIR}/walletDB/"
 [api]
-  enabled=true
+  enabled=false
   enableTLS = false
   address="127.0.0.1:$((9490+$i))"
   dbfile="${DDIR}/chain/api.db"
