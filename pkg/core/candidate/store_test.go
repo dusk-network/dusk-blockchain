@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
@@ -69,8 +71,13 @@ func TestRequestCandidate(t *testing.T) {
 	// Fetch a candidate we don't have
 	genesis := config.DecodeGenesis()
 	go func(errChan chan<- error) {
-		req := rpcbus.NewRequest(*bytes.NewBuffer(genesis.Header.Hash))
-		resp, err := rpc.Call(topics.GetCandidate, req, 0)
+
+		buf := new(bytes.Buffer)
+		_ = encoding.Write256(buf, genesis.Header.Hash)
+		_ = encoding.WriteBool(buf, true)
+
+		req := rpcbus.NewRequest(*buf)
+		resp, err := rpc.Call(topics.GetCandidate, req, time.Hour)
 		if err != nil {
 			errChan <- err
 			return
@@ -108,7 +115,7 @@ func TestRequestCandidate(t *testing.T) {
 	require.Equal(topics.GetCandidate, topics.Topic(bin[0]))
 
 	// Make sure we got a request for the genesis block
-	require.True(bytes.Equal(bin[1:], genesis.Header.Hash))
+	require.True(bytes.Equal(bin[1:33], genesis.Header.Hash))
 
 	// Send genesis back as a Candidate message
 	cm := mockCandidate()

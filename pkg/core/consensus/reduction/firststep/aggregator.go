@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -133,7 +134,12 @@ func (a *aggregator) addBitSet(sv *message.StepVotes, cluster sortedset.Cluster,
 
 func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	// Fetch the candidate block first.
-	req := rpcbus.NewRequest(*bytes.NewBuffer(blockHash))
+
+	params := new(bytes.Buffer)
+	_ = encoding.Write256(params, blockHash)
+	_ = encoding.WriteBool(params, true)
+
+	req := rpcbus.NewRequest(*params)
 	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
 	resp, err := rpcBus.Call(topics.GetCandidate, req, timeoutGetCandidate)
 	if err != nil {

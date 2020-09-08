@@ -96,7 +96,7 @@ type ScoreFactory struct {
 func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus.InternalPacket {
 	hdr := sf.sp.State()
 	if hdr.Round != round || hdr.Step != step {
-		lg.Panicf("mismatch of Header round and step in score creation. ScoreProposal has a different Round and Step (%d, %d) than the Coordinator (%d, %d)", hdr.Round, hdr.Step, round, step)
+		lg.Errorf("mismatch of Header round and step in score creation. ScoreProposal has a different Round and Step (%d, %d) than the Coordinator (%d, %d)", hdr.Round, hdr.Step, round, step)
 	}
 	score := message.NewScore(sf.sp, sender, sf.prevHash, sf.candidate)
 	return *score

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -25,10 +24,12 @@ func NewCandidateBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer
 // ProvideCandidate for a given (m *bytes.Buffer)
 func (c *CandidateBroker) ProvideCandidate(m *bytes.Buffer) error {
 	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
+
 	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*m), timeoutGetCandidate)
 	if err != nil {
 		lg.
 			WithError(err).
+			WithField("timeout", timeoutGetCandidate).
 			Error("timeout ProvideCandidate topics.GetCandidate")
 		return err
 	}

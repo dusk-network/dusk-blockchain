@@ -21,6 +21,9 @@ var (
 
 	// ErrInvalidRequestChan is returned method is bound to nil chan
 	ErrInvalidRequestChan = errors.New("invalid request channel")
+
+	// DefaultTimeout is used when 0 timeout is set on calling a method
+	DefaultTimeout = 5 * time.Second
 )
 
 // RPCBus is a request–response mechanism for internal communication between node
@@ -104,11 +107,11 @@ func (bus *RPCBus) Call(t topics.Topic, req Request, timeOut time.Duration) (int
 		return bytes.Buffer{}, err
 	}
 
-	if timeOut > 0 {
-		return bus.callTimeout(reqChan, req, timeOut)
+	if timeOut <= 0 {
+		timeOut = DefaultTimeout
 	}
 
-	return bus.callNoTimeout(reqChan, req)
+	return bus.callTimeout(reqChan, req, timeOut)
 }
 
 func (bus *RPCBus) callTimeout(reqChan chan<- Request, req Request, timeOut time.Duration) (interface{}, error) {
@@ -128,6 +131,7 @@ func (bus *RPCBus) callTimeout(reqChan chan<- Request, req Request, timeOut time
 	return resp.Resp, resp.Err
 }
 
+//nolint
 func (bus *RPCBus) callNoTimeout(reqChan chan<- Request, req Request) (interface{}, error) {
 	reqChan <- req
 	resp := <-req.RespChan
