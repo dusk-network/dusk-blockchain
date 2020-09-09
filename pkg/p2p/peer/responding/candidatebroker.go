@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/sirupsen/logrus"
 )
 
 // CandidateBroker holds instances to RPCBus and responseChan
@@ -27,7 +28,8 @@ func (c *CandidateBroker) ProvideCandidate(m *bytes.Buffer) error {
 
 	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*m), timeoutGetCandidate)
 	if err != nil {
-		lg.
+		logrus.
+			WithField("process", "candidatebroker").
 			WithError(err).
 			WithField("timeout", timeoutGetCandidate).
 			Error("timeout ProvideCandidate topics.GetCandidate")

@@ -257,7 +257,7 @@ func (c *Chain) beginAccepting(blk *block.Block) bool {
 	// started yet
 
 	if !c.counter.IsSyncing() {
-		lg.Error("could not accept block since we are syncing")
+		lg.Warn("could not accept block since we are syncing")
 		return false
 	}
 
