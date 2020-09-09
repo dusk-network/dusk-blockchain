@@ -1,9 +1,10 @@
 package eventbus
 
 import (
+	"crypto/rand"
 	"errors"
 	"io"
-	"math/rand"
+	"math/big"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -201,9 +202,16 @@ func (m *multiListener) Forward(topic topics.Topic, msg message.Message) (errorL
 }
 
 func (m *multiListener) Store(value Listener) uint32 {
+	// #654
+	nBig, err := rand.Int(rand.Reader, big.NewInt(32))
+	if err != nil {
+		panic(err)
+	}
+	n := nBig.Int64()
+
 	h := idListener{
 		Listener: value,
-		id:       rand.Uint32(),
+		id:       uint32(n),
 	}
 	m.Lock()
 	defer m.Unlock()
