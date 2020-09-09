@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math/big"
 	"math/bits"
 	"net"
 
@@ -317,10 +318,14 @@ func generateRandomDelegates(beta uint8, in []Peer, out *[]Peer) error {
 		return nil
 	}
 
+	maxval := int64(len(in))
 	// #654
-	b := []byte{0}
-	_, _ = rand.Reader.Read(b)
-	ind := b[0]
+	nBig, err := rand.Int(rand.Reader, big.NewInt(maxval))
+	if err != nil {
+		panic(err)
+	}
+	n := nBig.Int64()
+	ind := uint32(n)
 
 	*out = append(*out, in[ind])
 
