@@ -3,6 +3,7 @@ package kadcast
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/stretchr/testify/require"
 	"math"
 	"testing"
 
@@ -107,7 +108,8 @@ func TestGenerateRandomDelegates(t *testing.T) {
 	for i := 0; i < len(in); i++ {
 		var beta uint8 = uint8(i)
 		out := make([]Peer, 0)
-		generateRandomDelegates(beta, in, &out)
+		err := generateRandomDelegates(beta, in, &out)
+		require.Nil(t, err)
 
 		if len(out) != int(beta) {
 			t.Errorf("could not manage to generate %d delegates", beta)
@@ -116,7 +118,8 @@ func TestGenerateRandomDelegates(t *testing.T) {
 
 	beta := uint8(len(in) * 2)
 	out := make([]Peer, 0)
-	generateRandomDelegates(beta, in, &out)
+	err := generateRandomDelegates(beta, in, &out)
+	require.Nil(t, err)
 
 	if len(out) != len(in) {
 		t.Error("could not manage to generate n delegates")
