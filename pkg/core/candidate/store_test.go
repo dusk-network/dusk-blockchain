@@ -86,7 +86,8 @@ func TestRequestCandidate(t *testing.T) {
 		_ = encoding.WriteBool(buf, true)
 
 		req := rpcbus.NewRequest(*buf)
-		resp, err := rpc.Call(topics.GetCandidate, req, time.Hour)
+		var resp interface{}
+		resp, err = rpc.Call(topics.GetCandidate, req, time.Hour)
 		if err != nil {
 			errChan <- err
 			return
