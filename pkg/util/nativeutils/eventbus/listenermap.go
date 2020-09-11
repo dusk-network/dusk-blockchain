@@ -27,8 +27,8 @@ func newListenerMap() *listenerMap {
 func (h *listenerMap) Store(key topics.Topic, value Listener) uint32 {
 	id := rand.Uint32()
 	h.lock.Lock()
+	defer h.lock.Unlock()
 	h.listeners[key] = append(h.listeners[key], idListener{id, value})
-	h.lock.Unlock()
 	return id
 }
 
@@ -46,6 +46,7 @@ func (h *listenerMap) Load(key topics.Topic) []idListener {
 func (h *listenerMap) Delete(key topics.Topic, id uint32) bool {
 	found := false
 	h.lock.Lock()
+	defer h.lock.Unlock()
 	listeners := h.listeners[key]
 	for i, listener := range listeners {
 		if listener.id == id {
@@ -58,6 +59,5 @@ func (h *listenerMap) Delete(key topics.Topic, id uint32) bool {
 			break
 		}
 	}
-	h.lock.Unlock()
 	return found
 }

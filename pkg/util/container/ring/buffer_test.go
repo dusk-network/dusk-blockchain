@@ -36,11 +36,11 @@ type safeSlice struct {
 
 func (s *safeSlice) append(items [][]byte) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.data == nil {
 		s.data = make([][]byte, 0)
 	}
 	s.data = append(s.data, items...)
-	s.mu.Unlock()
 }
 
 func (s *safeSlice) Len() int {

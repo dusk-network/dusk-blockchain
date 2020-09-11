@@ -155,7 +155,7 @@ func (d *DuskNodes) SetInactive(ip string) {
 	if node != nil {
 		node.status = down
 		d.Lock()
+		defer d.Unlock()
 		d.Nodes[ip] = node
-		d.Unlock()
 	}
 }

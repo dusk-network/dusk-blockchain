@@ -71,7 +71,6 @@ func (db *DB) Begin(writable bool) (database.Transaction, error) {
 
 // Update the DB within a transaction
 func (db *DB) Update(fn func(database.Transaction) error) error {
-
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -99,7 +98,6 @@ func (db *DB) Update(fn func(database.Transaction) error) error {
 
 // View performs the equivalent of a Select SQL statement
 func (db *DB) View(fn func(database.Transaction) error) error {
-
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 

@@ -53,8 +53,8 @@ func (b *Handler) Committee(round uint64, step uint8, maxSize int) user.VotingCo
 		b.generateCommittees(round, step, maxSize)
 	}
 	b.lock.RLock()
+	defer b.lock.RUnlock()
 	committee := b.Committees[step]
-	b.lock.RUnlock()
 	return committee
 }
 
@@ -76,8 +76,9 @@ func (b *Handler) generateCommittees(round uint64, step uint8, maxSize int) {
 // how many provisioners are in the set.
 func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 	b.lock.RLock()
+	defer b.lock.RUnlock()
 	size := b.Provisioners.SubsetSizeAt(round)
-	b.lock.RUnlock()
+
 	if size > maxSize {
 		return maxSize
 	}

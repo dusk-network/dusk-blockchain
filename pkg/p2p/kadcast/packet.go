@@ -225,8 +225,8 @@ func handleChunks(packet Packet, router *Router) error {
 	// means that the packet is repeated and we just ignore it.
 	if _, ok := router.ChunkIDmap[*chunkID]; ok {
 		router.MapMutex.Lock()
+		defer router.MapMutex.Unlock()
 		router.Duplicated = true
-		router.MapMutex.Unlock()
 		return fmt.Errorf("chunk %s already registered", hex.EncodeToString((*chunkID)[:]))
 	}
 
@@ -236,6 +236,7 @@ func handleChunks(packet Packet, router *Router) error {
 	if router.StoreChunks {
 		router.ChunkIDmap[*chunkID] = payload
 	}
+	//TODO: #603
 	router.MapMutex.Unlock()
 
 	// TODO: HERE WE SHOULD SEND THE PAYLOAD TO THE `EVENTBUS`.

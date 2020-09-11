@@ -59,8 +59,8 @@ func (s *roundStore) Reset(c *Coordinator) {
 
 func (s *roundStore) addComponent(component Component) {
 	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.components = append(s.components, component)
-	s.lock.Unlock()
 }
 
 func (s *roundStore) hasComponent(id uint32) (bool, string) {
@@ -87,8 +87,8 @@ func (s *roundStore) initializeComponents(round RoundUpdate) []TopicListener {
 		allSubs = append(allSubs, subs...)
 	}
 	s.lock.Lock()
+	defer s.lock.Unlock()
 	sort.Slice(s.components, func(i, j int) bool { return s.components[i].ID() < s.components[j].ID() })
-	s.lock.Unlock()
 
 	return allSubs
 }

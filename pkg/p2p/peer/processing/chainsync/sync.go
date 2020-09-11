@@ -147,15 +147,15 @@ func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
 
 func (s *ChainSynchronizer) getHighestSeen() uint64 {
 	s.lock.RLock()
+	defer s.lock.RUnlock()
 	height := s.highestSeen
-	s.lock.RUnlock()
 	return height
 }
 
 func (s *ChainSynchronizer) setHighestSeen(height uint64) {
 	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.highestSeen = height
-	s.lock.Unlock()
 }
 
 func (s *ChainSynchronizer) publishHighestSeen(height uint64) {

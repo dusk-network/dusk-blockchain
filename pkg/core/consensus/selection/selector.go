@@ -176,8 +176,8 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 // CollectGeneration signals the selection start by triggering `EventPlayer.Play`
 func (s *Selector) CollectGeneration(packet consensus.InternalPacket) error {
 	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.bestEvent = message.EmptyScore()
-	s.lock.Unlock()
 	_ = s.eventPlayer.Forward(s.ID())
 	s.startSelection()
 	return nil
@@ -215,9 +215,11 @@ func (s *Selector) IncreaseTimeOut() {
 func (s *Selector) sendBestEvent() error {
 	var bestEvent consensus.InternalPacket
 	s.eventPlayer.Pause(s.scoreID)
+	// TODO: #603
 	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	bestEvent = s.bestEvent.Copy().(message.Score)
-	s.lock.RUnlock()
 
 	// If we had no best event, we should send an empty hash
 	if bestEvent.(message.Score).IsEmpty() {

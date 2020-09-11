@@ -212,10 +212,12 @@ func ScheduleRefreshToken(ctx context.Context, client *AuthClient, interceptor *
 				errChan <- err
 				return
 			}
-
-			interceptor.lock.Lock()
-			interceptor.accessToken = sessionToken
-			interceptor.lock.Unlock()
+			//TODO: #603
+			func() {
+				interceptor.lock.Lock()
+				defer interceptor.lock.Unlock()
+				interceptor.accessToken = sessionToken
+			}()
 		}
 	}
 }

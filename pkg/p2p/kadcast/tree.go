@@ -35,17 +35,18 @@ func (tree *Tree) addPeer(myPeer Peer, otherPeer Peer) {
 	// neighbor peer from the spanning tree myPeer belongs to.
 
 	tree.mu.Lock()
+	defer tree.mu.Unlock()
 	tree.buckets[idl].addPeer(otherPeer)
-	tree.mu.Unlock()
 }
 
 // Returns the total amount of peers that a `Peer` is connected to.
 func (tree *Tree) getTotalPeers() uint64 {
 	tree.mu.RLock()
+	defer tree.mu.RUnlock()
+
 	var count uint64 = 0
 	for _, bucket := range tree.buckets {
 		count += uint64(len(bucket.entries))
 	}
-	tree.mu.RUnlock()
 	return count
 }

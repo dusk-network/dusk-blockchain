@@ -23,15 +23,15 @@ func newStore() *store {
 func (c *store) storeCandidateMessage(cm message.Candidate) {
 	// TODO: ensure we can't become a victim of memory overflow attacks
 	c.lock.Lock()
+	defer c.lock.Unlock()
 	c.messages[string(cm.Block.Header.Hash)] = cm
-	c.lock.Unlock()
 }
 
 // fetchCandidateMessage returns a deep copy of the Candidate of this hash or an error if not found.
 func (c *store) fetchCandidateMessage(hash []byte) (message.Candidate, error) {
 	c.lock.RLock()
+	defer c.lock.RUnlock()
 	cm, ok := c.messages[string(hash)]
-	c.lock.RUnlock()
 
 	if ok {
 		return cm.Copy().(message.Candidate), nil

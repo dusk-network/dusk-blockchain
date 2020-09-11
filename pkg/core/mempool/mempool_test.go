@@ -42,14 +42,16 @@ type ctx struct {
 func (c *ctx) reset() {
 
 	// Reset shared context state
+	// TODO: #603
 	c.mu.Lock()
+	defer func() {
+		c.mu.Unlock()
+		c.m.Run()
+	}()
 	c.m.Quit()
 	c.m.verified = c.m.newPool()
 	c.verifiedTx = make([]transactions.ContractCall, 0)
 	c.propagated = make([][]byte, 0)
-	c.mu.Unlock()
-
-	c.m.Run()
 }
 
 func TestMain(m *testing.M) {
@@ -74,6 +76,7 @@ func TestMain(m *testing.M) {
 				log.Panic(err)
 			}
 
+			//TODO: #603
 			c.mu.Lock()
 			c.propagated = append(c.propagated, tx)
 			c.mu.Unlock()

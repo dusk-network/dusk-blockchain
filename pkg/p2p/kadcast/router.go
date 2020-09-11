@@ -72,6 +72,7 @@ func makeRouterFromPeer(peer Peer) Router {
 // as they have the xor distance in respec to a Peer as a parameter.
 func (router *Router) getPeerSortDist(refPeer Peer) []PeerSort {
 	var peerList []Peer
+	//TODO: #603
 	router.tree.mu.RLock()
 	for buckIdx, bucket := range router.tree.buckets {
 		if buckIdx == 0 {

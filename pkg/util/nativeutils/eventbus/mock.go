@@ -206,8 +206,8 @@ func (ms *GossipStreamer) Read() ([]byte, error) {
 	}
 
 	ms.lock.Lock()
+	defer ms.lock.Unlock()
 	ms.seenTopics = append(ms.seenTopics, topic)
-	ms.lock.Unlock()
 
 	return decoded.Bytes(), nil
 }

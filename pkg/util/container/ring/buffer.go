@@ -51,6 +51,7 @@ func (r *Buffer) Put(item []byte) bool {
 		r.items[r.writeIndex] = item
 	}
 
+	//TODO: #603
 	r.mu.Unlock()
 
 	// Signal consumers we've got new item
@@ -69,8 +70,8 @@ func (r *Buffer) Close() {
 
 // GetAll get all items in a buffer
 func (r *Buffer) GetAll() ([][]byte, bool) {
-
 	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	for int(r.writeIndex) < 0 && !r.closed.Load() {
 		r.notEmpty.Wait()
@@ -86,7 +87,6 @@ func (r *Buffer) GetAll() ([][]byte, bool) {
 	}
 
 	r.writeIndex = -1
-	r.mu.Unlock()
 
 	return items, r.closed.Load()
 }

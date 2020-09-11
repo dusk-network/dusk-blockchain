@@ -29,8 +29,8 @@ func (c *mockWebsocketConn) WriteMessage(messageType int, data []byte) error {
 	var p BlockMsg
 	if err := json.Unmarshal(data, &p); err == nil {
 		c.mu.Lock()
+		defer c.mu.Unlock()
 		c.msgBuf[p.Hash] = true
-		c.mu.Unlock()
 	}
 
 	return nil

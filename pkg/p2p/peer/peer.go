@@ -313,9 +313,9 @@ func (c *Connection) keepAlive() error {
 // and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
 	c.lock.Lock()
+	defer c.lock.Unlock()
 	_ = c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	n, err := c.Conn.Write(b)
-	c.lock.Unlock()
 	return n, err
 }
 
