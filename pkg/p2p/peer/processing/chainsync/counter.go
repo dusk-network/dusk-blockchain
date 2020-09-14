@@ -23,24 +23,11 @@ type Counter struct {
 	getAcceptedBlockChan <-chan rpcbus.Request
 }
 
-/*
-// NewCounter returns an initialized counter. It will decrement each time we accept a new block.
-func NewCounter(bus rpcbus.RPCBus) *Counter {
-	sc := &Counter{stopChan: make(chan struct{})}
-	decrementListener := eventbus.NewCallbackListener(sc.decrement)
-	if config.Get().General.SafeCallbackListener {
-		decrementListener = eventbus.NewSafeCallbackListener(sc.decrement)
-	}
-	subscriber.Subscribe(topics.AcceptedBlock, decrementListener)
-	return sc
-}
-*/
-
-// NewCounter counts remainin blocks when synchronizing. It is called through
+// NewCounter counts remaining blocks when synchronizing. It is called through
 // an RPCBus call
 // TODO: rename the RPC topic to DECREMENT
 func NewCounter(bus *rpcbus.RPCBus) (*Counter, error) {
-	getAcceptedBlockChan := make(chan rpcbus.Request, 1)
+	getAcceptedBlockChan := make(chan rpcbus.Request)
 	if err := bus.Register(topics.AcceptedBlock, getAcceptedBlockChan); err != nil {
 		return nil, err
 	}

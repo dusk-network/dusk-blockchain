@@ -110,6 +110,7 @@ func (r *Republisher) Activate() uint32 {
 // Note: the logic for marshaling should be moved after the Gossip
 func (r *Republisher) Republish(m message.Message) {
 	for _, v := range r.validators {
+		//TODO: why do we check for DuplicatePayloadError on if condition and switch case ?
 		if err := v(m); err != nil && err != DuplicatePayloadError {
 			switch err {
 			case DuplicatePayloadError:

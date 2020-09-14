@@ -34,7 +34,7 @@ import (
 func TestConcurrentAcceptBlock(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(1)
-	eb, _, c := setupChainTest(startingHeight, true)
+	eb, _, c := setupChainTest(t, startingHeight)
 	go c.Listen()
 
 	// Run two subscribers expecting acceptedBlock message
@@ -93,7 +93,7 @@ func mutateFirstChan(propagatedHeight uint64, eb eventbus.Publisher, acceptedBlo
 func TestAcceptFromPeer(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(1)
-	eb, _, c := setupChainTest(startingHeight, false)
+	eb, _, c := setupChainTest(t, startingHeight)
 	stopConsensusChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
 
@@ -156,7 +156,7 @@ func TestAcceptIntermediate(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(2)
 
-	eb, rpc, c := setupChainTest(startingHeight, false)
+	eb, rpc, c := setupChainTest(t, startingHeight)
 	go c.Listen()
 
 	intermediateChan := make(chan message.Message, 1)
@@ -167,7 +167,7 @@ func TestAcceptIntermediate(t *testing.T) {
 	// Make a 'winning' candidate message
 	blk := helper.RandomBlock(startingHeight, 1)
 	cert := block.EmptyCertificate()
-	provideCandidate(rpc, message.MakeCandidate(blk, cert))
+	provideCandidate(t, rpc, message.MakeCandidate(blk, cert))
 
 	// Now send a `Certificate` message with this block's hash
 	// Make a certificate with a different step, to do a proper equality
@@ -205,7 +205,7 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(2)
 
-	eb, _, c := setupChainTest(startingHeight, false)
+	eb, _, c := setupChainTest(t, startingHeight)
 	intermediateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
 
@@ -233,9 +233,10 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 }
 
 //nolint:unused
-func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
+func provideCandidate(t *testing.T, rpc *rpcbus.RPCBus, cm message.Candidate) {
 	c := make(chan rpcbus.Request, 1)
-	rpc.Register(topics.GetCandidate, c)
+	err := rpc.Register(topics.GetCandidate, c)
+	assert.NoError(t, err)
 
 	go func() {
 		r := <-c
@@ -283,9 +284,9 @@ func TestFetchTip(t *testing.T) {
 }
 
 func TestRebuildChain(t *testing.T) {
-	eb, rb, c := setupChainTest(0, true)
+	eb, rb, c := setupChainTest(t, 0)
 	go c.Listen()
-	catchClearWalletDatabaseRequest(rb)
+	catchClearWalletDatabaseRequest(t, rb)
 
 	// Listen for `StopConsensus` messages
 	stopConsensusChan := make(chan message.Message, 1)
@@ -336,28 +337,27 @@ func mockAcceptableBlock(prevBlock block.Block) *block.Block {
 	return blk
 }
 
-//nolint:unparam
-func setupChainTest(startAtHeight uint64, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
+func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	counter, _ := chainsync.NewCounter(rpc)
+	counter, err := chainsync.NewCounter(rpc)
+	assert.NoError(t, err)
+
 	loader := createLoader()
 	proxy := &transactions.MockProxy{
 		E: transactions.MockExecutor(startAtHeight),
 	}
-	c, err := New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, proxy.Executor())
-	if err != nil {
-		panic(err)
-	}
+	var c *Chain
+	c, err = New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, proxy.Executor())
+	assert.NoError(t, err)
 
 	return eb, rpc, c
 }
 
-func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
+func catchClearWalletDatabaseRequest(t *testing.T, rb *rpcbus.RPCBus) {
 	c := make(chan rpcbus.Request, 1)
-	if err := rb.Register(topics.ClearWalletDatabase, c); err != nil {
-		panic(err)
-	}
+	err := rb.Register(topics.ClearWalletDatabase, c)
+	assert.NoError(t, err)
 
 	go func() {
 		r := <-c

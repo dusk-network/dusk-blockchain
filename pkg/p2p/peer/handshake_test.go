@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
@@ -17,7 +19,9 @@ func TestHandshake(t *testing.T) {
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
-	counter, _ := chainsync.NewCounter(rpcBus)
+	counter, err := chainsync.NewCounter(rpcBus)
+	require.NoError(t, err)
+
 	client, srv := net.Pipe()
 
 	go func() {

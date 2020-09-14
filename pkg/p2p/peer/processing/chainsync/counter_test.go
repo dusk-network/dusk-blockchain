@@ -23,15 +23,8 @@ func TestStopTimerGoroutine(t *testing.T) {
 
 	c.StartSyncing(1)
 
-	//msg := message.New(topics.AcceptedBlock, message.SafeBuffer{})
-	//// Decrement to 0. This should stop the running `listenForTimer` goroutine
-	//// that's related to the current sync session.
-	//bus.Publish(topics.AcceptedBlock, msg)
-	//// making sure that the message got propagated
-	//time.Sleep(100 * time.Millisecond)
-
 	params := new(bytes.Buffer)
-	resp, err := c.bus.Call(topics.AcceptedBlock, rpcbus.NewRequest(*params), time.Second) //20 is tmp value for further checks
+	resp, err := c.bus.Call(topics.AcceptedBlock, rpcbus.NewRequest(*params), time.Second)
 
 	// testing that there is no error and an empty response (counter.decrement
 	// does not return anything)

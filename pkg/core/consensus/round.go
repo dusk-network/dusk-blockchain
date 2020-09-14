@@ -374,6 +374,7 @@ func (c *Coordinator) reinstantiateStore() {
 // component.
 // It is the callback passed to the eventbus.Multicaster
 func (c *Coordinator) CollectEvent(m message.Message) {
+	//TODO: what if this is a message.SafeBuffer ?
 	msg := m.Payload().(InternalPacket)
 
 	hdr := msg.State()
@@ -457,7 +458,6 @@ func (c *Coordinator) CollectEvent(m message.Message) {
 				Error("failed to Dispatch CollectEvent")
 		}
 	}
-	return
 }
 
 // FinalizeRound triggers the store to dispatch a finalize to the Components
