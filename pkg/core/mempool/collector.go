@@ -23,8 +23,7 @@ func initIntermediateBlockCollector(sub eventbus.Subscriber) chan block.Block {
 	return blkChan
 }
 
-func (i *intermediateBlockCollector) Collect(blockMsg message.Message) error {
+func (i *intermediateBlockCollector) Collect(blockMsg message.Message) {
 	blk := blockMsg.Payload().(block.Block)
 	i.blkChan <- blk
-	return nil
 }

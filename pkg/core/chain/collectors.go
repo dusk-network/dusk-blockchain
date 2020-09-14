@@ -35,11 +35,10 @@ func initCertificateCollector(subscriber eventbus.Subscriber) <-chan certMsg {
 	return certificateChan
 }
 
-func (c *certificateCollector) Collect(m message.Message) error {
+func (c *certificateCollector) Collect(m message.Message) {
 	cmsg := m.Payload().(message.Certificate)
 	cert := cmsg.Ag.GenerateCertificate()
 	c.certificateChan <- certMsg{cmsg.Ag.State().BlockHash, cert, cmsg.Keys}
-	return nil
 }
 
 func initHighestSeenCollector(sub eventbus.Subscriber) <-chan uint64 {
@@ -53,8 +52,7 @@ func initHighestSeenCollector(sub eventbus.Subscriber) <-chan uint64 {
 	return highestSeenChan
 }
 
-func (h *highestSeenCollector) Collect(m message.Message) error {
+func (h *highestSeenCollector) Collect(m message.Message) {
 	height, _ := message.ConvU64(m.Payload())
 	h.highestSeenChan <- height
-	return nil
 }

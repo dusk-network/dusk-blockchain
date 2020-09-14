@@ -34,7 +34,7 @@ func NewCounter(subscriber eventbus.Subscriber) *Counter {
 	return sc
 }
 
-func (s *Counter) decrement(m message.Message) error {
+func (s *Counter) decrement(m message.Message) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if s.blocksRemaining > 0 {
@@ -43,14 +43,12 @@ func (s *Counter) decrement(m message.Message) error {
 		// Stop the timer goroutine if we're done
 		if s.blocksRemaining == 0 {
 			s.stopChan <- struct{}{}
-			return nil
+			return
 		}
 
 		// Refresh the timer whenever we get a new block during sync
 		s.timer.Reset(syncTime)
 	}
-
-	return nil
 }
 
 // IsSyncing notifies whether the counter is syncing

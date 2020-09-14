@@ -24,14 +24,15 @@ type Listener interface {
 
 // CallbackListener subscribes using callbacks
 type CallbackListener struct {
-	callback func(message.Message) error
+	callback func(message.Message)
 	safe     bool
 }
 
 // Notify the copy of a message as a parameter to a callback
 func (c *CallbackListener) Notify(m message.Message) error {
 	if !c.safe {
-		return c.callback(m)
+		go c.callback(m)
+		return nil
 	}
 
 	clone, err := message.Clone(m)
@@ -39,16 +40,17 @@ func (c *CallbackListener) Notify(m message.Message) error {
 		log.WithError(err).Error("CallbackListener, failed to clone message")
 		return err
 	}
-	return c.callback(clone)
+	go c.callback(clone)
+	return nil
 }
 
 // NewSafeCallbackListener creates a callback based dispatcher
-func NewSafeCallbackListener(callback func(message.Message) error) Listener {
+func NewSafeCallbackListener(callback func(message.Message)) Listener {
 	return &CallbackListener{callback, true}
 }
 
 // NewCallbackListener creates a callback based dispatcher
-func NewCallbackListener(callback func(message.Message) error) Listener {
+func NewCallbackListener(callback func(message.Message)) Listener {
 	return &CallbackListener{callback, false}
 }
 

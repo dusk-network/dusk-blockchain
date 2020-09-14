@@ -263,6 +263,7 @@ func (c *Chain) beginAccepting(blk *block.Block) bool {
 
 	// If we are more than one block behind, stop the consensus
 	lg.Debug("topics.StopConsensus")
+	// FIXME: this call should be blocking
 	errList := c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, message.EMPTY))
 	diagnostics.LogPublishErrors("chain/chain.go, topics.StopConsensus", errList)
 
@@ -285,6 +286,8 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	// This will decrement the sync counter
 	// TODO: a new context should be created with timeout, cancellation, etc
 	// instead of reusing the Chain global one
+	// FIXME: the synchronizer counter should be synchronous!! AcceptBlock should not
+	// use the EventBus but use the RPCBus to wait for the counter
 	if err := c.AcceptBlock(c.ctx, blk); err != nil {
 		lg.WithError(err).Debug("could not AcceptBlock")
 		return err

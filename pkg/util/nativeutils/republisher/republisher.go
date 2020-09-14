@@ -108,16 +108,15 @@ func (r *Republisher) Activate() uint32 {
 // Republish intercepts a topic and repropagates it immediately
 // after applying any eventual validation logic.
 // Note: the logic for marshaling should be moved after the Gossip
-func (r *Republisher) Republish(m message.Message) error {
+func (r *Republisher) Republish(m message.Message) {
 	for _, v := range r.validators {
-		if err := v(m); err != nil {
+		if err := v(m); err != nil && err != DuplicatePayloadError {
 			switch err {
-			case InvalidError, EncodingError:
-				return err
 			case DuplicatePayloadError:
-				return nil
+				return
 			default:
-				return err
+				// TODO: log
+				return
 			}
 		}
 	}
@@ -131,7 +130,8 @@ func (r *Republisher) Republish(m message.Message) error {
 		// header, etc
 		marshaled, err = message.Marshal(m)
 		if err != nil {
-			return err
+			diagnostics.LogError("republisher.go, problem marshaling", err)
+			return
 		}
 	}
 
@@ -142,8 +142,4 @@ func (r *Republisher) Republish(m message.Message) error {
 	// gossip away
 	errList := r.broker.Publish(topics.Gossip, serialized)
 	diagnostics.LogPublishErrors("republisher.go, topics.Gossip", errList)
-
-	return nil
-	//r.broker.Publish(topics.Gossip, m)
-	//return nil
 }

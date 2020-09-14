@@ -168,8 +168,7 @@ func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Co
 	msg := message.New(topics.RoundUpdate, ru)
 
 	// Collect the round update to initialize the state
-	err = c.CollectRoundUpdate(msg)
-	assert.Nil(t, err)
+	c.CollectRoundUpdate(msg)
 
 	return c, c.store.components
 }
