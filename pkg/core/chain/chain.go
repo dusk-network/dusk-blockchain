@@ -395,6 +395,9 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 
 	msg := message.New(topics.AcceptedBlock, blk)
 	errList := c.eventBus.Publish(topics.AcceptedBlock, msg)
+
+	// decrement the counter
+	_, _ = c.rpcBus.Call(topics.AcceptedBlock, rpcbus.NewRequest(&bytes.Buffer{}), 0)
 	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
 
 	l.Trace("procedure ended")

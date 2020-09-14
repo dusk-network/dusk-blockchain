@@ -85,7 +85,7 @@ func setupSynchronizer() (*chainsync.ChainSynchronizer, *eventbus.EventBus, chan
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
 	responseChan := make(chan *bytes.Buffer, 100)
-	counter := chainsync.NewCounter(eb)
+	counter, _ := chainsync.NewCounter(rpcBus)
 	cs := chainsync.NewChainSynchronizer(eb, rpcBus, responseChan, counter)
 	respond(rpcBus)
 	return cs, eb, responseChan

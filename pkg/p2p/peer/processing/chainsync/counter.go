@@ -1,14 +1,12 @@
 package chainsync
 
 import (
+	"bytes"
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 var syncTime = 30 * time.Second
@@ -18,13 +16,16 @@ var syncTime = 30 * time.Second
 type Counter struct {
 	lock            sync.RWMutex
 	blocksRemaining uint64
+	bus             *rpcbus.RPCBus
 
-	timer    *time.Timer
-	stopChan chan struct{}
+	timer                *time.Timer
+	stopChan             chan struct{}
+	getAcceptedBlockChan <-chan rpcbus.Request
 }
 
+/*
 // NewCounter returns an initialized counter. It will decrement each time we accept a new block.
-func NewCounter(subscriber eventbus.Subscriber) *Counter {
+func NewCounter(bus rpcbus.RPCBus) *Counter {
 	sc := &Counter{stopChan: make(chan struct{})}
 	decrementListener := eventbus.NewCallbackListener(sc.decrement)
 	if config.Get().General.SafeCallbackListener {
@@ -33,8 +34,40 @@ func NewCounter(subscriber eventbus.Subscriber) *Counter {
 	subscriber.Subscribe(topics.AcceptedBlock, decrementListener)
 	return sc
 }
+*/
 
-func (s *Counter) decrement(m message.Message) {
+// NewCounter counts remainin blocks when synchronizing. It is called through
+// an RPCBus call
+// TODO: rename the RPC topic to DECREMENT
+func NewCounter(bus *rpcbus.RPCBus) (*Counter, error) {
+	getAcceptedBlockChan := make(chan rpcbus.Request, 1)
+	if err := bus.Register(topics.AcceptedBlock, getAcceptedBlockChan); err != nil {
+		return nil, err
+	}
+
+	sc := &Counter{
+		bus:                  bus,
+		stopChan:             make(chan struct{}),
+		getAcceptedBlockChan: getAcceptedBlockChan,
+	}
+
+	go sc.listen()
+	return sc, nil
+}
+
+func (s *Counter) listen() {
+	for {
+		select {
+		case req := <-s.getAcceptedBlockChan:
+			s.decrement()
+			req.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: nil}
+		case <-s.stopChan:
+			return
+		}
+	}
+}
+
+func (s *Counter) decrement() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if s.blocksRemaining > 0 {
