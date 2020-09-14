@@ -336,17 +336,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 		return err
 	}
 
-	// 2. Check the certificate
-	// This check should avoid a possible race condition between accepting two blocks
-	// at the same height, as the probability of the committee creating two valid certificates
-	// for the same round is negligible.
-	l.Trace("verifying block certificate")
-	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
-		l.WithError(err).Error("certificate verification failed")
-		return err
-	}
-
-	// 3. Call ExecuteStateTransitionFunction
+	// 2. Call ExecuteStateTransitionFunction
 	l.Debug("calling ExecuteStateTransitionFunction")
 	provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs, blk.Header.Height)
 	if err != nil {
@@ -355,8 +345,18 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	}
 
 	// Caching the provisioners
-	// TODO: add bidList ?
+	// TODO: add bidList
 	c.p = &provisioners
+
+	// 3. Check the certificate
+	// This check should avoid a possible race condition between accepting two blocks
+	// at the same height, as the probability of the committee creating two valid certificates
+	// for the same round is negligible.
+	l.WithField("provisioners_len", c.p.Set.Len()).Trace("verifying block certificate")
+	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
+		l.WithError(err).Error("certificate verification failed")
+		return err
+	}
 
 	if config.Get().API.Enabled {
 		go func() {
