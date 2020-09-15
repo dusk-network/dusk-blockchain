@@ -100,6 +100,7 @@ init_dusk_func() {
   timeoutsendstaketx = 5
   timeoutgetmempooltxs = 3
   timeoutgetroundresults = 5
+  timeoutbrokergetcandidate = 2
 
 [genesis]
   legacy = true
@@ -145,7 +146,7 @@ enabled = false
   file = "${currentDir}/harness/data/wallet-$((9000+$i)).dat"
   store = "${DDIR}/walletDB/"
 [api]
-  enabled=false
+  enabled=true
   enableTLS = false
   address="127.0.0.1:$((9490+$i))"
   dbfile="${DDIR}/chain/api.db"

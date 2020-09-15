@@ -3,6 +3,7 @@ package candidate
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -57,6 +58,14 @@ func TestDeepCopy(t *testing.T) {
 
 // Test the candidate request functionality.
 func TestRequestCandidate(t *testing.T) {
+	//setup viper timeout
+	cwd, err := os.Getwd()
+	require.Nil(t, err)
+
+	r, err := config.LoadFromFile(cwd + "/../../../dusk.toml")
+	require.Nil(t, err)
+	config.Mock(&r)
+
 	assert := assert.New(t)
 	require := require.New(t)
 	eb := eventbus.New()
@@ -77,7 +86,8 @@ func TestRequestCandidate(t *testing.T) {
 		_ = encoding.WriteBool(buf, true)
 
 		req := rpcbus.NewRequest(*buf)
-		resp, err := rpc.Call(topics.GetCandidate, req, time.Hour)
+		var resp interface{}
+		resp, err = rpc.Call(topics.GetCandidate, req, time.Hour)
 		if err != nil {
 			errChan <- err
 			return

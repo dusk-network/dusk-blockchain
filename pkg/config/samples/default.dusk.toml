@@ -21,6 +21,7 @@ timeoutverifycandidateblock = 5
 timeoutsendstaketx = 5
 timeoutgetmempooltxs = 3
 timeoutgetroundresults = 5
+timeoutbrokergetcandidate = 2
 
 # logger configs
 [logger]

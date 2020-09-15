@@ -45,6 +45,8 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("timeout.timeoutgetmempooltxs", 3)
 	//roundresultsbroker.go
 	viper.Set("timeout.timeoutgetroundresults", 5)
+	//broker.go
+	viper.Set("timeout.timeoutbrokergetcandidate", 2)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
 	viper.Set("gql.address", node.Cfg.Gql.Address)

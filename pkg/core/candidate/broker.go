@@ -6,6 +6,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -130,7 +132,10 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	diagnostics.LogPublishErrors("candidate/broker.go, topics.Gossip, topics.GetCandidate", errList)
 
 	//FIXME: Add option to configure timeout #614
-	timer := time.NewTimer(2 * time.Second)
+
+	brokergetcandidateTimeout := config.Get().Timeout.TimeoutBrokerGetCandidate
+	timer := time.NewTimer(time.Duration(brokergetcandidateTimeout) * time.Second)
+
 	for {
 		select {
 		case <-timer.C:
