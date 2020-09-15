@@ -83,8 +83,7 @@ func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *eventbus.Ev
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
 	responseChan := make(chan *bytes.Buffer, 100)
-	counter, err := chainsync.NewCounter(rpcBus)
-	assert.NoError(t, err)
+	counter := chainsync.NewCounter()
 
 	cs := chainsync.NewChainSynchronizer(eb, rpcBus, responseChan, counter)
 	respond(t, rpcBus)

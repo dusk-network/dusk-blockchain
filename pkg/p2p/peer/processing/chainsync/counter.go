@@ -1,11 +1,9 @@
 package chainsync
 
 import (
-	"bytes"
-	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
@@ -14,9 +12,7 @@ var syncTime = 30 * time.Second
 // Counter is a simple guarded counter, which can be used to figure out if we are currently
 // syncing with another peer. It is used to orchestrate requests for blocks.
 type Counter struct {
-	lock            sync.RWMutex
 	blocksRemaining uint64
-	bus             *rpcbus.RPCBus
 
 	timer                *time.Timer
 	stopChan             chan struct{}
@@ -26,42 +22,20 @@ type Counter struct {
 // NewCounter counts remaining blocks when synchronizing. It is called through
 // an RPCBus call
 // TODO: rename the RPC topic to DECREMENT
-func NewCounter(bus *rpcbus.RPCBus) (*Counter, error) {
-	getAcceptedBlockChan := make(chan rpcbus.Request)
-	if err := bus.Register(topics.AcceptedBlock, getAcceptedBlockChan); err != nil {
-		return nil, err
-	}
-
+func NewCounter() *Counter {
 	sc := &Counter{
-		bus:                  bus,
-		stopChan:             make(chan struct{}),
-		getAcceptedBlockChan: getAcceptedBlockChan,
+		stopChan: make(chan struct{}),
 	}
-
-	go sc.listen()
-	return sc, nil
+	atomic.StoreUint64(&sc.blocksRemaining, 0)
+	return sc
 }
 
-func (s *Counter) listen() {
-	for {
-		select {
-		case req := <-s.getAcceptedBlockChan:
-			s.decrement()
-			req.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: nil}
-		case <-s.stopChan:
-			return
-		}
-	}
-}
-
-func (s *Counter) decrement() {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	if s.blocksRemaining > 0 {
-		s.blocksRemaining--
+func (s *Counter) Decrement() {
+	if atomic.LoadUint64(&s.blocksRemaining) > 0 {
+		atomic.AddUint64(&s.blocksRemaining, ^uint64(0))
 
 		// Stop the timer goroutine if we're done
-		if s.blocksRemaining == 0 {
+		if atomic.LoadUint64(&s.blocksRemaining) == 0 {
 			s.stopChan <- struct{}{}
 			return
 		}
@@ -73,22 +47,17 @@ func (s *Counter) decrement() {
 
 // IsSyncing notifies whether the counter is syncing
 func (s *Counter) IsSyncing() bool {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.blocksRemaining > 0
+	return atomic.LoadUint64(&s.blocksRemaining) > 0
 }
 
 // StartSyncing with the peers
 func (s *Counter) StartSyncing(heightDiff uint64) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	// We can only receive up to 500 blocks at a time
 	if heightDiff > 500 {
 		heightDiff = 500
 	}
 
-	s.blocksRemaining = heightDiff
+	atomic.StoreUint64(&s.blocksRemaining, heightDiff)
 	s.timer = time.NewTimer(syncTime)
 	go s.listenForTimer(s.timer)
 }
@@ -96,9 +65,7 @@ func (s *Counter) StartSyncing(heightDiff uint64) {
 func (s *Counter) listenForTimer(timer *time.Timer) {
 	select {
 	case <-timer.C:
-		s.lock.Lock()
-		defer s.lock.Unlock()
-		s.blocksRemaining = 0
+		atomic.StoreUint64(&s.blocksRemaining, 0)
 	case <-s.stopChan:
 	}
 }
