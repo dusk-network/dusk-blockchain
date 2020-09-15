@@ -340,15 +340,14 @@ func mockAcceptableBlock(prevBlock block.Block) *block.Block {
 func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	counter, err := chainsync.NewCounter(rpc)
-	assert.NoError(t, err)
+	counter := chainsync.NewCounter()
 
 	loader := createLoader()
 	proxy := &transactions.MockProxy{
 		E: transactions.MockExecutor(startAtHeight),
 	}
 	var c *Chain
-	c, err = New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, proxy.Executor())
+	c, err := New(context.Background(), eb, rpc, counter, loader, &MockVerifier{}, nil, proxy.Executor())
 	assert.NoError(t, err)
 
 	return eb, rpc, c

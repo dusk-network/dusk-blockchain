@@ -37,8 +37,7 @@ func TestReader(t *testing.T) {
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
-	counter, err := chainsync.NewCounter(rpcBus)
-	require.NoError(t, err)
+	counter := chainsync.NewCounter()
 
 	peerReader, err := StartPeerReader(srv, eb, rpcBus, counter, nil)
 	if err != nil {
