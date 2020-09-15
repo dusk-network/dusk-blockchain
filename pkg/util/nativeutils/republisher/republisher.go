@@ -116,7 +116,6 @@ func (r *Republisher) Republish(m message.Message) {
 			case DuplicatePayloadError:
 				return
 			default:
-				// TODO: log
 				log.
 					WithField("message", m).
 					WithField("validator", v).
