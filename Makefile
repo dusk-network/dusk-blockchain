@@ -72,7 +72,7 @@ install-tools:
 cross: \
 	dusk-linux dusk-linux-arm dusk-darwin dusk-windows \
 	voucher-linux voucher-linux-arm voucher-darwin voucher-windows \
-	wallet-linux wallet-linux-arm wallet-darwin wallet-windows \
+	wallet-linux wallet-linux-arm wallet-darwin wallet-windows
 ###################################DUSK#################################################
 dusk-linux: install-tools
 	xgo --go=latest --targets=linux/amd64 -out=./bin/dusk ./cmd/dusk
