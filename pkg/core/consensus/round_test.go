@@ -1,7 +1,9 @@
 package consensus
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -148,6 +150,51 @@ func TestQueueDispatchAgreement(t *testing.T) {
 
 	// Should receive the agreement event
 	<-agComp.receivedEvents
+}
+
+// TestStoreReadLock ensures no deadlock can occur in Store due to recursive read locks
+func TestStoreReadLock(t *testing.T) {
+
+	// With little possibility, deadlock around RLock-ing of RWMutex (of store component) explained
+	// https://github.com/golang/go/issues/15418#issuecomment-216220249
+
+	// Ref: dusk-network/dusk-blockchain/issues/669
+
+	done := make(chan bool)
+	go func() {
+		c, _ := initCoordinatorTest(t, topics.Agreement)
+
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+
+		// goroutine that (used to) call recursively read lock
+		go func() {
+			for i := 0; i < 1000; i++ {
+				_ = c.store.Dispatch(message.New(topics.Generation, EmptyPacket()))
+			}
+			wg.Done()
+		}()
+
+		// goroutine thats acquires mutex for writing
+		go func() {
+			for i := 0; i < 1000; i++ {
+				comp := newMockComponent(topics.Generation)
+				c.store.addComponent(comp)
+			}
+			wg.Done()
+		}()
+
+		wg.Wait()
+		done <- true
+	}()
+
+	select {
+	case <-time.After(5 * time.Second):
+		t.Fatal("Store deadlock detected")
+	case <-done:
+		t.Log("No deadlock detected")
+	}
+
 }
 
 // Initialize a coordinator with a single component.
