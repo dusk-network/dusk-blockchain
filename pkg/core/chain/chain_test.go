@@ -133,21 +133,24 @@ func TestAcceptFromPeer(t *testing.T) {
 	case <-stopConsensusChan:
 	}
 
-	// Discard block gossip
-	_, err := streamer.Read()
-	assert.NoError(err)
+	// the order of received stuff cannot be guaranteed. So we just search for
+	// getRoundResult topic. If it hasn't been received the test fails.
+	// One message should be the block gossip. The other, the round result
+	for i := 0; i < 2; i++ {
+		m, err := streamer.Read()
+		assert.NoError(err)
 
-	// Should get a request for round results for round 2
-	m, serr := streamer.Read()
-	assert.NoError(serr)
+		if streamer.SeenTopics()[i] == topics.GetRoundResults {
+			var round uint64
+			err = encoding.ReadUint64LE(bytes.NewBuffer(m), &round)
+			assert.NoError(err)
 
-	assert.Equal(topics.GetRoundResults, streamer.SeenTopics()[1])
+			assert.Equal(uint64(2), round)
+			return
+		}
+	}
 
-	var round uint64
-	err = encoding.ReadUint64LE(bytes.NewBuffer(m), &round)
-	assert.NoError(err)
-
-	assert.Equal(uint64(2), round)
+	assert.Fail("expected a round result to be received, but it is not in the ringbuffer")
 }
 
 // This test ensures the correct behavior when accepting a block

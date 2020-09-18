@@ -283,11 +283,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	field := logger.Fields{"process": "onAcceptBlock", "height": blk.Header.Height}
 	lg := log.WithFields(field)
 
-	// This will decrement the sync counter
-	// TODO: a new context should be created with timeout, cancellation, etc
-	// instead of reusing the Chain global one
-	// FIXME: the synchronizer counter should be synchronous!! AcceptBlock should not
-	// use the EventBus but use the RPCBus to wait for the counter
+	// Accepting the block decrements the sync counter
 	if err := c.AcceptBlock(c.ctx, blk); err != nil {
 		lg.WithError(err).Debug("could not AcceptBlock")
 		return err

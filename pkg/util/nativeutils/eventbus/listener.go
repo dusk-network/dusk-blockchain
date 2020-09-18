@@ -78,19 +78,17 @@ func NewStreamListener(w io.WriteCloser) Listener {
 	return sh
 }
 
-// Notify puts a message to the Listener's ringbuffer
+// Notify puts a message to the Listener's ringbuffer. It uses a goroutine so
+// to not block while the item is put in the ringbuffer
 func (s *StreamListener) Notify(m message.Message) error {
-	if s.ringbuffer == nil {
-		return errors.New("no ringbuffer specified")
-	}
-
-	// TODO: interface - the ring buffer should be able to handle interface
-	// payloads rather than restricting solely to buffers
-	// TODO: interface - This panics in case payload is not a buffer
-	buf := m.Payload().(message.SafeBuffer)
-	if !s.ringbuffer.Put(buf.Bytes()) {
-		return errors.New("could not push a message")
-	}
+	// writing on the ringbuffer happens asynchronously
+	go func() {
+		buf := m.Payload().(message.SafeBuffer)
+		if !s.ringbuffer.Put(buf.Bytes()) {
+			err := errors.New("ringbuffer is closed")
+			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("ringbuffer closed")
+		}
+	}()
 
 	return nil
 }
