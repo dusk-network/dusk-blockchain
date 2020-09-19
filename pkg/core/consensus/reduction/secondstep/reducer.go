@@ -33,8 +33,7 @@ type Reducer struct {
 	eventPlayer consensus.EventPlayer
 	signer      consensus.Signer
 
-	reductionID   uint32
-	reductionName string
+	reductionID uint32
 
 	handler    *reduction.Handler
 	aggregator *aggregator

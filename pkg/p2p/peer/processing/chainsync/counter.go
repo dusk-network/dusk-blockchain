@@ -3,8 +3,6 @@ package chainsync
 import (
 	"sync/atomic"
 	"time"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 var syncTime = 30 * time.Second
@@ -14,14 +12,12 @@ var syncTime = 30 * time.Second
 type Counter struct {
 	blocksRemaining uint64
 
-	timer                *time.Timer
-	stopChan             chan struct{}
-	getAcceptedBlockChan <-chan rpcbus.Request
+	timer    *time.Timer
+	stopChan chan struct{}
 }
 
 // NewCounter counts remaining blocks when synchronizing. It is called through
 // an RPCBus call
-// TODO: rename the RPC topic to DECREMENT
 func NewCounter() *Counter {
 	sc := &Counter{
 		stopChan: make(chan struct{}),
@@ -30,6 +26,7 @@ func NewCounter() *Counter {
 	return sc
 }
 
+//Decrement the number of remaining blocks until the node is fully synchronized
 func (s *Counter) Decrement() {
 	if atomic.LoadUint64(&s.blocksRemaining) > 0 {
 		atomic.AddUint64(&s.blocksRemaining, ^uint64(0))

@@ -3,6 +3,7 @@ package republisher
 import (
 	"bytes"
 	"errors"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
