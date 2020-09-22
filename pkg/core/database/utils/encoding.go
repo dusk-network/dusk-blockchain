@@ -17,7 +17,6 @@ var (
 
 // EncodeBlockTx tries to serialize type, index and encoded value of transactions.ContractCall
 func EncodeBlockTx(tx transactions.ContractCall, txIndex uint32) ([]byte, error) {
-
 	buf := new(bytes.Buffer)
 
 	// Write tx type as first field
@@ -44,13 +43,12 @@ func EncodeBlockTx(tx transactions.ContractCall, txIndex uint32) ([]byte, error)
 
 // DecodeBlockTx tries to deserialize the type, index and decoded value of a tx
 func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.ContractCall, uint32, error) {
-
 	txIndex := uint32(math.MaxUint32)
 
-	var tx transactions.ContractCall
+	tx := transactions.NewTransaction()
 	reader := bytes.NewBuffer(data)
 
-	// Peak the type from the first byte
+	// Peek the type from the first byte
 	typeBytes, err := reader.ReadByte()
 	if err != nil {
 		return nil, txIndex, err

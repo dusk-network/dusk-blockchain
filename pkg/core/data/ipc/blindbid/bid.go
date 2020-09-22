@@ -97,8 +97,6 @@ func MarshalBid(r *bytes.Buffer, f *Bid) error {
 
 // UnmarshalBid reads a Bid struct from a bytes.Buffer.
 func UnmarshalBid(r *bytes.Buffer, f *Bid) error {
-	f = new(Bid)
-
 	if err := common.UnmarshalPoseidonCipher(r, f.EncryptedData); err != nil {
 		return err
 	}
@@ -208,8 +206,6 @@ func MarshalBidTransactionRequest(r *bytes.Buffer, f *BidTransactionRequest) err
 
 // UnmarshalBidTransactionRequest reads a BidTransactionRequest struct from a bytes.Buffer.
 func UnmarshalBidTransactionRequest(r *bytes.Buffer, f *BidTransactionRequest) error {
-	f = new(BidTransactionRequest)
-
 	if err := common.UnmarshalBlsScalar(r, f.K); err != nil {
 		return err
 	}
@@ -275,8 +271,6 @@ func MarshalBidTransaction(r *bytes.Buffer, f *BidTransaction) error {
 
 // UnmarshalBidTransaction reads a BidTransaction struct from a bytes.Buffer.
 func UnmarshalBidTransaction(r *bytes.Buffer, f *BidTransaction) error {
-	f = new(BidTransaction)
-
 	if err := UnmarshalBid(r, f.Bid); err != nil {
 		return err
 	}
@@ -314,8 +308,6 @@ func MarshalFindBidRequest(r *bytes.Buffer, f *FindBidRequest) error {
 
 // UnmarshalFindBidRequest reads a FindBidRequest struct from a bytes.Buffer.
 func UnmarshalFindBidRequest(r *bytes.Buffer, f *FindBidRequest) error {
-	f = new(FindBidRequest)
-
 	return keys.UnmarshalStealthAddress(r, f.Addr)
 }
 
@@ -397,8 +389,6 @@ func MarshalBidList(r *bytes.Buffer, f *BidList) error {
 
 // UnmarshalBidList reads a BidList struct from a bytes.Buffer.
 func UnmarshalBidList(r *bytes.Buffer, f *BidList) error {
-	f = new(BidList)
-
 	lenBidList, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
@@ -406,7 +396,7 @@ func UnmarshalBidList(r *bytes.Buffer, f *BidList) error {
 
 	f.BidList = make([]*Bid, lenBidList)
 	for _, bid := range f.BidList {
-		if err := UnmarshalBid(r, bid); err != nil {
+		if err = UnmarshalBid(r, bid); err != nil {
 			return err
 		}
 	}
@@ -418,7 +408,7 @@ func UnmarshalBidList(r *bytes.Buffer, f *BidList) error {
 
 	f.BidHashList = make([]*common.BlsScalar, lenBidHashList)
 	for _, bidHash := range f.BidHashList {
-		if err := common.UnmarshalBlsScalar(r, bidHash); err != nil {
+		if err = common.UnmarshalBlsScalar(r, bidHash); err != nil {
 			return err
 		}
 	}

@@ -268,7 +268,6 @@ func TestFetchBlockHeader(test *testing.T) {
 	})
 }
 func TestFetchBlockTxs(test *testing.T) {
-
 	test.Parallel()
 
 	// Verify all blocks transactions can be fetched by Header.Hash
@@ -545,11 +544,9 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 }
 
 func TestFetchBlockTxByHash(test *testing.T) {
-
 	test.Parallel()
 
 	var maxTxToFetch uint16 = 30
-
 	done := false
 
 	// Ensure we can fetch one by one each transaction by its TxID without
@@ -557,11 +554,9 @@ func TestFetchBlockTxByHash(test *testing.T) {
 	err := db.View(func(t database.Transaction) error {
 		for _, blk := range blocks {
 			for txIndex, originTx := range blk.Txs {
-
 				// FetchBlockTxByHash
 				txID, _ := originTx.CalculateHash()
 				fetchedTx, fetchedIndex, _, err := t.FetchBlockTxByHash(txID)
-
 				if err != nil {
 					test.Fatal(err.Error())
 				}
@@ -599,6 +594,7 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 			}
 		}
+
 		return nil
 	})
 
@@ -629,6 +625,7 @@ func TestFetchBlockTxByHash(test *testing.T) {
 		if tx != nil || fetchedBlockHash != nil {
 			test.Fatal("Found non-existing tx?")
 		}
+
 		return nil
 	})
 }

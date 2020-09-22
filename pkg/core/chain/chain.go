@@ -500,7 +500,6 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 }
 
 func (c *Chain) handleCertificateMessage(cMsg certMsg) {
-
 	// Set latest certificate and committee
 	c.lastCertificate = cMsg.cert
 	c.lastCommittee = cMsg.committee

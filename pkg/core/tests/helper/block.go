@@ -74,7 +74,6 @@ func RandomCertificate() *block.Certificate {
 // RandomHeader returns a random header for testing. `height` randomness is up
 // to the caller. A global atomic counter per pkg can handle it
 func RandomHeader(height uint64) *block.Header {
-
 	h := &block.Header{
 		Version:   0,
 		Height:    height,

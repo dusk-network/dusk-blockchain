@@ -19,6 +19,19 @@ type TransactionPayload struct {
 	CallData      []byte        `json:"call_data"`
 }
 
+// NewTransactionPayload returns a new empty TransactionPayload struct.
+func NewTransactionPayload() *TransactionPayload {
+	return &TransactionPayload{
+		Anchor:        common.NewBlsScalar(),
+		Nullifiers:    make([]*common.BlsScalar, 0),
+		Crossover:     NewCrossover(),
+		Notes:         make([]*Note, 0),
+		Fee:           NewFee(),
+		SpendingProof: common.NewProof(),
+		CallData:      make([]byte, 0),
+	}
+}
+
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (t *TransactionPayload) Copy() *TransactionPayload {
@@ -74,15 +87,17 @@ func UTransactionPayload(r *rusk.TransactionPayload, f *TransactionPayload) {
 	common.UBlsScalar(r.Anchor, f.Anchor)
 
 	f.Nullifiers = make([]*common.BlsScalar, len(r.Nullifier))
-	for i, input := range f.Nullifiers {
-		common.UBlsScalar(r.Nullifier[i], input)
+	for i := range f.Nullifiers {
+		f.Nullifiers[i] = common.NewBlsScalar()
+		common.UBlsScalar(r.Nullifier[i], f.Nullifiers[i])
 	}
 
 	UCrossover(r.Crossover, f.Crossover)
 
 	f.Notes = make([]*Note, len(r.Notes))
-	for i, note := range f.Notes {
-		UNote(r.Notes[i], note)
+	for i := range f.Notes {
+		f.Notes[i] = NewNote()
+		UNote(r.Notes[i], f.Notes[i])
 	}
 
 	UFee(r.Fee, f.Fee)
@@ -135,8 +150,6 @@ func MarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 
 // UnmarshalTransactionPayload reads a TransactionPayload struct from a bytes.Buffer.
 func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
-	f = new(TransactionPayload)
-
 	if err := common.UnmarshalBlsScalar(r, f.Anchor); err != nil {
 		return err
 	}
@@ -147,13 +160,14 @@ func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 	}
 
 	f.Nullifiers = make([]*common.BlsScalar, lenInputs)
-	for _, input := range f.Nullifiers {
-		if err := common.UnmarshalBlsScalar(r, input); err != nil {
+	for i := range f.Nullifiers {
+		f.Nullifiers[i] = common.NewBlsScalar()
+		if err = common.UnmarshalBlsScalar(r, f.Nullifiers[i]); err != nil {
 			return err
 		}
 	}
 
-	if err := UnmarshalCrossover(r, f.Crossover); err != nil {
+	if err = UnmarshalCrossover(r, f.Crossover); err != nil {
 		return err
 	}
 
@@ -163,19 +177,57 @@ func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 	}
 
 	f.Notes = make([]*Note, lenNotes)
-	for _, note := range f.Notes {
-		if err := UnmarshalNote(r, note); err != nil {
+	for i := range f.Notes {
+		f.Notes[i] = NewNote()
+		if err = UnmarshalNote(r, f.Notes[i]); err != nil {
 			return err
 		}
 	}
 
-	if err := UnmarshalFee(r, f.Fee); err != nil {
+	if err = UnmarshalFee(r, f.Fee); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalProof(r, f.SpendingProof); err != nil {
+	if err = common.UnmarshalProof(r, f.SpendingProof); err != nil {
 		return err
 	}
 
 	return encoding.ReadVarBytes(r, &f.CallData)
+}
+
+// Equal returns whether or not two TransactionPayloads are equal.
+func (t *TransactionPayload) Equal(other *TransactionPayload) bool {
+	if !t.Anchor.Equal(other.Anchor) {
+		return false
+	}
+
+	if len(t.Nullifiers) != len(other.Nullifiers) {
+		return false
+	}
+
+	for i := range t.Nullifiers {
+		if !t.Nullifiers[i].Equal(other.Nullifiers[i]) {
+			return false
+		}
+	}
+
+	if !t.Crossover.Equal(other.Crossover) {
+		return false
+	}
+
+	if len(t.Notes) != len(other.Notes) {
+		return false
+	}
+
+	for i := range t.Notes {
+		if !t.Notes[i].Equal(other.Notes[i]) {
+			return false
+		}
+	}
+
+	if !t.SpendingProof.Equal(other.SpendingProof) {
+		return false
+	}
+
+	return bytes.Equal(t.CallData, other.CallData)
 }

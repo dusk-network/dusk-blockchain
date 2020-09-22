@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"os"
 	"testing"
 	"time"
@@ -26,7 +27,6 @@ const secretFile = "key.dat"
 const address = "127.0.0.1:5051"
 
 func TestMain(m *testing.M) {
-
 	//start rusk mock rpc server
 	tests.StartMockServer(address)
 
@@ -67,7 +67,11 @@ func TestNewWallet(t *testing.T) {
 	secretKey, err := client.GenerateKeys(ctx, &rusk.GenerateKeysRequest{})
 	assert.NoError(err)
 
-	sk := new(keys.SecretKey)
+	// Since the dusk-protobuf mocks currently do not fill up the scalars,
+	// we will have to do it ourselves.
+	require.Nil(t, fillSecretKey(secretKey.Sk))
+
+	sk := keys.NewSecretKey()
 	keys.USecretKey(secretKey.Sk, sk)
 	assert.NotNil(sk)
 	assert.NotNil(sk.A.Data)
@@ -112,13 +116,31 @@ func TestCatchEOF(t *testing.T) {
 
 		ctx := context.Background()
 		secretKey, err := client.GenerateKeys(ctx, &rusk.GenerateKeysRequest{})
-		sk := new(keys.SecretKey)
-		keys.USecretKey(secretKey.Sk, sk)
 		require.Nil(t, err)
+
+		require.Nil(t, fillSecretKey(secretKey.Sk))
+		sk := keys.NewSecretKey()
+		keys.USecretKey(secretKey.Sk, sk)
 
 		_, err = New(nil, seed, netPrefix, db, "pass", seedFile, sk)
 		assert.Nil(t, err)
 		os.Remove(seedFile)
 		os.Remove(secretFile)
 	}
+}
+
+func fillSecretKey(sk *rusk.SecretKey) error {
+	bs := make([]byte, 32)
+	if _, err := rand.Read(bs); err != nil {
+		return err
+	}
+
+	sk.A.Data = bs
+	bs2 := make([]byte, 32)
+	if _, err := rand.Read(bs); err != nil {
+		return err
+	}
+
+	sk.B.Data = bs2
+	return nil
 }

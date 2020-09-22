@@ -182,7 +182,6 @@ func (m *Mempool) Run() {
 
 // onPendingTx handles a submitted tx from any source (rpcBus or eventBus)
 func (m *Mempool) onPendingTx(t TxDesc) ([]byte, error) {
-
 	log.WithField("len_pending", len(m.pending)).Info("handle submitted tx")
 
 	start := time.Now()
@@ -262,7 +261,6 @@ func (m *Mempool) onBlock(b block.Block) {
 // The passed block is supposed to be the last one accepted. That said, it must
 // contain a valid TxRoot.
 func (m *Mempool) removeAccepted(b block.Block) {
-
 	blockHash := toHex(b.Header.Hash)
 
 	log.

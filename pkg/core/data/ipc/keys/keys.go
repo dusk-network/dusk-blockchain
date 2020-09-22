@@ -14,6 +14,14 @@ type SecretKey struct {
 	B *common.JubJubScalar `json:"b"`
 }
 
+// NewSecretKey returns a new empty SecretKey struct.
+func NewSecretKey() *SecretKey {
+	return &SecretKey{
+		A: common.NewJubJubScalar(),
+		B: common.NewJubJubScalar(),
+	}
+}
+
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (s *SecretKey) Copy() *SecretKey {
@@ -46,8 +54,6 @@ func MarshalSecretKey(r *bytes.Buffer, f *SecretKey) error {
 
 // UnmarshalSecretKey reads a SecretKey struct from a bytes.Buffer.
 func UnmarshalSecretKey(r *bytes.Buffer, f *SecretKey) error {
-	f = new(SecretKey)
-
 	if err := common.UnmarshalJubJubScalar(r, f.A); err != nil {
 		return err
 	}
@@ -60,6 +66,14 @@ func UnmarshalSecretKey(r *bytes.Buffer, f *SecretKey) error {
 type ViewKey struct {
 	A  *common.JubJubScalar     `json:"a"`
 	BG *common.JubJubCompressed `json:"b_g"`
+}
+
+// NewViewKey returns a new empty ViewKey struct.
+func NewViewKey() *ViewKey {
+	return &ViewKey{
+		A:  common.NewJubJubScalar(),
+		BG: common.NewJubJubCompressed(),
+	}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
@@ -94,8 +108,6 @@ func MarshalViewKey(r *bytes.Buffer, f *ViewKey) error {
 
 // UnmarshalViewKey reads a ViewKey struct from a bytes.Buffer.
 func UnmarshalViewKey(r *bytes.Buffer, f *ViewKey) error {
-	f = new(ViewKey)
-
 	if err := common.UnmarshalJubJubScalar(r, f.A); err != nil {
 		return err
 	}
@@ -107,6 +119,14 @@ func UnmarshalViewKey(r *bytes.Buffer, f *ViewKey) error {
 type PublicKey struct {
 	AG *common.JubJubCompressed `json:"a_g"`
 	BG *common.JubJubCompressed `json:"b_g"`
+}
+
+// NewPublicKey returns a new empty PublicKey struct.
+func NewPublicKey() *PublicKey {
+	return &PublicKey{
+		AG: common.NewJubJubCompressed(),
+		BG: common.NewJubJubCompressed(),
+	}
 }
 
 // ToAddr concatenates the two points in the PublicKey, and returns them
@@ -148,8 +168,6 @@ func MarshalPublicKey(r *bytes.Buffer, f *PublicKey) error {
 
 // UnmarshalPublicKey reads a PublicKey struct from a bytes.Buffer.
 func UnmarshalPublicKey(r *bytes.Buffer, f *PublicKey) error {
-	f = new(PublicKey)
-
 	if err := common.UnmarshalJubJubCompressed(r, f.AG); err != nil {
 		return err
 	}
@@ -195,8 +213,6 @@ func MarshalStealthAddress(r *bytes.Buffer, f *StealthAddress) error {
 
 // UnmarshalStealthAddress reads a StealthAddress struct from a bytes.Buffer.
 func UnmarshalStealthAddress(r *bytes.Buffer, f *StealthAddress) error {
-	f = new(StealthAddress)
-
 	if err := common.UnmarshalJubJubCompressed(r, f.RG); err != nil {
 		return err
 	}

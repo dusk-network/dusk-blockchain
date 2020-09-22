@@ -7,7 +7,7 @@ require (
 	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/drewolson/testflight v1.0.0
 	github.com/dusk-network/dusk-crypto v0.1.3
-	github.com/dusk-network/dusk-protobuf v0.2.10
+	github.com/dusk-network/dusk-protobuf v0.2.11
 	github.com/dusk-network/dusk-wallet/v2 v2.0.3
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/etherlabsio/healthcheck v0.0.0-20191224061800-dd3d2fd8c3f6
@@ -20,7 +20,7 @@ require (
 	github.com/facebookgo/stats v0.0.0-20151006221625-1b76add642e4 // indirect
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
 	github.com/go-chi/render v1.0.1
-	github.com/gogo/protobuf v1.3.1
+	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/golangci/golangci-lint v1.31.0 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.7.4 // indirect

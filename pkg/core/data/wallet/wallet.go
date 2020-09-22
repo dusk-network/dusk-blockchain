@@ -45,7 +45,6 @@ type KeysJSON struct {
 
 // New creates a wallet instance
 func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, db *database.DB, password, seedFile string, secretKey *keys.SecretKey) (*Wallet, error) {
-
 	//create new seed if seed comes empty
 	if len(seed) == 0 {
 		var err error
@@ -73,7 +72,7 @@ func LoadFromSeed(netPrefix byte, db *database.DB, password, seedFile string, ke
 		return nil, errors.New("seed must be at least 64 bytes in size")
 	}
 
-	secretKey := new(keys.SecretKey)
+	secretKey := keys.NewSecretKey()
 	err := keys.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
 	if err != nil {
 		return nil, err
@@ -132,7 +131,7 @@ func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile str
 	}
 
 	// secretKey manipulation
-	secretKey := new(keys.SecretKey)
+	secretKey := keys.NewSecretKey()
 	err = keys.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
 	if err != nil {
 		return nil, err

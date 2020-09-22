@@ -168,6 +168,7 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 	}, nil
 }
 
+// GetProvisioners returns the current set of provisioners.
 func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersRequest) (*rusk.GetProvisionersResponse, error) {
 	return &rusk.GetProvisionersResponse{
 		Provisioners: legacy.ProvisionersToRuskCommittee(s.p),
@@ -234,7 +235,9 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 	}
 
 	seed := make([]byte, 32)
-	rand.Read(seed)
+	if _, err = rand.Read(seed); err != nil {
+		return nil, err
+	}
 
 	w, err := wallet.LoadFromSeed(seed, byte(2), db, fetchDecoys, fetchInputs, "password", config.Get().Wallet.File)
 	if err != nil {

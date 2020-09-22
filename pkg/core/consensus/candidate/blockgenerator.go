@@ -248,9 +248,9 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 	}
 
 	// Construct and append coinbase Tx to reward the generator
-	// TODO: this needs to have the appropriate calldata
-	// coinbaseTx := transactions.NewDistribute(config.GeneratorReward, keys, *bg.genPubKey)
-	// txs = append(txs, coinbaseTx)
+	// XXX: this needs to be adjusted
+	coinbaseTx := transactions.RandDistributeTx(config.GeneratorReward, len(keys))
+	txs = append(txs, coinbaseTx)
 
 	return txs, nil
 }

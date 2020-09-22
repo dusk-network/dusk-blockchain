@@ -78,7 +78,7 @@ func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, er
 	blk.SetPrevBlock(prevBlockHeader)
 
 	tx := transactions.IntermediateCoinbase(config.GeneratorReward)
-	blk.AddTx(*tx)
+	blk.AddTx(tx)
 	root, err := blk.CalculateRoot()
 	if err != nil {
 		return nil, err

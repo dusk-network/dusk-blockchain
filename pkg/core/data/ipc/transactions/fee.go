@@ -16,6 +16,14 @@ type Fee struct {
 	PkR      *common.JubJubCompressed `json:"pk_r"`
 }
 
+// NewFee returns a new empty Fee struct.
+func NewFee() *Fee {
+	return &Fee{
+		R:   common.NewJubJubCompressed(),
+		PkR: common.NewJubJubCompressed(),
+	}
+}
+
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (f *Fee) Copy() *Fee {
@@ -31,7 +39,9 @@ func (f *Fee) Copy() *Fee {
 func MFee(r *rusk.Fee, f *Fee) {
 	r.GasLimit = f.GasLimit
 	r.GasPrice = f.GasPrice
+	r.R = new(rusk.JubJubCompressed)
 	common.MJubJubCompressed(r.R, f.R)
+	r.PkR = new(rusk.JubJubCompressed)
 	common.MJubJubCompressed(r.PkR, f.PkR)
 }
 
@@ -39,7 +49,9 @@ func MFee(r *rusk.Fee, f *Fee) {
 func UFee(r *rusk.Fee, f *Fee) {
 	f.GasLimit = r.GasLimit
 	f.GasPrice = r.GasPrice
+	f.R = new(common.JubJubCompressed)
 	common.UJubJubCompressed(r.R, f.R)
+	f.PkR = new(common.JubJubCompressed)
 	common.UJubJubCompressed(r.PkR, f.PkR)
 }
 
@@ -62,8 +74,6 @@ func MarshalFee(r *bytes.Buffer, f *Fee) error {
 
 // UnmarshalFee reads a Fee struct from a bytes.Buffer.
 func UnmarshalFee(r *bytes.Buffer, f *Fee) error {
-	f = new(Fee)
-
 	if err := encoding.ReadUint64LE(r, &f.GasLimit); err != nil {
 		return err
 	}
@@ -77,4 +87,21 @@ func UnmarshalFee(r *bytes.Buffer, f *Fee) error {
 	}
 
 	return common.UnmarshalJubJubCompressed(r, f.PkR)
+}
+
+// Equal returns whether or not two Fees are equal.
+func (f *Fee) Equal(other *Fee) bool {
+	if f.GasLimit != other.GasLimit {
+		return false
+	}
+
+	if f.GasPrice != other.GasPrice {
+		return false
+	}
+
+	if !f.R.Equal(other.R) {
+		return false
+	}
+
+	return f.PkR.Equal(other.PkR)
 }

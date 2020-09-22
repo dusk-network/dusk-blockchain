@@ -12,6 +12,13 @@ type BlsScalar struct {
 	Data []byte `json:"data"`
 }
 
+// NewBlsScalar returns a new empty BlsScalar struct.
+func NewBlsScalar() *BlsScalar {
+	return &BlsScalar{
+		Data: make([]byte, 32),
+	}
+}
+
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (b *BlsScalar) Copy() *BlsScalar {
@@ -49,9 +56,21 @@ func UnmarshalBlsScalar(r *bytes.Buffer, b *BlsScalar) error {
 	return encoding.Read256(r, b.Data)
 }
 
+// Equal returns whether or not two BlsScalars are the same.
+func (b *BlsScalar) Equal(other *BlsScalar) bool {
+	return bytes.Equal(b.Data, other.Data)
+}
+
 // JubJubScalar represents a number in the JubJub scalar field.
 type JubJubScalar struct {
 	Data []byte `json:"data"`
+}
+
+// NewJubJubScalar returns a new empty JubJubScalar struct.
+func NewJubJubScalar() *JubJubScalar {
+	return &JubJubScalar{
+		Data: make([]byte, 32),
+	}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
@@ -91,9 +110,21 @@ func UnmarshalJubJubScalar(r *bytes.Buffer, b *JubJubScalar) error {
 	return encoding.Read256(r, b.Data)
 }
 
+// Equal returns whether or not two JubJubScalars are equal.
+func (j *JubJubScalar) Equal(other *JubJubScalar) bool {
+	return bytes.Equal(j.Data, other.Data)
+}
+
 // JubJubCompressed represents a compressed point on the JubJub curve.
 type JubJubCompressed struct {
 	Data []byte `json:"data"`
+}
+
+// NewJubJubCompressed returns a new empty JubJubCompressed struct.
+func NewJubJubCompressed() *JubJubCompressed {
+	return &JubJubCompressed{
+		Data: make([]byte, 32),
+	}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
@@ -133,9 +164,21 @@ func UnmarshalJubJubCompressed(r *bytes.Buffer, b *JubJubCompressed) error {
 	return encoding.Read256(r, b.Data)
 }
 
+// Equal returns whether or not two JubJubCompresseds are equal.
+func (j *JubJubCompressed) Equal(other *JubJubCompressed) bool {
+	return bytes.Equal(j.Data, other.Data)
+}
+
 // PoseidonCipher ...
 type PoseidonCipher struct {
 	Data []byte `json:"data"`
+}
+
+// NewPoseidonCipher returns a new empty PoseidonCipher struct.
+func NewPoseidonCipher() *PoseidonCipher {
+	return &PoseidonCipher{
+		Data: make([]byte, 96),
+	}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
@@ -170,9 +213,21 @@ func UnmarshalPoseidonCipher(r *bytes.Buffer, b *PoseidonCipher) error {
 	return encoding.ReadVarBytes(r, &b.Data)
 }
 
+// Equal returns whether or not two PoseidonCiphers are equal.
+func (p *PoseidonCipher) Equal(other *PoseidonCipher) bool {
+	return bytes.Equal(p.Data, other.Data)
+}
+
 // Proof holds the zero-knowledge proof data, typically a PLONK proof.
 type Proof struct {
 	Data []byte `json:"data"`
+}
+
+// NewProof returns a new empty Proof struct.
+func NewProof() *Proof {
+	return &Proof{
+		Data: make([]byte, 0),
+	}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
@@ -205,4 +260,9 @@ func MarshalProof(r *bytes.Buffer, b *Proof) error {
 // UnmarshalProof reads a Proof struct from a bytes.Buffer.
 func UnmarshalProof(r *bytes.Buffer, b *Proof) error {
 	return encoding.ReadVarBytes(r, &b.Data)
+}
+
+// Equal returns whether or not two Proofs are equal.
+func (p *Proof) Equal(other *Proof) bool {
+	return bytes.Equal(p.Data, other.Data)
 }

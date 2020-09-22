@@ -6,11 +6,12 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/merkletree"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
+// TxType is the type identifier for a transaction.
 type TxType uint32
 
 const (
@@ -42,6 +43,13 @@ type Transaction struct {
 	TxPayload *TransactionPayload `json:"tx_payload"`
 }
 
+// NewTransaction returns a new empty Transaction struct.
+func NewTransaction() *Transaction {
+	t := new(Transaction)
+	t.TxPayload = NewTransactionPayload()
+	return t
+}
+
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (t Transaction) Copy() payload.Safe {
@@ -54,6 +62,11 @@ func (t Transaction) Copy() payload.Safe {
 
 // MTransaction copies the Transaction structure into the Rusk equivalent.
 func MTransaction(r *rusk.Transaction, f *Transaction) {
+	r.TxPayload = new(rusk.TransactionPayload)
+	r.TxPayload.Anchor = new(rusk.BlsScalar)
+	r.TxPayload.Crossover = new(rusk.Crossover)
+	r.TxPayload.Fee = new(rusk.Fee)
+	r.TxPayload.SpendingProof = new(rusk.Proof)
 	r.Version = f.Version
 	r.Type = uint32(f.TxType)
 	MTransactionPayload(r.TxPayload, f.TxPayload)
@@ -81,8 +94,6 @@ func MarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 
 // UnmarshalTransaction reads a Transaction struct from a bytes.Buffer.
 func UnmarshalTransaction(r *bytes.Buffer, f *Transaction) error {
-	f = new(Transaction)
-
 	if err := encoding.ReadUint32LE(r, &f.Version); err != nil {
 		return err
 	}
@@ -117,28 +128,32 @@ type ContractCall interface {
 	Values() (amount uint64, fee uint64)
 }
 
+// Marshal a Contractcall to a bytes.Buffer.
 func Marshal(r *bytes.Buffer, f ContractCall) error {
-	switch f.(type) {
+	switch f := f.(type) {
 	case *Transaction:
-		return MarshalTransaction(r, f.(*Transaction))
+		return MarshalTransaction(r, f)
 	default:
-		return errors.New("")
+		return errors.New("unrecognized type of ContractCall")
 	}
 }
 
+// Unmarshal a ContractCall from a bytes.Buffer.
 func Unmarshal(r *bytes.Buffer, f ContractCall) error {
-	switch f.(type) {
+	switch f := f.(type) {
 	case *Transaction:
-		return UnmarshalTransaction(r, f.(*Transaction))
+		return UnmarshalTransaction(r, f)
 	default:
-		return errors.New("")
+		return errors.New("unrecognized type of ContractCall")
 	}
 }
 
+// StandardTx returns the transaction payload.
 func (t Transaction) StandardTx() *TransactionPayload {
 	return t.TxPayload
 }
 
+// CalculateHash returns the SHA3-256 hash digest of the transaction.
 func (t Transaction) CalculateHash() ([]byte, error) {
 	b := new(bytes.Buffer)
 	if err := Marshal(b, &t); err != nil {
@@ -148,21 +163,30 @@ func (t Transaction) CalculateHash() ([]byte, error) {
 	return hash.Sha3256(b.Bytes())
 }
 
+// Type returns the transaction type.
 func (t Transaction) Type() TxType {
 	return t.TxType
 }
 
+// Obfuscated returns whether or not the outputs of this transaction
+// are obfuscated.
 // TODO: implement
 func (t Transaction) Obfuscated() bool {
 	return true
 }
 
+// Values returns the amount and fee spent in this transaction.
 // TODO: implement
 func (t Transaction) Values() (amount uint64, fee uint64) {
 	return
 }
 
+// Equal checks equality between two transactions.
 // TODO: implement
 func Equal(t, other ContractCall) bool {
-	return false
+	if t.Type() != other.Type() {
+		return false
+	}
+
+	return t.StandardTx().Equal(other.StandardTx())
 }

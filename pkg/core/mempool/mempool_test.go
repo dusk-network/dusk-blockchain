@@ -37,7 +37,6 @@ type ctx struct {
 }
 
 func (c *ctx) reset() {
-
 	// Reset shared context state
 	c.mu.Lock()
 	c.m.Quit()
@@ -108,7 +107,6 @@ func (c *ctx) wait() {
 }
 
 func (c *ctx) assert(t *testing.T, checkPropagated bool) {
-
 	c.wait()
 
 	resp, _ := c.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
@@ -122,7 +120,6 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 	}
 
 	for i, tx := range c.verifiedTx {
-
 		var exists bool
 		for _, memTx := range txs {
 			if transactions.Equal(memTx, tx) {
@@ -150,7 +147,6 @@ func prepTx(tx transactions.ContractCall) message.Message {
 
 // QUESTION: What does this test actually do?
 func TestProcessPendingTxs(t *testing.T) {
-
 	c.reset()
 
 	cc := transactions.RandContractCalls(10, 0, false)
@@ -180,7 +176,6 @@ func TestProcessPendingTxs(t *testing.T) {
 }
 
 func TestProcessPendingTxsAsync(t *testing.T) {
-
 	c.reset()
 
 	// A batch consists of all 4 types of Dusk transactions (excluding coinbase)
@@ -192,7 +187,6 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	const numOfTxsPerBatch = 4
 	// generate and store txs that are expected to be valid
 	for i := 0; i <= batchCount; i++ {
-
 		// Generate a single batch of txs and added to the expected list of verified
 		txs := transactions.RandContractCalls(4, 0, false)
 		for _, tx := range txs {
@@ -204,7 +198,6 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 
 	// Publish valid txs in concurrent manner
 	for i := 0; i <= batchCount; i++ {
-
 		// get a slice of all txs
 		from := numOfTxsPerBatch * i
 		to := from + numOfTxsPerBatch
@@ -259,7 +252,7 @@ func TestRemoveAccepted(t *testing.T) {
 		buf := new(bytes.Buffer)
 		assert.NoError(transactions.Marshal(buf, tx))
 
-		txCopy := new(transactions.Transaction)
+		txCopy := transactions.NewTransaction()
 		err := transactions.Unmarshal(buf, txCopy)
 		assert.NoError(err)
 
@@ -269,11 +262,11 @@ func TestRemoveAccepted(t *testing.T) {
 		errList := c.bus.Publish(topics.Tx, txMsg)
 		assert.Empty(errList)
 
-		// Simulate a situation where the block has accepted each 2th tx
+		// Simulate a situation where the block has accepted each 2nd tx
 		counter++
 		if math.Mod(float64(counter), 2) == 0 {
 			t := tx.(*transactions.Transaction)
-			b.AddTx(*t)
+			b.AddTx(t)
 			// If tx is accepted, it is expected to be removed from mempool on
 			// onAcceptBlock event
 		} else {

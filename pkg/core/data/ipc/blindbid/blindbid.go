@@ -79,8 +79,6 @@ func MarshalGenerateScoreRequest(r *bytes.Buffer, f *GenerateScoreRequest) error
 
 // UnmarshalGenerateScoreRequest reads a GenerateScoreRequest struct from a bytes.Buffer.
 func UnmarshalGenerateScoreRequest(r *bytes.Buffer, f *GenerateScoreRequest) error {
-	f = new(GenerateScoreRequest)
-
 	if err := common.UnmarshalBlsScalar(r, f.K); err != nil {
 		return err
 	}
@@ -151,8 +149,6 @@ func MarshalGenerateScoreResponse(r *bytes.Buffer, f *GenerateScoreResponse) err
 
 // UnmarshalGenerateScoreResponse reads a GenerateScoreResponse struct from a bytes.Buffer.
 func UnmarshalGenerateScoreResponse(r *bytes.Buffer, f *GenerateScoreResponse) error {
-	f = new(GenerateScoreResponse)
-
 	if err := common.UnmarshalProof(r, f.BlindbidProof); err != nil {
 		return err
 	}
@@ -235,8 +231,6 @@ func MarshalVerifyScoreRequest(r *bytes.Buffer, f *VerifyScoreRequest) error {
 
 // UnmarshalVerifyScoreRequest reads a VerifyScoreRequest struct from a bytes.Buffer.
 func UnmarshalVerifyScoreRequest(r *bytes.Buffer, f *VerifyScoreRequest) error {
-	f = new(VerifyScoreRequest)
-
 	if err := common.UnmarshalProof(r, f.Proof); err != nil {
 		return err
 	}
@@ -291,6 +285,5 @@ func MarshalVerifyScoreResponse(r *bytes.Buffer, f *VerifyScoreResponse) error {
 
 // UnmarshalVerifyScoreResponse reads a VerifyScoreResponse struct from a bytes.Buffer.
 func UnmarshalVerifyScoreResponse(r *bytes.Buffer, f *VerifyScoreResponse) error {
-	f = new(VerifyScoreResponse)
 	return encoding.ReadBool(r, &f.Success)
 }

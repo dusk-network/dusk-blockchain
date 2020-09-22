@@ -33,7 +33,6 @@ func MarshalBlock(r *bytes.Buffer, b *block.Block) error {
 
 // UnmarshalBlock unmarshals a block from a binary buffer
 func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
-
 	if err := UnmarshalHeader(r, b.Header); err != nil {
 		return err
 	}
@@ -51,7 +50,7 @@ func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
 
 	b.Txs = make([]transactions.ContractCall, lTxs)
 	for i := range b.Txs {
-		c := new(transactions.Transaction)
+		c := transactions.NewTransaction()
 		if err := transactions.Unmarshal(r, c); err != nil {
 			return err
 		}

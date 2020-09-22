@@ -36,7 +36,7 @@ func TestPersistentSession(t *testing.T) {
 	assert.Error(createDumbWallet(conn))
 }
 
-func createDumbWallet(conn grpc.ClientConnInterface) error {
+func createDumbWallet(conn *grpc.ClientConn) error {
 	// create a wallet client
 	walletClient := node.NewWalletClient(conn)
 
@@ -51,7 +51,7 @@ func createDumbWallet(conn grpc.ClientConnInterface) error {
 	return err
 }
 
-func loadDumbWallet(conn grpc.ClientConnInterface) error {
+func loadDumbWallet(conn *grpc.ClientConn) error {
 	// create a wallet client
 	walletClient := node.NewWalletClient(conn)
 

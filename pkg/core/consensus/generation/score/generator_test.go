@@ -39,7 +39,7 @@ func TestCorrectBidValues(t *testing.T) {
 	c := f.Instantiate().(*Generator)
 
 	// assert.Equal(d1, c.d)
-	assert.Equal(k1, c.k)
+	assert.Equal(k1, c.k.Data)
 	// assert.Equal(edPk1, c.edPk)
 
 	// Now update our state so that the previous bid values are removed
@@ -51,10 +51,11 @@ func TestCorrectBidValues(t *testing.T) {
 	c = f.Instantiate().(*Generator)
 
 	// assert.Equal(d2, c.d)
-	assert.Equal(k2, c.k)
+	assert.Equal(k2, c.k.Data)
 	// assert.Equal(edPk2, c.edPk)
 }
 
+//nolint
 func addBidValues(db database.DB, lockTime uint64) ([]byte, []byte, []byte, error) {
 	d := transactions.Rand32Bytes()
 	k := transactions.Rand32Bytes()

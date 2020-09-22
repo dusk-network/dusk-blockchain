@@ -55,7 +55,7 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 }
 
 // AddTx will add a transaction to the block.
-func (b *Block) AddTx(tx transactions.Transaction) {
+func (b *Block) AddTx(tx *transactions.Transaction) {
 	b.Txs = append(b.Txs, tx)
 }
 

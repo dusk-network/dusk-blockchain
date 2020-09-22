@@ -43,7 +43,6 @@ func MakeCandidate(blk *block.Block, cert *block.Certificate) Candidate {
 // that can be handy when publishing this Payload for multiple subscribers to
 // consume
 func (c Candidate) Copy() payload.Safe {
-
 	r := Candidate{}
 
 	if c.Block != nil {

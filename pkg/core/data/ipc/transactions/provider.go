@@ -217,7 +217,7 @@ func (p *provider) NewContractCall(ctx context.Context, b []byte, tx TxRequest) 
 // It accepts the PublicKey of the recipient, a value, a fee and whether
 // the transaction should be obfuscated or otherwise
 func (p *provider) NewTransactionTx(ctx context.Context, tx TxRequest) (Transaction, error) {
-	trans := new(Transaction)
+	trans := NewTransaction()
 	/*
 		tr := new(rusk.NewTransactionRequest)
 		MTxRequest(tr, tx)
@@ -242,9 +242,9 @@ type keymaster struct {
 
 // GenerateKeys creates a SecretKey using a []byte as Seed
 func (k *keymaster) GenerateKeys(ctx context.Context, seed []byte) (keys.SecretKey, keys.PublicKey, keys.ViewKey, error) {
-	sk := new(keys.SecretKey)
-	pk := new(keys.PublicKey)
-	vk := new(keys.ViewKey)
+	sk := keys.NewSecretKey()
+	pk := keys.NewPublicKey()
+	vk := keys.NewViewKey()
 	gskr := new(rusk.GenerateKeysRequest)
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(k.timeout))
 	defer cancel()
