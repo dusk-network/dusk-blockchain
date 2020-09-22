@@ -166,8 +166,6 @@ func (s *roundStore) Dispatch(m message.Message) []error {
 // order subscribers by priority for event dispatch
 // TODO: it makes more sense to do this once per round
 func (s *roundStore) createSubscriberQueue(topic topics.Topic) []Listener {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
 	subQueue := make([]Listener, 0, len(s.subscribers[topic]))
 	for _, sub := range s.subscribers[topic] {
 		if sub.Priority() == HighPriority && !sub.Paused() {

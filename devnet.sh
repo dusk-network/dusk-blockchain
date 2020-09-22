@@ -100,6 +100,7 @@ init_dusk_func() {
   timeoutsendstaketx = 5
   timeoutgetmempooltxs = 3
   timeoutgetroundresults = 5
+  timeoutbrokergetcandidate = 2
   timeoutreadwrite = 60
   timeoutkeepalivetime = 30
 [genesis]

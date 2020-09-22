@@ -18,6 +18,7 @@ type timeoutConfiguration struct {
 	TimeoutSendStakeTX          int64
 	TimeoutGetMempoolTXs        int64
 	TimeoutGetRoundResults      int64
+	TimeoutBrokerGetCandidate   int64
 	TimeoutReadWrite            int64
 	TimeoutKeepAliveTime        int64
 }
