@@ -62,6 +62,8 @@ func action(ctx *cli.Context) error {
 		"config.timeout.timeoutsendstaketx":          cfg.Get().Timeout.TimeoutSendStakeTX,
 		"config.timeout.timeoutgetmempooltxs":        cfg.Get().Timeout.TimeoutGetMempoolTXs,
 		"config.timeout.timeoutgetroundresults":      cfg.Get().Timeout.TimeoutGetRoundResults,
+		"config.timeout.timeoutreadwrite":            cfg.Get().Timeout.TimeoutReadWrite,
+		"config.timeout.timeoutkeepalivetime":        cfg.Get().Timeout.TimeoutKeepAliveTime,
 	}).
 		Info("Timeout config...")
 

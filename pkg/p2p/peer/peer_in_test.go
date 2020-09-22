@@ -3,8 +3,12 @@ package peer
 import (
 	"bytes"
 	"net"
+	"os"
 	"testing"
 	"time"
+
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -29,7 +33,18 @@ func TestPingLoop(t *testing.T) {
 	// suppressing expected error message about method not registered
 	bus := eventbus.New()
 	client, srv := net.Pipe()
-	keepAliveTime = 1 * time.Second
+
+	//setup viper timeout
+	cwd, err := os.Getwd()
+	require.Nil(t, err)
+
+	r, err := cfg.LoadFromFile(cwd + "/../../../dusk.toml")
+	require.Nil(t, err)
+
+	// override keepAliveTime
+	r.Timeout.TimeoutKeepAliveTime = 1
+
+	cfg.Mock(&r)
 
 	responseChan := make(chan *bytes.Buffer, 10)
 	writer := NewWriter(client, processing.NewGossip(protocol.TestNet), bus)

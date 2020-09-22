@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -20,9 +22,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
-
-var readWriteTimeout = 60 * time.Second // Max idle time for a peer
-var keepAliveTime = 30 * time.Second    // Send keepalive message after inactivity for this amount of time
 
 var l = log.WithField("process", "peer")
 
@@ -231,6 +230,9 @@ func (p *Reader) readLoop() {
 		_ = p.Conn.Close()
 	}()
 
+	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second  // Max idle time for a peer
+	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
+
 	// Set up a timer, which triggers the sending of a `keepalive` message
 	// when fired.
 	timer, quitChan := p.keepAliveLoop()
@@ -277,6 +279,8 @@ func (p *Reader) readLoop() {
 }
 
 func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
+	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
+
 	timer := time.NewTimer(keepAliveTime)
 	quitChan := make(chan struct{}, 1)
 	go func(p *Reader, t *time.Timer, quitChan chan struct{}) {
@@ -312,6 +316,8 @@ func (c *Connection) keepAlive() error {
 // Conn needs to be locked, as this function can be called both by the WriteLoop,
 // and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
+	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second // Max idle time for a peer
+
 	c.lock.Lock()
 	_ = c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	n, err := c.Conn.Write(b)

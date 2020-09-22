@@ -100,7 +100,8 @@ init_dusk_func() {
   timeoutsendstaketx = 5
   timeoutgetmempooltxs = 3
   timeoutgetroundresults = 5
-
+  timeoutreadwrite = 60
+  timeoutkeepalivetime = 30
 [genesis]
   legacy = true
 
