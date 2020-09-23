@@ -1,7 +1,10 @@
 package api
 
 import (
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -28,7 +31,7 @@ type Server struct {
 	// Node components
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
-	store    *capi.BuntStore
+	store    *capi.StormDBInstance
 
 	Server *http.Server
 }
@@ -39,14 +42,18 @@ func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server,
 	dbFile := cfg.Get().API.DBFile
 	if dbFile == "" {
 		log.Info("Will start monitoring db with in-memory since DBFile cfg is not set")
-		dbFile = ":memory:"
+		dir, err := ioutil.TempDir(os.TempDir(), "storm")
+		if err != nil {
+			panic(err)
+		}
+		dbFile = filepath.Join(dir, "api.db")
 	}
 
-	store, err := capi.NewBuntStore(dbFile, 1)
+	store, err := capi.NewStormDBInstance(dbFile)
 	if err != nil {
 		log.Fatal(err)
 	}
-	capi.SetBuntStoreInstance(store)
+	capi.SetStormDBInstance(store)
 
 	srv := Server{
 		eventBus: eventBus,

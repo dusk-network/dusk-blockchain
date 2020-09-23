@@ -1,17 +1,16 @@
 package api
 
 import (
-	"bytes"
 	"fmt"
+	"github.com/asdine/storm/v3/q"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"os"
 	"testing"
-
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"time"
 
 	"github.com/drewolson/testflight"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,10 +78,38 @@ func TestConsensusAPIProvisioners(t *testing.T) {
 
 	provisioners, _ := consensus.MockProvisioners(5)
 
-	err = apiServer.store.StoreProvisioners(provisioners, 1)
+	var members []*capi.Member
+	for _, v := range provisioners.Members {
+		var stakes []capi.Stake
+
+		for _, s := range v.Stakes {
+			stake := capi.Stake{
+				Amount:      s.Amount,
+				StartHeight: s.StartHeight,
+				EndHeight:   s.EndHeight,
+			}
+			stakes = append(stakes, stake)
+		}
+
+		member := capi.Member{
+			PublicKeyBLS: v.PublicKeyBLS,
+			Stakes:       stakes,
+		}
+
+		members = append(members, &member)
+	}
+
+	provisioner := capi.ProvisionerJSON{
+		ID:      1,
+		Set:     provisioners.Set,
+		Members: members,
+	}
+
+	err = apiServer.store.Save(&provisioner)
 	require.Nil(t, err)
 
-	provisioners, err = apiServer.store.FetchProvisioners(1)
+	var provisionerJSON capi.ProvisionerJSON
+	err = apiServer.store.Find("ID", uint64(1), &provisionerJSON)
 	require.Nil(t, err)
 	require.NotNil(t, provisioners)
 
@@ -109,14 +136,21 @@ func TestConsensusAPIRoundInfo(t *testing.T) {
 	apiServer, err := NewHTTPServer(nil, nil)
 	require.Nil(t, err)
 
-	for i := 0; i < 5; i++ {
+	for i := 1; i < 6; i++ {
 
 		// steps array
 		for j := 0; j < 5; j++ {
-			err = apiServer.store.StoreRoundInfo(uint64(i), uint8(j), "StopConsensus", "")
+			roundInfo := capi.RoundInfoJSON{
+				ID:     uint64(i),
+				Step:   uint8(j),
+				Method: "StopConsensus",
+				Name:   "",
+			}
+			err = apiServer.store.Save(&roundInfo)
 			require.Nil(t, err)
 
-			roundInfo, err := apiServer.store.FetchRoundInfo(uint64(i), 0, 5)
+			var roundInfoArr []capi.RoundInfoJSON
+			err := apiServer.store.DB.Select(q.Gte("ID", uint64(0)), q.Lte("ID", 5)).Find(&roundInfoArr)
 			require.Nil(t, err)
 			require.NotNil(t, roundInfo)
 		}
@@ -147,24 +181,29 @@ func TestConsensusAPIEventStatus(t *testing.T) {
 	apiServer, err := NewHTTPServer(nil, nil)
 	require.Nil(t, err)
 
-	for i := 0; i < 5; i++ {
+	for i := 1; i < 6; i++ {
 
 		// steps array
 		for j := 0; j < 5; j++ {
-			msg := message.New(topics.Initialization, bytes.Buffer{})
-			err = apiServer.store.StoreEventQueue(uint64(i), uint8(j), msg)
+			eventQueue := capi.EventQueueJSON{
+				Round:     uint64(i),
+				Step:      uint8(j),
+				UpdatedAt: time.Now(),
+			}
+			err = apiServer.store.Save(&eventQueue)
 			require.Nil(t, err)
 
-			roundInfo, err := apiServer.store.FetchEventQueue(uint64(i), 0, 5)
+			var eventQueueList []capi.EventQueueJSON
+			err := apiServer.store.DB.Select(q.Gte("Round", uint64(0)), q.Lte("Round", 5)).Find(&eventQueueList)
 			require.Nil(t, err)
-			require.NotNil(t, roundInfo)
+			require.NotNil(t, eventQueueList)
 		}
 
 	}
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
 
-		for i := 0; i < 5; i++ {
+		for i := 1; i < 6; i++ {
 			targetURL := fmt.Sprintf("/consensus/eventqueuestatus?height=%d", i)
 			response := r.Get(targetURL)
 			require.NotNil(t, response)

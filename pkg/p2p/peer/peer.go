@@ -3,6 +3,8 @@ package peer
 import (
 	"bytes"
 	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"io"
 	"net"
 	"sync"
@@ -153,6 +155,21 @@ func (w *Writer) Connect() error {
 	if err := w.Handshake(); err != nil {
 		_ = w.Conn.Close()
 		return err
+	}
+
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := w.Addr()
+			peerJSON := capi.PeerJSON{
+				ID:       addr,
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peer into StormDB")
+			}
+		}()
 	}
 
 	return nil
