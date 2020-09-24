@@ -9,7 +9,7 @@ import (
 
 // EventQueueJSON is used as JSON rapper for eventQueue fields
 type EventQueueJSON struct {
-	ID        int              `storm:"id,increment"` // primary key with auto increment
+	ID        int              `storm:"id,increment" json:"id"` // primary key with auto increment
 	Round     uint64           `json:"round"`
 	Step      uint8            `json:"step"`
 	Message   *message.Message `json:"message"`
@@ -18,7 +18,8 @@ type EventQueueJSON struct {
 
 // RoundInfoJSON is used as JSON wrapper for round info fields
 type RoundInfoJSON struct {
-	ID        uint64    `storm:"id" json:"round"`
+	ID        int       `storm:"id,increment" json:"id"`
+	Round     uint64    `storm:"index" json:"round"`
 	Step      uint8     `json:"step"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Method    string    `json:"method"`
@@ -26,7 +27,8 @@ type RoundInfoJSON struct {
 }
 
 type PeerJSON struct {
-	ID       string    `storm:"id"`
+	ID       int       `storm:"id,increment" json:"round"`
+	Address  string    `storm:"address"`
 	LastSeen time.Time `storm:"index"`
 }
 

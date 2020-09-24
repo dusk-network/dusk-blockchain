@@ -162,7 +162,7 @@ func (w *Writer) Connect() error {
 			store := capi.GetStormDBInstance()
 			addr := w.Addr()
 			peerJSON := capi.PeerJSON{
-				ID:       addr,
+				Address:  addr,
 				LastSeen: time.Now(),
 			}
 			err := store.Save(&peerJSON)

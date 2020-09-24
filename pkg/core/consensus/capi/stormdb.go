@@ -3,11 +3,9 @@ package capi
 import (
 	"github.com/asdine/storm/v3"
 	"os"
-	"sync"
 )
 
 var (
-	mutex           = sync.Mutex{}
 	stormDBInstance *StormDBInstance
 )
 
@@ -16,34 +14,19 @@ type StormDBInstance struct {
 }
 
 func (bdb *StormDBInstance) Close() error {
-	mutex.Lock()
-	defer mutex.Unlock()
 	return bdb.DB.Close()
 }
 
 func (bdb *StormDBInstance) Delete(data interface{}) error {
-	mutex.Lock()
-	defer mutex.Unlock()
 	return bdb.DB.DeleteStruct(data)
 }
 
 func (bdb *StormDBInstance) Find(fieldName string, value interface{}, to interface{}) error {
-	mutex.Lock()
-	locked := true
-	defer func() {
-		if locked {
-			mutex.Unlock()
-		}
-	}()
 	err := bdb.DB.One(fieldName, value, to)
-	mutex.Unlock()
-	locked = false
 	return err
 }
 
 func (bdb *StormDBInstance) Save(data interface{}) error {
-	mutex.Lock()
-	defer mutex.Unlock()
 	err := bdb.DB.Save(data)
 	if err != nil && err == storm.ErrAlreadyExists {
 		err = bdb.DB.Update(data)
@@ -65,8 +48,6 @@ func SetStormDBInstance(store *StormDBInstance) {
 }
 
 func NewStormDBInstance(filename string) (*StormDBInstance, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		_, err := os.Create(filename)
 		if err != nil {

@@ -141,7 +141,7 @@ func TestConsensusAPIRoundInfo(t *testing.T) {
 		// steps array
 		for j := 0; j < 5; j++ {
 			roundInfo := capi.RoundInfoJSON{
-				ID:     uint64(i),
+				Round:  uint64(i),
 				Step:   uint8(j),
 				Method: "StopConsensus",
 				Name:   "",
@@ -159,11 +159,16 @@ func TestConsensusAPIRoundInfo(t *testing.T) {
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
 
 		for i := 0; i < 5; i++ {
-			targetURL := fmt.Sprintf("/consensus/roundinfo?height_begin=%d&height_end=5", i)
+			targetURL := fmt.Sprintf("/consensus/roundinfo?height_begin=%d&height_end=6", i)
 			response := r.Get(targetURL)
 			require.NotNil(t, response)
 
 			require.NotEmpty(t, response.RawBody)
+
+			require.True(t, len(response.RawBody) > 50)
+
+			body := string(response.RawBody)
+			fmt.Println("roundinfo body", body)
 		}
 	})
 }

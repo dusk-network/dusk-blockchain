@@ -112,7 +112,7 @@ func GetRoundInfoHandler(res http.ResponseWriter, req *http.Request) {
 	var roundInfos []RoundInfoJSON
 
 	//TODO: step should be a argument for query ?
-	err = GetStormDBInstance().DB.Select(q.Gte("ID", uint64(heightBegin)), q.Lte("ID", heightEnd)).Find(&roundInfos)
+	err = GetStormDBInstance().DB.Range("Round", heightBegin, heightEnd, &roundInfos)
 	if err != nil {
 		res.WriteHeader(http.StatusInternalServerError)
 		return

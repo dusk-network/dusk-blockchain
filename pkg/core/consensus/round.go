@@ -258,8 +258,8 @@ func (c *Coordinator) StopConsensus(m message.Message) error {
 		go func() {
 			store := capi.GetStormDBInstance()
 			roundInfo := capi.RoundInfoJSON{
-				ID:        c.round,
-				Step:      c.step,
+				Round:     c.Round(),
+				Step:      c.Step(),
 				Method:    "StopConsensus",
 				Name:      "",
 				UpdatedAt: time.Now(),
@@ -267,10 +267,8 @@ func (c *Coordinator) StopConsensus(m message.Message) error {
 			err := store.Save(&roundInfo)
 			if err != nil {
 				lg.
-					WithFields(log.Fields{
-						"round": c.Round,
-						"step":  c.Step,
-					}).
+					WithField("round", roundInfo.Round).
+					WithField("step", roundInfo.Step).
 					WithError(err).
 					Error("could not save StoreRoundInfo on api db")
 			}
@@ -453,9 +451,9 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 			go func() {
 				store := capi.GetStormDBInstance()
 				eventQueue := capi.EventQueueJSON{
-					Round:     hdr.Round,
-					Step:      hdr.Step,
-					Message:   &m,
+					Round: hdr.Round,
+					Step:  hdr.Step,
+					//Message:   &m,
 					UpdatedAt: time.Now(),
 				}
 				err := store.Save(&eventQueue)
@@ -514,18 +512,16 @@ func (c *Coordinator) Forward(id uint32) uint8 {
 		go func() {
 			store := capi.GetStormDBInstance()
 			roundInfo := capi.RoundInfoJSON{
-				ID:     c.round,
-				Step:   c.step,
+				Round:  c.Round(),
+				Step:   c.Step(),
 				Method: "Forward",
 				Name:   name,
 			}
 			err := store.Save(&roundInfo)
 			if err != nil {
 				lg.
-					WithFields(log.Fields{
-						"round": c.Round(),
-						"step":  c.Step(),
-					}).
+					WithField("round", roundInfo.Round).
+					WithField("step", roundInfo.Step).
 					WithError(err).
 					Error("could not save StoreRoundInfo on api db")
 			}
