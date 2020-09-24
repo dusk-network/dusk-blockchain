@@ -27,9 +27,11 @@ type RoundInfoJSON struct {
 }
 
 type PeerJSON struct {
-	ID       int       `storm:"id,increment" json:"round"`
-	Address  string    `storm:"address"`
-	LastSeen time.Time `storm:"index"`
+	ID       int       `storm:"id,increment" json:"id"`
+	Address  string    `json:"address"`
+	Type     string    `storm:"index" json:"type"`
+	Method   string    `storm:"index" json:"method"`
+	LastSeen time.Time `storm:"index" json:"last_seen"`
 }
 
 type Member struct {

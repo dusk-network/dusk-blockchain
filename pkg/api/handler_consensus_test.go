@@ -221,3 +221,93 @@ func TestConsensusAPIEventStatus(t *testing.T) {
 
 	})
 }
+
+func TestP2PLogsReader(t *testing.T) {
+
+	//setup viper timeout
+	cwd, err := os.Getwd()
+	require.Nil(t, err)
+
+	r, err := cfg.LoadFromFile(cwd + "/../../dusk.toml")
+	require.Nil(t, err)
+	cfg.Mock(&r)
+
+	apiServer, err := NewHTTPServer(nil, nil)
+	require.Nil(t, err)
+
+	// steps array
+	for j := 0; j < 5; j++ {
+		peerJSON := capi.PeerJSON{
+			Address:  fmt.Sprintf("127.0.0.1:7485%d", j),
+			Type:     "Reader",
+			Method:   "Accept",
+			LastSeen: time.Now(),
+		}
+		err = apiServer.store.Save(&peerJSON)
+		require.Nil(t, err)
+
+		var peerList []capi.PeerJSON
+		err := apiServer.store.DB.Find("Type", "Reader", &peerList)
+		require.Nil(t, err)
+		require.NotNil(t, peerList)
+	}
+
+	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
+
+		targetURL := "/p2p/logs?type=Reader"
+		response := r.Get(targetURL)
+		require.NotNil(t, response)
+		require.NotEmpty(t, response.RawBody)
+
+		body := string(response.RawBody)
+		fmt.Println(body)
+
+		require.True(t, len(body) > 100)
+
+	})
+}
+
+func TestP2PLogsWriter(t *testing.T) {
+
+	//setup viper timeout
+	cwd, err := os.Getwd()
+	require.Nil(t, err)
+
+	r, err := cfg.LoadFromFile(cwd + "/../../dusk.toml")
+	require.Nil(t, err)
+	cfg.Mock(&r)
+
+	apiServer, err := NewHTTPServer(nil, nil)
+	require.Nil(t, err)
+
+	// steps array
+	for j := 0; j < 5; j++ {
+		peerJSON := capi.PeerJSON{
+			Address:  fmt.Sprintf("127.0.0.1:7485%d", j),
+			Type:     "Writer",
+			Method:   "Accept",
+			LastSeen: time.Now(),
+		}
+		err = apiServer.store.Save(&peerJSON)
+		require.Nil(t, err)
+
+		var peerList []capi.PeerJSON
+		err := apiServer.store.DB.Find("Type", "Writer", &peerList)
+		require.Nil(t, err)
+		require.NotNil(t, peerList)
+	}
+
+	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
+
+		targetURL := "/p2p/logs?type=Writer"
+		response := r.Get(targetURL)
+		require.NotNil(t, response)
+		require.NotEmpty(t, response.RawBody)
+
+		body := string(response.RawBody)
+		fmt.Println(body)
+
+		require.True(t, len(body) > 100)
+
+	})
+}

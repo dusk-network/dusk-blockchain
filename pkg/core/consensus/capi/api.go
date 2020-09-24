@@ -165,3 +165,26 @@ func GetEventQueueStatusHandler(res http.ResponseWriter, req *http.Request) {
 
 	_, _ = res.Write(b)
 }
+
+// GetP2PLogsHandler will return PeerJSON json
+func GetP2PLogsHandler(res http.ResponseWriter, req *http.Request) {
+	typeStr := req.URL.Query().Get("type")
+	if typeStr == "" {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	log.WithField("typeStr", typeStr).Debug("GetP2PLogsHandler")
+
+	var peerList []PeerJSON
+	err := GetStormDBInstance().DB.Find("Type", typeStr, &peerList)
+
+	var b []byte
+	b, err = json.Marshal(peerList)
+	if err != nil {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	_, _ = res.Write(b)
+}
