@@ -34,8 +34,11 @@ func (g *GenerateScoreRequest) Copy() *GenerateScoreRequest {
 
 // MGenerateScoreRequest copies the GenerateScoreRequest structure into the Rusk equivalent.
 func MGenerateScoreRequest(r *rusk.GenerateScoreRequest, f *GenerateScoreRequest) {
+	r.K = new(rusk.BlsScalar)
 	common.MBlsScalar(r.K, f.K)
+	r.Seed = new(rusk.BlsScalar)
 	common.MBlsScalar(r.Seed, f.Seed)
+	r.Secret = new(rusk.JubJubCompressed)
 	common.MJubJubCompressed(r.Secret, f.Secret)
 	r.Round = f.Round
 	r.Step = f.Step
@@ -108,6 +111,15 @@ type GenerateScoreResponse struct {
 	BlindbidProof  *common.Proof     `json:"blindbid_proof"`
 	Score          *common.BlsScalar `json:"score"`
 	ProverIdentity *common.BlsScalar `json:"prover_identity"`
+}
+
+// NewGenerateScoreResponse returns a new empty GenerateScoreResponse struct.
+func NewGenerateScoreResponse() *GenerateScoreResponse {
+	return &GenerateScoreResponse{
+		BlindbidProof:  common.NewProof(),
+		Score:          common.NewBlsScalar(),
+		ProverIdentity: common.NewBlsScalar(),
+	}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
@@ -186,9 +198,13 @@ func (v *VerifyScoreRequest) Copy() *VerifyScoreRequest {
 
 // MVerifyScoreRequest copies the VerifyScoreRequest structure into the Rusk equivalent.
 func MVerifyScoreRequest(r *rusk.VerifyScoreRequest, f *VerifyScoreRequest) {
+	r.Proof = new(rusk.Proof)
 	common.MProof(r.Proof, f.Proof)
+	r.Score = new(rusk.BlsScalar)
 	common.MBlsScalar(r.Score, f.Score)
+	r.Seed = new(rusk.BlsScalar)
 	common.MBlsScalar(r.Seed, f.Seed)
+	r.ProverId = new(rusk.BlsScalar)
 	common.MBlsScalar(r.ProverId, f.ProverID)
 	r.Round = f.Round
 	r.Step = f.Step

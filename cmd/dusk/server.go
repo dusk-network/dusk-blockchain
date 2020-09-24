@@ -109,10 +109,12 @@ func Setup() *Server {
 	keysClient, _ := client.CreateKeysClient(ctx, cfg.Get().RPC.Rusk.Address)
 	blindbidServiceClient, _ := client.CreateBlindBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
 	bidServiceClient, _ := client.CreateBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
+	transferClient, _ := client.CreateTransferClient(ctx, cfg.Get().RPC.Rusk.Address)
+	stakeClient, _ := client.CreateStakeClient(ctx, cfg.Get().RPC.Rusk.Address)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	proxy := transactions.NewProxy(ruskClient, keysClient, blindbidServiceClient, bidServiceClient, txTimeout, defaultTimeout)
+	proxy := transactions.NewProxy(ruskClient, keysClient, blindbidServiceClient, bidServiceClient, transferClient, stakeClient, txTimeout, defaultTimeout)
 
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()

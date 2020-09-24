@@ -197,6 +197,13 @@ type BidTransaction struct {
 	Tx                  *Transaction `json:"tx"`
 }
 
+// NewBidTransaction creates a new empty BidTransaction struct.
+func NewBidTransaction() *BidTransaction {
+	return &BidTransaction{
+		Tx: NewTransaction(),
+	}
+}
+
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (b *BidTransaction) Copy() *BidTransaction {

@@ -66,6 +66,9 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 
 	grpcServer := grpc.NewServer()
 	rusk.RegisterStateServer(grpcServer, srv)
+	rusk.RegisterKeysServer(grpcServer, srv)
+	rusk.RegisterBlindBidServiceServer(grpcServer, srv)
+	// rusk.RegisterBidServiceServer(grpcServer, srv)
 	srv.s = grpcServer
 
 	// First load the database

@@ -181,6 +181,14 @@ type StealthAddress struct {
 	PkR *common.JubJubCompressed `json:"pk_r"`
 }
 
+// NewStealthAddress returns a new empty StealthAddress struct.
+func NewStealthAddress() *StealthAddress {
+	return &StealthAddress{
+		RG:  common.NewJubJubCompressed(),
+		PkR: common.NewJubJubCompressed(),
+	}
+}
+
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (s *StealthAddress) Copy() *StealthAddress {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -49,13 +50,16 @@ type Provider interface {
 	// DUSK. It accepts the ViewKey as parameter
 	GetBalance(context.Context, keys.ViewKey) (uint64, error)
 
-	// NewContractCall creates a non-genesis smart contract related transaction
-	NewContractCall(context.Context, []byte, TxRequest) (ContractCall, error)
+	// NewStake creates a staking transaction.
+	NewStake(context.Context, []byte, uint64) (*Transaction, error)
+
+	// NewBid creates a new bidding transaction.
+	NewBid(context.Context, *common.BlsScalar, uint64, *common.JubJubCompressed, *keys.StealthAddress, *common.BlsScalar, uint64, uint64) (*BidTransaction, error)
 
 	// NewTransaction creates a new transaction using the user's PrivateKey
 	// It accepts the PublicKey of the recipient, a value, a fee and whether
 	// the transaction should be obfuscated or otherwise
-	NewTransactionTx(context.Context, TxRequest) (Transaction, error)
+	NewTransfer(context.Context, uint64, *keys.StealthAddress) (*Transaction, error)
 }
 
 // KeyMaster Encapsulates the Key creation and retrieval operations
@@ -106,17 +110,21 @@ type proxy struct {
 	keysClient     rusk.KeysClient
 	blindbidClient rusk.BlindBidServiceClient
 	bidClient      rusk.BidServiceClient
+	transferClient rusk.TransferClient
+	stakeClient    rusk.StakeServiceClient
 	txTimeout      time.Duration
 	timeout        time.Duration
 }
 
 // NewProxy creates a new Proxy
-func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, blindbidClient rusk.BlindBidServiceClient, bidClient rusk.BidServiceClient, txTimeout, defaultTimeout time.Duration) Proxy {
+func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, blindbidClient rusk.BlindBidServiceClient, bidClient rusk.BidServiceClient, transferClient rusk.TransferClient, stakeClient rusk.StakeServiceClient, txTimeout, defaultTimeout time.Duration) Proxy {
 	return &proxy{
 		stateClient:    stateClient,
 		keysClient:     keysClient,
 		blindbidClient: blindbidClient,
 		bidClient:      bidClient,
+		transferClient: transferClient,
+		stakeClient:    stakeClient,
 		txTimeout:      txTimeout,
 		timeout:        defaultTimeout,
 	}
@@ -202,38 +210,69 @@ func (p *provider) GetBalance(ctx context.Context, vk keys.ViewKey) (uint64, err
 	return 0, nil
 }
 
-// NewContractCall creates a new transaction using the user's PrivateKey
+// NewStake creates a new transaction using the user's PrivateKey
 // It accepts the PublicKey of the recipient, a value, a fee and whether
 // the transaction should be obfuscated or otherwise
-func (p *provider) NewContractCall(ctx context.Context, b []byte, tx TxRequest) (ContractCall, error) {
-	//trans := new(Transaction)
-	//tr := new(rusk.NewTransactionRequest)
-	//MTxRequest(tr, tx)
-	//res, err := p.client.NewContractCall(ctx, tr)
-	return nil, errors.New("not implemented yet")
+func (p *provider) NewStake(ctx context.Context, pubKeyBLS []byte, value uint64) (*Transaction, error) {
+	tr := new(rusk.StakeTransactionRequest)
+	tr.Value = value
+	tr.PublicKeyBls = pubKeyBLS
+
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
+	defer cancel()
+	res, err := p.stakeClient.NewStake(ctx, tr)
+	if err != nil {
+		return nil, err
+	}
+
+	trans := NewTransaction()
+	UTransaction(res, trans)
+	return trans, nil
 }
 
-// NewTransaction creates a new transaction using the user's PrivateKey
+// NewBid creates a new transaction using the user's PrivateKey
 // It accepts the PublicKey of the recipient, a value, a fee and whether
 // the transaction should be obfuscated or otherwise
-func (p *provider) NewTransactionTx(ctx context.Context, tx TxRequest) (Transaction, error) {
+func (p *provider) NewBid(ctx context.Context, k *common.BlsScalar, value uint64, secret *common.JubJubCompressed, pkR *keys.StealthAddress, seed *common.BlsScalar, round uint64, step uint64) (*BidTransaction, error) {
+	tr := new(rusk.BidTransactionRequest)
+	common.MBlsScalar(tr.K, k)
+	tr.Value = value
+	common.MJubJubCompressed(tr.Secret, secret)
+	keys.MStealthAddress(tr.PkR, pkR)
+	common.MBlsScalar(tr.Seed, seed)
+	tr.LatestConsensusRound = round
+	tr.LatestConsensusStep = step
+
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
+	defer cancel()
+	res, err := p.bidClient.NewBid(ctx, tr)
+	if err != nil {
+		return nil, err
+	}
+
+	trans := NewBidTransaction()
+	UBidTransaction(res, trans)
+	return trans, nil
+}
+
+// NewTransfer creates a new transaction using the user's PrivateKey
+// It accepts the PublicKey of the recipient, a value, a fee and whether
+// the transaction should be obfuscated or otherwise
+func (p *provider) NewTransfer(ctx context.Context, value uint64, sa *keys.StealthAddress) (*Transaction, error) {
+	tr := new(rusk.TransferTransactionRequest)
+	tr.Value = value
+	keys.MStealthAddress(tr.Recipient, sa)
+
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
+	defer cancel()
+	res, err := p.transferClient.NewTransfer(ctx, tr)
+	if err != nil {
+		return nil, err
+	}
+
 	trans := NewTransaction()
-	/*
-		tr := new(rusk.NewTransactionRequest)
-		MTxRequest(tr, tx)
-
-		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
-		defer cancel()
-		res, err := p.client.NewTransaction(ctx, tr)
-		if err != nil {
-			return *trans, err
-		}
-
-		if err := UTransaction(res, trans); err != nil {
-			return *trans, err
-		}
-	*/
-	return *trans, nil
+	UTransaction(res, trans)
+	return trans, nil
 }
 
 type keymaster struct {
@@ -366,7 +405,7 @@ func (b *blockgenerator) GenerateScore(ctx context.Context, s blindbid.GenerateS
 		return blindbid.GenerateScoreResponse{}, err
 	}
 
-	g := new(blindbid.GenerateScoreResponse)
+	g := blindbid.NewGenerateScoreResponse()
 	blindbid.UGenerateScoreResponse(score, g)
 	return *g, nil
 }

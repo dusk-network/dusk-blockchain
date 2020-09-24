@@ -25,7 +25,6 @@ import (
 // PublishTopic publishes an event bus topic to the specified node via
 // rpc call
 func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
-
 	/*
 		if nodeIndex >= uint(len(n.Nodes)) {
 			return errors.New("invalid node index")
@@ -106,7 +105,6 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 
 // LoadNetworkWallets sends a LoadWallet request to N nodes of the network
 func (n *Network) LoadNetworkWallets(t *testing.T, nodesNum int) {
-
 	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 	t.Logf("Send request to %d nodes to loadWallet", nodesNum)
 	for i := 0; i < nodesNum; i++ {

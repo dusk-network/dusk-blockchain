@@ -81,24 +81,24 @@ func (t *Transactor) loadWallet(password string) (pubKey keys.PublicKey, err err
 }
 
 // DecodeAddressToPublicKey will decode a []byte to rusk.PublicKey
-func DecodeAddressToPublicKey(in []byte) (keys.PublicKey, error) {
-	var pk keys.PublicKey
+func DecodeAddressToPublicKey(in []byte) (*keys.StealthAddress, error) {
+	pk := keys.NewStealthAddress()
 	var buf = &bytes.Buffer{}
 	_, err := buf.Write(in)
 	if err != nil {
 		return pk, err
 	}
 
-	pk.AG = new(common.JubJubCompressed)
-	pk.BG = new(common.JubJubCompressed)
-	pk.AG.Data = make([]byte, 32)
-	pk.BG.Data = make([]byte, 32)
+	pk.RG = new(common.JubJubCompressed)
+	pk.PkR = new(common.JubJubCompressed)
+	pk.RG.Data = make([]byte, 32)
+	pk.PkR.Data = make([]byte, 32)
 
-	if _, err = buf.Read(pk.AG.Data); err != nil {
+	if _, err = buf.Read(pk.RG.Data); err != nil {
 		return pk, err
 	}
 
-	if _, err = buf.Read(pk.BG.Data); err != nil {
+	if _, err = buf.Read(pk.PkR.Data); err != nil {
 		return pk, err
 	}
 

@@ -81,7 +81,7 @@ func txsToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, e
 			return nil, err
 		}
 
-		tx := &newtx.Transaction{}
+		tx := newtx.NewTransaction()
 		newtx.UTransaction(call, tx)
 
 		calls[i] = tx
@@ -109,8 +109,10 @@ func ContractCallsToTxs(calls []*rusk.Transaction) ([]transactions.Transaction, 
 // TxToRuskTx turns a legacy transaction into a rusk transaction.
 func TxToRuskTx(tx transactions.Transaction) (*rusk.Transaction, error) {
 	buf := new(bytes.Buffer)
-	if err := tx.StandardTx().RangeProof.Encode(buf, true); err != nil {
-		return nil, err
+	if tx.Type() != transactions.CoinbaseType {
+		if err := tx.StandardTx().RangeProof.Encode(buf, true); err != nil {
+			return nil, err
+		}
 	}
 
 	inputs, err := inputsToRuskInputs(tx.StandardTx().Inputs)
@@ -124,44 +126,11 @@ func TxToRuskTx(tx transactions.Transaction) (*rusk.Transaction, error) {
 		Type:    uint32(tx.Type()),
 		TxPayload: &rusk.TransactionPayload{
 			// XXX: fix typo in rusk-schema
+			Anchor:    &rusk.BlsScalar{Data: make([]byte, 32)},
 			Nullifier: inputs,
 			Notes:     outputs,
-
-			/*
-				Fee: &rusk.TransactionOutput{
-					BlindingFactor: &rusk.Scalar{
-						Data: make([]byte, 32),
-					},
-					Pk: &rusk.PublicKey{
-						AG: &rusk.CompressedPoint{
-							Y: make([]byte, 32),
-						},
-						BG: &rusk.CompressedPoint{
-							Y: make([]byte, 32),
-						},
-					},
-					Value: tx.Fee.BigInt().Uint64(),
-					Note: &rusk.Note{
-						ValueCommitment: &rusk.Scalar{
-							Data: make([]byte, 0),
-						},
-						RG: &rusk.CompressedPoint{
-							Y: make([]byte, 0),
-						},
-						Nonce: &rusk.Nonce{
-							Bs: make([]byte, 0),
-						},
-						PkR: &rusk.CompressedPoint{
-							Y: make([]byte, 0),
-						},
-						BlindingFactor: &rusk.Note_TransparentBlindingFactor{
-							TransparentBlindingFactor: &rusk.Scalar{Data: []byte{0x55, 0x66}},
-						},
-						Value: &rusk.Note_TransparentValue{
-							TransparentValue: uint64(0),
-						},
-					},
-			*/
+			Crossover: newtx.MockRuskCrossover(),
+			Fee:       newtx.MockRuskFee(),
 			SpendingProof: &rusk.Proof{
 				Data: buf.Bytes(),
 			},
@@ -389,7 +358,7 @@ func outputsToRuskOutputs(outputs transactions.Outputs) []*rusk.Note {
 			},
 			// XXX: fix typo in rusk-schema
 			EncyptedData: &rusk.PoseidonCipher{
-				Data: []byte{0x55, 0x66},
+				Data: make([]byte, 96),
 			},
 		}
 	}

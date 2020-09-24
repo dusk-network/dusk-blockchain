@@ -2,12 +2,14 @@ package transactor
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"os"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -113,93 +115,116 @@ func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadRe
 }
 
 func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionResponse, error) {
-	/*
-		if t.w == nil {
-			return nil, errWalletNotLoaded
-		}
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
 
-		// // create and sign transaction
+	// create and sign transaction
+	log.
+		WithField("amount", req.Amount).
+		WithField("locktime", req.Locktime).
+		Tracef("Creating a bid tx")
+
+	// TODO context should be created from the parent one
+	ctx := context.Background()
+
+	// FIXME: 476 - here we need to create K, EdPk; retrieve seed somehow and decide
+	// an ExpirationHeight (most likely the last 2 should be retrieved from he DB)
+	// Create the Ed25519 Keypair
+	// XXX: We need to get the proper values, and not just make some up out of thin air.
+	k := &common.BlsScalar{Data: make([]byte, 32)}
+	if _, err := rand.Read(k.Data); err != nil {
+		return nil, err
+	}
+
+	secret := &common.JubJubCompressed{Data: make([]byte, 32)}
+	if _, err := rand.Read(secret.Data); err != nil {
+		return nil, err
+	}
+
+	pkR := &keys.StealthAddress{
+		RG: &common.JubJubCompressed{
+			Data: make([]byte, 32),
+		},
+		PkR: &common.JubJubCompressed{
+			Data: make([]byte, 32),
+		},
+	}
+	if _, err := rand.Read(pkR.RG.Data); err != nil {
+		return nil, err
+	}
+	if _, err := rand.Read(pkR.PkR.Data); err != nil {
+		return nil, err
+	}
+
+	seed := &common.BlsScalar{Data: make([]byte, 32)}
+	if _, err := rand.Read(seed.Data); err != nil {
+		return nil, err
+	}
+
+	tx, err := t.proxy.Provider().NewBid(ctx, k, req.Amount, secret, pkR, seed, 0, 0)
+	if err != nil {
 		log.
 			WithField("amount", req.Amount).
 			WithField("locktime", req.Locktime).
-			Tracef("Creating a bid tx")
+			Error("handleSendBidTx, failed to create NewBidTx")
+		return nil, err
+	}
 
-		// TODO context should be created from the parent one
-		ctx := context.Background()
+	// TODO: store the K and D in storage for the block generator
 
-		txReq := transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, true)
-		// FIXME: 476 - here we need to create K, EdPk; retrieve seed somehow and decide
-		// an ExpirationHeight (most likely the last 2 should be retrieved from he DB)
-		// Create the Ed25519 Keypair
-		tx, err := t.proxy.Provider().NewBidTx(ctx, nil, nil, nil, uint64(0), txReq)
-		if err != nil {
-			log.
-				WithField("amount", req.Amount).
-				WithField("locktime", req.Locktime).
-				Error("handleSendBidTx, failed to create NewBidTx")
-			return nil, err
-		}
+	hash, err := t.publishTx(tx.Tx)
+	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendBidTx, failed to create publishTx")
+		return nil, err
+	}
 
-		// TODO: store the K and D in storage for the block generator
-
-		hash, err := t.publishTx(&tx)
-		if err != nil {
-			log.
-				WithField("amount", req.Amount).
-				WithField("locktime", req.Locktime).
-				Error("handleSendBidTx, failed to create publishTx")
-			return nil, err
-		}
-
-		return &node.TransactionResponse{Hash: hash}, nil
-	*/
-	return nil, nil
+	return &node.TransactionResponse{Hash: hash}, nil
 }
 
 func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.TransactionResponse, error) {
-	/*
-		if t.w == nil {
-			return nil, errWalletNotLoaded
-		}
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
 
-		// create and sign transaction
+	// create and sign transaction
+	log.
+		WithField("amount", req.Amount).
+		WithField("locktime", req.Locktime).
+		Tracef("Creating a stake tx")
+
+	blsKey := t.w.Keys().BLSPubKey
+	if blsKey == nil {
+		return nil, errWalletNotLoaded
+	}
+
+	// TODO: use a parent context
+	ctx := context.Background()
+	// FIXME: 476 - we should calculate the expirationHeight somehow (by asking
+	// the chain for the last block through the RPC bus and calculating the
+	// height)
+	tx, err := t.proxy.Provider().NewStake(ctx, blsKey.Marshal(), req.Amount)
+	if err != nil {
 		log.
 			WithField("amount", req.Amount).
 			WithField("locktime", req.Locktime).
-			Tracef("Creating a stake tx")
+			Error("handleSendStakeTx, failed to create NewStakeTx")
+		return nil, err
+	}
 
-		blsKey := t.w.Keys().BLSPubKey
-		if blsKey == nil {
-			return nil, errWalletNotLoaded
-		}
+	hash, err := t.publishTx(tx)
+	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendStakeTx, failed to create publishTx")
+		return nil, err
+	}
 
-		// TODO: use a parent context
-		ctx := context.Background()
-		// FIXME: 476 - we should calculate the expirationHeight somehow (by asking
-		// the chain for the last block through the RPC bus and calculating the
-		// height)
-		var expirationHeight uint64
-		tx, err := t.proxy.Provider().NewStakeTx(ctx, blsKey.Marshal(), expirationHeight, transactions.MakeGenesisTxRequest(t.w.SecretKey, req.Amount, req.Fee, false))
-		if err != nil {
-			log.
-				WithField("amount", req.Amount).
-				WithField("locktime", req.Locktime).
-				Error("handleSendStakeTx, failed to create NewStakeTx")
-			return nil, err
-		}
-
-		hash, err := t.publishTx(&tx)
-		if err != nil {
-			log.
-				WithField("amount", req.Amount).
-				WithField("locktime", req.Locktime).
-				Error("handleSendStakeTx, failed to create publishTx")
-			return nil, err
-		}
-
-		return &node.TransactionResponse{Hash: hash}, nil
-	*/
-	return nil, nil
+	return &node.TransactionResponse{Hash: hash}, nil
 }
 
 func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.TransactionResponse, error) {
@@ -220,8 +245,7 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 		return nil, err
 	}
 
-	txReq := transactions.MakeTxRequest(t.w.SecretKey, pb, req.Amount, req.Fee, false)
-	tx, err := t.proxy.Provider().NewTransactionTx(ctx, txReq)
+	tx, err := t.proxy.Provider().NewTransfer(ctx, req.Amount, pb)
 	if err != nil {
 		log.
 			WithField("amount", req.Amount).
@@ -231,7 +255,7 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 	}
 
 	// Publish transaction to the mempool processing
-	hash, err := t.publishTx(&tx)
+	hash, err := t.publishTx(tx)
 	if err != nil {
 		log.
 			WithField("amount", req.Amount).
@@ -296,26 +320,28 @@ func (t *Transactor) publishTx(tx transactions.ContractCall) ([]byte, error) {
 }
 
 func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.TransactionResponse, error) {
-	ctx := context.Background()
+	/*
+		ctx := context.Background()
 
-	pb, err := DecodeAddressToPublicKey(c.Address)
-	if err != nil {
-		return nil, err
-	}
+		pb, err := DecodeAddressToPublicKey(c.Address)
+		if err != nil {
+			return nil, err
+		}
 
-	txReq := transactions.MakeTxRequest(t.w.SecretKey, pb, uint64(0), c.Fee, true)
-	tx, err := t.proxy.Provider().NewContractCall(ctx, c.Data, txReq)
-	if err != nil {
-		return nil, err
-	}
+		txReq := transactions.MakeTxRequest(t.w.SecretKey, pb, uint64(0), c.Fee, true)
+		tx, err := t.proxy.Provider().NewContractCall(ctx, c.Data, txReq)
+		if err != nil {
+			return nil, err
+		}
 
-	// Publish transaction to the mempool processing
-	hash, err := t.publishTx(tx)
-	if err != nil {
-		return nil, err
-	}
+		// Publish transaction to the mempool processing
+		hash, err := t.publishTx(tx)
+		if err != nil {
+			return nil, err
+		}
+	*/
 
-	return &node.TransactionResponse{Hash: hash}, nil
+	return nil, nil
 }
 
 func loadResponseFromPub(pubKey keys.PublicKey) *node.LoadResponse {

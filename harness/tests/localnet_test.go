@@ -119,7 +119,6 @@ func monitorNetwork() {
 // by all nodes in the network within a particular time frame and within
 // the same block
 func TestSendBidTransaction(t *testing.T) {
-
 	localNet.LoadNetworkWallets(t, localNet.Size())
 
 	t.Log("Send request to node 0 to generate and process a Bid transaction")
@@ -163,7 +162,6 @@ func TestSendBidTransaction(t *testing.T) {
 // TestCatchup tests that a node which falls behind during consensus
 // will properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
-
 	localNet.LoadNetworkWallets(t, localNet.Size())
 
 	t.Log("Wait till we are at height 3")
@@ -186,7 +184,6 @@ func TestCatchup(t *testing.T) {
 }
 
 func TestSendStakeTransaction(t *testing.T) {
-
 	localNet.LoadNetworkWallets(t, localNet.Size())
 
 	t.Log("Send request to node 1 to generate and process a Bid transaction")
@@ -224,7 +221,6 @@ func TestSendStakeTransaction(t *testing.T) {
 // should ensure that in a network of multiple Bidders and Provisioners
 // consensus is stable and consistent
 func TestMultipleBiddersProvisioners(t *testing.T) {
-
 	if !*engine.KeepAlive {
 		// Runnable in keepalive mode only
 		t.SkipNow()
@@ -252,5 +248,4 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 			}
 		}
 	}
-
 }

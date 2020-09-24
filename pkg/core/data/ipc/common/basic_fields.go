@@ -42,18 +42,19 @@ func UBlsScalar(r *rusk.BlsScalar, b *BlsScalar) {
 }
 
 // MarshalBlsScalar writes the BlsScalar struct into a bytes.Buffer.
-// Because BLS scalars are always supposed to be 32 bytes, we simply
-// use the `Write256` encoding function.
+// BLS scalars are supposed to be 32 bytes at all times. However,
+// for testing purposes, we sometimes store more than 32 bytes
+// of data. Hence, we choose `WriteVarBytes`.
 func MarshalBlsScalar(r *bytes.Buffer, b *BlsScalar) error {
-	return encoding.Write256(r, b.Data)
+	return encoding.WriteVarBytes(r, b.Data)
 }
 
 // UnmarshalBlsScalar reads a BlsScalar struct from a bytes.Buffer.
-// Because BLS scalars are always supposed to be 32 bytes, we simply
-// use the `Read256` encoding function.
+// BLS scalars are supposed to be 32 bytes at all times. However,
+// for testing purposes, we sometimes store more than 32 bytes
+// of data. Hence, we choose `ReadVarBytes`.
 func UnmarshalBlsScalar(r *bytes.Buffer, b *BlsScalar) error {
-	b.Data = make([]byte, 32)
-	return encoding.Read256(r, b.Data)
+	return encoding.ReadVarBytes(r, &b.Data)
 }
 
 // Equal returns whether or not two BlsScalars are the same.

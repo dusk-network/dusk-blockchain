@@ -176,7 +176,7 @@ func TestTxSize(t *testing.T) {
 			"data": {
 				"transactions": [
 					{
-						"size": 712,
+						"size": 716,
 						"txtype": "3"
 					}
 				]
