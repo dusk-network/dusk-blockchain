@@ -235,10 +235,14 @@ func (p *provider) NewStake(ctx context.Context, pubKeyBLS []byte, value uint64)
 // the transaction should be obfuscated or otherwise
 func (p *provider) NewBid(ctx context.Context, k *common.BlsScalar, value uint64, secret *common.JubJubCompressed, pkR *keys.StealthAddress, seed *common.BlsScalar, round uint64, step uint64) (*BidTransaction, error) {
 	tr := new(rusk.BidTransactionRequest)
+	tr.K = new(rusk.BlsScalar)
 	common.MBlsScalar(tr.K, k)
 	tr.Value = value
+	tr.Secret = new(rusk.JubJubCompressed)
 	common.MJubJubCompressed(tr.Secret, secret)
+	tr.PkR = new(rusk.StealthAddress)
 	keys.MStealthAddress(tr.PkR, pkR)
+	tr.Seed = new(rusk.BlsScalar)
 	common.MBlsScalar(tr.Seed, seed)
 	tr.LatestConsensusRound = round
 	tr.LatestConsensusStep = step
@@ -261,6 +265,7 @@ func (p *provider) NewBid(ctx context.Context, k *common.BlsScalar, value uint64
 func (p *provider) NewTransfer(ctx context.Context, value uint64, sa *keys.StealthAddress) (*Transaction, error) {
 	tr := new(rusk.TransferTransactionRequest)
 	tr.Value = value
+	tr.Recipient = new(rusk.StealthAddress)
 	keys.MStealthAddress(tr.Recipient, sa)
 
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
@@ -322,12 +327,12 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 		return nil, err
 	}
 
-	validTxs := make([]ContractCall, len(res.FailedCalls))
-	for i, idx := range res.FailedCalls {
-		validTxs[i] = calls[idx]
+	for idx := range res.FailedCalls {
+		calls[idx], calls[len(calls)-1] = calls[len(calls)-1], calls[idx]
+		calls = calls[:len(calls)-1]
 	}
 
-	return validTxs, nil
+	return calls, nil
 }
 
 // ExecuteStateTransition performs a global state mutation and steps the

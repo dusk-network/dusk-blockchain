@@ -8,7 +8,7 @@ import (
 
 // UnmarshalTxMessage unmarshals a Message carrying a tx from a buffer
 func UnmarshalTxMessage(r *bytes.Buffer, m SerializableMessage) error {
-	cc := new(transactions.Transaction)
+	cc := transactions.NewTransaction()
 	if err := transactions.Unmarshal(r, cc); err != nil {
 		return err
 	}

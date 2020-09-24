@@ -204,7 +204,6 @@ func (p *Reader) Accept() error {
 
 // Serve utilizes two different methods for writing to the open connection
 func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
-
 	defer w.onDisconnect()
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
@@ -242,7 +241,6 @@ func (w *Writer) onDisconnect() {
 }
 
 func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
-
 	for {
 		select {
 		case buf := <-writeQueueChan:
@@ -265,15 +263,14 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
 func (p *Reader) ReadLoop() {
-
 	// As the peer ReadLoop is at the front-line of P2P network, receiving a
 	// malformed frame by an adversary node could lead to a panic.
 	// In such situation, the node should survive but adversary conn gets dropped
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
+	// 	}
+	// }()
 
 	p.readLoop()
 }

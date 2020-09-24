@@ -200,7 +200,9 @@ func (s *StealthAddress) Copy() *StealthAddress {
 
 // MStealthAddress copies the StealthAddress structure into the Rusk equivalent.
 func MStealthAddress(r *rusk.StealthAddress, f *StealthAddress) {
+	r.RG = new(rusk.JubJubCompressed)
 	common.MJubJubCompressed(r.RG, f.RG)
+	r.PkR = new(rusk.JubJubCompressed)
 	common.MJubJubCompressed(r.PkR, f.PkR)
 }
 

@@ -140,7 +140,6 @@ func TestSendBidTransaction(t *testing.T) {
 	t.Log("Ensure all nodes have accepted this transaction at the same height")
 	blockhash := ""
 	for i := 0; i < localNet.Size(); i++ {
-
 		bh := localNet.WaitUntilTx(t, uint(i), txID)
 
 		if len(bh) == 0 {
@@ -186,7 +185,7 @@ func TestCatchup(t *testing.T) {
 func TestSendStakeTransaction(t *testing.T) {
 	localNet.LoadNetworkWallets(t, localNet.Size())
 
-	t.Log("Send request to node 1 to generate and process a Bid transaction")
+	t.Log("Send request to node 1 to generate and process a Stake transaction")
 	txidBytes, err := localNet.SendStakeCmd(1, 10, 10)
 	if err != nil {
 		t.Fatal(err)
@@ -198,7 +197,6 @@ func TestSendStakeTransaction(t *testing.T) {
 	t.Log("Ensure all nodes have accepted stake transaction at the same height")
 	blockhash := ""
 	for i := 0; i < localNet.Size(); i++ {
-
 		bh := localNet.WaitUntilTx(t, uint(i), txID)
 
 		if len(bh) == 0 {

@@ -3,6 +3,7 @@ package ruskmock
 import (
 	"context"
 	"crypto/rand"
+	"math/big"
 	"net"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -17,6 +18,7 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -68,7 +70,9 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 	rusk.RegisterStateServer(grpcServer, srv)
 	rusk.RegisterKeysServer(grpcServer, srv)
 	rusk.RegisterBlindBidServiceServer(grpcServer, srv)
-	// rusk.RegisterBidServiceServer(grpcServer, srv)
+	rusk.RegisterBidServiceServer(grpcServer, srv)
+	rusk.RegisterTransferServer(grpcServer, srv)
+	rusk.RegisterStakeServiceServer(grpcServer, srv)
 	srv.s = grpcServer
 
 	// First load the database
@@ -302,18 +306,17 @@ func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey
 	}, nil
 }
 
-// NewTransaction creates a transaction and returns it to the caller.
-/*
-func (s *Server) NewTransaction(ctx context.Context, req *rusk.NewTransactionRequest) (*rusk.Transaction, error) {
-	tx, err := transactions.NewStandard(0, byte(2), int64(req.Fee))
+// NewTransfer creates a transaction and returns it to the caller.
+func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionRequest) (*rusk.Transaction, error) {
+	tx, err := transactions.NewStandard(0, byte(2), int64(100))
 	if err != nil {
 		return nil, err
 	}
 
 	var spend ristretto.Point
-	_ = spend.UnmarshalBinary(req.Recipient.AG.Y)
+	_ = spend.UnmarshalBinary(req.Recipient.RG.Data)
 	var view ristretto.Point
-	_ = view.UnmarshalBinary(req.Recipient.BG.Y)
+	_ = view.UnmarshalBinary(req.Recipient.PkR.Data)
 	sp := key.PublicSpend(spend)
 	v := key.PublicView(view)
 
@@ -339,7 +342,43 @@ func (s *Server) NewTransaction(ctx context.Context, req *rusk.NewTransactionReq
 
 	return legacy.TxToRuskTx(tx)
 }
-*/
+
+// NewStake creates a staking transaction and returns it to the caller.
+func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.Transaction, error) {
+	stake, err := transactions.NewStake(0, byte(2), int64(0), 250000, s.w.ConsensusKeys().EdPubKeyBytes, s.w.ConsensusKeys().BLSPubKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.w.Sign(stake); err != nil {
+		return nil, err
+	}
+
+	return legacy.StakeToRuskStake(stake)
+}
+
+// NewBid creates a bidding transaction and returns it to the caller.
+func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*rusk.BidTransaction, error) {
+	var k ristretto.Scalar
+	_ = k.UnmarshalBinary(req.K.Data)
+	m := zkproof.CalculateM(k)
+	bid, err := transactions.NewBid(0, byte(2), int64(0), 250000, m.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.w.Sign(bid); err != nil {
+		return nil, err
+	}
+
+	return legacy.BidToRuskBid(bid)
+}
+
+// FindBid will return all of the bids for a given stealth address.
+// TODO: implement
+func (s *Server) FindBid(ctx context.Context, req *rusk.FindBidRequest) (*rusk.BidList, error) {
+	return nil, nil
+}
 
 func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
 	// Fetch all inputs from database that are >= totalAmount

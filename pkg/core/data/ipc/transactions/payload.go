@@ -64,15 +64,17 @@ func MTransactionPayload(r *rusk.TransactionPayload, f *TransactionPayload) {
 	common.MBlsScalar(r.Anchor, f.Anchor)
 
 	r.Nullifier = make([]*rusk.BlsScalar, len(f.Nullifiers))
-	for i, input := range r.Nullifier {
-		common.MBlsScalar(input, f.Nullifiers[i])
+	for i := range r.Nullifier {
+		r.Nullifier[i] = new(rusk.BlsScalar)
+		common.MBlsScalar(r.Nullifier[i], f.Nullifiers[i])
 	}
 
 	MCrossover(r.Crossover, f.Crossover)
 
 	r.Notes = make([]*rusk.Note, len(f.Notes))
-	for i, note := range r.Notes {
-		MNote(note, f.Notes[i])
+	for i := range r.Notes {
+		r.Notes[i] = new(rusk.Note)
+		MNote(r.Notes[i], f.Notes[i])
 	}
 
 	MFee(r.Fee, f.Fee)

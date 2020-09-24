@@ -233,6 +233,7 @@ func IntermediateCoinbase(reward uint64) *Transaction {
 	}
 
 	tx.TxPayload.CallData = buf.Bytes()
+	tx.TxPayload.Nullifiers = make([]*common.BlsScalar, 0)
 	tx.TxType = Distribute
 	return tx
 }
@@ -263,6 +264,7 @@ func RandDistributeTx(reward uint64, provisionerNr int) *Transaction {
 	}
 
 	tx.TxPayload.CallData = buf.Bytes()
+	tx.TxPayload.Nullifiers = make([]*common.BlsScalar, 0)
 	tx.TxType = Distribute
 	return tx
 }
