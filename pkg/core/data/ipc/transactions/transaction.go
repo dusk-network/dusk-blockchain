@@ -190,3 +190,48 @@ func Equal(t, other ContractCall) bool {
 
 	return t.StandardTx().Equal(other.StandardTx())
 }
+
+// BidTransaction is used to perform a blind bid.
+type BidTransaction struct {
+	BidTreeStorageIndex uint64
+	Tx                  *Transaction `json:"tx"`
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers.
+func (b *BidTransaction) Copy() *BidTransaction {
+	return &BidTransaction{
+		BidTreeStorageIndex: b.BidTreeStorageIndex,
+		Tx:                  b.Tx.Copy().(*Transaction),
+	}
+}
+
+// MBidTransaction copies the BidTransaction structure into the Rusk equivalent.
+func MBidTransaction(r *rusk.BidTransaction, f *BidTransaction) {
+	r.BidTreeStorageIndex = f.BidTreeStorageIndex
+	MTransaction(r.Tx, f.Tx)
+}
+
+// UBidTransaction copies the Rusk BidTransaction structure into the native equivalent.
+func UBidTransaction(r *rusk.BidTransaction, f *BidTransaction) {
+	f.BidTreeStorageIndex = r.BidTreeStorageIndex
+	UTransaction(r.Tx, f.Tx)
+}
+
+// MarshalBidTransaction writes the BidTransaction struct into a bytes.Buffer.
+func MarshalBidTransaction(r *bytes.Buffer, f *BidTransaction) error {
+	if err := encoding.WriteUint64LE(r, f.BidTreeStorageIndex); err != nil {
+		return err
+	}
+
+	return MarshalTransaction(r, f.Tx)
+}
+
+// UnmarshalBidTransaction reads a BidTransaction struct from a bytes.Buffer.
+func UnmarshalBidTransaction(r *bytes.Buffer, f *BidTransaction) error {
+	if err := encoding.ReadUint64LE(r, &f.BidTreeStorageIndex); err != nil {
+		return err
+	}
+
+	return UnmarshalTransaction(r, f.Tx)
+}

@@ -11,28 +11,26 @@ import (
 
 // Bid represents a blind bid, made by a block generator.
 type Bid struct {
-	EncryptedData       *common.PoseidonCipher   `json:"encrypted_data"`
-	HashedSecret        *common.BlsScalar        `json:"hashed_secret"`
-	Nonce               *common.BlsScalar        `json:"nonce"`
-	PkR                 *keys.StealthAddress     `json:"stealth_address"`
-	Commitment          *common.JubJubCompressed `json:"commitment"`
-	EligibilityTS       *common.BlsScalar        `json:"eligibility_ts"`
-	ExpirationTS        *common.BlsScalar        `json:"expiration_ts"`
-	BidTreeStorageIndex uint64                   `json:"bid_tree_storage_index"`
+	EncryptedData *common.PoseidonCipher   `json:"encrypted_data"`
+	HashedSecret  *common.BlsScalar        `json:"hashed_secret"`
+	Nonce         *common.BlsScalar        `json:"nonce"`
+	PkR           *keys.StealthAddress     `json:"stealth_address"`
+	Commitment    *common.JubJubCompressed `json:"commitment"`
+	EligibilityTS *common.BlsScalar        `json:"eligibility_ts"`
+	ExpirationTS  *common.BlsScalar        `json:"expiration_ts"`
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (b *Bid) Copy() *Bid {
 	return &Bid{
-		EncryptedData:       b.EncryptedData.Copy(),
-		HashedSecret:        b.HashedSecret.Copy(),
-		Nonce:               b.Nonce.Copy(),
-		PkR:                 b.PkR.Copy(),
-		Commitment:          b.Commitment.Copy(),
-		EligibilityTS:       b.EligibilityTS.Copy(),
-		ExpirationTS:        b.ExpirationTS.Copy(),
-		BidTreeStorageIndex: b.BidTreeStorageIndex,
+		EncryptedData: b.EncryptedData.Copy(),
+		HashedSecret:  b.HashedSecret.Copy(),
+		Nonce:         b.Nonce.Copy(),
+		PkR:           b.PkR.Copy(),
+		Commitment:    b.Commitment.Copy(),
+		EligibilityTS: b.EligibilityTS.Copy(),
+		ExpirationTS:  b.ExpirationTS.Copy(),
 	}
 }
 
@@ -46,7 +44,6 @@ func MBid(r *rusk.Bid, f *Bid) {
 	// XXX: fix typo in rusk-schema
 	common.MBlsScalar(r.ElegibilityTs, f.EligibilityTS)
 	common.MBlsScalar(r.ExpirationTs, f.ExpirationTS)
-	r.BidTreeStorageIndex = f.BidTreeStorageIndex
 }
 
 // UBid copies the Rusk Bid structure into the native equivalent.
@@ -59,7 +56,6 @@ func UBid(r *rusk.Bid, f *Bid) {
 	// XXX: fix typo in rusk-schema
 	common.UBlsScalar(r.ElegibilityTs, f.EligibilityTS)
 	common.UBlsScalar(r.ExpirationTs, f.ExpirationTS)
-	f.BidTreeStorageIndex = r.BidTreeStorageIndex
 }
 
 // MarshalBid writes the Bid struct into a bytes.Buffer.
@@ -88,11 +84,7 @@ func MarshalBid(r *bytes.Buffer, f *Bid) error {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.ExpirationTS); err != nil {
-		return err
-	}
-
-	return encoding.WriteUint64LE(r, f.BidTreeStorageIndex)
+	return common.MarshalBlsScalar(r, f.ExpirationTS)
 }
 
 // UnmarshalBid reads a Bid struct from a bytes.Buffer.
@@ -121,11 +113,7 @@ func UnmarshalBid(r *bytes.Buffer, f *Bid) error {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.ExpirationTS); err != nil {
-		return err
-	}
-
-	return encoding.ReadUint64LE(r, &f.BidTreeStorageIndex)
+	return common.UnmarshalBlsScalar(r, f.ExpirationTS)
 }
 
 // BidTransactionRequest is used to construct a Bid transaction.
@@ -231,51 +219,6 @@ func UnmarshalBidTransactionRequest(r *bytes.Buffer, f *BidTransactionRequest) e
 	}
 
 	return encoding.ReadUint64LE(r, &f.LatestConsensusStep)
-}
-
-// BidTransaction is used to perform a blind bid.
-type BidTransaction struct {
-	Bid     *Bid              `json:"bid"`
-	BidHash *common.BlsScalar `json:"bid_hash"`
-}
-
-// Copy complies with message.Safe interface. It returns a deep copy of
-// the message safe to publish to multiple subscribers.
-func (b *BidTransaction) Copy() *BidTransaction {
-	return &BidTransaction{
-		Bid:     b.Bid.Copy(),
-		BidHash: b.BidHash.Copy(),
-	}
-}
-
-// MBidTransaction copies the BidTransaction structure into the Rusk equivalent.
-func MBidTransaction(r *rusk.BidTransaction, f *BidTransaction) {
-	MBid(r.Bid, f.Bid)
-	common.MBlsScalar(r.BidHash, f.BidHash)
-}
-
-// UBidTransaction copies the Rusk BidTransaction structure into the native equivalent.
-func UBidTransaction(r *rusk.BidTransaction, f *BidTransaction) {
-	UBid(r.Bid, f.Bid)
-	common.UBlsScalar(r.BidHash, f.BidHash)
-}
-
-// MarshalBidTransaction writes the BidTransaction struct into a bytes.Buffer.
-func MarshalBidTransaction(r *bytes.Buffer, f *BidTransaction) error {
-	if err := MarshalBid(r, f.Bid); err != nil {
-		return err
-	}
-
-	return common.MarshalBlsScalar(r, f.BidHash)
-}
-
-// UnmarshalBidTransaction reads a BidTransaction struct from a bytes.Buffer.
-func UnmarshalBidTransaction(r *bytes.Buffer, f *BidTransaction) error {
-	if err := UnmarshalBid(r, f.Bid); err != nil {
-		return err
-	}
-
-	return common.UnmarshalBlsScalar(r, f.BidHash)
 }
 
 // FindBidRequest is used to find a specific Bid belonging to a public key.
