@@ -2,9 +2,10 @@ package capi
 
 import (
 	"encoding/json"
-	"github.com/asdine/storm/v3/q"
 	"net/http"
 	"strconv"
+
+	"github.com/asdine/storm/v3/q"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -178,6 +179,10 @@ func GetP2PLogsHandler(res http.ResponseWriter, req *http.Request) {
 
 	var peerList []PeerJSON
 	err := GetStormDBInstance().DB.Find("Type", typeStr, &peerList)
+	if err != nil {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	var b []byte
 	b, err = json.Marshal(peerList)

@@ -1,8 +1,9 @@
 package capi
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
@@ -26,6 +27,7 @@ type RoundInfoJSON struct {
 	Name      string    `json:"name"`
 }
 
+// PeerJSON is used as JSON wrapper for peer info fields
 type PeerJSON struct {
 	ID       int       `storm:"id,increment" json:"id"`
 	Address  string    `json:"address"`
@@ -34,6 +36,7 @@ type PeerJSON struct {
 	LastSeen time.Time `storm:"index" json:"last_seen"`
 }
 
+// Member is the holder of bls and stakes
 type Member struct {
 	PublicKeyBLS []byte  `json:"bls_key"`
 	Stakes       []Stake `json:"stakes"`
@@ -46,6 +49,7 @@ type Stake struct {
 	EndHeight   uint64 `json:"end_height"`
 }
 
+// ProvisionerJSON represents the Provisioner
 type ProvisionerJSON struct {
 	ID      uint64        `storm:"id" json:"id"`
 	Set     sortedset.Set `json:"set"`

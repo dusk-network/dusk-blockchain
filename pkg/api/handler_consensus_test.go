@@ -2,11 +2,12 @@ package api
 
 import (
 	"fmt"
-	"github.com/asdine/storm/v3/q"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/asdine/storm/v3/q"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 
 	"github.com/drewolson/testflight"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"

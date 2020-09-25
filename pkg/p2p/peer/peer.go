@@ -3,12 +3,13 @@ package peer
 import (
 	"bytes"
 	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"io"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 
 	log "github.com/sirupsen/logrus"
 
