@@ -8,12 +8,14 @@ import (
 
 // Object implements copy-on-write technique based on payload.Safe
 // Useful on sharing safely a Copyable data between goroutines
+// Multiple readers, single writer at a time
 type Object struct {
 	data payload.Safe
 	mu   sync.RWMutex
 }
 
-// Set updates last block with a full copy of the new block
+// Set updates inner value with a deep copy
+// concurrency safe
 func (s *Object) Set(n payload.Safe) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -22,7 +24,8 @@ func (s *Object) Set(n payload.Safe) {
 	}
 }
 
-// Get returns a safe copy of last block
+// Get returns a deep copy of the inner value
+// concurrency safe
 func (s *Object) Get() payload.Safe {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
