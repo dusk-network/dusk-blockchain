@@ -74,8 +74,8 @@ type Chain struct {
 	// verifier performs verifications on the block
 	verifier Verifier
 
-	// prevBlock is blockchain tip
-	prevBlock block.Block
+	// current blockchain tip of local state
+	tip *lastBlockProvider
 
 	// Intermediate block, decided on by consensus.
 	// Used to verify a candidate against the correct previous block,
@@ -105,7 +105,6 @@ type Chain struct {
 	executor transactions.Executor
 
 	// rpcbus channels
-	getLastBlockChan         <-chan rpcbus.Request
 	verifyCandidateBlockChan <-chan rpcbus.Request
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
@@ -129,14 +128,11 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	highestSeenChan := initHighestSeenCollector(eventBus)
 
 	// set up rpcbus channels
-	getLastBlockChan := make(chan rpcbus.Request, 1)
 	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
 	getLastCertificateChan := make(chan rpcbus.Request, 1)
 	getRoundResultsChan := make(chan rpcbus.Request, 1)
 	getLastCommitteeChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(topics.GetLastBlock, getLastBlockChan); err != nil {
-		return nil, err
-	}
+
 	if err := rpcBus.Register(topics.VerifyCandidateBlock, verifyCandidateBlockChan); err != nil {
 		return nil, err
 	}
@@ -157,7 +153,6 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		counter:                  counter,
 		certificateChan:          certificateChan,
 		highestSeenChan:          highestSeenChan,
-		getLastBlockChan:         getLastBlockChan,
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
 		getLastCertificateChan:   getLastCertificateChan,
 		getRoundResultsChan:      getRoundResultsChan,
@@ -181,25 +176,30 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		// TODO: maybe it would be better to have a consensus-compatible
 		// intermediate block and certificate.
 		chain.lastCertificate = block.EmptyCertificate()
-		blk, err := mockFirstIntermediateBlock(prevBlock.Header)
-		if err != nil {
-			return nil, err
+
+		blk, errIntern := mockFirstIntermediateBlock(prevBlock.Header)
+		if errIntern != nil {
+			return nil, errIntern
 		}
 
 		chain.intermediateBlock = blk
 
 		// If we're running the test harness, we should also populate some consensus values
 		if config.Get().Genesis.Legacy {
-			if err := setupBidValues(); err != nil {
-				return nil, err
+			if errV := setupBidValues(); errV != nil {
+				return nil, errV
 			}
 
-			if err := reconstructCommittee(chain.p, prevBlock); err != nil {
-				return nil, err
+			if errV := reconstructCommittee(chain.p, prevBlock); errV != nil {
+				return nil, errV
 			}
 		}
 	}
-	chain.prevBlock = *prevBlock
+
+	chain.tip, err = newLastBlockProvider(rpcBus, prevBlock)
+	if err != nil {
+		return nil, err
+	}
 
 	if srv != nil {
 		node.RegisterChainServer(srv, chain)
@@ -229,9 +229,8 @@ func (c *Chain) Listen() {
 		case certificateMsg := <-c.certificateChan:
 			c.handleCertificateMessage(certificateMsg)
 		case height := <-c.highestSeenChan:
+			// TODO: check out if highestSeen could be out of chain
 			c.highestSeen = height
-		case r := <-c.getLastBlockChan:
-			c.provideLastBlock(r)
 		case r := <-c.verifyCandidateBlockChan:
 			c.processCandidateVerificationRequest(r)
 		case r := <-c.getLastCertificateChan:
@@ -330,8 +329,9 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 
 	l.Trace("verifying block")
 
+	prevBlock := c.tip.Get()
 	// 1. Check that stateless and stateful checks pass
-	if err := c.verifier.SanityCheckBlock(c.prevBlock, blk); err != nil {
+	if err := c.verifier.SanityCheckBlock(prevBlock, blk); err != nil {
 		l.WithError(err).Error("block verification failed")
 		return err
 	}
@@ -382,7 +382,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 		return err
 	}
 
-	c.prevBlock = blk
+	c.tip.Set(&blk)
 
 	// 6. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
@@ -582,17 +582,18 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 		case m := <-roundResultsChan:
 			cm := m.Payload().(message.Candidate)
 
+			prevBlock := c.tip.Get()
 			// Check block and certificate for correctness
-			if err := c.verifier.SanityCheckBlock(c.prevBlock, *cm.Block); err != nil {
+			if err := c.verifier.SanityCheckBlock(prevBlock, *cm.Block); err != nil {
 				continue
 			}
 
-			calls, err := c.executor.ValidateStateTransition(c.ctx, c.prevBlock.Txs, c.prevBlock.Header.Height)
+			calls, err := c.executor.ValidateStateTransition(c.ctx, prevBlock.Txs, prevBlock.Header.Height)
 			if err != nil {
 				continue
 			}
 
-			if len(calls) != len(c.prevBlock.Txs) {
+			if len(calls) != len(prevBlock.Txs) {
 				continue
 			}
 
@@ -607,11 +608,6 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 			return cm.Block, cm.Certificate, nil
 		}
 	}
-}
-
-func (c *Chain) provideLastBlock(r rpcbus.Request) {
-	prevBlock := c.prevBlock
-	r.RespChan <- rpcbus.NewResponse(prevBlock, nil)
 }
 
 func (c *Chain) provideLastCertificate(r rpcbus.Request) {
@@ -673,7 +669,8 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 		return &node.SyncProgressResponse{Progress: 0}, nil
 	}
 
-	prevBlockHeight := c.prevBlock.Header.Height
+	prevBlock := c.tip.Get()
+	prevBlockHeight := prevBlock.Header.Height
 	progressPercentage := (float64(prevBlockHeight) / float64(c.highestSeen)) * 100
 
 	// Avoiding strange output when the chain can be ahead of the highest
@@ -712,7 +709,7 @@ func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.G
 		log.Panic(tipErr)
 	}
 
-	c.prevBlock = *tip
+	c.tip.Set(tip)
 	if unrecoverable := c.verifier.PerformSanityCheck(0, SanityCheckHeight, 0); unrecoverable != nil {
 		log.Panic(unrecoverable)
 	}
@@ -732,8 +729,9 @@ func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.G
 }
 
 func (c *Chain) resetState() error {
+	prevBlock := c.tip.Get()
 	c.p = user.NewProvisioners()
-	intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
+	intermediateBlock, err := mockFirstIntermediateBlock(prevBlock.Header)
 	if err != nil {
 		return err
 	}
