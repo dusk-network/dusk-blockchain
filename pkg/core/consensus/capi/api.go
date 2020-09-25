@@ -5,16 +5,17 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/asdine/storm/v3/q"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
+	log      = logrus.WithField("package", "capi")
 )
 
 // StartAPI init consensus API pointers
@@ -61,16 +62,16 @@ func GetProvisionersHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.WithField("height", height).Debug("GetProvisioners")
-	var provisioners *user.Provisioners
-	provisioners, err = GetBuntStoreInstance().FetchProvisioners(uint64(height))
+	log.WithField("height", height).Debug("GetProvisionersHandler")
+	var provisioner ProvisionerJSON
+	err = GetStormDBInstance().Find("ID", uint64(height), &provisioner)
 	if err != nil {
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	var b []byte
-	b, err = json.Marshal(provisioners)
+	b, err = json.Marshal(provisioner)
 	if err != nil {
 		res.WriteHeader(http.StatusNotFound)
 		return
@@ -107,18 +108,15 @@ func GetRoundInfoHandler(res http.ResponseWriter, req *http.Request) {
 	log.
 		WithField("heightBegin", heightBegin).
 		WithField("heightEnd", heightEnd).
-		Debug("GetRoundInfo")
+		Debug("GetRoundInfoHandler")
 
 	var roundInfos []RoundInfoJSON
 
-	count := heightEnd - heightBegin
-	for i := 0; i < count; i++ {
-		//TODO: step should be a argument for query ?
-		roundInfos, err = GetBuntStoreInstance().FetchRoundInfo(uint64(heightBegin+i), 0, 255)
-		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+	//TODO: step should be a argument for query ?
+	err = GetStormDBInstance().DB.Range("Round", heightBegin, heightEnd, &roundInfos)
+	if err != nil {
+		res.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	if len(roundInfos) == 0 {
@@ -148,17 +146,46 @@ func GetEventQueueStatusHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.WithField("height", height).Debug("GetEventQueueStatus")
+	log.WithField("height", height).Debug("GetEventQueueStatusHandler")
 
 	//TODO: stepBegin and stepEnd should be req parameters ?
-	provisioners, err := GetBuntStoreInstance().FetchEventQueue(uint64(height), 0, 255)
+	var eventQueueList []EventQueueJSON
+	err = GetStormDBInstance().DB.Select(q.Gte("Round", uint64(height)), q.Lte("Round", uint64(height))).Find(&eventQueueList)
 	if err != nil {
+		log.WithError(err).Error("could not execute query GetEventQueueStatusHandler")
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	var b []byte
-	b, err = json.Marshal(provisioners)
+	b, err = json.Marshal(eventQueueList)
+	if err != nil {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	_, _ = res.Write(b)
+}
+
+// GetP2PLogsHandler will return PeerJSON json
+func GetP2PLogsHandler(res http.ResponseWriter, req *http.Request) {
+	typeStr := req.URL.Query().Get("type")
+	if typeStr == "" {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	log.WithField("typeStr", typeStr).Debug("GetP2PLogsHandler")
+
+	var peerList []PeerJSON
+	err := GetStormDBInstance().DB.Find("Type", typeStr, &peerList)
+	if err != nil {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var b []byte
+	b, err = json.Marshal(peerList)
 	if err != nil {
 		res.WriteHeader(http.StatusNotFound)
 		return

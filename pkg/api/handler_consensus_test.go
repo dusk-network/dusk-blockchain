@@ -1,17 +1,17 @@
 package api
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/asdine/storm/v3/q"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 
 	"github.com/drewolson/testflight"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,10 +79,38 @@ func TestConsensusAPIProvisioners(t *testing.T) {
 
 	provisioners, _ := consensus.MockProvisioners(5)
 
-	err = apiServer.store.StoreProvisioners(provisioners, 1)
+	var members []*capi.Member
+	for _, v := range provisioners.Members {
+		var stakes []capi.Stake
+
+		for _, s := range v.Stakes {
+			stake := capi.Stake{
+				Amount:      s.Amount,
+				StartHeight: s.StartHeight,
+				EndHeight:   s.EndHeight,
+			}
+			stakes = append(stakes, stake)
+		}
+
+		member := capi.Member{
+			PublicKeyBLS: v.PublicKeyBLS,
+			Stakes:       stakes,
+		}
+
+		members = append(members, &member)
+	}
+
+	provisioner := capi.ProvisionerJSON{
+		ID:      1,
+		Set:     provisioners.Set,
+		Members: members,
+	}
+
+	err = apiServer.store.Save(&provisioner)
 	require.Nil(t, err)
 
-	provisioners, err = apiServer.store.FetchProvisioners(1)
+	var provisionerJSON capi.ProvisionerJSON
+	err = apiServer.store.Find("ID", uint64(1), &provisionerJSON)
 	require.Nil(t, err)
 	require.NotNil(t, provisioners)
 
@@ -109,14 +137,21 @@ func TestConsensusAPIRoundInfo(t *testing.T) {
 	apiServer, err := NewHTTPServer(nil, nil)
 	require.Nil(t, err)
 
-	for i := 0; i < 5; i++ {
+	for i := 1; i < 6; i++ {
 
 		// steps array
 		for j := 0; j < 5; j++ {
-			err = apiServer.store.StoreRoundInfo(uint64(i), uint8(j), "StopConsensus", "")
+			roundInfo := capi.RoundInfoJSON{
+				Round:  uint64(i),
+				Step:   uint8(j),
+				Method: "StopConsensus",
+				Name:   "",
+			}
+			err = apiServer.store.Save(&roundInfo)
 			require.Nil(t, err)
 
-			roundInfo, err := apiServer.store.FetchRoundInfo(uint64(i), 0, 5)
+			var roundInfoArr []capi.RoundInfoJSON
+			err := apiServer.store.DB.Select(q.Gte("ID", uint64(0)), q.Lte("ID", 5)).Find(&roundInfoArr)
 			require.Nil(t, err)
 			require.NotNil(t, roundInfo)
 		}
@@ -125,11 +160,16 @@ func TestConsensusAPIRoundInfo(t *testing.T) {
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
 
 		for i := 0; i < 5; i++ {
-			targetURL := fmt.Sprintf("/consensus/roundinfo?height_begin=%d&height_end=5", i)
+			targetURL := fmt.Sprintf("/consensus/roundinfo?height_begin=%d&height_end=6", i)
 			response := r.Get(targetURL)
 			require.NotNil(t, response)
 
 			require.NotEmpty(t, response.RawBody)
+
+			require.True(t, len(response.RawBody) > 50)
+
+			body := string(response.RawBody)
+			fmt.Println("roundinfo body", body)
 		}
 	})
 }
@@ -147,24 +187,29 @@ func TestConsensusAPIEventStatus(t *testing.T) {
 	apiServer, err := NewHTTPServer(nil, nil)
 	require.Nil(t, err)
 
-	for i := 0; i < 5; i++ {
+	for i := 1; i < 6; i++ {
 
 		// steps array
 		for j := 0; j < 5; j++ {
-			msg := message.New(topics.Initialization, bytes.Buffer{})
-			err = apiServer.store.StoreEventQueue(uint64(i), uint8(j), msg)
+			eventQueue := capi.EventQueueJSON{
+				Round:     uint64(i),
+				Step:      uint8(j),
+				UpdatedAt: time.Now(),
+			}
+			err = apiServer.store.Save(&eventQueue)
 			require.Nil(t, err)
 
-			roundInfo, err := apiServer.store.FetchEventQueue(uint64(i), 0, 5)
+			var eventQueueList []capi.EventQueueJSON
+			err := apiServer.store.DB.Select(q.Gte("Round", uint64(0)), q.Lte("Round", 5)).Find(&eventQueueList)
 			require.Nil(t, err)
-			require.NotNil(t, roundInfo)
+			require.NotNil(t, eventQueueList)
 		}
 
 	}
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
 
-		for i := 0; i < 5; i++ {
+		for i := 1; i < 6; i++ {
 			targetURL := fmt.Sprintf("/consensus/eventqueuestatus?height=%d", i)
 			response := r.Get(targetURL)
 			require.NotNil(t, response)
@@ -174,6 +219,96 @@ func TestConsensusAPIEventStatus(t *testing.T) {
 			body := response.Body
 			fmt.Println(body)
 		}
+
+	})
+}
+
+func TestP2PLogsReader(t *testing.T) {
+
+	//setup viper timeout
+	cwd, err := os.Getwd()
+	require.Nil(t, err)
+
+	r, err := cfg.LoadFromFile(cwd + "/../../dusk.toml")
+	require.Nil(t, err)
+	cfg.Mock(&r)
+
+	apiServer, err := NewHTTPServer(nil, nil)
+	require.Nil(t, err)
+
+	// steps array
+	for j := 0; j < 5; j++ {
+		peerJSON := capi.PeerJSON{
+			Address:  fmt.Sprintf("127.0.0.1:7485%d", j),
+			Type:     "Reader",
+			Method:   "Accept",
+			LastSeen: time.Now(),
+		}
+		err = apiServer.store.Save(&peerJSON)
+		require.Nil(t, err)
+
+		var peerList []capi.PeerJSON
+		err := apiServer.store.DB.Find("Type", "Reader", &peerList)
+		require.Nil(t, err)
+		require.NotNil(t, peerList)
+	}
+
+	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
+
+		targetURL := "/p2p/logs?type=Reader"
+		response := r.Get(targetURL)
+		require.NotNil(t, response)
+		require.NotEmpty(t, response.RawBody)
+
+		body := string(response.RawBody)
+		fmt.Println(body)
+
+		require.True(t, len(body) > 100)
+
+	})
+}
+
+func TestP2PLogsWriter(t *testing.T) {
+
+	//setup viper timeout
+	cwd, err := os.Getwd()
+	require.Nil(t, err)
+
+	r, err := cfg.LoadFromFile(cwd + "/../../dusk.toml")
+	require.Nil(t, err)
+	cfg.Mock(&r)
+
+	apiServer, err := NewHTTPServer(nil, nil)
+	require.Nil(t, err)
+
+	// steps array
+	for j := 0; j < 5; j++ {
+		peerJSON := capi.PeerJSON{
+			Address:  fmt.Sprintf("127.0.0.1:7485%d", j),
+			Type:     "Writer",
+			Method:   "Accept",
+			LastSeen: time.Now(),
+		}
+		err = apiServer.store.Save(&peerJSON)
+		require.Nil(t, err)
+
+		var peerList []capi.PeerJSON
+		err := apiServer.store.DB.Find("Type", "Writer", &peerList)
+		require.Nil(t, err)
+		require.NotNil(t, peerList)
+	}
+
+	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
+
+		targetURL := "/p2p/logs?type=Writer"
+		response := r.Get(targetURL)
+		require.NotNil(t, response)
+		require.NotEmpty(t, response.RawBody)
+
+		body := string(response.RawBody)
+		fmt.Println(body)
+
+		require.True(t, len(body) > 100)
 
 	})
 }

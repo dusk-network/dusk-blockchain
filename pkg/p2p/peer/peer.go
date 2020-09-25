@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -155,6 +158,23 @@ func (w *Writer) Connect() error {
 		return err
 	}
 
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := w.Addr()
+			peerJSON := capi.PeerJSON{
+				Address:  addr,
+				Type:     "Writer",
+				Method:   "Connect",
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peer into StormDB")
+			}
+		}()
+	}
+
 	return nil
 }
 
@@ -163,6 +183,23 @@ func (p *Reader) Accept() error {
 	if err := p.Handshake(); err != nil {
 		_ = p.Conn.Close()
 		return err
+	}
+
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := p.Addr()
+			peerJSON := capi.PeerJSON{
+				Address:  addr,
+				Type:     "Reader",
+				Method:   "Accept",
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peer into StormDB")
+			}
+		}()
 	}
 
 	return nil
@@ -187,6 +224,24 @@ func (w *Writer) onDisconnect() {
 	log.WithField("address", w.Connection.RemoteAddr().String()).Infof("Connection terminated")
 	_ = w.Conn.Close()
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
+
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := w.Addr()
+			peerJSON := capi.PeerJSON{
+				Address:  addr,
+				Type:     "Writer",
+				Method:   "onDisconnect",
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peer into StormDB")
+			}
+		}()
+	}
+
 }
 
 func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
@@ -255,7 +310,7 @@ func (p *Reader) readLoop() {
 
 		message, cs, err := checksum.Extract(b)
 		if err != nil {
-			l.WithError(err).Warnln("error reading message")
+			l.WithError(err).Warnln("error reading Extract message")
 			return
 		}
 
@@ -283,6 +338,7 @@ func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
 		for {
 			select {
 			case <-t.C:
+				// TODO: why not check err returned ?
 				_ = p.Connection.keepAlive()
 			case <-quitChan:
 				t.Stop()
