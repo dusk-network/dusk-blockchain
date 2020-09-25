@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net"
@@ -21,8 +22,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
-var readWriteTimeout = 60 * time.Second // Max idle time for a peer
-var keepAliveTime = 30 * time.Second    // Send keepalive message after inactivity for this amount of time
+var maxTimeCollecting = float64(10 * 1000) // Max time to collect a wire message in ms
+var readWriteTimeout = 60 * time.Second    // Max idle time for a peer
+var keepAliveTime = 30 * time.Second       // Send keepalive message after inactivity for this amount of time
 
 var l = log.WithField("process", "peer")
 
@@ -266,10 +268,10 @@ func (p *Reader) readLoop() {
 
 		// TODO: error here should be checked in order to decrease reputation
 		// or blacklist spammers
-		err = p.router.Collect(message)
-		if err != nil {
-			log.WithError(err).Errorln("error routing message")
-		}
+		startTime := time.Now().UnixNano()
+		category, err := p.router.Collect(message)
+
+		traceWireMessage(cs, category, startTime, len(message), err)
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)
@@ -322,4 +324,32 @@ func (c *Connection) Write(b []byte) (int, error) {
 // Addr returns the peer's address as a string.
 func (c *Connection) Addr() string {
 	return c.Conn.RemoteAddr().String()
+}
+
+// traceWireMessage prints metadata of the wire message being collected
+// format msg_checksum, msg_length, msg_category, duration of collecting by router
+func traceWireMessage(cs []byte, category topics.Topic, startTime int64, len int, err error) {
+
+	duration := float64(time.Now().UnixNano()-startTime) / 1000000
+
+	checksum := hex.EncodeToString(cs)
+	tl := l.WithField("cs", checksum).
+		WithField("len", len).
+		WithField("topic", category).
+		WithField("ms", duration)
+
+	label := "message routing"
+
+	if err == nil {
+		tl.Debug(label)
+	} else {
+		tl.WithError(err).Error(label)
+	}
+
+	// TODO: dump the entire message if Trace level
+
+	// Raise a red flag if collecting consumes too much time (more than 10sec)
+	if duration > maxTimeCollecting {
+		tl.WithField("cs", checksum).Warnf("%s too slow", label)
+	}
 }
