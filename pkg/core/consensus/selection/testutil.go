@@ -1,5 +1,6 @@
 package selection
 
+/*
 import (
 	"context"
 	"sync"
@@ -150,3 +151,4 @@ func (h *Helper) SendBatch(hash []byte) {
 func (h *Helper) SetHandler(handler Handler) {
 	h.Selector.handler = handler
 }
+*/

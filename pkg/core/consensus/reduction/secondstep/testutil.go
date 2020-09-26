@@ -1,5 +1,6 @@
 package secondstep
 
+/*
 import (
 	"time"
 
@@ -55,3 +56,4 @@ func Kickstart(nr int, timeOut time.Duration) (*Helper, []byte) {
 	hash, _ := crypto.RandEntropy(32)
 	return h, hash
 }
+*/

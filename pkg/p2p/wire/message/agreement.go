@@ -38,7 +38,7 @@ type (
 	// external communications and therefore it does not have a
 	// Marshal/Unmarshal methods associated
 	StepVotesMsg struct {
-		hdr header.Header
+		header.Header
 		StepVotes
 	}
 
@@ -100,9 +100,10 @@ func (a Agreement) Copy() payload.Safe {
 }
 
 // NewStepVotesMsg creates a StepVotesMsg
+// Deprecated
 func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) StepVotesMsg {
 	return StepVotesMsg{
-		hdr: header.Header{
+		Header: header.Header{
 			Step:      sv.Step,
 			Round:     round,
 			BlockHash: hash,
@@ -130,17 +131,17 @@ func (s StepVotesMsg) Copy() payload.Safe {
 		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes())
 	}
 
-	hdrCopy := s.hdr.Copy()
+	hdrCopy := s.Header.Copy()
 	if hdrCopy == nil {
 		return StepVotesMsg{
 			//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
-			hdr:       NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes()).hdr,
+			Header:    NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes()).Header,
 			StepVotes: *sv,
 		}
 	}
 
 	cpy := StepVotesMsg{
-		hdr:       s.hdr.Copy().(header.Header),
+		Header:    s.Header.Copy().(header.Header),
 		StepVotes: *sv,
 	}
 
@@ -150,7 +151,7 @@ func (s StepVotesMsg) Copy() payload.Safe {
 // State returns the Header without information about Sender (as this is only
 // for internal communications)
 func (s StepVotesMsg) State() header.Header {
-	return s.hdr
+	return s.Header
 }
 
 // IsEmpty returns whether the StepVotesMsg represents a failed convergence

@@ -1,5 +1,6 @@
 package firststep
 
+/*
 import (
 	"bytes"
 	"errors"
@@ -153,3 +154,4 @@ func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisi
 	hlp.SendBatch(hash)
 	return hlp, hash
 }
+*/

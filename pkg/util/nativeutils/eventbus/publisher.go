@@ -16,6 +16,9 @@ type Publisher interface {
 // (i.e. in the Gossip case)
 // Publishing is a fire and forget. If there is no listener for a topic, the
 // messages are lost
+// FIXME: Publish should fail fast and return one error. Since the code is largely
+// asynchronous, we don't expect errors and if they happen, this should be
+// reported asap
 func (bus *EventBus) Publish(topic topics.Topic, m message.Message) (errorList []error) {
 	//logEB.WithFields(logrus.Fields{
 	//	"topic":    topic,

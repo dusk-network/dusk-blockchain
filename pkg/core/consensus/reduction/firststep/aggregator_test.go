@@ -1,5 +1,7 @@
 package firststep
 
+/*
+
 import (
 	"testing"
 	"time"
@@ -77,3 +79,4 @@ func TestCandidateNotFound(t *testing.T) {
 	assert.Equal(t, emptyHash[:], m.Hash)
 	assert.Equal(t, 0, len(m.Sv))
 }
+*/

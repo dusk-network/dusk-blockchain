@@ -10,9 +10,11 @@ type Multicaster interface {
 	SubscribeDefault(Listener) uint32
 }
 
-// AddDefaultTopic adds a topic to the default multiListener
-func (bus *EventBus) AddDefaultTopic(topic topics.Topic) {
-	bus.defaultListener.Add(topic)
+// AddDefaultTopic add topics to the default multiListener
+func (bus *EventBus) AddDefaultTopic(tpcs ...topics.Topic) {
+	for _, tpc := range tpcs {
+		bus.defaultListener.Add(tpc)
+	}
 }
 
 // SubscribeDefault subscribes a Listener to the default multiListener.

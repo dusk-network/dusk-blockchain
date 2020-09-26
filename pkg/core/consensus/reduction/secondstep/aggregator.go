@@ -1,8 +1,6 @@
 package secondstep
 
 import (
-	"sync"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
@@ -15,12 +13,8 @@ import (
 // An aggregator should be instantiated on a per-step basis and is no longer usable
 // after reaching quorum and sending on `haltChan`.
 type aggregator struct {
-	haltChan       chan<- reduction.HaltMsg
-	handler        *reduction.Handler
-	firstStepVotes *message.StepVotes
-	finished       bool
+	handler *reduction.Handler
 
-	lock     sync.RWMutex
 	voteSets map[string]struct {
 		*message.StepVotes
 		sortedset.Cluster
@@ -28,15 +22,10 @@ type aggregator struct {
 }
 
 // newAggregator returns an instantiated aggregator, ready for use.
-func newAggregator(
-	haltChan chan<- reduction.HaltMsg,
-	handler *reduction.Handler,
-	firstStepVotes *message.StepVotes) *aggregator {
+func newAggregator(handler *reduction.Handler) *aggregator {
 
 	return &aggregator{
-		haltChan:       haltChan,
-		handler:        handler,
-		firstStepVotes: firstStepVotes,
+		handler: handler,
 		voteSets: make(map[string]struct {
 			*message.StepVotes
 			sortedset.Cluster
@@ -46,13 +35,7 @@ func newAggregator(
 
 // Collect a Reduction message, and add it's sender public key and signature to the
 // StepVotes/Set kept under the corresponding block hash.
-func (a *aggregator) collectVote(ev message.Reduction) error {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	if a.finished {
-		return nil
-	}
-
+func (a *aggregator) collectVote(ev message.Reduction) (*result, error) {
 	hdr := ev.State()
 	hash := string(hdr.BlockHash)
 	sv, found := a.voteSets[hash]
@@ -68,7 +51,7 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 			WithField("step", hdr.Step).
 			WithField("quorum", sv.Cluster.TotalOccurrences()).
 			Debug("secondstep, StepVotes.Add failed")
-		return err
+		return nil, err
 	}
 
 	votes := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
@@ -82,20 +65,20 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 			WithField("step", hdr.Step).
 			WithField("quorum", sv.Cluster.TotalOccurrences()).
 			Debug("secondstep_quorum_reached")
-		a.finished = true
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
-		a.haltChan <- reduction.HaltMsg{
+		return &result{
 			Hash: hdr.BlockHash,
-			Sv:   []*message.StepVotes{a.firstStepVotes, sv.StepVotes},
-		}
-	} else {
-		lg.
-			WithField("round", hdr.Round).
-			WithField("step", hdr.Step).
-			WithField("quorum", sv.Cluster.TotalOccurrences()).
-			Debug("secondstep_quorum_not_reached")
+			SV:   *sv.StepVotes,
+		}, nil
+
 	}
-	return nil
+
+	lg.
+		WithField("round", hdr.Round).
+		WithField("step", hdr.Step).
+		WithField("quorum", sv.Cluster.TotalOccurrences()).
+		Debug("secondstep_quorum_not_reached")
+	return nil, nil
 }
 
 func (a *aggregator) addBitSet(sv *message.StepVotes, cluster sortedset.Cluster, round uint64, step uint8) {

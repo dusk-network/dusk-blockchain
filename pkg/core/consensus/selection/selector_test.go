@@ -1,5 +1,6 @@
 package selection_test
 
+/*
 import (
 	"bytes"
 	"context"
@@ -129,3 +130,4 @@ func (m *mockHandler) ResetThreshold() {}
 func (m *mockHandler) Priority(first, second message.Score) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }
+*/
