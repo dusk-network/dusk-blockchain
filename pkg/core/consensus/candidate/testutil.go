@@ -1,5 +1,7 @@
 package candidate
 
+/*
+
 import (
 	"bytes"
 	"context"
@@ -144,3 +146,4 @@ func randomScoreEvent() message.ScoreProposal {
 	}
 	return message.MockScoreProposal(hdr)
 }
+*/

@@ -5,13 +5,13 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
+
+var lg = log.WithField("process", "agreement")
 
 // WorkerAmount sets the number of concurrent workers to concurrently verify
 // Agreement messages
@@ -20,8 +20,7 @@ var WorkerAmount = 4
 // Step is the struct holding the state of the Agreement phase which does not
 // change during the consensus loop
 type Step struct {
-	publisher   eventbus.Publisher
-	keys        key.Keys
+	*consensus.Emitter
 	handler     *handler
 	accumulator *Accumulator
 }
@@ -30,8 +29,7 @@ type Step struct {
 func New(p user.Provisioners, e *consensus.Emitter) *Step {
 	handler := NewHandler(e.Keys, p)
 	return &Step{
-		publisher:   e.EventBus,
-		keys:        e.Keys,
+		Emitter:     e,
 		handler:     handler,
 		accumulator: newAccumulator(handler, WorkerAmount),
 	}
@@ -39,7 +37,6 @@ func New(p user.Provisioners, e *consensus.Emitter) *Step {
 
 // Run the agreement step loop
 func Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate, e *consensus.Emitter) error {
-
 	// creating the step for this round
 	s := New(r.P, e)
 
@@ -132,6 +129,6 @@ func (s *Step) sendCertificate(ag message.Agreement) error {
 	}
 	cert := message.NewCertificate(ag, keys)
 	msg := message.New(topics.Certificate, cert)
-	_ = s.publisher.Publish(topics.Certificate, msg)
+	_ = s.EventBus.Publish(topics.Certificate, msg)
 	return nil
 }

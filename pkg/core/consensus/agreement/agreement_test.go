@@ -1,5 +1,7 @@
 package agreement_test
 
+/*
+
 import (
 	"runtime"
 	"testing"
@@ -65,3 +67,4 @@ func TestFinalize(t *testing.T) {
 	// We should have roughly the same amount of goroutines
 	assert.InDelta(t, numGRBefore, numGRAfter, 10.0)
 }
+*/

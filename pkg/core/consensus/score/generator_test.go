@@ -1,5 +1,7 @@
 package score
 
+/*
+
 import (
 	"context"
 	"testing"
@@ -64,3 +66,4 @@ func addBidValues(db database.DB, lockTime uint64) ([]byte, []byte, []byte, erro
 		return t.StoreBidValues(d, k, edPk, lockTime)
 	})
 }
+*/

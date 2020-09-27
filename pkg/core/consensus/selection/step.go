@@ -36,13 +36,14 @@ type Phase struct {
 // New creates and launches the component which responsibility is to validate
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
-func New(next *consensus.Phase, e *consensus.Emitter, timeout time.Duration) *Phase {
+func New(next consensus.Phase, e *consensus.Emitter, timeout time.Duration) *Phase {
 	selector := &Phase{
 		timeout:     timeout,
 		publisher:   e.EventBus,
 		bestEvent:   message.EmptyScore(),
 		provisioner: e.Proxy.Provisioner(),
 		keys:        e.Keys,
+		next:        next,
 	}
 	CUSTOM_SELECTOR_TIMEOUT := os.Getenv("CUSTOM_SELECTOR_TIMEOUT")
 	if CUSTOM_SELECTOR_TIMEOUT != "" {
@@ -63,11 +64,20 @@ func New(next *consensus.Phase, e *consensus.Emitter, timeout time.Duration) *Ph
 	return selector
 }
 
+// Name as dictated by the Phase interface
+func (p *Phase) Name() string {
+	return "selection"
+}
+
+// Fn returns the Phase state function for the next phase, and initializes it
+// with the result from this phase
 func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
 	return p.Run
 }
 
-func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
+// Run executes the logic for this phase
+// In this case the selection listens to new Score/Candidate messages
+func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) (consensus.PhaseFn, error) {
 	p.handler = NewScoreHandler(p.provisioner)
 	timeoutChan := time.After(p.timeout)
 	for _, ev := range queue.GetEvents(r.Round, step) {
@@ -85,15 +95,15 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 		case <-timeoutChan:
 			p.endSelection(r.Round, step)
+			return p.next.Fn(nil), nil
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
 				<-timeoutChan
 			}()
-			return nil
+			return nil, nil
 		}
 	}
-	return nil
 }
 
 func (p *Phase) endSelection(round uint64, step uint8) {
@@ -150,7 +160,6 @@ func (p *Phase) collectScore(ctx context.Context, sc message.Score) {
 		}).Debugln("swapping best score")
 
 	p.bestEvent = sc
-	return
 }
 
 // increaseTimeOut increases the timeout after a failed selection

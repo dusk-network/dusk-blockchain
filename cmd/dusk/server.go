@@ -49,7 +49,6 @@ type Server struct {
 	gossip            *processing.Gossip
 	grpcServer        *grpc.Server
 	ruskConn          *grpc.ClientConn
-	cancelMonitor     StopFunc
 	activeConnections map[string]time.Time
 }
 
@@ -173,13 +172,6 @@ func Setup() *Server {
 
 	// TODO: maintainer should be started here
 
-	// Connecting to the log based monitoring system
-	stopFunc, err := LaunchMonitor(eventBus)
-	if err != nil {
-		log.Panic(err)
-	}
-	srv.cancelMonitor = stopFunc
-
 	// Start serving from the gRPC server
 	go func() {
 		conf := cfg.Get().RPC
@@ -262,6 +254,5 @@ func (s *Server) Close() {
 	_ = s.loader.Close(cfg.Get().Database.Driver)
 	s.rpcBus.Close()
 	s.grpcServer.GracefulStop()
-	s.cancelMonitor()
 	_ = s.ruskConn.Close()
 }

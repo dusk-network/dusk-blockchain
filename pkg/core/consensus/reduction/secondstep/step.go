@@ -23,7 +23,7 @@ type result struct {
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
-	e          *consensus.Emitter
+	*consensus.Emitter
 	handler    *reduction.Handler
 	aggregator *aggregator
 
@@ -37,12 +37,21 @@ type Phase struct {
 // New creates and launches the component which responsibility is to reduce the
 // candidates gathered as winner of the selection of all nodes in the committee
 // and reduce them to just one candidate obtaining 64% of the committee vote
-func New(next consensus.Phase, e *consensus.Emitter, timeOut time.Duration) *Phase {
+func New(e *consensus.Emitter, timeOut time.Duration) *Phase {
 	return &Phase{
-		e:       e,
-		next:    next,
+		Emitter: e,
 		timeOut: timeOut,
 	}
+}
+
+// SetNext sets the next step to be returned at the end of this one
+func (p *Phase) SetNext(next consensus.Phase) {
+	p.next = next
+}
+
+// Name as dictated by the Phase interface
+func (p *Phase) Name() string {
+	return "secondstep_reduction"
 }
 
 // Fn passes to this reduction step the best score collected during selection
@@ -58,7 +67,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 		WithField("round", r.Round).
 		WithField("step", step).
 		Trace("starting secondstep reduction")
-	p.handler = reduction.NewHandler(p.e.Keys, r.P)
+	p.handler = reduction.NewHandler(p.Keys, r.P)
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
 		if err := p.sendReduction(r.Round, step, p.firstStepVotesMsg.BlockHash); err != nil {
@@ -72,9 +81,13 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	p.aggregator = newAggregator(p.handler)
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Reduction {
+			rMsg := ev.Payload().(message.Reduction)
+			if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
+				continue
+			}
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
-			svm, err := p.collectReduction(ev.Payload().(message.Reduction), r.Round, step)
+			svm, err := p.collectReduction(rMsg, r.Round, step)
 			if err != nil {
 				return nil, err
 			}
@@ -96,7 +109,11 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 		select {
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
-				svm, err := p.collectReduction(ev.Payload().(message.Reduction), r.Round, step)
+				rMsg := ev.Payload().(message.Reduction)
+				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
+					continue
+				}
+				svm, err := p.collectReduction(rMsg, r.Round, step)
 				if err != nil {
 					return nil, err
 				}
@@ -137,18 +154,17 @@ func (p *Phase) sendReduction(round uint64, step uint8, hash []byte) error {
 		Round:     round,
 		Step:      step,
 		BlockHash: hash,
-		PubKeyBLS: p.e.Keys.BLSPubKeyBytes,
+		PubKeyBLS: p.Keys.BLSPubKeyBytes,
 	}
 
-	sig, err := p.e.Sign(hdr)
+	sig, err := p.Sign(hdr)
 	if err != nil {
 		return err
 	}
 
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
-	msg := message.New(topics.Reduction, *red)
-	_ = p.e.EventBus.Publish(topics.Gossip, msg)
+	_ = p.Gossip(message.New(topics.Reduction, *red))
 	return nil
 }
 
@@ -183,7 +199,7 @@ func (p *Phase) createStepVoteMessage(r *result, round uint64, step uint8) *mess
 			Step:      step,
 			Round:     round,
 			BlockHash: r.Hash,
-			PubKeyBLS: p.e.Keys.BLSPubKeyBytes,
+			PubKeyBLS: p.Keys.BLSPubKeyBytes,
 		},
 		StepVotes: r.SV,
 	}
@@ -193,11 +209,11 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 	hdr := header.Header{
 		Round:     round,
 		Step:      step,
-		PubKeyBLS: p.e.Keys.BLSPubKeyBytes,
+		PubKeyBLS: p.Keys.BLSPubKeyBytes,
 		BlockHash: svm.BlockHash,
 	}
 
-	sig, err := p.e.Sign(hdr)
+	sig, err := p.Sign(hdr)
 	if err != nil {
 		return err
 	}
@@ -213,9 +229,7 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 		&svm.StepVotes,
 	}
 
-	msg := message.New(topics.Agreement, *ev)
-	_ = p.e.EventBus.Publish(topics.Gossip, msg)
-	return nil
+	return p.Gossip(message.New(topics.Agreement, *ev))
 }
 
 func stepVotesAreValid(svs ...*message.StepVotesMsg) bool {

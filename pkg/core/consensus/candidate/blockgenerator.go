@@ -8,7 +8,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
@@ -17,8 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
 )
-
-var _ consensus.Component = (*Generator)(nil)
 
 var lg = log.WithField("process", "candidate generator")
 
@@ -29,92 +26,30 @@ const MaxTxSetSize = 150000
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator struct {
-	publisher eventbus.Publisher
+	*consensus.Emitter
 	genPubKey *transactions.PublicKey
-	rpcBus    *rpcbus.RPCBus
-	signer    consensus.Signer
-
-	roundInfo      consensus.RoundUpdate
-	scoreEventID   uint32
-	scoreEventName string
-
-	ctx context.Context
 }
 
-// NewComponent returns an uninitialized candidate generator.
-func NewComponent(ctx context.Context, publisher eventbus.Publisher, genPubKey *transactions.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
+// New creates a new block generator
+func New(e *consensus.Emitter, genPubKey *transactions.PublicKey) *Generator {
 	return &Generator{
-		publisher: publisher,
-		rpcBus:    rpcBus,
+		Emitter:   e,
 		genPubKey: genPubKey,
-		ctx:       ctx,
 	}
 }
 
-// Initialize the Generator, by populating the fields needed to generate candidate
-// blocks, and returns a Listener for ScoreEvents.
-// Implements consensus.Component.
-func (bg *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
-	bg.roundInfo = ru
-	bg.signer = signer
-
-	scoreEventListener := consensus.TopicListener{
-		Topic:    topics.ScoreEvent,
-		Listener: consensus.NewSimpleListener(bg.Collect, consensus.LowPriority, false),
-	}
-	bg.scoreEventID = scoreEventListener.Listener.ID()
-	bg.scoreEventName = "candidate/Generator"
-
-	return []consensus.TopicListener{scoreEventListener}
-}
-
-// ID returns the listener ID of the Generator.
-// Implements consensus.Component.
-func (bg *Generator) ID() uint32 {
-	return bg.scoreEventID
-}
-
-// Name returns the listener Name of the Generator.
-// Implements consensus.Component.
-func (bg *Generator) Name() string {
-	return bg.scoreEventName
-}
-
-// Finalize implements consensus.Component
-// Implements consensus.Component.
-func (bg *Generator) Finalize() {}
-
-// ScoreFactory is the PacketFactory implementation to let the signer  scores
-type ScoreFactory struct {
-	sp        message.ScoreProposal
-	prevHash  []byte
-	candidate message.Candidate
-}
-
-// Create a score message by setting the right header. It complies with the
-// consensus.PacketFactory interface
-func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus.InternalPacket {
-	hdr := sf.sp.State()
-	if hdr.Round != round || hdr.Step != step {
-		lg.Errorf("mismatch of Header round and step in score creation. ScoreProposal has a different Round and Step (%d, %d) than the Coordinator (%d, %d)", hdr.Round, hdr.Step, round, step)
-	}
-	score := message.NewScore(sf.sp, sender, sf.prevHash, sf.candidate)
-	return *score
-}
-
-// Collect a `ScoreProposal`, which triggers generation of a `Score` and a
-// candidate `block.Block`
+// PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
-func (bg *Generator) Collect(e consensus.InternalPacket) error {
-	sev := e.(message.ScoreProposal)
-
+func (bg *Generator) PropagateBlockAndScore(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) error {
 	log := lg.
 		WithField("round", sev.State().Round).
 		WithField("step", sev.State().Step)
 
 	timeoutGetLastCommittee := time.Duration(config.Get().Timeout.TimeoutGetLastCommittee) * time.Second
-	resp, err := bg.rpcBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), timeoutGetLastCommittee)
+
+	// XXX: PRCBus must be able to operate on context cancelation
+	resp, err := bg.RPCBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), timeoutGetLastCommittee)
 	if err != nil {
 		log.
 			WithError(err).
@@ -123,7 +58,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	}
 
 	keys := resp.([][]byte)
-	blk, err := bg.Generate(sev, keys)
+	blk, err := bg.Generate(sev, keys, r)
 	if err != nil {
 		log.
 			WithError(err).
@@ -133,7 +68,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 
 	// Create candidate message
 	timeoutGetLastCertificate := time.Duration(config.Get().Timeout.TimeoutGetLastCertificate) * time.Second
-	resp, err = bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), timeoutGetLastCertificate)
+	resp, err = bg.RPCBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), timeoutGetLastCertificate)
 	if err != nil {
 		log.
 			WithError(err).
@@ -154,27 +89,24 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
 	candidate := message.MakeCandidate(blk, cert)
-
-	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, candidate}
-	score := bg.signer.Compose(scoreFactory)
+	score := message.NewScore(sev, bg.Keys.BLSPubKeyBytes, r.Hash, candidate)
 
 	log.
-		WithField("step", score.State().Step).
-		WithField("round", score.State().Round).
+		WithField("step", step).
+		WithField("round", r.Round).
 		Debugln("sending score")
 
 	msg := message.New(topics.Score, score)
-	if err := bg.signer.Gossip(msg, bg.ID()); err != nil {
+	if err := bg.Gossip(msg); err != nil {
 		return err
 	}
 
 	return nil
-
 }
 
 // Generate a Block
-func (bg *Generator) Generate(sev message.ScoreProposal, keys [][]byte) (*block.Block, error) {
-	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof, sev.Score, bg.roundInfo.Hash, keys)
+func (bg *Generator) Generate(sev message.ScoreProposal, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
+	return bg.GenerateBlock(r.Round, sev.Seed, sev.Proof, sev.Score, r.Hash, keys)
 }
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
@@ -228,23 +160,20 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 	txs := make([]transactions.ContractCall, 0)
 
 	// Retrieve and append the verified transactions from Mempool
-	if bg.rpcBus != nil {
-
-		// Max transaction size param
-		param := new(bytes.Buffer)
-		if err := encoding.WriteUint32LE(param, uint32(MaxTxSetSize)); err != nil {
-			return nil, err
-		}
-
-		timeoutGetMempoolTXsBySize := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXsBySize) * time.Second
-		resp, err := bg.rpcBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), timeoutGetMempoolTXsBySize)
-		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
-		// already accepted in the chain.
-		if err != nil {
-			return nil, err
-		}
-		txs = append(txs, resp.([]transactions.ContractCall)...)
+	// Max transaction size param
+	param := new(bytes.Buffer)
+	if err := encoding.WriteUint32LE(param, uint32(MaxTxSetSize)); err != nil {
+		return nil, err
 	}
+
+	timeoutGetMempoolTXsBySize := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXsBySize) * time.Second
+	resp, err := bg.RPCBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), timeoutGetMempoolTXsBySize)
+	// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
+	// already accepted in the chain.
+	if err != nil {
+		return nil, err
+	}
+	txs = append(txs, resp.([]transactions.ContractCall)...)
 
 	// Construct and append coinbase Tx to reward the generator
 	coinbaseTx := transactions.NewDistribute(config.GeneratorReward, keys, *bg.genPubKey)

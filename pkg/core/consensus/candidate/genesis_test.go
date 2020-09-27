@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -39,7 +40,7 @@ func TestGenerateGenesis(t *testing.T) {
 	}
 
 	// Generate a new genesis block with new wallet pubkey
-	genesisHex, err := GenerateGenesisBlock(rpcBus, publicKey)
+	genesisHex, err := GenerateGenesisBlock(&consensus.Emitter{RPCBus: rpcBus}, publicKey)
 	if err != nil {
 		t.Fatalf("expecting valid genesis block: %s", err.Error())
 	}

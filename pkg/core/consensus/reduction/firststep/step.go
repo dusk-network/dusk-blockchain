@@ -23,7 +23,8 @@ type result struct {
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
-	e          *consensus.Emitter
+	*consensus.Emitter
+
 	handler    *reduction.Handler
 	aggregator *aggregator
 
@@ -39,10 +40,15 @@ type Phase struct {
 // and reduce them to just one candidate obtaining 64% of the committee vote
 func New(next consensus.Phase, e *consensus.Emitter, timeOut time.Duration) *Phase {
 	return &Phase{
-		e:       e,
+		Emitter: e,
 		next:    next,
 		timeOut: timeOut,
 	}
+}
+
+// Name as dictated by the Phase interface
+func (p *Phase) Name() string {
+	return "firststep_reduction"
 }
 
 // Fn passes to this reduction step the best score collected during selection
@@ -54,7 +60,8 @@ func (p *Phase) Fn(re consensus.InternalPacket) consensus.PhaseFn {
 // Run the first reduction step until either there is a timeout, we reach 64%
 // of votes, or we experience an unrecoverable error
 func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) (consensus.PhaseFn, error) {
-	p.handler = reduction.NewHandler(p.e.Keys, r.P)
+	p.handler = reduction.NewHandler(p.Keys, r.P)
+
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
 		if err := p.sendReduction(r.Round, step, p.selectionResult.State().BlockHash); err != nil {
@@ -65,18 +72,28 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 
 	timeoutChan := time.After(p.timeOut)
-	p.aggregator = newAggregator(p.handler, p.e.RPCBus)
+	p.aggregator = newAggregator(p.handler, p.RPCBus)
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Reduction {
+			rMsg := ev.Payload().(message.Reduction)
+
+			// if the sender is no member we discard the message
+			// XXX: the fact that a message from a non-committee member can end
+			// up in the Queue, is a vulnerability since an attacker could
+			// flood the queue with future non-committee reductions
+			if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
+				continue
+			}
+
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
-			sv, err := p.collectReduction(ev.Payload().(message.Reduction), r.Round, step) 
+			sv, err := p.collectReduction(rMsg, r.Round, step)
 			if err != nil {
 				return nil, err
 			}
 
 			if sv != nil {
-				return p.next.Fn(message.New(topics.StepVotes, *sv)), nil
+				return p.next.Fn(*sv), nil
 			}
 		}
 	}
@@ -85,7 +102,12 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 		select {
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, queue) {
-				sv, err := p.collectReduction(ev.Payload().(message.Reduction), r.Round, step)
+				rMsg := ev.Payload().(message.Reduction)
+				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
+					continue
+				}
+
+				sv, err := p.collectReduction(rMsg, r.Round, step)
 				if err != nil {
 					return nil, err
 				}
@@ -95,14 +117,14 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 					go func() {
 						<-timeoutChan
 					}()
-					return p.next.Fn(message.New(topics.StepVotes, *sv)), nil
+					return p.next.Fn(*sv), nil
 				}
 			}
 
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
 			sv := p.createStepVoteMessage(&result{emptyHash[:], emptyStepVotes}, r.Round, step)
-			return p.next.Fn(message.New(topics.StepVotes, *sv)), nil
+			return p.next.Fn(*sv), nil
 
 		case <-ctx.Done():
 			// preventing timeout leakage
@@ -112,8 +134,6 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			return nil, nil
 		}
 	}
-
-	return nil, nil
 }
 
 func (p *Phase) sendReduction(round uint64, step uint8, hash []byte) error {
@@ -121,10 +141,10 @@ func (p *Phase) sendReduction(round uint64, step uint8, hash []byte) error {
 		Round:     round,
 		Step:      step,
 		BlockHash: hash,
-		PubKeyBLS: p.e.Keys.BLSPubKeyBytes,
+		PubKeyBLS: p.Keys.BLSPubKeyBytes,
 	}
 
-	sig, err := p.e.Sign(hdr)
+	sig, err := p.Sign(hdr)
 	if err != nil {
 		return err
 	}
@@ -132,8 +152,7 @@ func (p *Phase) sendReduction(round uint64, step uint8, hash []byte) error {
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
 	msg := message.New(topics.Reduction, *red)
-	_ = p.e.EventBus.Publish(topics.Gossip, msg)
-	return nil
+	return p.Gossip(msg)
 }
 
 func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) (*message.StepVotesMsg, error) {
@@ -179,7 +198,7 @@ func (p *Phase) createStepVoteMessage(r *result, round uint64, step uint8) *mess
 			Step:      step,
 			Round:     round,
 			BlockHash: r.Hash,
-			PubKeyBLS: p.e.Keys.BLSPubKeyBytes,
+			PubKeyBLS: p.Keys.BLSPubKeyBytes,
 		},
 		StepVotes: r.SV,
 	}

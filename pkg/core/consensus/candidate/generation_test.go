@@ -1,5 +1,6 @@
 package candidate_test
 
+/*
 import (
 	"testing"
 
@@ -64,3 +65,4 @@ func provideCommittee(rb *rpcbus.RPCBus) error {
 	}()
 	return nil
 }
+*/

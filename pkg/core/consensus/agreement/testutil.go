@@ -1,5 +1,6 @@
 package agreement
 
+/*
 import (
 	"sync"
 
@@ -104,3 +105,4 @@ func ProduceWinningHash(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
 	hlp.SendBatch(hash)
 	return hlp, hash
 }
+*/
