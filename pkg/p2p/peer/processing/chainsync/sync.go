@@ -27,6 +27,9 @@ var log = logger.WithFields(logger.Fields{"process": "synchronizer"})
 // rest of the network. It sits between the peer and the chain, as a sort of gateway for
 // incoming blocks. It keeps track of the local chain tip and compares it with each incoming
 // block to make sure we stay in sync with our peers.
+// NB: every peer reader has its own instance of ChainSynchronizer to which it
+// pipes a peer-specific responseChan. Internally, though, the
+// ChainSynchronizer uses a Counter that is accessed globally
 type ChainSynchronizer struct {
 	publisher eventbus.Publisher
 	rpcBus    *rpcbus.RPCBus
@@ -61,10 +64,12 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 	log.WithField("height", height).Debug("Synchronize")
 
 	// Notify `Chain` of our highest seen block
-	if s.getHighestSeen() < height {
-		s.setHighestSeen(height)
+	s.lock.Lock()
+	if s.highestSeen < height {
+		s.highestSeen = height
 		s.publishHighestSeen(height)
 	}
+	s.lock.Unlock()
 
 	lastBlk, err := s.getLastBlock()
 	if err != nil {
@@ -143,19 +148,6 @@ func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
 	}
 	blk := resp.(block.Block)
 	return blk, nil
-}
-
-func (s *ChainSynchronizer) getHighestSeen() uint64 {
-	s.lock.RLock()
-	height := s.highestSeen
-	s.lock.RUnlock()
-	return height
-}
-
-func (s *ChainSynchronizer) setHighestSeen(height uint64) {
-	s.lock.Lock()
-	s.highestSeen = height
-	s.lock.Unlock()
 }
 
 func (s *ChainSynchronizer) publishHighestSeen(height uint64) {

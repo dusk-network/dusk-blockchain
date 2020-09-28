@@ -8,3 +8,8 @@ func LogPublishErrors(msg string, errorList []error) {
 		log.WithError(err).Debug(msg)
 	}
 }
+
+// LogError logs a single error it uses LogPublishErrors in the background
+func LogError(msg string, err error) {
+	LogPublishErrors(msg, []error{err})
+}
