@@ -1,6 +1,7 @@
 module github.com/dusk-network/dusk-blockchain
 
 require (
+	github.com/asdine/storm/v3 v3.2.1
 	github.com/bwesterb/go-ristretto v1.1.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/didip/tollbooth v4.0.2+incompatible

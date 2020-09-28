@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
@@ -253,14 +254,19 @@ func Start(eventBus *eventbus.EventBus, keys key.Keys, factories ...ComponentFac
 func (c *Coordinator) StopConsensus(m message.Message) error {
 	if config.Get().API.Enabled {
 		go func() {
-			store := capi.GetBuntStoreInstance()
-			err := store.StoreRoundInfo(c.round, c.step, "StopConsensus", "")
+			store := capi.GetStormDBInstance()
+			roundInfo := capi.RoundInfoJSON{
+				Round:     c.Round(),
+				Step:      c.Step(),
+				Method:    "StopConsensus",
+				Name:      "",
+				UpdatedAt: time.Now(),
+			}
+			err := store.Save(&roundInfo)
 			if err != nil {
 				lg.
-					WithFields(log.Fields{
-						"round": c.Round,
-						"step":  c.Step,
-					}).
+					WithField("round", roundInfo.Round).
+					WithField("step", roundInfo.Step).
 					WithError(err).
 					Error("could not save StoreRoundInfo on api db")
 			}
@@ -441,8 +447,14 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 		//TODO: should this be moved into eventqueue ?
 		if config.Get().API.Enabled {
 			go func() {
-				store := capi.GetBuntStoreInstance()
-				err := store.StoreEventQueue(hdr.Round, hdr.Step, m)
+				store := capi.GetStormDBInstance()
+				eventQueue := capi.EventQueueJSON{
+					Round: hdr.Round,
+					Step:  hdr.Step,
+					//Message:   &m,
+					UpdatedAt: time.Now(),
+				}
+				err := store.Save(&eventQueue)
 				if err != nil {
 					lg.
 						WithFields(log.Fields{
@@ -496,14 +508,18 @@ func (c *Coordinator) Forward(id uint32) uint8 {
 
 	if config.Get().API.Enabled {
 		go func() {
-			store := capi.GetBuntStoreInstance()
-			err := store.StoreRoundInfo(c.round, c.step, "Forward", name)
+			store := capi.GetStormDBInstance()
+			roundInfo := capi.RoundInfoJSON{
+				Round:  c.Round(),
+				Step:   c.Step(),
+				Method: "Forward",
+				Name:   name,
+			}
+			err := store.Save(&roundInfo)
 			if err != nil {
 				lg.
-					WithFields(log.Fields{
-						"round": c.Round(),
-						"step":  c.Step(),
-					}).
+					WithField("round", roundInfo.Round).
+					WithField("step", roundInfo.Step).
 					WithError(err).
 					Error("could not save StoreRoundInfo on api db")
 			}

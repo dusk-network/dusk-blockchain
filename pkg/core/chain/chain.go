@@ -360,8 +360,34 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 
 	if config.Get().API.Enabled {
 		go func() {
-			store := capi.GetBuntStoreInstance()
-			err := store.StoreProvisioners(c.p, blk.Header.Height)
+			store := capi.GetStormDBInstance()
+			var members []*capi.Member
+			for _, v := range c.p.Members {
+				var stakes []capi.Stake
+
+				for _, s := range v.Stakes {
+					stake := capi.Stake{
+						Amount:      s.Amount,
+						StartHeight: s.StartHeight,
+						EndHeight:   s.EndHeight,
+					}
+					stakes = append(stakes, stake)
+				}
+
+				member := capi.Member{
+					PublicKeyBLS: v.PublicKeyBLS,
+					Stakes:       stakes,
+				}
+
+				members = append(members, &member)
+			}
+
+			provisioner := capi.ProvisionerJSON{
+				ID:      blk.Header.Height,
+				Set:     c.p.Set,
+				Members: members,
+			}
+			err := store.Save(&provisioner)
 			if err != nil {
 				log.Warn("Could not store provisioners on memoryDB")
 			}
