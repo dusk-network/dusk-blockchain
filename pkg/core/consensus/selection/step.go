@@ -64,11 +64,6 @@ func New(next consensus.Phase, e *consensus.Emitter, timeout time.Duration) *Pha
 	return selector
 }
 
-// Name as dictated by the Phase interface
-func (p *Phase) Name() string {
-	return "selection"
-}
-
 // Fn returns the Phase state function for the next phase, and initializes it
 // with the result from this phase
 func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
@@ -94,8 +89,8 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			}
 
 		case <-timeoutChan:
-			p.endSelection(r.Round, step)
-			return p.next.Fn(nil), nil
+			phase := p.endSelection(r.Round, step)
+			return phase, nil
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
@@ -106,7 +101,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 }
 
-func (p *Phase) endSelection(round uint64, step uint8) {
+func (p *Phase) endSelection(round uint64, step uint8) consensus.PhaseFn {
 
 	defer func() {
 		p.handler.LowerThreshold()
@@ -120,11 +115,10 @@ func (p *Phase) endSelection(round uint64, step uint8) {
 			PubKeyBLS: p.keys.BLSPubKeyBytes,
 			BlockHash: emptyScore[:],
 		}
-		p.next.Fn(message.EmptyScoreProposal(hdr))
-		return
+		return p.next.Fn(message.EmptyScoreProposal(hdr))
 	}
 
-	p.next.Fn(p.bestEvent)
+	return p.next.Fn(p.bestEvent)
 }
 
 func (p *Phase) collectScore(ctx context.Context, sc message.Score) {

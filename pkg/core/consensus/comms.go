@@ -27,7 +27,6 @@ type (
 		Keys        key.Keys
 		PubkeyBuf   bytes.Buffer
 		Proxy       transactions.Proxy
-		PubKey      *transactions.PublicKey
 		TimerLength time.Duration
 	}
 

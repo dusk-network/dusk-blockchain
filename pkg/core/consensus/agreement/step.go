@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
@@ -21,34 +19,36 @@ var WorkerAmount = 4
 // change during the consensus loop
 type Loop struct {
 	*consensus.Emitter
-	handler     *handler
-	accumulator *Accumulator
 }
 
 // New creates a round-specific agreement step
-func New(p user.Provisioners, e *consensus.Emitter) *Loop {
-	handler := NewHandler(e.Keys, p)
+func New(e *consensus.Emitter) *Loop {
 	return &Loop{
-		Emitter:     e,
-		handler:     handler,
-		accumulator: newAccumulator(handler, WorkerAmount),
+		Emitter: e,
 	}
 }
 
+// GetControlFn is a factory method for the ControlFn. It makes it possible for
+// the consensus loop to mock the agreement
+func (s *Loop) GetControlFn() consensus.ControlFn {
+	return s.Run
+}
+
 // Run the agreement step loop
-func Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate, e *consensus.Emitter) error {
-	// creating the step for this round
-	s := New(r.P, e)
+func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) error {
+	// creating accumulator and handler
+	h := NewHandler(s.Keys, r.P)
+	acc := newAccumulator(h, WorkerAmount)
 
 	// deferring queue cleanup at the end of the execution of this round
 	defer func() {
 		roundQueue.Clear(r.Round)
-		s.accumulator.Stop()
+		acc.Stop()
 	}()
 
 	evs := roundQueue.Flush(r.Round)
 	for _, ev := range evs {
-		go s.collectEvent(ev.Payload().(message.Agreement))
+		go collectEvent(h, acc, ev.Payload().(message.Agreement))
 	}
 
 	for {
@@ -56,16 +56,16 @@ func Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan 
 		case m := <-agreementChan:
 			if s.shouldCollectNow(m, r.Round, roundQueue) {
 				msg := m.Payload().(message.Agreement)
-				go s.collectEvent(msg)
+				go collectEvent(h, acc, msg)
 			}
-		case evs := <-s.accumulator.CollectedVotesChan:
+		case evs := <-acc.CollectedVotesChan:
 			lg.
 				WithField("round", r.Round).
 				WithField("step", evs[0].State().Step).
 				Debugln("quorum reached")
 
 			// Send the Agreement to the Certificate Collector within the Chain
-			if err := s.sendCertificate(evs[0]); err != nil {
+			if err := s.sendCertificate(h, evs[0]); err != nil {
 				return err
 			}
 
@@ -109,21 +109,17 @@ func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensu
 	return true
 }
 
-// shouldProcess checks if the sender was in the committee
-func (s *Loop) shouldProcess(hdr header.Header) bool {
-	return !s.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
-}
-
-func (s *Loop) collectEvent(a message.Agreement) {
-	if !s.shouldProcess(a.State()) {
+func collectEvent(h *handler, accumulator *Accumulator, a message.Agreement) {
+	hdr := a.State()
+	if !h.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step) {
 		return
 	}
 
-	s.accumulator.Process(a)
+	accumulator.Process(a)
 }
 
-func (s *Loop) sendCertificate(ag message.Agreement) error {
-	keys, err := s.handler.getVoterKeys(ag)
+func (s *Loop) sendCertificate(h *handler, ag message.Agreement) error {
+	keys, err := h.getVoterKeys(ag)
 	if err != nil {
 		return err
 	}

@@ -41,16 +41,18 @@ type Consensus struct {
 	agreementChan chan message.Message
 	eventChan     chan message.Message
 	score         consensus.Phase
+	agreement     consensus.Controller
 }
 
 // Wire creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing
-func Wire(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *transactions.PublicKey) (scoreStep consensus.Phase, err error) {
+func Wire(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *transactions.PublicKey) (scoreStep consensus.Phase, agreementStep consensus.Controller, err error) {
 	redu2 := secondstep.New(emitter, consensusTimeOut)
 	redu1 := firststep.New(redu2, emitter, consensusTimeOut)
 	sel := selection.New(redu1, emitter, consensusTimeOut)
 	blockGen := candidate.New(emitter, pubKey)
 	scoreStep, err = score.New(sel, emitter, blockGen)
+	agreementStep = agreement.New(emitter)
 	if err != nil {
 		return
 	}
@@ -61,7 +63,7 @@ func Wire(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *tr
 // New creates a new Consensus struct. The legacy StopConsensus and RoundUpdate
 // are now replaced with context cancelation and direct function call operated
 // by the chain component
-func New(e *consensus.Emitter, scr consensus.Phase) *Consensus {
+func New(e *consensus.Emitter, scr consensus.Phase, ag consensus.Controller) *Consensus {
 	// TODO: channel size should be configurable
 	agreementChan := make(chan message.Message, 1000)
 	eventChan := make(chan message.Message, 1000)
@@ -82,6 +84,7 @@ func New(e *consensus.Emitter, scr consensus.Phase) *Consensus {
 		agreementChan: agreementChan,
 		eventChan:     eventChan,
 		score:         scr,
+		agreement:     ag,
 	}
 
 	return c
@@ -105,7 +108,8 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 	// agreements from future rounds and stopped receiving them for the current round
 	// (in which case we should probably re-sync)
 	go func() {
-		aerr := agreement.Run(ctx, c.roundQueue, c.agreementChan, round, c.Emitter)
+		agreementLoop := c.agreement.GetControlFn()
+		aerr := agreementLoop(ctx, c.roundQueue, c.agreementChan, round)
 		// canceling the consensus phase loop when Agreement is done (either
 		// because the parent canceled or because a consensus has been reached)
 		cancel()
@@ -123,6 +127,7 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 			// which probably needs to resync or panic
 			// TODO: errors should be diversified here so to ease the decision
 			// to panic or resync
+			cancel()
 			return err
 		}
 
