@@ -17,18 +17,18 @@ var lg = log.WithField("process", "agreement")
 // Agreement messages
 var WorkerAmount = 4
 
-// Step is the struct holding the state of the Agreement phase which does not
+// Loop is the struct holding the state of the Agreement phase which does not
 // change during the consensus loop
-type Step struct {
+type Loop struct {
 	*consensus.Emitter
 	handler     *handler
 	accumulator *Accumulator
 }
 
 // New creates a round-specific agreement step
-func New(p user.Provisioners, e *consensus.Emitter) *Step {
+func New(p user.Provisioners, e *consensus.Emitter) *Loop {
 	handler := NewHandler(e.Keys, p)
-	return &Step{
+	return &Loop{
 		Emitter:     e,
 		handler:     handler,
 		accumulator: newAccumulator(handler, WorkerAmount),
@@ -81,7 +81,7 @@ func Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan 
 // TODO: consider adding a deadline for the Agreements collection and monitor
 // if we get many future events (in which case we might want to return an error
 // to trigger a synchronization)
-func (s *Step) shouldCollectNow(a message.Message, round uint64, queue *consensus.Queue) bool {
+func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensus.Queue) bool {
 	hdr := a.Payload().(message.Agreement).State()
 	if hdr.Round < round {
 		lg.
@@ -110,11 +110,11 @@ func (s *Step) shouldCollectNow(a message.Message, round uint64, queue *consensu
 }
 
 // shouldProcess checks if the sender was in the committee
-func (s *Step) shouldProcess(hdr header.Header) bool {
+func (s *Loop) shouldProcess(hdr header.Header) bool {
 	return !s.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
 
-func (s *Step) collectEvent(a message.Agreement) {
+func (s *Loop) collectEvent(a message.Agreement) {
 	if !s.shouldProcess(a.State()) {
 		return
 	}
@@ -122,7 +122,7 @@ func (s *Step) collectEvent(a message.Agreement) {
 	s.accumulator.Process(a)
 }
 
-func (s *Step) sendCertificate(ag message.Agreement) error {
+func (s *Loop) sendCertificate(ag message.Agreement) error {
 	keys, err := s.handler.getVoterKeys(ag)
 	if err != nil {
 		return err

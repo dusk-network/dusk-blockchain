@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
@@ -39,37 +40,42 @@ type Consensus struct {
 
 	agreementChan chan message.Message
 	eventChan     chan message.Message
-	score         *score.Phase
+	score         consensus.Phase
+}
+
+// Wire creates and link the steps in the consensus. It is kept separated from
+// consensus.New so to ease mocking the consensus up when testing
+func Wire(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *transactions.PublicKey) (scoreStep consensus.Phase, err error) {
+	redu2 := secondstep.New(emitter, consensusTimeOut)
+	redu1 := firststep.New(redu2, emitter, consensusTimeOut)
+	sel := selection.New(redu1, emitter, consensusTimeOut)
+	blockGen := candidate.New(emitter, pubKey)
+	scoreStep, err = score.New(sel, emitter, blockGen)
+	if err != nil {
+		return
+	}
+	redu2.SetNext(scoreStep)
+	return
 }
 
 // New creates a new Consensus struct. The legacy StopConsensus and RoundUpdate
 // are now replaced with context cancelation and direct function call operated
 // by the chain component
-func New(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *transactions.PublicKey) (*Consensus, error) {
+func New(e *consensus.Emitter, scr consensus.Phase) *Consensus {
 	// TODO: channel size should be configurable
 	agreementChan := make(chan message.Message, 1000)
 	eventChan := make(chan message.Message, 1000)
 
 	// subscribe agreement phase to message.Agreement
 	aChan := eventbus.NewChanListener(agreementChan)
-	emitter.EventBus.Subscribe(topics.Agreement, aChan)
+	e.EventBus.Subscribe(topics.Agreement, aChan)
 
 	// subscribe topics to eventChan
 	evSub := eventbus.NewChanListener(eventChan)
-	emitter.EventBus.AddDefaultTopic(topics.Reduction, topics.Score)
-	emitter.EventBus.SubscribeDefault(evSub)
-
-	redu2 := secondstep.New(emitter, consensusTimeOut)
-	redu1 := firststep.New(redu2, emitter, consensusTimeOut)
-	sel := selection.New(redu1, emitter, consensusTimeOut)
-	scr, err := score.New(sel, emitter, pubKey)
-	if err != nil {
-		return nil, err
-	}
-	redu2.SetNext(scr)
+	e.EventBus.AddDefaultTopic(topics.Reduction, topics.Score)
+	e.EventBus.SubscribeDefault(evSub)
 
 	c := &Consensus{
-		Emitter:       emitter,
 		eventQueue:    consensus.NewQueue(),
 		roundQueue:    consensus.NewQueue(),
 		agreementChan: agreementChan,
@@ -77,7 +83,7 @@ func New(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *tra
 		score:         scr,
 	}
 
-	return c, nil
+	return c
 }
 
 // Spin the consensus state machine. The consensus runs for the whole round
@@ -105,7 +111,7 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 	}()
 
 	// score generation phase is the first step in the consensus
-	phase := c.score.Run
+	phase := c.score.Fn(nil)
 	// synchronous consensus loop keeps running until the agreement invokes
 	// context.Done or the context is canceled some other way
 	for step := uint8(1); phase != nil; step++ {

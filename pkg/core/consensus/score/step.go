@@ -31,7 +31,7 @@ type Phase struct {
 }
 
 // New creates a new score generation step
-func New(next consensus.Phase, e *consensus.Emitter, genPubKey *transactions.PublicKey) (*Phase, error) {
+func New(next consensus.Phase, e *consensus.Emitter, bg *candidate.Generator) (*Phase, error) {
 	var d, k, edPk []byte
 	_, db := heavy.CreateDBConnection()
 
@@ -51,13 +51,8 @@ func New(next consensus.Phase, e *consensus.Emitter, genPubKey *transactions.Pub
 		edPk:      edPk,
 		threshold: consensus.NewThreshold(),
 		next:      next,
-		generator: candidate.New(e, genPubKey),
+		generator: bg,
 	}, nil
-}
-
-// Name as dictated by the Phase interface
-func (p *Phase) Name() string {
-	return "generation"
 }
 
 // Fn returns the Phase state function
