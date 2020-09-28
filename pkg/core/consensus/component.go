@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"sync"
@@ -101,12 +102,9 @@ type SimpleListener struct {
 // NewSimpleListener creates a SimpleListener
 func NewSimpleListener(callback func(InternalPacket) error, priority Priority, paused bool) Listener {
 	// #654
-	nBig, err := rand.Int(rand.Reader, big.NewInt(32))
-	if err != nil {
-		panic(err)
-	}
-	n := nBig.Int64()
-	id := uint32(n)
+	buf := make([]byte, 32)
+	_, _ = rand.Read(buf)
+	id := binary.LittleEndian.Uint32(buf)
 
 	return &SimpleListener{callback, id, priority, sync.RWMutex{}, paused}
 }
