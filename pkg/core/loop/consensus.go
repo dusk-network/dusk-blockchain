@@ -76,6 +76,7 @@ func New(e *consensus.Emitter, scr consensus.Phase) *Consensus {
 	e.EventBus.SubscribeDefault(evSub)
 
 	c := &Consensus{
+		Emitter:       e,
 		eventQueue:    consensus.NewQueue(),
 		roundQueue:    consensus.NewQueue(),
 		agreementChan: agreementChan,
@@ -90,6 +91,7 @@ func New(e *consensus.Emitter, scr consensus.Phase) *Consensus {
 // until either a new round is produced or the node needs to re-sync. The
 // Agreement loop (acting roundwise) runs concurrently with the generation-selection-reduction
 // loop (acting step-wise)
+// TODO: consider stopping the phase loop with a Done phase, instead of nil
 func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error {
 	var err error
 	// cancel
@@ -124,7 +126,9 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 			return err
 		}
 
-		report(round.Round, step)
+		if config.Get().API.Enabled {
+			go report(round.Round, step)
+		}
 
 		if step >= 213 {
 			return ErrMaxStepsReached
@@ -146,20 +150,16 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 var steps = []string{"selection", "reduction1", "reduction2"}
 
 func report(round uint64, step uint8) {
-	if config.Get().API.Enabled {
-		go func() {
-			store := capi.GetBuntStoreInstance()
-			err := store.StoreRoundInfo(round, step, "Forward", steps[(step-1)%3])
-			if err != nil {
-				lg.
-					WithFields(log.Fields{
-						"round": round,
-						"step":  step,
-					}).
-					WithError(err).
-					Error("could not save StoreRoundInfo on api db")
-			}
-		}()
+	store := capi.GetBuntStoreInstance()
+	err := store.StoreRoundInfo(round, step, "Forward", steps[(step-1)%3])
+	if err != nil {
+		lg.
+			WithFields(log.Fields{
+				"round": round,
+				"step":  step,
+			}).
+			WithError(err).
+			Error("could not save StoreRoundInfo on api db")
 	}
 }
 
