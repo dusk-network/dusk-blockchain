@@ -18,18 +18,17 @@ import (
 // are sufficiently behind the chain tip.
 func TestSynchronizeBehind(t *testing.T) {
 	assert := assert.New(t)
-	cs, eb, responseChan := setupSynchronizer()
+	cs, eb, responseChan := setupSynchronizer(t)
 	// Create a listener for HighestSeen topic
 	highestSeenChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.HighestSeen, eventbus.NewChanListener(highestSeenChan))
 
 	// Create a block that is a few rounds in the future
 	height := uint64(5)
-	blk := randomBlockBuffer(height, 20)
+	blk := randomBlockBuffer(t, height, 20)
 
-	if err := cs.Synchronize(blk, "test_peer"); err != nil {
-		t.Fatal(err)
-	}
+	err := cs.Synchronize(blk, "test_peer")
+	assert.NoError(err)
 
 	msg := <-responseChan
 
@@ -52,7 +51,7 @@ func TestSynchronizeBehind(t *testing.T) {
 // are synced with other peers.
 func TestSynchronizeSynced(t *testing.T) {
 	assert := assert.New(t)
-	cs, eb, _ := setupSynchronizer()
+	cs, eb, _ := setupSynchronizer(t)
 
 	// subscribe to topics.Block
 	blockChan := make(chan message.Message, 1)
@@ -60,7 +59,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	_ = eb.Subscribe(topics.Block, listener)
 
 	// Make a block which should follow our genesis block
-	blk := randomBlockBuffer(1, 20)
+	blk := randomBlockBuffer(t, 1, 20)
 
 	assert.NoError(cs.Synchronize(blk, "test_peer"))
 	// The synchronizer should put this block on the blockChan
@@ -71,31 +70,34 @@ func TestSynchronizeSynced(t *testing.T) {
 }
 
 // Returns an encoded representation of a `helper.RandomBlock`.
-func randomBlockBuffer(height uint64, txBatchCount uint16) *bytes.Buffer {
+func randomBlockBuffer(t *testing.T, height uint64, txBatchCount uint16) *bytes.Buffer {
 	blk := helper.RandomBlock(height, txBatchCount)
 	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, blk); err != nil {
-		panic(err)
-	}
+	err := message.MarshalBlock(buf, blk)
+	assert.NoError(t, err)
 
 	return buf
 }
 
-func setupSynchronizer() (*chainsync.ChainSynchronizer, *eventbus.EventBus, chan *bytes.Buffer) {
+func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *eventbus.EventBus, chan *bytes.Buffer) {
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
 	responseChan := make(chan *bytes.Buffer, 100)
-	counter := chainsync.NewCounter(eb)
+	counter := chainsync.NewCounter()
+
 	cs := chainsync.NewChainSynchronizer(eb, rpcBus, responseChan, counter)
-	respond(rpcBus)
+	respond(t, rpcBus)
+
 	return cs, eb, responseChan
 }
 
 // Dummy goroutine which simply sends a random block back when the ChainSynchronizer
 // requests the last block.
-func respond(rpcBus *rpcbus.RPCBus) {
+func respond(t *testing.T, rpcBus *rpcbus.RPCBus) {
 	g := make(chan rpcbus.Request, 1)
-	rpcBus.Register(topics.GetLastBlock, g)
+	err := rpcBus.Register(topics.GetLastBlock, g)
+	assert.NoError(t, err)
+
 	go func() {
 		r := <-g
 		r.RespChan <- rpcbus.NewResponse(*helper.RandomBlock(0, 1), nil)

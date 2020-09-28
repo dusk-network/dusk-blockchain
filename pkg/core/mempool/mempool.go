@@ -373,10 +373,9 @@ func (m *Mempool) newPool() Pool {
 // CollectPending process the emitted transactions.
 // Fast-processing and simple impl to avoid locking here.
 // NB This is always run in a different than main mempool routine
-func (m *Mempool) CollectPending(msg message.Message) error {
+func (m *Mempool) CollectPending(msg message.Message) {
 	tx := msg.Payload().(transactions.ContractCall)
 	m.pending <- TxDesc{tx: tx, received: time.Now(), size: uint(len(msg.Id()))}
-	return nil
 }
 
 // processGetMempoolTxsRequest retrieves current state of the mempool of the verified but

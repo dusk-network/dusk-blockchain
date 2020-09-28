@@ -99,10 +99,10 @@ func Setup() *Server {
 	// creating the eventbus
 	eventBus := eventbus.New()
 
-	counter := chainsync.NewCounter(eventBus)
-
 	// creating the rpcbus
 	rpcBus := rpcbus.New()
+
+	counter := chainsync.NewCounter()
 
 	// Instantiate gRPC client
 	// TODO: get address from config

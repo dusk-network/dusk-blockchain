@@ -25,14 +25,15 @@ type Listener interface {
 
 // CallbackListener subscribes using callbacks
 type CallbackListener struct {
-	callback func(message.Message) error
+	callback func(message.Message)
 	safe     bool
 }
 
 // Notify the copy of a message as a parameter to a callback
 func (c *CallbackListener) Notify(m message.Message) error {
 	if !c.safe {
-		return c.callback(m)
+		go c.callback(m)
+		return nil
 	}
 
 	clone, err := message.Clone(m)
@@ -40,16 +41,17 @@ func (c *CallbackListener) Notify(m message.Message) error {
 		log.WithError(err).Error("CallbackListener, failed to clone message")
 		return err
 	}
-	return c.callback(clone)
+	go c.callback(clone)
+	return nil
 }
 
 // NewSafeCallbackListener creates a callback based dispatcher
-func NewSafeCallbackListener(callback func(message.Message) error) Listener {
+func NewSafeCallbackListener(callback func(message.Message)) Listener {
 	return &CallbackListener{callback, true}
 }
 
 // NewCallbackListener creates a callback based dispatcher
-func NewCallbackListener(callback func(message.Message) error) Listener {
+func NewCallbackListener(callback func(message.Message)) Listener {
 	return &CallbackListener{callback, false}
 }
 
@@ -77,19 +79,17 @@ func NewStreamListener(w io.WriteCloser) Listener {
 	return sh
 }
 
-// Notify puts a message to the Listener's ringbuffer
+// Notify puts a message to the Listener's ringbuffer. It uses a goroutine so
+// to not block while the item is put in the ringbuffer
 func (s *StreamListener) Notify(m message.Message) error {
-	if s.ringbuffer == nil {
-		return errors.New("no ringbuffer specified")
-	}
-
-	// TODO: interface - the ring buffer should be able to handle interface
-	// payloads rather than restricting solely to buffers
-	// TODO: interface - This panics in case payload is not a buffer
-	buf := m.Payload().(message.SafeBuffer)
-	if !s.ringbuffer.Put(buf.Bytes()) {
-		return errors.New("could not push a message")
-	}
+	// writing on the ringbuffer happens asynchronously
+	go func() {
+		buf := m.Payload().(message.SafeBuffer)
+		if !s.ringbuffer.Put(buf.Bytes()) {
+			err := errors.New("ringbuffer is closed")
+			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("ringbuffer closed")
+		}
+	}()
 
 	return nil
 }

@@ -2,10 +2,10 @@ package consensus
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
@@ -250,17 +250,22 @@ func Start(eventBus *eventbus.EventBus, keys key.Keys, factories ...ComponentFac
 }
 
 //StopConsensus stop the consensus for this round, finalizes the Round, instantiate a new Store
-func (c *Coordinator) StopConsensus(m message.Message) error {
+func (c *Coordinator) StopConsensus(m message.Message) {
 	if config.Get().API.Enabled {
 		go func() {
-			store := capi.GetBuntStoreInstance()
-			err := store.StoreRoundInfo(c.round, c.step, "StopConsensus", "")
+			store := capi.GetStormDBInstance()
+			roundInfo := capi.RoundInfoJSON{
+				Round:     c.Round(),
+				Step:      c.Step(),
+				Method:    "StopConsensus",
+				Name:      "",
+				UpdatedAt: time.Now(),
+			}
+			err := store.Save(&roundInfo)
 			if err != nil {
 				lg.
-					WithFields(log.Fields{
-						"round": c.Round,
-						"step":  c.Step,
-					}).
+					WithField("round", roundInfo.Round).
+					WithField("step", roundInfo.Step).
 					WithError(err).
 					Error("could not save StoreRoundInfo on api db")
 			}
@@ -275,8 +280,6 @@ func (c *Coordinator) StopConsensus(m message.Message) error {
 		c.stopConsensus()
 		c.stopped = true
 	}
-
-	return nil
 }
 
 func (c *Coordinator) stopConsensus() {
@@ -296,7 +299,7 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 // CollectRoundUpdate is triggered when the Chain propagates a new round update.
 // The consensus components are swapped out, initialized, and the
 // state will be updated to the new round.
-func (c *Coordinator) CollectRoundUpdate(m message.Message) error {
+func (c *Coordinator) CollectRoundUpdate(m message.Message) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	r := m.Payload().(RoundUpdate)
@@ -316,6 +319,7 @@ func (c *Coordinator) CollectRoundUpdate(m message.Message) error {
 	log.
 		WithField("round", r.Round).
 		Debug("CollectRoundUpdate, Dispatch, topics.Generation")
+
 	errList := c.store.Dispatch(message.New(topics.Generation, EmptyPacket()))
 	if len(errList) > 0 {
 		for _, err := range errList {
@@ -326,7 +330,6 @@ func (c *Coordinator) CollectRoundUpdate(m message.Message) error {
 			//FIXME: shall this panic ? is this a extreme violation ?
 		}
 	}
-	return nil
 }
 
 func (c *Coordinator) flushRoundQueue() {
@@ -374,17 +377,9 @@ func (c *Coordinator) reinstantiateStore() {
 // CollectEvent collects the consensus message and reroutes it to the proper
 // component.
 // It is the callback passed to the eventbus.Multicaster
-func (c *Coordinator) CollectEvent(m message.Message) error {
-	var msg InternalPacket
-	switch p := m.Payload().(type) {
-	case message.SafeBuffer: // TODO: we should actually panic here (panic??)
-		_, _ = topics.Extract(&p)
-		return fmt.Errorf("trying to feed the Coordinator a bytes.Buffer for message: %s", m.Category().String())
-	case InternalPacket:
-		msg = p
-	default:
-		return errors.New("trying to feed the Coordinator a screwed up message from the EventBus")
-	}
+func (c *Coordinator) CollectEvent(m message.Message) {
+	//TODO: what if this is a message.SafeBuffer ?
+	msg := m.Payload().(InternalPacket)
 
 	hdr := msg.State()
 	lg.WithFields(log.Fields{
@@ -413,7 +408,7 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 				"coordinator_step":  c.Step(),
 			}).
 			Debugln("discarding obsolete event")
-		return nil
+		return
 	case header.After:
 		lg.
 			WithFields(log.Fields{
@@ -431,7 +426,7 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 		// header.
 		if m.Category() == topics.Agreement {
 			c.roundQueue.PutEvent(hdr.Round, hdr.Step, m)
-			return nil
+			return
 		}
 
 		// Otherwise, we just queue it according to the header round
@@ -441,8 +436,14 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 		//TODO: should this be moved into eventqueue ?
 		if config.Get().API.Enabled {
 			go func() {
-				store := capi.GetBuntStoreInstance()
-				err := store.StoreEventQueue(hdr.Round, hdr.Step, m)
+				store := capi.GetStormDBInstance()
+				eventQueue := capi.EventQueueJSON{
+					Round: hdr.Round,
+					Step:  hdr.Step,
+					//Message:   &m,
+					UpdatedAt: time.Now(),
+				}
+				err := store.Save(&eventQueue)
 				if err != nil {
 					lg.
 						WithFields(log.Fields{
@@ -455,7 +456,7 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 			}()
 		}
 
-		return nil
+		return
 	}
 
 	errList := c.store.Dispatch(m)
@@ -467,7 +468,6 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 				Error("failed to Dispatch CollectEvent")
 		}
 	}
-	return nil
 }
 
 // FinalizeRound triggers the store to dispatch a finalize to the Components
@@ -496,14 +496,18 @@ func (c *Coordinator) Forward(id uint32) uint8 {
 
 	if config.Get().API.Enabled {
 		go func() {
-			store := capi.GetBuntStoreInstance()
-			err := store.StoreRoundInfo(c.round, c.step, "Forward", name)
+			store := capi.GetStormDBInstance()
+			roundInfo := capi.RoundInfoJSON{
+				Round:  c.Round(),
+				Step:   c.Step(),
+				Method: "Forward",
+				Name:   name,
+			}
+			err := store.Save(&roundInfo)
 			if err != nil {
 				lg.
-					WithFields(log.Fields{
-						"round": c.Round(),
-						"step":  c.Step(),
-					}).
+					WithField("round", roundInfo.Round).
+					WithField("step", roundInfo.Step).
 					WithError(err).
 					Error("could not save StoreRoundInfo on api db")
 			}

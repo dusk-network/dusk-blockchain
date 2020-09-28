@@ -263,6 +263,7 @@ func (c *Chain) beginAccepting(blk *block.Block) bool {
 
 	// If we are more than one block behind, stop the consensus
 	lg.Debug("topics.StopConsensus")
+	// FIXME: this call should be blocking
 	errList := c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, message.EMPTY))
 	diagnostics.LogPublishErrors("chain/chain.go, topics.StopConsensus", errList)
 
@@ -282,9 +283,7 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	field := logger.Fields{"process": "onAcceptBlock", "height": blk.Header.Height}
 	lg := log.WithFields(field)
 
-	// This will decrement the sync counter
-	// TODO: a new context should be created with timeout, cancellation, etc
-	// instead of reusing the Chain global one
+	// Accepting the block decrements the sync counter
 	if err := c.AcceptBlock(c.ctx, blk); err != nil {
 		lg.WithError(err).Debug("could not AcceptBlock")
 		return err
@@ -360,8 +359,34 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 
 	if config.Get().API.Enabled {
 		go func() {
-			store := capi.GetBuntStoreInstance()
-			err := store.StoreProvisioners(c.p, blk.Header.Height)
+			store := capi.GetStormDBInstance()
+			var members []*capi.Member
+			for _, v := range c.p.Members {
+				var stakes []capi.Stake
+
+				for _, s := range v.Stakes {
+					stake := capi.Stake{
+						Amount:      s.Amount,
+						StartHeight: s.StartHeight,
+						EndHeight:   s.EndHeight,
+					}
+					stakes = append(stakes, stake)
+				}
+
+				member := capi.Member{
+					PublicKeyBLS: v.PublicKeyBLS,
+					Stakes:       stakes,
+				}
+
+				members = append(members, &member)
+			}
+
+			provisioner := capi.ProvisionerJSON{
+				ID:      blk.Header.Height,
+				Set:     c.p.Set,
+				Members: members,
+			}
+			err := store.Save(&provisioner)
 			if err != nil {
 				log.Warn("Could not store provisioners on memoryDB")
 			}
@@ -393,6 +418,9 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	msg := message.New(topics.AcceptedBlock, blk)
 	errList := c.eventBus.Publish(topics.AcceptedBlock, msg)
 	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
+
+	// decrement the counter
+	c.counter.Decrement()
 
 	l.Trace("procedure ended")
 	return nil
