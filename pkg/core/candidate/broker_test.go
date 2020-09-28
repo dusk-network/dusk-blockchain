@@ -1,1 +1,0 @@
-package candidate_test

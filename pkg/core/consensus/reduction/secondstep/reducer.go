@@ -2,6 +2,7 @@ package secondstep
 
 import (
 	"bytes"
+	"sync/atomic"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -32,8 +33,7 @@ type Reducer struct {
 	eventPlayer consensus.EventPlayer
 	signer      consensus.Signer
 
-	reductionID   uint32
-	reductionName string
+	reductionID uint32
 
 	handler    *reduction.Handler
 	aggregator *aggregator
@@ -76,8 +76,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 		Topic:    topics.Reduction,
 		Listener: consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority, true),
 	}
-	r.reductionID = reductionSubscriber.Listener.ID()
-	r.reductionName = "secondstep/Reducer"
+	atomic.StoreUint32(&r.reductionID, reductionSubscriber.Listener.ID())
 
 	return []consensus.TopicListener{stepVotesSubscriber, reductionSubscriber}
 }
@@ -85,13 +84,13 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 // ID returns the listener ID of the reducer.
 // Implements consensus.Component.
 func (r *Reducer) ID() uint32 {
-	return r.reductionID
+	return atomic.LoadUint32(&r.reductionID)
 }
 
 // Name returns the listener Name of the reducer.
 // Implements consensus.Component.
 func (r *Reducer) Name() string {
-	return r.reductionName
+	return "secondstep/Reducer"
 }
 
 // Finalize the Reducer component by killing the timer, and pausing event streaming.

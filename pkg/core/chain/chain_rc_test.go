@@ -25,7 +25,7 @@ func TestConcurrentBlock(t *testing.T) {
 
 	// Set up a chain instance with mocking verifiers
 	startingHeight := uint64(1)
-	eb, rpc, chain := setupChainTest(startingHeight, true)
+	eb, rpc, chain := setupChainTest(t, startingHeight)
 	go chain.Listen()
 
 	// Set up a goroutine to provide a mock topics.RoundUpdates

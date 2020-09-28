@@ -4,6 +4,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
@@ -22,14 +23,14 @@ func initCandidateCollector(sub eventbus.Subscriber) <-chan message.Candidate {
 	return candidateChan
 }
 
-func (c *candidateCollector) Collect(m message.Message) error {
+func (c *candidateCollector) Collect(m message.Message) {
 	// validate performs a simple integrity check with an
 	// incoming block's hash
 	cm := m.Payload().(message.Candidate)
 	if err := ValidateCandidate(cm); err != nil {
-		return err
+		diagnostics.LogError("error in validating the candidate", err)
+		return
 	}
 
 	c.candidateChan <- cm
-	return nil
 }

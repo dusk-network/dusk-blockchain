@@ -29,7 +29,8 @@ func TestHandshake(t *testing.T) {
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
-	counter := chainsync.NewCounter(eb)
+	counter := chainsync.NewCounter()
+
 	client, srv := net.Pipe()
 
 	go func() {
