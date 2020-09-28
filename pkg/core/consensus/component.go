@@ -1,8 +1,10 @@
 package consensus
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -99,7 +101,11 @@ type SimpleListener struct {
 
 // NewSimpleListener creates a SimpleListener
 func NewSimpleListener(callback func(InternalPacket) error, priority Priority, paused bool) Listener {
-	id := rand.Uint32()
+	// #654
+	buf := make([]byte, 32)
+	_, _ = rand.Read(buf)
+	id := binary.LittleEndian.Uint32(buf)
+
 	return &SimpleListener{callback, id, priority, sync.RWMutex{}, paused}
 }
 
@@ -149,7 +155,13 @@ type FilteringListener struct {
 
 // NewFilteringListener creates a FilteringListener
 func NewFilteringListener(callback func(InternalPacket) error, filter func(header.Header) bool, priority Priority, paused bool) Listener {
-	id := rand.Uint32()
+	// #654
+	nBig, err := rand.Int(rand.Reader, big.NewInt(32))
+	if err != nil {
+		panic(err)
+	}
+	n := nBig.Int64()
+	id := uint32(n)
 	return &FilteringListener{&SimpleListener{callback, id, priority, sync.RWMutex{}, paused}, filter}
 }
 
