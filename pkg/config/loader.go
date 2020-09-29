@@ -63,7 +63,7 @@ type Registry struct {
 	Profile     []profileConfiguration
 
 	Genesis genesisConfiguration
-	lock    sync.RWMutex
+	lock    *sync.RWMutex
 }
 
 // Load makes an attempt to read and unmarshal any configs from flag, env and
@@ -81,6 +81,7 @@ type Registry struct {
 func Load(configFileName string, secondary interface{}, customflags func() (string, error)) error {
 
 	r = new(Registry)
+	r.lock = new(sync.RWMutex)
 	r.ConfigFileName = configFileName
 
 	r.loadFlagsFn = loadFlags
@@ -99,11 +100,12 @@ func Load(configFileName string, secondary interface{}, customflags func() (stri
 	return nil
 }
 
-// LoadFromFile unmarshals configPath file into a new Registry instance
+// LoadFromFile unmarshalls configPath file into a new Registry instance
 // NB. It does not overwrite the global Registry
 func LoadFromFile(configPath string) (Registry, error) {
 
 	registry := Registry{}
+	registry.lock = new(sync.RWMutex)
 	registry.FixedConfigFile = configPath
 
 	// Initialization
@@ -236,6 +238,9 @@ func defineENV() {
 // Mock should be used only in test packages. It could be useful when a unit
 // test needs to be rerun with configs different from the default ones.
 func Mock(m *Registry) {
+	if m.lock == nil {
+		m.lock = new(sync.RWMutex)
+	}
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r = m
@@ -245,6 +250,7 @@ func init() {
 	// By default Registry should be empty but not nil. In that way, consumers
 	// (packages) can use their default values on unit testing
 	r = new(Registry)
+	r.lock = new(sync.RWMutex)
 	r.Database.Driver = "lite_v0.1.0"
 	r.General.Network = testnet
 	r.Wallet.File = "wallet.dat"
