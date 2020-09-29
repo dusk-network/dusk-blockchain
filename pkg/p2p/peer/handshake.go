@@ -45,8 +45,8 @@ func (p *Reader) Handshake() error {
 	return p.readVerAck()
 }
 
-func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
-	message, e := p.createVersionBuffer()
+func (c *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
+	message, e := c.createVersionBuffer()
 	if e != nil {
 		return e
 	}
@@ -59,12 +59,12 @@ func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
 		return err
 	}
 
-	_, e = p.Write(message.Bytes())
+	_, e = c.Write(message.Bytes())
 	return e
 }
 
-func (p *Connection) readRemoteMsgVersion() error {
-	msgBytes, err := p.ReadMessage()
+func (c *Connection) readRemoteMsgVersion() error {
+	msgBytes, err := c.ReadMessage()
 	if err != nil {
 		return err
 	}
@@ -97,8 +97,8 @@ func (p *Connection) readRemoteMsgVersion() error {
 	return verifyVersion(version.Version)
 }
 
-func (p *Connection) readVerAck() error {
-	msgBytes, err := p.ReadMessage()
+func (c *Connection) readVerAck() error {
+	msgBytes, err := c.ReadMessage()
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func (p *Connection) readVerAck() error {
 	return nil
 }
 
-func (p *Connection) writeVerAck(g *processing.Gossip) error {
+func (c *Connection) writeVerAck(g *processing.Gossip) error {
 	verAckMsg := new(bytes.Buffer)
 	if err := topics.Prepend(verAckMsg, topics.VerAck); err != nil {
 		return err
@@ -136,14 +136,14 @@ func (p *Connection) writeVerAck(g *processing.Gossip) error {
 		return err
 	}
 
-	if _, err := p.Write(verAckMsg.Bytes()); err != nil {
+	if _, err := c.Write(verAckMsg.Bytes()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *Connection) createVersionBuffer() (*bytes.Buffer, error) {
+func (c *Connection) createVersionBuffer() (*bytes.Buffer, error) {
 	version := protocol.NodeVer
 	message, err := newVersionMessageBuffer(version, protocol.FullNode)
 	if err != nil {

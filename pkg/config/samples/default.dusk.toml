@@ -23,6 +23,11 @@ timeoutgetmempooltxs = 3
 timeoutgetroundresults = 5
 timeoutbrokergetcandidate = 2
 
+# timeoutkeepalivetime must be always smaller than timeoutreadwrite
+# otherwise the node will disconnect due to read timeout error
+timeoutreadwrite = 60
+timeoutkeepalivetime = 30
+
 # logger configs
 [logger]
 # log levels can be any of error, warn, trace
