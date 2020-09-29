@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -62,6 +63,7 @@ type Registry struct {
 	Profile     []profileConfiguration
 
 	Genesis genesisConfiguration
+	lock    sync.RWMutex
 }
 
 // Load makes an attempt to read and unmarshal any configs from flag, env and
@@ -112,6 +114,8 @@ func LoadFromFile(configPath string) (Registry, error) {
 // Get returns registry by value in order to avoid further modifications after
 // initial configuration loading
 func Get() Registry {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 	return *r
 }
 
@@ -232,6 +236,8 @@ func defineENV() {
 // Mock should be used only in test packages. It could be useful when a unit
 // test needs to be rerun with configs different from the default ones.
 func Mock(m *Registry) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	r = m
 }
 
