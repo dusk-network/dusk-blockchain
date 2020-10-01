@@ -24,14 +24,14 @@ type Phase struct {
 	next       consensus.Phase
 	d, k, edPk []byte
 	bg         transactions.BlockGenerator
-	generator  *candidate.Generator
+	generator  candidate.Generator
 
 	lock      sync.Mutex
 	threshold *consensus.Threshold
 }
 
 // New creates a new score generation step
-func New(next consensus.Phase, e *consensus.Emitter, bg *candidate.Generator) (*Phase, error) {
+func New(next consensus.Phase, e *consensus.Emitter, bg candidate.Generator) (*Phase, error) {
 	var d, k, edPk []byte
 	_, db := heavy.CreateDBConnection()
 

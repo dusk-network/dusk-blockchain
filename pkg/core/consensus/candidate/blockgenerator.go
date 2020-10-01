@@ -25,14 +25,18 @@ const MaxTxSetSize = 150000
 
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
-type Generator struct {
+type Generator interface {
+	PropagateBlockAndScore(context.Context, message.ScoreProposal, consensus.RoundUpdate, uint8) error
+}
+
+type generator struct {
 	*consensus.Emitter
 	genPubKey *transactions.PublicKey
 }
 
 // New creates a new block generator
-func New(e *consensus.Emitter, genPubKey *transactions.PublicKey) *Generator {
-	return &Generator{
+func New(e *consensus.Emitter, genPubKey *transactions.PublicKey) Generator {
+	return &generator{
 		Emitter:   e,
 		genPubKey: genPubKey,
 	}
@@ -41,7 +45,7 @@ func New(e *consensus.Emitter, genPubKey *transactions.PublicKey) *Generator {
 // PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
-func (bg *Generator) PropagateBlockAndScore(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) error {
+func (bg *generator) PropagateBlockAndScore(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) error {
 	log := lg.
 		WithField("round", sev.State().Round).
 		WithField("step", sev.State().Step)
@@ -105,13 +109,13 @@ func (bg *Generator) PropagateBlockAndScore(ctx context.Context, sev message.Sco
 }
 
 // Generate a Block
-func (bg *Generator) Generate(sev message.ScoreProposal, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
+func (bg *generator) Generate(sev message.ScoreProposal, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
 	return bg.GenerateBlock(r.Round, sev.Seed, sev.Proof, sev.Score, r.Hash, keys)
 }
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
-func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
+func (bg *generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
 	txs, err := bg.ConstructBlockTxs(proof, score, keys)
 	if err != nil {
 		return nil, err
@@ -156,7 +160,7 @@ func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 
 // ConstructBlockTxs will fetch all valid transactions from the mempool, append a coinbase
 // transaction, and return them all.
-func (bg *Generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]transactions.ContractCall, error) {
+func (bg *generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]transactions.ContractCall, error) {
 	txs := make([]transactions.ContractCall, 0)
 
 	// Retrieve and append the verified transactions from Mempool
