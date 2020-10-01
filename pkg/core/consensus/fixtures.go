@@ -22,7 +22,10 @@ func MockEmitter(consTimeout time.Duration, proxy transactions.Proxy) *Emitter {
 	_, pk := transactions.MockKeys()
 
 	buf := new(bytes.Buffer)
-	_ = transactions.MarshalPublicKey(buf, *pk)
+	err := transactions.MarshalPublicKey(buf, *pk)
+	if err != nil {
+		panic("MockEmitter transactions.MarshalPublicKey")
+	}
 
 	return &Emitter{
 		EventBus:    eb,

@@ -116,9 +116,11 @@ func (p *Phase) endSelection(round uint64, step uint8) consensus.PhaseFn {
 		//	PubKeyBLS: p.keys.BLSPubKeyBytes,
 		//	BlockHash: emptyScore[:],
 		//}
+		log.Debug("endSelection, p.next.Fn(message.EmptyScore())")
 		return p.next.Fn(message.EmptyScore())
 	}
 
+	log.Debug("endSelection, p.next.Fn(p.bestEvent)")
 	return p.next.Fn(p.bestEvent)
 }
 
@@ -175,8 +177,8 @@ func (p *Phase) increaseTimeOut() {
 		Trace("increase_timeout")
 }
 
-func shouldProcess(a message.Message, round uint64, step uint8, queue *consensus.Queue) bool {
-	msg := a.Payload().(consensus.InternalPacket)
+func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus.Queue) bool {
+	msg := m.Payload().(consensus.InternalPacket)
 	hdr := msg.State()
 
 	cmp := hdr.CompareRoundAndStep(round, step)
@@ -199,11 +201,18 @@ func shouldProcess(a message.Message, round uint64, step uint8, queue *consensus
 				"coordinator_round": round,
 			}).
 			Debugln("storing future round for later")
-		queue.PutEvent(hdr.Round, hdr.Step, a)
+		queue.PutEvent(hdr.Round, hdr.Step, m)
 		return false
 	}
 
-	if a.Category() != topics.Score {
+	if m.Category() != topics.Score {
+		lg.
+			WithFields(log.Fields{
+				"topic":             "Agreement",
+				"round":             hdr.Round,
+				"coordinator_round": round,
+			}).
+			Debugln("message not topics.Score")
 		return false
 	}
 

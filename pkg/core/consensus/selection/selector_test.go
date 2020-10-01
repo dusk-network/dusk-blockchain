@@ -24,7 +24,8 @@ func TestSelectorRun(t *testing.T) {
 	evChan := make(chan message.Message, 10)
 	step := uint8(1)
 
-	hash, _ := crypto.RandEntropy(32)
+	hash, err := crypto.RandEntropy(32)
+	require.Nil(t, err)
 	hdr := header.Mock()
 	hdr.BlockHash = hash
 	hdr.Round = 1
@@ -38,7 +39,7 @@ func TestSelectorRun(t *testing.T) {
 
 	msg := message.New(topics.Score, se)
 
-	consensusTimeOut := 1000 * time.Millisecond
+	consensusTimeOut := 2 * time.Second
 
 	mockProxy := transactions.MockProxy{
 		P: transactions.PermissiveProvisioner{},
@@ -56,25 +57,23 @@ func TestSelectorRun(t *testing.T) {
 
 			return true, nil
 		}
-		return false, errors.New("test err")
+		return false, errors.New("cb: failed to validate Score")
 	}
 
 	mockPhase := consensus.MockPhase(cb)
 	sel := selection.New(mockPhase, emitter, consensusTimeOut)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(1000 * time.Millisecond)
-		cancel()
-	}()
+	ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
 
 	go func() {
 		evChan <- msg
 	}()
 
 	phaseFn, err := sel.Run(ctx, queue, evChan, consensus.RoundUpdate{Round: uint64(1)}, step)
-	require.NoError(t, err)
-	_, err = phaseFn(ctx, queue, evChan, consensus.RoundUpdate{Round: uint64(1)}, step+1)
-	require.NoError(t, err)
+	require.Nil(t, err)
+	require.NotNil(t, phaseFn)
 
+	_, err = phaseFn(ctx, queue, evChan, consensus.RoundUpdate{Round: uint64(1)}, step+1)
+
+	require.Nil(t, err)
 }
