@@ -2,13 +2,13 @@ package selection
 
 import (
 	"context"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -84,7 +84,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	for {
 		select {
 		case ev := <-evChan:
-			if shouldProcess(ev, r.Round, queue) {
+			if shouldProcess(ev, r.Round, step, queue) {
 				p.collectScore(ctx, ev.Payload().(message.Score))
 			}
 
@@ -109,13 +109,14 @@ func (p *Phase) endSelection(round uint64, step uint8) consensus.PhaseFn {
 	}()
 
 	if p.bestEvent.IsEmpty() {
-		hdr := header.Header{
-			Round:     round,
-			Step:      step,
-			PubKeyBLS: p.keys.BLSPubKeyBytes,
-			BlockHash: emptyScore[:],
-		}
-		return p.next.Fn(message.EmptyScoreProposal(hdr))
+		//TODO: check if this is required
+		//hdr := header.Header{
+		//	Round:     round,
+		//	Step:      step,
+		//	PubKeyBLS: p.keys.BLSPubKeyBytes,
+		//	BlockHash: emptyScore[:],
+		//}
+		return p.next.Fn(message.EmptyScore())
 	}
 
 	return p.next.Fn(p.bestEvent)
@@ -174,26 +175,12 @@ func (p *Phase) increaseTimeOut() {
 		Trace("increase_timeout")
 }
 
-func shouldProcess(a message.Message, round uint64, queue *consensus.Queue) bool {
+func shouldProcess(a message.Message, round uint64, step uint8, queue *consensus.Queue) bool {
 	msg := a.Payload().(consensus.InternalPacket)
 	hdr := msg.State()
 
-	if !check(a, round, queue) {
-		return false
-	}
-
-	if a.Category() != topics.Score {
-		queue.PutEvent(hdr.Round, hdr.Step, a)
-		return false
-	}
-
-	return true
-}
-
-func check(a message.Message, round uint64, queue *consensus.Queue) bool {
-	msg := a.Payload().(consensus.InternalPacket)
-	hdr := msg.State()
-	if hdr.Round < round {
+	cmp := hdr.CompareRoundAndStep(round, step)
+	if cmp == header.Before {
 		lg.
 			WithFields(log.Fields{
 				"topic":             "Agreement",
@@ -204,7 +191,7 @@ func check(a message.Message, round uint64, queue *consensus.Queue) bool {
 		return false
 	}
 
-	if hdr.Round > round {
+	if cmp == header.After {
 		lg.
 			WithFields(log.Fields{
 				"topic":             "Agreement",
@@ -213,6 +200,10 @@ func check(a message.Message, round uint64, queue *consensus.Queue) bool {
 			}).
 			Debugln("storing future round for later")
 		queue.PutEvent(hdr.Round, hdr.Step, a)
+		return false
+	}
+
+	if a.Category() != topics.Score {
 		return false
 	}
 

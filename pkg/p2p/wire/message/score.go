@@ -2,6 +2,7 @@ package message
 
 import (
 	"bytes"
+	"math/big"
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -262,7 +263,16 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 
 // MockScoreProposal mocks a ScoreProposal up
 func MockScoreProposal(hdr header.Header) ScoreProposal {
-	score, _ := crypto.RandEntropy(32)
+	var score []byte
+	for {
+		score, _ = crypto.RandEntropy(32)
+		scoreInt := big.NewInt(0).SetBytes(score)
+		limit, _ := big.NewInt(0).SetString("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 16)
+
+		if scoreInt.Cmp(limit) > -1 {
+			break
+		}
+	}
 	proof, _ := crypto.RandEntropy(1477)
 	identity, _ := crypto.RandEntropy(32)
 	seed, _ := crypto.RandEntropy(33)

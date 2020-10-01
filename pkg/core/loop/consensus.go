@@ -61,7 +61,7 @@ func Wire(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *tr
 }
 
 // New creates a new Consensus struct. The legacy StopConsensus and RoundUpdate
-// are now replaced with context cancelation and direct function call operated
+// are now replaced with context cancellation and direct function call operated
 // by the chain component
 func New(e *consensus.Emitter, scr consensus.Phase, ag consensus.Controller) *Consensus {
 	// TODO: channel size should be configurable

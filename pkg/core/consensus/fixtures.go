@@ -79,13 +79,16 @@ func MockMember(keys key.Keys) *user.Member {
 
 type mockPhase struct {
 	callback func(ctx context.Context) (bool, error)
+	packet   InternalPacket
 }
 
-func (m *mockPhase) Fn(_ InternalPacket) PhaseFn {
+func (m *mockPhase) Fn(packet InternalPacket) PhaseFn {
+	m.packet = packet
 	return m.Run
 }
 
 func (m *mockPhase) Run(ctx context.Context, queue *Queue, evChan chan message.Message, r RoundUpdate, step uint8) (PhaseFn, error) {
+	ctx = context.WithValue(ctx, "Packet", m.packet)
 	if stop, err := m.callback(ctx); err != nil {
 		return nil, err
 	} else if stop {
@@ -104,5 +107,5 @@ func MockPhase(cb func(ctx context.Context) (bool, error)) Phase {
 			return true, nil
 		}
 	}
-	return &mockPhase{cb}
+	return &mockPhase{cb, nil}
 }

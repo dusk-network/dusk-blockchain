@@ -1,133 +1,80 @@
 package selection_test
 
-/*
 import (
-	"bytes"
 	"context"
-	"sort"
-	"sync"
+	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestSelection(t *testing.T) {
-	bus := eventbus.New()
-	hlp := selection.NewHelper(bus)
-	// Sub to BestScore, to observe the outcome of the Selector
-	bestScoreChan := make(chan message.Message, 1)
-	bus.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
-	hlp.Initialize(consensus.MockRoundUpdate(1, nil))
+// TestSelectorRun tests that we can Run the selection
+func TestSelectorRun(t *testing.T) {
+	queue := consensus.NewQueue()
+	evChan := make(chan message.Message, 10)
+	step := uint8(1)
 
-	// Make sure to replace the handler, to avoid zkproof verification
-	hlp.SetHandler(newMockHandler())
-
-	hlp.StartSelection()
-
-	// Send a set of events
 	hash, _ := crypto.RandEntropy(32)
-	hlp.SendBatch(hash)
+	hdr := header.Mock()
+	hdr.BlockHash = hash
+	hdr.Round = 1
 
-	// Wait for a result on the best score channel
-	bestScoreMsg := <-bestScoreChan
-	score := bestScoreMsg.Payload().(message.Score)
+	// mock candidate
+	genesis := config.DecodeGenesis()
+	cert := block.EmptyCertificate()
+	c := message.MakeCandidate(genesis, cert)
 
-	// We should've gotten a non-zero result
-	assert.NotEqual(t, make([]byte, 32), score.Score)
-}
+	se := message.MockScore(hdr, c)
 
-func TestMultipleVerification(t *testing.T) {
+	msg := message.New(topics.Score, se)
 
-	bus := eventbus.New()
-	hlp := selection.NewHelper(bus)
+	consensusTimeOut := 1000 * time.Millisecond
 
-	bestScoreChan := make(chan message.Message, 1)
-	bus.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
-	hlp.Initialize(consensus.MockRoundUpdate(1, nil))
+	mockProxy := transactions.MockProxy{
+		P: transactions.PermissiveProvisioner{},
+	}
+	emitter := consensus.MockEmitter(consensusTimeOut, mockProxy)
 
-	// Make sure to replace the handler, to avoid zkproof verification
-	hlp.SetHandler(newMockHandler())
+	cb := func(ctx context.Context) (bool, error) {
+		packet := ctx.Value("Packet")
+		require.NotNil(t, packet)
 
-	hlp.StartSelection()
+		if messageScore, ok := packet.(message.Score); ok {
+			require.NotEmpty(t, messageScore.Score)
 
-	// Create some score messages
-	hash, _ := crypto.RandEntropy(32)
-	scores := hlp.Spawn(hash)
+			require.Equal(t, msg.Payload(), messageScore)
 
-	// Sort the slice so that the highest scoring message is first
-	sort.Slice(scores, func(i, j int) bool { return bytes.Compare(scores[i].Score, scores[j].Score) == 1 })
-
-	// Now send them to the selector concurrently, except for the first one, with a
-	// slight delay (guaranteeing that the highest scoring message comes in first).
-	// Only one event should be verified and propagated.
-	var wg sync.WaitGroup
-	wg.Add(len(scores) - 1)
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		for i, ev := range scores {
-			if i != 0 {
-				hlp.Selector.CollectScoreEvent(ev)
-				wg.Done()
-			}
+			return true, nil
 		}
+		return false, errors.New("test err")
+	}
 
+	mockPhase := consensus.MockPhase(cb)
+	sel := selection.New(mockPhase, emitter, consensusTimeOut)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(1000 * time.Millisecond)
+		cancel()
 	}()
 
-	hlp.Selector.CollectScoreEvent(scores[0])
-	wg.Wait()
+	go func() {
+		evChan <- msg
+	}()
 
-	// Collect bestScore
-	bestScoreMessage := <-bestScoreChan
-	bs := bestScoreMessage.Payload().(message.Score)
+	phaseFn, err := sel.Run(ctx, queue, evChan, consensus.RoundUpdate{Round: uint64(1)}, step)
+	require.NoError(t, err)
+	_, err = phaseFn(ctx, queue, evChan, consensus.RoundUpdate{Round: uint64(1)}, step+1)
+	require.NoError(t, err)
 
-	assert.True(t, bs.Equal(scores[0]))
 }
-
-// Ensure that `CollectScoreEvent` does not panic if it is called before
-// receiving a Generation message. (Note that this can happen, as the Score
-// listener is not paused on startup)
-func TestCollectNoGeneration(t *testing.T) {
-	assert.NotPanics(t, func() {
-		bus := eventbus.New()
-		hlp := selection.NewHelper(bus)
-		hlp.Initialize(consensus.MockRoundUpdate(1, nil))
-
-		// Make sure to replace the handler, to avoid zkproof verification
-		hlp.SetHandler(newMockHandler())
-
-		// Create some score messages
-		hash, _ := crypto.RandEntropy(32)
-		evs := hlp.Spawn(hash)
-
-		hlp.Selector.CollectScoreEvent(evs[0])
-	})
-}
-
-// Mock implementation of a selection.Handler to avoid elaborate set-up of
-// a Rust process for the purposes of zkproof verification.
-type mockHandler struct {
-}
-
-func newMockHandler() *mockHandler {
-	return &mockHandler{}
-}
-
-func (m *mockHandler) Verify(context.Context, uint64, uint8, message.Score) error {
-	time.Sleep(500 * time.Millisecond)
-	return nil
-}
-
-func (m *mockHandler) LowerThreshold() {}
-func (m *mockHandler) ResetThreshold() {}
-
-func (m *mockHandler) Priority(first, second message.Score) bool {
-	return bytes.Compare(second.Score, first.Score) != 1
-}
-*/
