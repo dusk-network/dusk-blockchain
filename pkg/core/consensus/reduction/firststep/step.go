@@ -101,7 +101,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	for {
 		select {
 		case ev := <-evChan:
-			if shouldProcess(ev, r.Round, queue) {
+			if shouldProcess(ev, r.Round, step, queue) {
 				rMsg := ev.Payload().(message.Reduction)
 				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
 					continue
@@ -204,26 +204,12 @@ func (p *Phase) createStepVoteMessage(r *result, round uint64, step uint8) *mess
 	}
 }
 
-func shouldProcess(a message.Message, round uint64, queue *consensus.Queue) bool {
-	msg := a.Payload().(consensus.InternalPacket)
+func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus.Queue) bool {
+	msg := m.Payload().(consensus.InternalPacket)
 	hdr := msg.State()
 
-	if !check(a, round, queue) {
-		return false
-	}
-
-	if a.Category() != topics.Score {
-		queue.PutEvent(hdr.Round, hdr.Step, a)
-		return false
-	}
-
-	return true
-}
-
-func check(a message.Message, round uint64, queue *consensus.Queue) bool {
-	msg := a.Payload().(consensus.InternalPacket)
-	hdr := msg.State()
-	if hdr.Round < round {
+	cmp := hdr.CompareRoundAndStep(round, step)
+	if cmp == header.Before {
 		lg.
 			WithFields(log.Fields{
 				"topic":             "Agreement",
@@ -234,7 +220,7 @@ func check(a message.Message, round uint64, queue *consensus.Queue) bool {
 		return false
 	}
 
-	if hdr.Round > round {
+	if cmp == header.After {
 		lg.
 			WithFields(log.Fields{
 				"topic":             "Agreement",
@@ -242,7 +228,18 @@ func check(a message.Message, round uint64, queue *consensus.Queue) bool {
 				"coordinator_round": round,
 			}).
 			Debugln("storing future round for later")
-		queue.PutEvent(hdr.Round, hdr.Step, a)
+		queue.PutEvent(hdr.Round, hdr.Step, m)
+		return false
+	}
+
+	if m.Category() != topics.Reduction {
+		lg.
+			WithFields(log.Fields{
+				"topic":             "Reduction",
+				"round":             hdr.Round,
+				"coordinator_round": round,
+			}).
+			Debugln("message not topics.Score")
 		return false
 	}
 

@@ -1,20 +1,16 @@
 package firststep
 
-/*
 import (
 	"bytes"
 	"errors"
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 // Helper for reducing test boilerplate
@@ -31,7 +27,7 @@ type Helper struct {
 // that intercept RPC calls made by the first step Reducer.
 func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration, startGoroutines bool) *Helper {
 	hlp := &Helper{
-		Helper:             reduction.NewHelper(eb, rpcbus, provisioners, CreateReducer, timeOut),
+		Helper:             reduction.NewHelper(eb, rpcbus, provisioners, timeOut),
 		StepVotesChan:      make(chan message.Message, 1),
 		failOnFetching:     false,
 		failOnVerification: false,
@@ -108,50 +104,3 @@ func (hlp *Helper) createResultChan() {
 	chanListener := eventbus.NewChanListener(hlp.StepVotesChan)
 	hlp.Bus.Subscribe(topics.StepVotes, chanListener)
 }
-
-// ActivateReduction sends the reducer a BestScore event to trigger a EvenPlayer.Resume
-func (hlp *Helper) ActivateReduction(hash []byte) {
-	hlp.CollectionWaitGroup.Wait()
-	hdr := header.Header{BlockHash: hash, Round: hlp.Round, Step: hlp.Step(), PubKeyBLS: hlp.PubKeyBLS}
-	_ = hlp.Reducer.(*Reducer).CollectBestScore(hdr)
-}
-
-// NextBatch forwards additional batches of consensus.Event. It takes care of marshaling the right Step when creating the Signature
-func (hlp *Helper) NextBatch() []byte {
-	blockHash, _ := crypto.RandEntropy(32)
-	hlp.ActivateReduction(blockHash)
-	hlp.SendBatch(blockHash)
-	return blockHash
-}
-
-// Kickstart a Helper without sending any reduction event, and without starting goroutines to
-// intercept RPCBus calls.
-func Kickstart(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) (*Helper, []byte) {
-	h := NewHelper(eb, rpcbus, provisioners, timeOut, false)
-	hash := kickstart(h)
-	return h, hash
-}
-
-// KickstartConcurrent kickstarts a Helper without sending any reduction event, starting
-// goroutines to intercept RPCBus calls.
-func KickstartConcurrent(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) (*Helper, []byte) {
-	h := NewHelper(eb, rpcbus, provisioners, timeOut, true)
-	hash := kickstart(h)
-	return h, hash
-}
-
-func kickstart(h *Helper) []byte {
-	roundUpdate := consensus.MockRoundUpdate(h.Round, h.P)
-	h.Initialize(roundUpdate)
-	hash, _ := crypto.RandEntropy(32)
-	h.ActivateReduction(hash)
-	return hash
-}
-
-// ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
-func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) (*Helper, []byte) {
-	hlp, hash := KickstartConcurrent(eb, rpcbus, provisioners, timeOut)
-	hlp.SendBatch(hash)
-	return hlp, hash
-}
-*/

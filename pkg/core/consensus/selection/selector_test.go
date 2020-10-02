@@ -39,7 +39,7 @@ func TestSelectorRun(t *testing.T) {
 
 	msg := message.New(topics.Score, se)
 
-	consensusTimeOut := 2 * time.Second
+	consensusTimeOut := 100 * time.Millisecond
 
 	mockProxy := transactions.MockProxy{
 		P: transactions.PermissiveProvisioner{},
@@ -63,7 +63,7 @@ func TestSelectorRun(t *testing.T) {
 	mockPhase := consensus.MockPhase(cb)
 	sel := selection.New(mockPhase, emitter, consensusTimeOut)
 
-	ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx := context.Background()
 
 	go func() {
 		evChan <- msg
