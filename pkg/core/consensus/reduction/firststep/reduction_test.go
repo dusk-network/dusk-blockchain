@@ -3,34 +3,60 @@ package firststep
 import (
 	"context"
 	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
-func TestFirstStep(t *testing.T) {
+func TestSendReduction(t *testing.T) {
+	hlp := NewHelper(50, time.Second, true)
 
+	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+	hlp.Bus.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+
+	step := New(nil, hlp.Emitter, 10*time.Second)
+
+	msg := consensus.MockScoreMsg(t, nil)
+	// injecting the result of the Selection step
+	step.Fn(msg.Payload().(message.Score))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		_, err := streamer.Read()
+		require.NoError(t, err)
+		require.Equal(t, streamer.SeenTopics()[0], topics.Reduction)
+		cancel()
+	}()
+
+	evChan := make(chan message.Message, 1)
+	n, err := step.Run(ctx, consensus.NewQueue(), evChan, consensus.MockRoundUpdate(uint64(1), hlp.P), uint8(2))
+	require.Nil(t, n)
+	require.NoError(t, err)
+}
+
+func TestFirstStep(t *testing.T) {
 	queue := consensus.NewQueue()
 	evChan := make(chan message.Message, 50)
 	step := uint8(2)
 	round := uint64(1)
 
-	bus, rpcBus := eventbus.New(), rpcbus.New()
 	messageToSpawn := 50
 
 	hash, err := crypto.RandEntropy(32)
 	require.Nil(t, err)
 
-	consensusTimeOut := 100 * time.Millisecond
+	consensusTimeOut := 10 * time.Second
 
-	hlp := NewHelper(bus, rpcBus, messageToSpawn+1, 1*time.Second, true)
+	hlp := NewHelper(messageToSpawn, time.Second, true)
 
 	cb := func(ctx context.Context) (bool, error) {
 		packet := ctx.Value("Packet")
@@ -50,8 +76,13 @@ func TestFirstStep(t *testing.T) {
 		return false, errors.New("cb: failed to validate Score")
 	}
 
-	mockPhase := consensus.MockPhase(cb)
-	firstStepReduction := New(mockPhase, hlp.Emitter, consensusTimeOut)
+	resultPhase := consensus.MockPhase(cb)
+	firstStepReduction := New(resultPhase, hlp.Emitter, consensusTimeOut)
+
+	msg := consensus.MockScoreMsg(t, &header.Header{BlockHash: hash})
+
+	// injecting the result of the Selection step
+	firstStepReduction.Fn(msg.Payload().(message.Score))
 
 	ctx := context.Background()
 
@@ -64,11 +95,17 @@ func TestFirstStep(t *testing.T) {
 
 	}()
 
-	phaseFn, err := firstStepReduction.Run(ctx, queue, evChan, consensus.RoundUpdate{Round: uint64(1)}, step)
-	require.Nil(t, err)
-	require.NotNil(t, phaseFn)
+	r := consensus.RoundUpdate{
+		Round: uint64(1),
+		P:     *hlp.P,
+		Hash:  hash,
+		Seed:  hash,
+	}
+	resultFn, err := firstStepReduction.Run(ctx, queue, evChan, r, step)
+	require.NoError(t, err)
+	require.NotNil(t, resultFn)
 
-	_, err = phaseFn(ctx, queue, evChan, consensus.RoundUpdate{Round: uint64(1)}, step+1)
+	_, err = resultFn(ctx, queue, evChan, r, step+1)
 
 	require.Nil(t, err)
 

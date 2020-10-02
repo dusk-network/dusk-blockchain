@@ -3,12 +3,17 @@ package consensus
 import (
 	"bytes"
 	"context"
+	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -90,6 +95,7 @@ func (m *mockPhase) Fn(packet InternalPacket) PhaseFn {
 	return m.Run
 }
 
+// nolint
 func (m *mockPhase) Run(ctx context.Context, queue *Queue, evChan chan message.Message, r RoundUpdate, step uint8) (PhaseFn, error) {
 	ctx = context.WithValue(ctx, "Packet", m.packet)
 	if stop, err := m.callback(ctx); err != nil {
@@ -111,4 +117,25 @@ func MockPhase(cb func(ctx context.Context) (bool, error)) Phase {
 		}
 	}
 	return &mockPhase{cb, nil}
+}
+
+// MockScoreMsg ...
+func MockScoreMsg(t *testing.T, hdr *header.Header) message.Message {
+	var h header.Header
+	if hdr == nil {
+		h = header.Mock()
+		h.Round = 1
+		hash, _ := crypto.RandEntropy(32)
+		h.BlockHash = hash
+	} else {
+		h = *hdr
+	}
+
+	// mock candidate
+	genesis := config.DecodeGenesis()
+	cert := block.EmptyCertificate()
+	c := message.MakeCandidate(genesis, cert)
+
+	se := message.MockScore(h, c)
+	return message.New(topics.Score, se)
 }

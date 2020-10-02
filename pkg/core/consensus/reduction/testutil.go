@@ -1,9 +1,9 @@
 package reduction
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"sync"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
@@ -17,19 +17,18 @@ import (
 
 // Helper for reducing test boilerplate
 type Helper struct {
-	PubKeyBLS           []byte
-	Bus                 *eventbus.EventBus
-	RBus                *rpcbus.RPCBus
-	Keys                []key.Keys
-	P                   *user.Provisioners
-	nr                  int
-	Handler             *Handler
-	CollectionWaitGroup sync.WaitGroup
-	Emitter             *consensus.Emitter
+	PubKeyBLS []byte
+	Bus       *eventbus.EventBus
+	RBus      *rpcbus.RPCBus
+	Keys      []key.Keys
+	P         *user.Provisioners
+	nr        int
+	Handler   *Handler
+	Emitter   *consensus.Emitter
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) *Helper {
+func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	p, keys := consensus.MockProvisioners(provisioners)
 
 	mockProxy := transactions.MockProxy{
@@ -40,14 +39,13 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, t
 
 	hlp := &Helper{
 		PubKeyBLS: emitter.Keys.BLSPubKeyBytes,
-		Bus:       eb,
-		RBus:      rpcbus,
+		Bus:       emitter.EventBus,
+		RBus:      emitter.RPCBus,
 		Keys:      keys,
 		P:         p,
-
-		nr:      provisioners,
-		Handler: NewHandler(emitter.Keys, *p),
-		Emitter: emitter,
+		nr:        provisioners,
+		Handler:   NewHandler(emitter.Keys, *p),
+		Emitter:   emitter,
 	}
 
 	return hlp

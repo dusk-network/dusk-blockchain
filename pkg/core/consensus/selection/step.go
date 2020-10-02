@@ -2,10 +2,11 @@ package selection
 
 import (
 	"context"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -18,7 +19,6 @@ import (
 )
 
 var lg = log.WithField("process", "selector")
-var emptyScore [32]byte
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
@@ -101,7 +101,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 }
 
-func (p *Phase) endSelection(round uint64, step uint8) consensus.PhaseFn {
+func (p *Phase) endSelection(_ uint64, _ uint8) consensus.PhaseFn {
 
 	defer func() {
 		p.handler.LowerThreshold()

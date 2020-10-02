@@ -9,14 +9,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 // Helper for reducing test boilerplate
 type Helper struct {
 	*reduction.Helper
-	StepVotesChan      chan message.Message
 	lock               sync.RWMutex
 	failOnFetching     bool
 	failOnVerification bool
@@ -25,10 +23,9 @@ type Helper struct {
 // NewHelper creates a Helper used for testing the first step Reducer.
 // `startGoroutines` can be specified to simultaneously launch goroutines
 // that intercept RPC calls made by the first step Reducer.
-func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration, startGoroutines bool) *Helper {
+func NewHelper(provisioners int, timeOut time.Duration, startGoroutines bool) *Helper {
 	hlp := &Helper{
-		Helper:             reduction.NewHelper(eb, rpcbus, provisioners, timeOut),
-		StepVotesChan:      make(chan message.Message, 1),
+		Helper:             reduction.NewHelper(provisioners, timeOut),
 		failOnFetching:     false,
 		failOnVerification: false,
 	}
@@ -37,7 +34,6 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, t
 		go hlp.provideCandidateBlock()
 		go hlp.processCandidateVerificationRequest()
 	}
-	hlp.createResultChan()
 	return hlp
 }
 
@@ -97,10 +93,4 @@ func (hlp *Helper) processCandidateVerificationRequest() {
 
 		r.RespChan <- rpcbus.NewResponse(nil, nil)
 	}
-}
-
-// CreateResultChan is used by tests (internal and external) to quickly wire the StepVotes resulting from the firststep reduction to a channel to listen to
-func (hlp *Helper) createResultChan() {
-	chanListener := eventbus.NewChanListener(hlp.StepVotesChan)
-	hlp.Bus.Subscribe(topics.StepVotes, chanListener)
 }
