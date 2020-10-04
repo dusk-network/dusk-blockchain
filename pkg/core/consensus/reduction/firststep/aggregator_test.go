@@ -46,7 +46,7 @@ var ttest = map[string]struct {
 
 // TestAggregation tests that upon collection of a quorum of events, a valid StepVotes get produced
 func TestAggregation(t *testing.T) {
-	t.Parallel()
+
 	hash, _ := crypto.RandEntropy(32)
 	messageToSpawn := 3
 	for testName, tt := range ttest {
@@ -69,6 +69,8 @@ func TestAggregation(t *testing.T) {
 			var res *result
 			for _, ev := range evs {
 				var err error
+				// if the aggregator returns a result, the quorum has been
+				// reached. Otherwise it returns nil
 				res, err = aggregator.collectVote(ev)
 				require.Nil(err)
 				if res != nil {

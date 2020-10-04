@@ -17,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/stretchr/testify/require"
 )
 
 // MockEmitter is a utility to quickly wire up an emitter in tests
@@ -117,6 +118,37 @@ func MockPhase(cb func(ctx context.Context) (bool, error)) Phase {
 		}
 	}
 	return &mockPhase{cb, nil}
+}
+
+// TestCallback is a callback to allow for table testing based on step results
+type TestCallback func(*require.Assertions, InternalPacket) error
+
+// TestPhase is the phase to inject in the step under test to allow for table
+// testing. It treats the packet injected through the Fn method as the result
+// to test
+type TestPhase struct {
+	callback TestCallback
+	packet   InternalPacket
+	req      *require.Assertions
+}
+
+// NewTestPhase returns a Phase implementation suitable for testing steps
+func NewTestPhase(t *testing.T, callback TestCallback) *TestPhase {
+	return &TestPhase{
+		req:      require.New(t),
+		callback: callback,
+	}
+}
+
+// Fn is used by the step under test to provide its result
+func (t *TestPhase) Fn(sv InternalPacket) PhaseFn {
+	t.packet = sv
+	return t.Run
+}
+
+// Run does nothing else than delegating to the specified callback
+func (t *TestPhase) Run(_ context.Context, queue *Queue, _ chan message.Message, _ RoundUpdate, _ uint8) (PhaseFn, error) {
+	return nil, t.callback(t.req, t.packet)
 }
 
 // MockScoreMsg ...

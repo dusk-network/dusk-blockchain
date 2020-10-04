@@ -19,7 +19,7 @@ type Helper struct {
 	ThisSender       []byte
 	ProvisionersKeys []key.Keys
 	P                *user.Provisioners
-	nr               int
+	Nr               int
 	Handler          *Handler
 }
 
@@ -37,7 +37,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 		ThisSender:       emitter.Keys.BLSPubKeyBytes,
 		ProvisionersKeys: provisionersKeys,
 		P:                p,
-		nr:               provisioners,
+		Nr:               provisioners,
 		Handler:          NewHandler(emitter.Keys, *p),
 		Emitter:          emitter,
 	}
@@ -47,7 +47,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 
 // Verify StepVotes. The step must be specified otherwise verification would be dependent on the state of the Helper
 func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, round uint64, step uint8) error {
-	vc := hlp.P.CreateVotingCommittee(round, step, hlp.nr)
+	vc := hlp.P.CreateVotingCommittee(round, step, hlp.Nr)
 	sub := vc.IntersectCluster(sv.BitSet)
 	apk, err := agreement.ReconstructApk(sub.Set)
 	if err != nil {
@@ -59,7 +59,7 @@ func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, round uint64, step 
 
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
 func (hlp *Helper) Spawn(hash []byte, round uint64, step uint8) []message.Reduction {
-	evs := make([]message.Reduction, 0, hlp.nr)
+	evs := make([]message.Reduction, 0, hlp.Nr)
 	i := 0
 	for count := 0; count < hlp.Handler.Quorum(round); {
 		ev := message.MockReduction(hash, round, step, hlp.ProvisionersKeys, i)
