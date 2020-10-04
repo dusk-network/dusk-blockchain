@@ -1,32 +1,29 @@
 package firststep
 
 import (
+	"bytes"
 	"context"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "firststep reduction")
-var emptyHash [32]byte
-var emptyStepVotes = message.StepVotes{}
-
-type result struct {
-	Hash []byte
-	SV   message.StepVotes
-}
+var lg = log.WithField("process", "first step reduction")
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
 	*consensus.Emitter
 
 	handler    *reduction.Handler
-	aggregator *aggregator
+	aggregator *reduction.Aggregator
 
 	timeOut time.Duration
 
@@ -72,7 +69,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 
 	timeoutChan := time.After(p.timeOut)
-	p.aggregator = newAggregator(p.handler, p.RPCBus)
+	p.aggregator = reduction.NewAggregator(p.handler)
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Reduction {
 			rMsg := ev.Payload().(message.Reduction)
@@ -101,7 +98,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	for {
 		select {
 		case ev := <-evChan:
-			if shouldProcess(ev, r.Round, step, queue) {
+			if reduction.ShouldProcess(ev, r.Round, step, queue) {
 				rMsg := ev.Payload().(message.Reduction)
 				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
 					continue
@@ -123,7 +120,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
-			sv := p.createStepVoteMessage(&result{emptyHash[:], emptyStepVotes}, r.Round, step)
+			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step)
 			return p.next.Fn(*sv), nil
 
 		case <-ctx.Done():
@@ -167,20 +164,36 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		//"sender": hex.EncodeToString(hdr.Sender()),
 		//"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received_event")
-	result, err := p.aggregator.collectVote(r)
+
+	result, err := p.aggregator.CollectVote(r)
 	if err != nil {
 		return nil, err
+	}
+
+	// if the votes converged for an empty hash we invoke halt with no
+	// StepVotes
+	if bytes.Equal(hdr.BlockHash, reduction.EmptyHash[:]) {
+		return p.createStepVoteMessage(reduction.EmptyResult, round, step), nil
+	}
+
+	if err := p.verifyCandidateBlock(hdr.BlockHash); err != nil {
+		log.
+			WithError(err).
+			WithField("round", hdr.Round).
+			WithField("step", hdr.Step).
+			Error("firststep_verifyCandidateBlock the candidate block failed")
+		return p.createStepVoteMessage(reduction.EmptyResult, round, step), nil
 	}
 
 	return p.createStepVoteMessage(result, round, step), nil
 }
 
-func (p *Phase) createStepVoteMessage(r *result, round uint64, step uint8) *message.StepVotesMsg {
+func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8) *message.StepVotesMsg {
 	if r == nil {
 		return nil
 	}
 
-	if r.SV == emptyStepVotes {
+	if r.IsEmpty() {
 		// if we converged on an empty block hash, we increase the timeout
 
 		p.timeOut = p.timeOut * 2
@@ -204,44 +217,40 @@ func (p *Phase) createStepVoteMessage(r *result, round uint64, step uint8) *mess
 	}
 }
 
-func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus.Queue) bool {
-	msg := m.Payload().(consensus.InternalPacket)
-	hdr := msg.State()
+func (p *Phase) verifyCandidateBlock(blockHash []byte) error {
+	// Fetch the candidate block first.
 
-	cmp := hdr.CompareRoundAndStep(round, step)
-	if cmp == header.Before {
-		lg.
+	params := new(bytes.Buffer)
+	_ = encoding.Write256(params, blockHash)
+	_ = encoding.WriteBool(params, true)
+
+	req := rpcbus.NewRequest(*params)
+	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
+	resp, err := p.RPCBus.Call(topics.GetCandidate, req, timeoutGetCandidate)
+	if err != nil {
+		log.
+			WithError(err).
 			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
-			}).
-			Debugln("discarding obsolete agreement")
-		return false
+				"process": "reduction",
+			}).Error("firststep, fetching the candidate block failed")
+		return err
+	}
+	cm := resp.(message.Candidate)
+
+	// If our result was not a zero value hash, we should first verify it
+	// before voting on it again
+	if !bytes.Equal(blockHash, reduction.EmptyHash[:]) {
+		req := rpcbus.NewRequest(cm)
+		timeoutVerifyCandidateBlock := time.Duration(config.Get().Timeout.TimeoutVerifyCandidateBlock) * time.Second
+		if _, err := p.RPCBus.Call(topics.VerifyCandidateBlock, req, timeoutVerifyCandidateBlock); err != nil {
+			log.
+				WithError(err).
+				WithFields(log.Fields{
+					"process": "reduction",
+				}).Error("firststep, verifying the candidate block failed")
+			return err
+		}
 	}
 
-	if cmp == header.After {
-		lg.
-			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
-			}).
-			Debugln("storing future round for later")
-		queue.PutEvent(hdr.Round, hdr.Step, m)
-		return false
-	}
-
-	if m.Category() != topics.Reduction {
-		lg.
-			WithFields(log.Fields{
-				"topic":             "Reduction",
-				"round":             hdr.Round,
-				"coordinator_round": round,
-			}).
-			Debugln("message not topics.Score")
-		return false
-	}
-
-	return true
+	return nil
 }

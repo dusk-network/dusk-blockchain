@@ -1,4 +1,4 @@
-package firststep
+package reduction
 
 import (
 	"testing"
@@ -13,35 +13,37 @@ var step = uint8(2)
 
 var ttest = map[string]struct {
 	setup func(*Helper)
-	tCb   func(*require.Assertions, *Helper, *result)
+	tCb   func(*require.Assertions, *Helper, *Result)
 }{
 	"Test Successful Aggregation": {
 		setup: func(hlp *Helper) {},
-		tCb: func(require *require.Assertions, hlp *Helper, res *result) {
+		tCb: func(require *require.Assertions, hlp *Helper, res *Result) {
 			require.NotNil(res)
 			require.NoError(hlp.Verify(res.Hash, res.SV, round, step))
 		},
 	},
 
-	"Test Invalid Block": {
-		setup: func(hlp *Helper) {
-			hlp.FailOnVerification(true)
+	/*
+		// TODO: move those into the firststep
+		"Test Invalid Block": {
+			setup: func(hlp *Helper) {
+				hlp.FailOnVerification(true)
+			},
+			tCb: func(require *require.Assertions, hlp *Helper, res *Result) {
+				require.True(res.IsEmpty())
+			},
 		},
-		tCb: func(require *require.Assertions, hlp *Helper, res *result) {
-			require.Equal(emptyHash[:], res.Hash)
-			require.True(res.SV.IsEmpty())
-		},
-	},
 
-	"Test Candidate Not Found": {
-		setup: func(hlp *Helper) {
-			hlp.FailOnFetching(true)
+		"Test Candidate Not Found": {
+			setup: func(hlp *Helper) {
+				hlp.FailOnFetching(true)
+			},
+			tCb: func(require *require.Assertions, hlp *Helper, res *result) {
+				require.Equal(emptyHash[:], res.Hash)
+				require.True(res.SV.IsEmpty())
+			},
 		},
-		tCb: func(require *require.Assertions, hlp *Helper, res *result) {
-			require.Equal(emptyHash[:], res.Hash)
-			require.True(res.SV.IsEmpty())
-		},
-	},
+	*/
 }
 
 // TestAggregation tests that upon collection of a quorum of events, a valid StepVotes get produced
@@ -57,7 +59,7 @@ func TestAggregation(t *testing.T) {
 			require := require.New(t)
 			// setting up the helper and the aggregator
 			hlp := NewHelper(messageToSpawn+1, 1*time.Second)
-			aggregator := newAggregator(hlp.Handler, hlp.RPCBus)
+			aggregator := NewAggregator(hlp.Handler)
 
 			// running test-specific setup on the Helper
 			tt.setup(hlp)
@@ -66,12 +68,12 @@ func TestAggregation(t *testing.T) {
 			evs := hlp.Spawn(hash, round, step)
 
 			// sending Reduction messages to the aggregator
-			var res *result
+			var res *Result
 			for _, ev := range evs {
 				var err error
 				// if the aggregator returns a result, the quorum has been
 				// reached. Otherwise it returns nil
-				res, err = aggregator.collectVote(ev)
+				res, err = aggregator.CollectVote(ev)
 				require.Nil(err)
 				if res != nil {
 					break

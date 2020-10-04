@@ -14,18 +14,12 @@ import (
 )
 
 var lg = log.WithField("process", "secondstep reduction")
-var emptyHash [32]byte
-
-type result struct {
-	Hash []byte
-	SV   message.StepVotes
-}
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
 	*consensus.Emitter
 	handler    *reduction.Handler
-	aggregator *aggregator
+	aggregator *reduction.Aggregator
 
 	timeOut time.Duration
 
@@ -47,11 +41,6 @@ func New(e *consensus.Emitter, timeOut time.Duration) *Phase {
 // SetNext sets the next step to be returned at the end of this one
 func (p *Phase) SetNext(next consensus.Phase) {
 	p.next = next
-}
-
-// Name as dictated by the Phase interface
-func (p *Phase) Name() string {
-	return "secondstep_reduction"
 }
 
 // Fn passes to this reduction step the best score collected during selection
@@ -78,7 +67,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 
 	timeoutChan := time.After(p.timeOut)
-	p.aggregator = newAggregator(p.handler)
+	p.aggregator = reduction.NewAggregator(p.handler)
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Reduction {
 			rMsg := ev.Payload().(message.Reduction)
@@ -180,7 +169,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		//"sender": hex.EncodeToString(hdr.Sender()),
 		//"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received_2nd_step_reduction")
-	result, err := p.aggregator.collectVote(r)
+	result, err := p.aggregator.CollectVote(r)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +177,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 	return p.createStepVoteMessage(result, round, step), nil
 }
 
-func (p *Phase) createStepVoteMessage(r *result, round uint64, step uint8) *message.StepVotesMsg {
+func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8) *message.StepVotesMsg {
 	if r == nil {
 		return nil
 	}
@@ -236,8 +225,8 @@ func stepVotesAreValid(svs ...*message.StepVotesMsg) bool {
 	return len(svs) == 2 &&
 		!svs[0].IsEmpty() &&
 		!svs[1].IsEmpty() &&
-		!bytes.Equal(svs[0].BlockHash, emptyHash[:]) &&
-		!bytes.Equal(svs[1].BlockHash, emptyHash[:])
+		!bytes.Equal(svs[0].BlockHash, reduction.EmptyHash[:]) &&
+		!bytes.Equal(svs[1].BlockHash, reduction.EmptyHash[:])
 }
 
 func (p *Phase) increaseTimeout(round uint64) {
