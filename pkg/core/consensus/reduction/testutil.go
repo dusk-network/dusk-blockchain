@@ -11,41 +11,35 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 // Helper for reducing test boilerplate
 type Helper struct {
-	PubKeyBLS []byte
-	Bus       *eventbus.EventBus
-	RBus      *rpcbus.RPCBus
-	Keys      []key.Keys
-	P         *user.Provisioners
-	nr        int
-	Handler   *Handler
-	Emitter   *consensus.Emitter
+	*consensus.Emitter
+	ThisSender       []byte
+	ProvisionersKeys []key.Keys
+	P                *user.Provisioners
+	nr               int
+	Handler          *Handler
 }
 
 // NewHelper creates a Helper
 func NewHelper(provisioners int, timeOut time.Duration) *Helper {
-	p, keys := consensus.MockProvisioners(provisioners)
+	p, provisionersKeys := consensus.MockProvisioners(provisioners)
 
 	mockProxy := transactions.MockProxy{
 		P: transactions.PermissiveProvisioner{},
 	}
 	emitter := consensus.MockEmitter(timeOut, mockProxy)
-	emitter.Keys = keys[0]
+	emitter.Keys = provisionersKeys[0]
 
 	hlp := &Helper{
-		PubKeyBLS: emitter.Keys.BLSPubKeyBytes,
-		Bus:       emitter.EventBus,
-		RBus:      emitter.RPCBus,
-		Keys:      keys,
-		P:         p,
-		nr:        provisioners,
-		Handler:   NewHandler(emitter.Keys, *p),
-		Emitter:   emitter,
+		ThisSender:       emitter.Keys.BLSPubKeyBytes,
+		ProvisionersKeys: provisionersKeys,
+		P:                p,
+		nr:               provisioners,
+		Handler:          NewHandler(emitter.Keys, *p),
+		Emitter:          emitter,
 	}
 
 	return hlp
@@ -68,10 +62,10 @@ func (hlp *Helper) Spawn(hash []byte, round uint64, step uint8) []message.Reduct
 	evs := make([]message.Reduction, 0, hlp.nr)
 	i := 0
 	for count := 0; count < hlp.Handler.Quorum(round); {
-		ev := message.MockReduction(hash, round, step, hlp.Keys, i)
+		ev := message.MockReduction(hash, round, step, hlp.ProvisionersKeys, i)
 		i++
 		evs = append(evs, ev)
-		count += hlp.Handler.VotesFor(hlp.Keys[i].BLSPubKeyBytes, round, step)
+		count += hlp.Handler.VotesFor(hlp.ProvisionersKeys[i].BLSPubKeyBytes, round, step)
 	}
 	return evs
 }

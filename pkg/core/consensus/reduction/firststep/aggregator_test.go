@@ -5,98 +5,78 @@ import (
 	"time"
 
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestSuccessfulAggro tests that upon collection of a quorum of events, a valid StepVotes get produced
-func TestSuccessfulAggro(t *testing.T) {
-	step := uint8(2)
-	round := uint64(1)
-	messageToSpawn := 3
+var round = uint64(1)
+var step = uint8(2)
 
-	hlp := NewHelper(messageToSpawn+1, 1*time.Second, true)
+var ttest = map[string]struct {
+	setup func(*Helper)
+	tCb   func(*require.Assertions, *Helper, *result)
+}{
+	"Test Successful Aggregation": {
+		setup: func(hlp *Helper) {},
+		tCb: func(require *require.Assertions, hlp *Helper, res *result) {
+			require.NotNil(res)
+			require.NoError(hlp.Verify(res.Hash, res.SV, round, step))
+		},
+	},
 
-	hash, _ := crypto.RandEntropy(32)
-	evs := hlp.Spawn(hash, round, step)
+	"Test Invalid Block": {
+		setup: func(hlp *Helper) {
+			hlp.FailOnVerification(true)
+		},
+		tCb: func(require *require.Assertions, hlp *Helper, res *result) {
+			require.Equal(emptyHash[:], res.Hash)
+			require.True(res.SV.IsEmpty())
+		},
+	},
 
-	aggregator := newAggregator(hlp.Handler, hlp.RBus)
-
-	var res *result
-	for _, ev := range evs {
-		var err error
-		res, err = aggregator.collectVote(ev)
-		require.Nil(t, err)
-		if res != nil {
-			break
-		}
-
-	}
-
-	assert.NotNil(t, res)
-
-	assert.NoError(t, hlp.Verify(res.Hash, res.SV, round, step))
+	"Test Candidate Not Found": {
+		setup: func(hlp *Helper) {
+			hlp.FailOnFetching(true)
+		},
+		tCb: func(require *require.Assertions, hlp *Helper, res *result) {
+			require.Equal(emptyHash[:], res.Hash)
+			require.True(res.SV.IsEmpty())
+		},
+	},
 }
 
-// TestInvalidBlock tests that upon collection of a quorum of events, a valid StepVotes get produced
-func TestInvalidBlock(t *testing.T) {
-	logrus.SetLevel(logrus.FatalLevel)
-	messageToSpawn := 3
-	step := uint8(2)
-	round := uint64(1)
-
+// TestAggregation tests that upon collection of a quorum of events, a valid StepVotes get produced
+func TestAggregation(t *testing.T) {
+	t.Parallel()
 	hash, _ := crypto.RandEntropy(32)
-
-	hlp := NewHelper(messageToSpawn+1, 1*time.Second, true)
-
-	hlp.FailOnVerification(true)
-	evs := hlp.Spawn(hash, round, step)
-
-	aggregator := newAggregator(hlp.Handler, hlp.RBus)
-
-	var res *result
-	for _, ev := range evs {
-		var err error
-		res, err = aggregator.collectVote(ev)
-		require.Nil(t, err)
-		if res != nil {
-			break
-		}
-
-	}
-
-	assert.Equal(t, emptyHash[:], res.Hash)
-	assert.True(t, res.SV.IsEmpty())
-}
-
-// Test that a valid stepvotes is produced when a candidate block for
-// a given hash is not found.
-func TestCandidateNotFound(t *testing.T) {
-	logrus.SetLevel(logrus.FatalLevel)
 	messageToSpawn := 3
-	step := uint8(2)
-	round := uint64(1)
+	for testName, tt := range ttest {
+		t.Run(testName, func(t *testing.T) {
+			// making sure that parallelism does not interfere with the test
+			tt := tt
+			// creting the require instance from this subtest
+			require := require.New(t)
+			// setting up the helper and the aggregator
+			hlp := NewHelper(messageToSpawn+1, 1*time.Second)
+			aggregator := newAggregator(hlp.Handler, hlp.RPCBus)
 
-	hash, _ := crypto.RandEntropy(32)
+			// running test-specific setup on the Helper
+			tt.setup(hlp)
 
-	hlp := NewHelper(messageToSpawn+1, 1*time.Second, true)
-	hlp.FailOnFetching(true)
-	evs := hlp.Spawn(hash, round, step)
+			// creating the messages
+			evs := hlp.Spawn(hash, round, step)
 
-	aggregator := newAggregator(hlp.Handler, hlp.RBus)
+			// sending Reduction messages to the aggregator
+			var res *result
+			for _, ev := range evs {
+				var err error
+				res, err = aggregator.collectVote(ev)
+				require.Nil(err)
+				if res != nil {
+					break
+				}
+			}
 
-	var res *result
-	for _, ev := range evs {
-		var err error
-		res, err = aggregator.collectVote(ev)
-		require.Nil(t, err)
-		if res != nil {
-			break
-		}
-
+			tt.tCb(require, hlp, res)
+		})
 	}
-
-	assert.Equal(t, emptyHash[:], res.Hash)
-	assert.True(t, res.SV.IsEmpty())
 }

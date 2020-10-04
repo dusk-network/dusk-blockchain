@@ -17,11 +17,13 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
+// TestSendReduction tests that the reduction step completes without problems
+// and produces a StepVotesMsg in case it receives enough valid Reduction messages
 func TestSendReduction(t *testing.T) {
-	hlp := NewHelper(50, time.Second, true)
+	hlp := NewHelper(50, time.Second)
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
-	hlp.Bus.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+	hlp.EventBus.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
 
 	step := New(nil, hlp.Emitter, 10*time.Second)
 
@@ -56,7 +58,7 @@ func TestFirstStep(t *testing.T) {
 
 	consensusTimeOut := 10 * time.Second
 
-	hlp := NewHelper(messageToSpawn, time.Second, true)
+	hlp := NewHelper(messageToSpawn, time.Second)
 
 	cb := func(ctx context.Context) (bool, error) {
 		packet := ctx.Value("Packet")
@@ -111,30 +113,6 @@ func TestFirstStep(t *testing.T) {
 
 }
 
-//
-//func TestMoreSteps(t *testing.T) {
-//	bus, rpcBus := eventbus.New(), rpcbus.New()
-//	hlp, _ := ProduceFirstStepVotes(bus, rpcBus, 50, 1*time.Second)
-//
-//	// Wait for resulting StepVotes
-//	<-hlp.StepVotesChan
-//
-//	hash := hlp.NextBatch()
-//	svMsg := <-hlp.StepVotesChan
-//
-//	// Retrieve StepVotes
-//	svm := svMsg.Payload().(message.StepVotesMsg)
-//
-//	// StepVotes should be valid
-//	assert.NoError(t, hlp.Verify(hash, svm.StepVotes, 2))
-//	// test that EventPlayer.Play has been called
-//	assert.Equal(t, uint8(2), hlp.Step())
-//	// test that the Player is PAUSED
-//	assert.Equal(t, consensus.PAUSED, hlp.State())
-//	// test that the timeout is still 1 second
-//	assert.Equal(t, 1*time.Second, hlp.Reducer.(*Reducer).timeOut)
-//}
-//
 //func TestFirstStepTimeOut(t *testing.T) {
 //	bus, rpcBus := eventbus.New(), rpcbus.New()
 //	timeOut := 100 * time.Millisecond

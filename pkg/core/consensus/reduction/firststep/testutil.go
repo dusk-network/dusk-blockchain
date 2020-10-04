@@ -21,19 +21,17 @@ type Helper struct {
 }
 
 // NewHelper creates a Helper used for testing the first step Reducer.
-// `startGoroutines` can be specified to simultaneously launch goroutines
+// The constructor also launches goroutines
 // that intercept RPC calls made by the first step Reducer.
-func NewHelper(provisioners int, timeOut time.Duration, startGoroutines bool) *Helper {
+func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	hlp := &Helper{
 		Helper:             reduction.NewHelper(provisioners, timeOut),
 		failOnFetching:     false,
 		failOnVerification: false,
 	}
 
-	if startGoroutines {
-		go hlp.provideCandidateBlock()
-		go hlp.processCandidateVerificationRequest()
-	}
+	go hlp.provideCandidateBlock()
+	go hlp.processCandidateVerificationRequest()
 	return hlp
 }
 
@@ -67,7 +65,7 @@ func (hlp *Helper) shouldFailVerification() bool {
 
 func (hlp *Helper) provideCandidateBlock() {
 	c := make(chan rpcbus.Request, 1)
-	_ = hlp.RBus.Register(topics.GetCandidate, c)
+	_ = hlp.RPCBus.Register(topics.GetCandidate, c)
 	for {
 		r := <-c
 		if hlp.shouldFailFetching() {
@@ -81,7 +79,7 @@ func (hlp *Helper) provideCandidateBlock() {
 
 func (hlp *Helper) processCandidateVerificationRequest() {
 	v := make(chan rpcbus.Request, 1)
-	if err := hlp.RBus.Register(topics.VerifyCandidateBlock, v); err != nil {
+	if err := hlp.RPCBus.Register(topics.VerifyCandidateBlock, v); err != nil {
 		panic(err)
 	}
 	for {
