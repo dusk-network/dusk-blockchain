@@ -1,6 +1,8 @@
 package reduction
 
 import (
+	"time"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -33,6 +35,46 @@ type Result struct {
 // IsEmpty tests if the result of the aggregation is empty
 func (r *Result) IsEmpty() bool {
 	return r == EmptyResult
+}
+
+// Reduction is a struct to be embedded in the reduction steps
+type Reduction struct {
+	*consensus.Emitter
+	TimeOut time.Duration
+}
+
+// IncreaseTimeout ...
+func (r *Reduction) IncreaseTimeout(round uint64) {
+
+	// if we converged on an empty block hash, we increase the timeout
+	r.TimeOut = r.TimeOut * 2
+	if r.TimeOut > 60*time.Second {
+		lg.
+			WithField("timeout", r.TimeOut).
+			WithField("round", round).
+			Error("max_timeout_reached")
+		r.TimeOut = 60 * time.Second
+	}
+}
+
+// SendReduction to the other peers
+func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) error {
+	hdr := header.Header{
+		Round:     round,
+		Step:      step,
+		BlockHash: hash,
+		PubKeyBLS: r.Keys.BLSPubKeyBytes,
+	}
+
+	sig, err := r.Sign(hdr)
+	if err != nil {
+		return err
+	}
+
+	red := message.NewReduction(hdr)
+	red.SignedHash = sig
+	_ = r.Gossip(message.New(topics.Reduction, *red))
+	return nil
 }
 
 // ShouldProcess checks whether a message is consistent with the current round

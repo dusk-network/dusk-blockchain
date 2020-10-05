@@ -17,11 +17,9 @@ var lg = log.WithField("process", "secondstep reduction")
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
-	*consensus.Emitter
+	*reduction.Reduction
 	handler    *reduction.Handler
 	aggregator *reduction.Aggregator
-
-	timeOut time.Duration
 
 	firstStepVotesMsg message.StepVotesMsg
 
@@ -33,8 +31,7 @@ type Phase struct {
 // and reduce them to just one candidate obtaining 64% of the committee vote
 func New(e *consensus.Emitter, timeOut time.Duration) *Phase {
 	return &Phase{
-		Emitter: e,
-		timeOut: timeOut,
+		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
 	}
 }
 
@@ -59,14 +56,14 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	p.handler = reduction.NewHandler(p.Keys, r.P)
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
-		if err := p.sendReduction(r.Round, step, p.firstStepVotesMsg.BlockHash); err != nil {
+		if err := p.SendReduction(r.Round, step, p.firstStepVotesMsg.BlockHash); err != nil {
 			// in case of error we need to tell the consensus loop as we cannot
 			// really recover from here
 			return nil, err
 		}
 	}
 
-	timeoutChan := time.After(p.timeOut)
+	timeoutChan := time.After(p.TimeOut)
 	p.aggregator = reduction.NewAggregator(p.handler)
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Reduction {
@@ -97,7 +94,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	for {
 		select {
 		case ev := <-evChan:
-			if shouldProcess(ev, r.Round, step, queue) {
+			if reduction.ShouldProcess(ev, r.Round, step, queue) {
 				rMsg := ev.Payload().(message.Reduction)
 				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
 					continue
@@ -125,7 +122,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 		case <-timeoutChan:
 			// in case of timeout we increase the timeout and that's it
-			p.increaseTimeout(r.Round)
+			p.IncreaseTimeout(r.Round)
 			return p.next.Fn(nil), nil
 
 		case <-ctx.Done():
@@ -136,25 +133,6 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			return nil, nil
 		}
 	}
-}
-
-func (p *Phase) sendReduction(round uint64, step uint8, hash []byte) error {
-	hdr := header.Header{
-		Round:     round,
-		Step:      step,
-		BlockHash: hash,
-		PubKeyBLS: p.Keys.BLSPubKeyBytes,
-	}
-
-	sig, err := p.Sign(hdr)
-	if err != nil {
-		return err
-	}
-
-	red := message.NewReduction(hdr)
-	red.SignedHash = sig
-	_ = p.Gossip(message.New(topics.Reduction, *red))
-	return nil
 }
 
 func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) (*message.StepVotesMsg, error) {
@@ -227,59 +205,4 @@ func stepVotesAreValid(svs ...*message.StepVotesMsg) bool {
 		!svs[1].IsEmpty() &&
 		!bytes.Equal(svs[0].BlockHash, reduction.EmptyHash[:]) &&
 		!bytes.Equal(svs[1].BlockHash, reduction.EmptyHash[:])
-}
-
-func (p *Phase) increaseTimeout(round uint64) {
-	p.timeOut = p.timeOut * 2
-	if p.timeOut > 60*time.Second {
-		lg.
-			WithField("timeout", p.timeOut).
-			WithField("round", round).
-			Error("max_timeout_reached")
-		p.timeOut = 60 * time.Second
-	}
-}
-
-func shouldProcess(a message.Message, round uint64, step uint8, queue *consensus.Queue) bool {
-	msg := a.Payload().(consensus.InternalPacket)
-	hdr := msg.State()
-
-	if !check(a, round, step, queue) {
-		return false
-	}
-
-	if a.Category() != topics.Reduction {
-		queue.PutEvent(hdr.Round, hdr.Step, a)
-		return false
-	}
-
-	return true
-}
-
-func check(a message.Message, round uint64, step uint8, queue *consensus.Queue) bool {
-	msg := a.Payload().(consensus.InternalPacket)
-	hdr := msg.State()
-	switch hdr.CompareRoundAndStep(round, step) {
-	case header.Before:
-		lg.
-			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
-			}).
-			Debugln("discarding obsolete agreement")
-		return false
-	case header.After:
-		lg.
-			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
-			}).
-			Debugln("storing future round for later")
-		queue.PutEvent(hdr.Round, hdr.Step, a)
-		return false
-	}
-
-	return true
 }

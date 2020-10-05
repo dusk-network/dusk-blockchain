@@ -55,7 +55,7 @@ type redTest struct {
 func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte, round uint64, step uint8) map[string]redTest {
 
 	return map[string]redTest{
-		"HappyPath": redTest{
+		"HappyPath": {
 			batchEvents: func() chan message.Message {
 				evChan := make(chan message.Message, hlp.Nr)
 
@@ -87,11 +87,11 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 			// testing that the timeout remained the same after a successful run
 			testStep: func(t *testing.T, step consensus.Phase) {
 				r := step.(*Phase)
-				require.Equal(t, r.timeOut, timeout)
+				require.Equal(t, r.TimeOut, timeout)
 			},
 		},
 
-		"Timeout": redTest{
+		"Timeout": {
 			// no need to create events as we are testing timeouts
 			batchEvents: func() chan message.Message {
 				return make(chan message.Message, hlp.Nr)
@@ -111,7 +111,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 			// testing that the timeout doubled
 			testStep: func(t *testing.T, step consensus.Phase) {
 				r := step.(*Phase)
-				require.Equal(t, r.timeOut, 2*timeout)
+				require.Equal(t, r.TimeOut, 2*timeout)
 			},
 		},
 	}

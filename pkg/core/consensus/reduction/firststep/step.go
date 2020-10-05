@@ -20,12 +20,10 @@ var lg = log.WithField("process", "first step reduction")
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
-	*consensus.Emitter
+	*reduction.Reduction
 
 	handler    *reduction.Handler
 	aggregator *reduction.Aggregator
-
-	timeOut time.Duration
 
 	selectionResult message.Score
 
@@ -37,15 +35,9 @@ type Phase struct {
 // and reduce them to just one candidate obtaining 64% of the committee vote
 func New(next consensus.Phase, e *consensus.Emitter, timeOut time.Duration) *Phase {
 	return &Phase{
-		Emitter: e,
-		next:    next,
-		timeOut: timeOut,
+		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
+		next:      next,
 	}
-}
-
-// Name as dictated by the Phase interface
-func (p *Phase) Name() string {
-	return "firststep_reduction"
 }
 
 // Fn passes to this reduction step the best score collected during selection
@@ -61,14 +53,14 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
-		if err := p.sendReduction(r.Round, step, p.selectionResult.State().BlockHash); err != nil {
+		if err := p.SendReduction(r.Round, step, p.selectionResult.State().BlockHash); err != nil {
 			// in case of error we need to tell the consensus loop as we cannot
 			// really recover from here
 			return nil, err
 		}
 	}
 
-	timeoutChan := time.After(p.timeOut)
+	timeoutChan := time.After(p.TimeOut)
 	p.aggregator = reduction.NewAggregator(p.handler)
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Reduction {
@@ -133,25 +125,6 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 }
 
-func (p *Phase) sendReduction(round uint64, step uint8, hash []byte) error {
-	hdr := header.Header{
-		Round:     round,
-		Step:      step,
-		BlockHash: hash,
-		PubKeyBLS: p.Keys.BLSPubKeyBytes,
-	}
-
-	sig, err := p.Sign(hdr)
-	if err != nil {
-		return err
-	}
-
-	red := message.NewReduction(hdr)
-	red.SignedHash = sig
-	msg := message.New(topics.Reduction, *red)
-	return p.Gossip(msg)
-}
-
 func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) (*message.StepVotesMsg, error) {
 	if err := p.handler.VerifySignature(r); err != nil {
 		return nil, err
@@ -194,16 +167,7 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 	}
 
 	if r.IsEmpty() {
-		// if we converged on an empty block hash, we increase the timeout
-
-		p.timeOut = p.timeOut * 2
-		if p.timeOut > 60*time.Second {
-			lg.
-				WithField("timeout", p.timeOut).
-				WithField("round", round).
-				Error("max_timeout_reached")
-			p.timeOut = 60 * time.Second
-		}
+		p.IncreaseTimeout(round)
 	}
 
 	return &message.StepVotesMsg{
