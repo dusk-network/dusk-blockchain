@@ -1,108 +1,67 @@
 package agreement
 
-/*
 import (
-	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 // Helper is a struct that facilitates sending semi-real Events with minimum effort
 type Helper struct {
-	Bus             *eventbus.EventBus
-	P               *user.Provisioners
-	Keys            []key.Keys
-	Aggro           *agreement
-	CertificateChan chan message.Message
-	nr              int
-}
-
-// WireAgreement ...
-func WireAgreement(nrProvisioners int) (*consensus.Coordinator, *Helper) {
-	eb := eventbus.New()
-	h := NewHelper(eb, nrProvisioners)
-	factory := NewFactory(eb, h.Keys[0])
-	coordinator := consensus.Start(eb, h.Keys[0], factory)
-	// starting up the coordinator
-	ru := consensus.MockRoundUpdate(1, h.P)
-	msg := message.New(topics.RoundUpdate, ru)
-	coordinator.CollectRoundUpdate(msg)
-
-	// Play to step 3, as agreements can only be made on step 3 or later
-	// This prevents the mocked events from getting queued
-	coordinator.Play(h.Aggro.ID())
-	coordinator.Play(h.Aggro.ID())
-	return coordinator, h
+	*consensus.Emitter
+	P                *user.Provisioners
+	CertificateChan  chan message.Message
+	Nr               int
+	ProvisionersKeys []key.Keys
+	Round            uint64
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, provisioners int) *Helper {
-	p, keys := consensus.MockProvisioners(provisioners)
-	factory := NewFactory(eb, keys[0])
-	a := factory.Instantiate()
-	aggro := a.(*agreement)
-	hlp := &Helper{eb, p, keys, aggro, make(chan message.Message, 1), provisioners}
-	hlp.createResultChan()
+func NewHelper(provisioners int) *Helper {
+	p, provisionersKeys := consensus.MockProvisioners(provisioners)
+	mockProxy := transactions.MockProxy{
+		P: transactions.PermissiveProvisioner{},
+	}
+	emitter := consensus.MockEmitter(time.Second, mockProxy)
+	emitter.Keys = provisionersKeys[0]
+
+	hlp := &Helper{
+		Emitter:          emitter,
+		Nr:               provisioners,
+		P:                p,
+		ProvisionersKeys: provisionersKeys,
+		Round:            uint64(1),
+		CertificateChan:  make(chan message.Message, 1),
+	}
+
+	chanListener := eventbus.NewChanListener(hlp.CertificateChan)
+	emitter.EventBus.Subscribe(topics.Certificate, chanListener)
 	return hlp
 }
 
-// CreateResultChan is used by tests (internal and external) to quickly wire the agreement results to a channel to listen to
-func (hlp *Helper) createResultChan() {
-	chanListener := eventbus.NewChanListener(hlp.CertificateChan)
-	hlp.Bus.Subscribe(topics.Certificate, chanListener)
-}
-
-// SendBatch let agreement collect  additional batches of consensus events
-func (hlp *Helper) SendBatch(hash []byte) {
-	batch := hlp.Spawn(hash)
-	var wg sync.WaitGroup
-	// Tell the 'wg' WaitGroup how many threads/goroutines
-	//   that are about to run concurrently.
-	wg.Add(len(batch))
-	for i := 0; i < len(batch); i++ {
-		go func(i int) {
-			defer wg.Done()
-			ev := batch[i]
-			_ = hlp.Aggro.CollectAgreementEvent(ev)
-		}(i)
+// Create a valid RoundUpdate for the current round, based on the information
+// passed to this Helper (i.e. round, Provisioners)
+func (hlp *Helper) RoundUpdate(hash []byte) consensus.RoundUpdate {
+	return consensus.RoundUpdate{
+		Round: hlp.Round,
+		P:     *hlp.P,
+		Seed:  hash,
+		Hash:  hash,
 	}
 }
 
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
 func (hlp *Helper) Spawn(hash []byte) []message.Agreement {
-	evs := make([]message.Agreement, hlp.nr)
-	for i := 0; i < hlp.nr; i++ {
-		ev := message.MockAgreement(hash, 1, 3, hlp.Keys, hlp.P, i)
-		evs[i] = ev
+	evs := make([]message.Agreement, hlp.Nr)
+	for i := 0; i < hlp.Nr; i++ {
+		evs[i] = message.MockAgreement(hash, hlp.Round, 3, hlp.ProvisionersKeys, hlp.P, i)
 	}
 
 	return evs
 }
-
-// Initialize the Agreement with a Round update
-func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
-	hlp.Aggro.Initialize(consensus.NewSimplePlayer(), nil, ru)
-}
-
-// LaunchHelper configures and launches a LaunchHelper
-func LaunchHelper(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
-	hlp := NewHelper(eb, nr)
-	roundUpdate := consensus.MockRoundUpdate(1, hlp.P)
-	hlp.Initialize(roundUpdate)
-	hash, _ := crypto.RandEntropy(32)
-	return hlp, hash
-}
-
-// ProduceWinningHash is used to produce enough valid Events to reach Quorum and trigger sending a winning hash to the channel
-func ProduceWinningHash(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
-	hlp, hash := LaunchHelper(eb, nr)
-	hlp.SendBatch(hash)
-	return hlp, hash
-}
-*/
