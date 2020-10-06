@@ -1,5 +1,18 @@
 package secondstep
 
+// TestSendReduction tests that the reduction step completes without problems
+// and produces a StepVotesMsg in case it receives enough valid Reduction messages
+// It uses the recution common test preparation
+/*
+func TestSendReduction(t *testing.T) {
+	hlp := reduction.NewHelper(50, time.Second)
+	step := New(hlp.Emitter, 10*time.Second)
+	svm :=
+	test := reduction.PrepareSendReductionTest(hlp, step)
+	test(t)
+}
+*/
+
 /*
 import (
 	"runtime"

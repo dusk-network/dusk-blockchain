@@ -2,12 +2,16 @@ package reduction
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
@@ -15,8 +19,33 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
+
+// TestSendReduction tests that the reduction step completes without problems
+// and produces a StepVotesMsg in case it receives enough valid Reduction messages
+func PrepareSendReductionTest(hlp *Helper, stepFn consensus.PhaseFn) func(t *testing.T) {
+	return func(t *testing.T) {
+		require := require.New(t)
+
+		streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+		hlp.EventBus.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			_, err := streamer.Read()
+			require.NoError(err)
+			require.Equal(streamer.SeenTopics()[0], topics.Reduction)
+			cancel()
+		}()
+
+		evChan := make(chan message.Message, 1)
+		n, err := stepFn(ctx, consensus.NewQueue(), evChan, consensus.MockRoundUpdate(uint64(1), hlp.P), uint8(2))
+		require.Nil(n)
+		require.NoError(err)
+	}
+}
 
 // Helper for reducing test boilerplate
 type Helper struct {

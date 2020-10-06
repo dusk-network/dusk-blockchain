@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/stretchr/testify/require"
 
@@ -14,47 +13,31 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 // TestSendReduction tests that the reduction step completes without problems
 // and produces a StepVotesMsg in case it receives enough valid Reduction messages
+// It uses the reduction common test preparation
 func TestSendReduction(t *testing.T) {
 	hlp := reduction.NewHelper(50, time.Second)
-
-	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
-	hlp.EventBus.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
-
 	step := New(nil, hlp.Emitter, 10*time.Second)
-
-	msg := consensus.MockScoreMsg(t, nil)
+	scoreMsg := consensus.MockScoreMsg(t, nil)
 	// injecting the result of the Selection step
-	step.Fn(msg.Payload().(message.Score))
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		_, err := streamer.Read()
-		require.NoError(t, err)
-		require.Equal(t, streamer.SeenTopics()[0], topics.Reduction)
-		cancel()
-	}()
-
-	evChan := make(chan message.Message, 1)
-	n, err := step.Run(ctx, consensus.NewQueue(), evChan, consensus.MockRoundUpdate(uint64(1), hlp.P), uint8(2))
-	require.Nil(t, n)
-	require.NoError(t, err)
+	stepFn := step.Fn(scoreMsg.Payload().(message.Score))
+	test := reduction.PrepareSendReductionTest(hlp, stepFn)
+	test(t)
 }
 
-type redTest struct {
+type reductionTest struct {
 	batchEvents       func() chan message.Message
 	testResultFactory consensus.TestCallback
 	testStep          func(*testing.T, consensus.Phase)
 }
 
-func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte, round uint64, step uint8) map[string]redTest {
+func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte, round uint64, step uint8) map[string]reductionTest {
 
-	return map[string]redTest{
+	return map[string]reductionTest{
 		"HappyPath": {
 			batchEvents: func() chan message.Message {
 				evChan := make(chan message.Message, hlp.Nr)

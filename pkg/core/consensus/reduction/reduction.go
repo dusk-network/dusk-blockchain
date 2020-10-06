@@ -43,7 +43,8 @@ type Reduction struct {
 	TimeOut time.Duration
 }
 
-// IncreaseTimeout ...
+// IncreaseTimeout is used when reduction does not reach the quorum or
+// converges over an empty block
 func (r *Reduction) IncreaseTimeout(round uint64) {
 
 	// if we converged on an empty block hash, we increase the timeout
