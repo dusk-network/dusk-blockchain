@@ -64,7 +64,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 
 					return nil
 				}
-				return fmt.Errorf("Unexpected not-nil packet: %v", packet)
+				return fmt.Errorf("unexpected not-nil packet: %v", packet)
 			},
 
 			// testing that the timeout remained the same after a successful run
@@ -88,7 +88,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 					require.True(stepVoteMessage.IsEmpty())
 					return nil
 				}
-				return fmt.Errorf("Unexpected not-nil packet: %v", packet)
+				return fmt.Errorf("unexpected not-nil packet: %v", packet)
 			},
 
 			// testing that the timeout doubled
