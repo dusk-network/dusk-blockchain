@@ -86,6 +86,30 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 				require.Equal(t, r.TimeOut, timeout)
 			},
 		},
+
+		"Timeout": {
+			// no need to create events as we are testing timeouts
+			batchEvents: func() chan message.Message {
+				return make(chan message.Message, hlp.Nr)
+			},
+
+			// the result of the test should be empty step votes
+			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket) error {
+				require.NotNil(packet)
+
+				if stepVoteMessage, ok := packet.(message.StepVotesMsg); ok {
+					require.True(stepVoteMessage.IsEmpty())
+					return nil
+				}
+				return fmt.Errorf("unexpected not-nil packet: %v", packet)
+			},
+
+			// testing that the timeout doubled
+			testStep: func(t *testing.T, step consensus.Phase) {
+				r := step.(*Phase)
+				require.Equal(t, r.TimeOut, 2*timeout)
+			},
+		},
 	}
 }
 
