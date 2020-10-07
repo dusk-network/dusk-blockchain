@@ -49,19 +49,3 @@ func TestGetVoterKeys(t *testing.T) {
 		assert.True(t, found)
 	}
 }
-
-/*
-func TestConsensusEventVerification(t *testing.T) {
-	p, keys := consensus.MockProvisioners(3)
-	hash, _ := crypto.RandEntropy(32)
-	for i := 0; i < 3; i++ {
-		ce := MockConsensusEvent(hash, 1, 3, keys, p, i)
-		ev, err := convertToAgreement(ce)
-		assert.NoError(t, err)
-		handler := newHandler(keys[0], *p)
-		if !assert.NoError(t, handler.Verify(*ev)) {
-			assert.FailNow(t, fmt.Sprintf("error at %d iteration", 0))
-		}
-	}
-}
-*/

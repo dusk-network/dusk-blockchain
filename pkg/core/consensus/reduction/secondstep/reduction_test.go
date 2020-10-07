@@ -2,15 +2,18 @@ package secondstep
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 // TestSendReduction tests that the reduction step completes without problems
@@ -44,7 +47,7 @@ type reductionTest struct {
 	testStep          func(*testing.T, consensus.Phase)
 }
 
-func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte, round uint64, step uint8, savedStepVotes *message.StepVotesMsg) map[string]reductionTest {
+func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte, round uint64, step uint8, agreementChan <-chan message.Message) map[string]reductionTest {
 
 	return map[string]reductionTest{
 		"HappyPath": {
@@ -59,24 +62,17 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 				return evChan
 			},
 
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket) error {
-				require.NotNil(packet)
+			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket) error {
+				msg := <-agreementChan
+				require.NotNil(msg)
 
-				if stepVoteMessage, ok := packet.(message.StepVotesMsg); ok {
-					require.False(stepVoteMessage.IsEmpty())
-
-					// Retrieve StepVotes
-					require.Equal(hash, stepVoteMessage.State().BlockHash)
-
-					// StepVotes should be valid
-					require.NoError(hlp.Verify(hash, stepVoteMessage.StepVotes, round, step))
-
-					savedStepVotes = &stepVoteMessage
-
+				if _, ok := msg.Payload().(message.Agreement); ok {
+					// TODO test the hash
+					// TODO verify the Agreement
 					return nil
 				}
 
-				return fmt.Errorf("unexpected not-nil packet: %v", packet)
+				return fmt.Errorf("unexpected message %v", msg)
 			},
 
 			// testing that the timeout remained the same after a successful run
@@ -93,15 +89,18 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 				return make(chan message.Message, hlp.Nr)
 			},
 
-			// the result of the test should be empty step votes
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket) error {
-				require.NotNil(packet)
-
-				if stepVoteMessage, ok := packet.(message.StepVotesMsg); ok {
-					require.True(stepVoteMessage.IsEmpty())
+			// no agreement should be sent at the end of a failing second step reduction
+			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket) error {
+				// 200 milliseconds should be plenty to receive an Agreement,
+				// especially since this happens at the end of the
+				// reduction step
+				c := time.After(200 * time.Millisecond)
+				select {
+				case <-agreementChan:
+					return errors.New("unexpected Agreement message")
+				case <-c:
 					return nil
 				}
-				return fmt.Errorf("unexpected not-nil packet: %v", packet)
 			},
 
 			// testing that the timeout doubled
@@ -113,7 +112,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 	}
 }
 
-func TestFirstStepReduction(t *testing.T) {
+func TestSecondStepReduction(t *testing.T) {
 	step := uint8(2)
 	round := uint64(1)
 	messageToSpawn := 50
@@ -122,9 +121,10 @@ func TestFirstStepReduction(t *testing.T) {
 	timeout := time.Second
 
 	hlp := reduction.NewHelper(messageToSpawn, timeout)
-	var savedStepVotes *message.StepVotesMsg
 
-	table := initiateTableTest(hlp, timeout, hash, round, step, savedStepVotes)
+	agreementChan := make(chan message.Message, 1)
+	hlp.EventBus.Subscribe(topics.Agreement, eventbus.NewSafeChanListener(agreementChan))
+	table := initiateTableTest(hlp, timeout, hash, round, step, agreementChan)
 	for name, ttest := range table {
 
 		t.Run(name, func(t *testing.T) {
@@ -159,15 +159,8 @@ func TestFirstStepReduction(t *testing.T) {
 			svs := message.GenVotes(hash, 1, 2, hlp.ProvisionersKeys, hlp.P)
 			msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0])
 
-			//scoreStep, err := score.New(nil, hlp.Emitter, blockGen)
-			cb := func(ctx context.Context) (bool, error) {
-				packet := ctx.Value("Packet")
-				require.NotNil(t, packet)
-				return true, nil
-			}
-
-			mockPhase := consensus.MockPhase(cb)
-			secondStepReduction.SetNext(mockPhase)
+			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory)
+			secondStepReduction.SetNext(testPhase)
 
 			// injecting the stepVotes into secondStep
 			secondStepReduction.Fn(msg)
@@ -180,7 +173,6 @@ func TestFirstStepReduction(t *testing.T) {
 			_, err = runTestCallback(ctx, queue, evChan, r, step+1)
 			// hopefully with no error
 			require.NoError(err)
-
 		})
 	}
 }

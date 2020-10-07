@@ -45,7 +45,7 @@ func NewHelper(provisioners int) *Helper {
 	return hlp
 }
 
-// Create a valid RoundUpdate for the current round, based on the information
+// RoundUpdate creates a valid RoundUpdate for the current round, based on the information
 // passed to this Helper (i.e. round, Provisioners)
 func (hlp *Helper) RoundUpdate(hash []byte) consensus.RoundUpdate {
 	return consensus.RoundUpdate{
