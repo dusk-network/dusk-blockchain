@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -50,7 +51,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 				return evChan
 			},
 
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket) error {
+			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer) error {
 				require.NotNil(packet)
 
 				if stepVoteMessage, ok := packet.(message.StepVotesMsg); ok {
@@ -81,7 +82,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 			},
 
 			// the result of the test should be empty step votes
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket) error {
+			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer) error {
 				require.NotNil(packet)
 
 				if stepVoteMessage, ok := packet.(message.StepVotesMsg); ok {
@@ -109,7 +110,6 @@ func TestFirstStepReduction(t *testing.T) {
 	timeout := time.Second
 
 	hlp := reduction.NewHelper(messageToSpawn, timeout)
-
 	table := initiateTableTest(hlp, timeout, hash, round, step)
 	for name, ttest := range table {
 
@@ -121,7 +121,7 @@ func TestFirstStepReduction(t *testing.T) {
 			evChan := ttest.batchEvents()
 
 			// injecting the test phase in the reduction step
-			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory)
+			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, nil)
 			firstStepReduction := New(testPhase, hlp.Emitter, timeout)
 
 			// injecting the result of the Selection step
