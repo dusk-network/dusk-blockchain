@@ -48,7 +48,6 @@ type reductionTest struct {
 	testStep          func(*testing.T, consensus.Phase)
 }
 
-// nolint
 func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step uint8) map[string]reductionTest {
 
 	return map[string]reductionTest{
