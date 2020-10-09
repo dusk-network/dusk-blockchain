@@ -253,4 +253,18 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 		}
 	}
 
+	deployNewNode := func() {
+		ind := localNetSize
+		t.Log("Start a new node. This node falls behind during consensus")
+		node := engine.NewDuskNode(9500+ind, 9000+ind, "default", localNet.IsSessionRequired())
+		localNet.AddNode(node)
+
+		if err := localNet.StartNode(ind, node, workspace); err != nil {
+			t.Fatal(err.Error())
+		}
+	}
+
+	// Deploy new node an hour after bootstrapping the network
+	// This allows us to monitor re-sync process with more than 500 blocks difference
+	time.AfterFunc(1*time.Hour, deployNewNode)
 }
