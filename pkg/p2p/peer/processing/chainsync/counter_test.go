@@ -19,7 +19,7 @@ func TestStopTimerGoroutine(t *testing.T) {
 	// Set syncTime to something more reasonable for a unit test
 	syncTime = 1 * time.Second
 
-	c.StartSyncing(1)
+	c.StartSyncing(1, "test_peer_addr")
 
 	msg := message.New(topics.AcceptedBlock, message.SafeBuffer{})
 	// Decrement to 0. This should stop the running `listenForTimer` goroutine
@@ -29,7 +29,7 @@ func TestStopTimerGoroutine(t *testing.T) {
 
 	// Set syncTime back to original value, so we can easily check the effects of the previous timer
 	syncTime = 30 * time.Second
-	c.StartSyncing(1)
+	c.StartSyncing(1, "test_peer_addr")
 
 	// Wait one second, and see if the old timer fires
 	time.Sleep(1 * time.Second)
