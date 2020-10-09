@@ -27,7 +27,7 @@ func TestSendReduction(t *testing.T) {
 	hlp := reduction.NewHelper(messageToSpawn, timeout)
 	secondStep := New(hlp.Emitter, 10*time.Second)
 
-	// Generate first StepVotes
+	// Generate second StepVotes
 	svs := message.GenVotes(hash, 1, 2, hlp.ProvisionersKeys, hlp.P)
 	msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0])
 
@@ -113,7 +113,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 	}
 }
 
-func TestFirstStepReduction(t *testing.T) {
+func TestSecondStepReduction(t *testing.T) {
 	step := uint8(2)
 	round := uint64(1)
 	messageToSpawn := 50
@@ -155,7 +155,7 @@ func TestFirstStepReduction(t *testing.T) {
 
 			hlp := reduction.NewHelper(messageToSpawn, timeout)
 
-			// Generate first StepVotes
+			// Generate second StepVotes
 			svs := message.GenVotes(hash, 1, 2, hlp.ProvisionersKeys, hlp.P)
 			msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0])
 
