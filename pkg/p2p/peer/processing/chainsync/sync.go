@@ -3,8 +3,9 @@ package chainsync
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
+	"io"
 	"sync"
 	"time"
 
@@ -21,7 +22,7 @@ import (
 	logger "github.com/sirupsen/logrus"
 )
 
-var log = logger.WithFields(logger.Fields{"process": "synchronizer"})
+var log = logger.WithFields(logger.Fields{"process": "sync"})
 
 // ChainSynchronizer is the component responsible for keeping the node in sync with the
 // rest of the network. It sits between the peer and the chain, as a sort of gateway for
@@ -33,9 +34,9 @@ type ChainSynchronizer struct {
 	*Counter
 	responseChan chan<- *bytes.Buffer
 
-	lock sync.RWMutex
 	// Highest block we've seen. We keep track of it, so that we do not
 	// spam the `Chain` with messages during a sync.
+	lock        sync.RWMutex
 	highestSeen uint64
 }
 
@@ -51,82 +52,158 @@ func NewChainSynchronizer(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, r
 	}
 }
 
-// Synchronize our blockchain with our peers.
-func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) error {
-	r := bufio.NewReader(blkBuf)
-	height, err := peekBlockHeight(r)
+// HandleBlock mainly busy with two activities
+// Unmarshal and republish block or
+// Switch to Syncing mode by triggering syncing procedure
+func (s *ChainSynchronizer) HandleBlock(blkBuf *bytes.Buffer, sendingPeerAddr string) error {
+
+	// wire message of type topics.Block
+	// sending peer address
+	fields := logger.Fields{
+		"sender": sendingPeerAddr,
+	}
+
+	msg := bufio.NewReader(blkBuf)
+	recvBlockHeight, err := peekBlockHeight(msg)
 	if err != nil {
+		log.WithFields(fields).WithError(err).Warn("failed to read block height")
 		return err
 	}
-	log.WithField("height", height).Debug("Synchronize")
+
+	// received block height (from the message but not from the unmarshaled block)
+	fields["recv_blk_h"] = recvBlockHeight
 
 	// Notify `Chain` of our highest seen block
-	if s.getHighestSeen() < height {
-		s.setHighestSeen(height)
-		s.publishHighestSeen(height)
+	// TODO: Chain processing should not be disturbed with highestSeen req
+	if s.getHighestSeen() < recvBlockHeight {
+		s.setHighestSeen(recvBlockHeight)
+		s.publishHighestSeen(recvBlockHeight)
 	}
 
+	// Request blockchain last block
 	lastBlk, err := s.getLastBlock()
 	if err != nil {
-		log.
-			WithError(err).
-			WithField("height", height).Error("failed to getLastBlock")
+		log.WithFields(fields).WithError(err).Error("failed to getLastBlock")
+		return err
+	}
+	diff := int64(recvBlockHeight - lastBlk.Header.Height)
+
+	fields["local_h"] = lastBlk.Header.Height
+	log.WithFields(fields).Debug("process topics.Block")
+
+	// ChainSynchronizer supports sync mode and non-sync mode
+	// Handle the wire block message accordingly
+	var resultErr error
+	if s.IsSyncing() {
+		resultErr = s.handleSyncingMode(sendingPeerAddr, msg, diff, fields)
+	} else {
+		resultErr = s.handleNonSyncingMode(sendingPeerAddr, msg, diff, lastBlk, fields)
+	}
+
+	return resultErr
+}
+
+func (s *ChainSynchronizer) handleNonSyncingMode(sendingPeerAddr string, msg io.Reader, diff int64, lastBlk block.Block, fields logger.Fields) error {
+
+	// Difference between local height and sending peer height is more than 1 block.
+	if diff > 1 {
+
+		// Switch to Syncing Mode
+		// Trigger syncing procedure with this peer for fetching
+		// up to maxBlocksCount blocks.
+
+		// marshal wire message topics.GetBlocks
+		msgGetBlocks := createGetBlocksMsg(lastBlk.Header.Hash)
+		buf, err := marshalGetBlocks(msgGetBlocks)
+		if err != nil {
+			log.WithFields(fields).Error("could not marshalGetBlocks")
+			return err
+		}
+
+		// The peer who first acquires sync lock state can trigger syncing procedure
+		if syncingPeer, err := s.StartSyncing(uint64(diff), sendingPeerAddr); err != nil {
+			// already started syncing with another peer
+			log.WithFields(fields).WithField("syncing_peer", syncingPeer).Warn("failed to start syncing")
+			return nil
+		}
+
+		log.WithFields(fields).
+			WithField("last_blk_hash", hex.EncodeToString(lastBlk.Header.Hash)).
+			WithField("diff", diff).
+			Info("start syncing")
+
+		// Respond back to the sending Peer with topics.GetBlocks wire message
+		s.responseChan <- buf
+
+	} else {
+
+		// Difference between local height and sending peer height is 1 block.
+		// No need for resyncing, just republish this block to the upper layers
+		if diff == 1 {
+
+			log.WithFields(fields).Info("republish a block")
+			if err := s.republish(msg); err != nil {
+				log.WithFields(fields).WithError(err).Warn("failed to republish")
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *ChainSynchronizer) handleSyncingMode(sendingPeerAddr string, r io.Reader, diff int64, fields logger.Fields) error {
+
+	syncPeerAddr := s.GetSyncingPeer()
+
+	// Republish blocks only from the syncing peer while in syncing mode
+	if len(syncPeerAddr) > 0 && (syncPeerAddr == sendingPeerAddr) && diff > 0 {
+
+		log.WithFields(fields).Info("republish a block from syncing peer")
+		if err := s.republish(r); err != nil {
+			log.WithFields(fields).WithError(err).Warn("failed to republish")
+			return err
+		}
+
+	} else {
+
+		if diff == 1 {
+			// While we are in syncing mode, another peer is sending us the next block
+			// That might mean be an indication that current syncingPeer is cheating
+			// TODO: detect if syncing peer misbehaving. If so, blacklist it
+			log.WithFields(fields).Warn("republish a block from a non-syncing peer")
+
+			if err := s.republish(r); err != nil {
+				log.WithFields(fields).WithError(err).Warn("failed to republish")
+				return err
+			}
+
+		} else {
+			log.WithFields(fields).WithField("syncPeer", syncPeerAddr).
+				Debug("Skip block, still syncing with another peer")
+		}
+	}
+
+	return nil
+}
+
+// republish unmarshals a block from a Reader and republish it
+func (s *ChainSynchronizer) republish(r io.Reader) error {
+
+	// Write bufio.Reader into a bytes.Buffer and unmarshal it so we can send it over the event bus.
+	buf := new(bytes.Buffer)
+	if _, err := buf.ReadFrom(r); err != nil {
 		return err
 	}
 
-	log.WithField("last_height", lastBlk.Header.Height).WithField("height", height).Debugln("block received")
-	// Only ask for missing blocks if we are not currently syncing, to prevent
-	// asking many peers for (generally) the same blocks.
-	diff := compareHeights(lastBlk.Header.Height, height)
-	if !s.IsSyncing() && diff > 1 {
-
-		hash := base64.StdEncoding.EncodeToString(lastBlk.Header.Hash)
-		log.
-			WithField("height", lastBlk.Header.Height).
-			WithField("hash", hash).
-			WithField("peerInfo", peerInfo).
-			Debug("Start syncing")
-
-		msg := createGetBlocksMsg(lastBlk.Header.Hash)
-		buf, err := marshalGetBlocks(msg)
-		if err != nil {
-			log.
-				WithField("height", lastBlk.Header.Height).
-				WithField("hash", hash).
-				WithField("peerInfo", peerInfo).
-				Error("could not marshalGetBlocks")
-			return err
-		}
-
-		s.responseChan <- buf
-		s.StartSyncing(uint64(diff))
-		return nil
+	blk := block.NewBlock()
+	if err := message.UnmarshalBlock(buf, blk); err != nil {
+		return err
 	}
 
-	// Does the block come directly after our most recent one?
-	if diff == 1 {
-		// Write bufio.Reader into a bytes.Buffer and unmarshal it so we can send it over the event bus.
-		buf := new(bytes.Buffer)
-		if _, err := buf.ReadFrom(r); err != nil {
-			log.
-				WithError(err).
-				WithField("height", height).Error("failed to ReadFrom")
-			return err
-		}
-
-		blk := block.NewBlock()
-		if err := message.UnmarshalBlock(buf, blk); err != nil {
-			log.
-				WithError(err).
-				WithField("height", height).Error("failed to UnmarshalBlock")
-			return err
-		}
-
-		msg := message.New(topics.Block, *blk)
-		errList := s.publisher.Publish(topics.Block, msg)
-		diagnostics.LogPublishErrors("chainsync/sync.go, topics.Block", errList)
-
-	}
+	msg := message.New(topics.Block, *blk)
+	errList := s.publisher.Publish(topics.Block, msg)
+	diagnostics.LogPublishErrors("chainsync/sync.go, topics.Block", errList)
 
 	return nil
 }
@@ -145,6 +222,7 @@ func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
 	return blk, nil
 }
 
+//  TODO: To be moved out of ChainSynchronizer
 func (s *ChainSynchronizer) getHighestSeen() uint64 {
 	s.lock.RLock()
 	height := s.highestSeen
@@ -162,10 +240,6 @@ func (s *ChainSynchronizer) publishHighestSeen(height uint64) {
 	msg := message.New(topics.HighestSeen, height)
 	errList := s.publisher.Publish(topics.HighestSeen, msg)
 	diagnostics.LogPublishErrors("", errList)
-}
-
-func compareHeights(ourHeight, theirHeight uint64) int64 {
-	return int64(theirHeight) - int64(ourHeight)
 }
 
 func createGetBlocksMsg(latestHash []byte) *peermsg.GetBlocks {

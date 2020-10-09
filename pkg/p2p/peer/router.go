@@ -69,7 +69,7 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) (topics.Topic
 	case topics.Inv:
 		err = m.dataRequestor.RequestMissingItems(&b)
 	case topics.Block:
-		err = m.synchronizer.Synchronize(&b, m.peerInfo)
+		err = m.synchronizer.HandleBlock(&b, m.peerInfo)
 	case topics.Ping:
 		m.ponger.Pong()
 	case topics.Pong:
