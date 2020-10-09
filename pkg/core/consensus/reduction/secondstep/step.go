@@ -29,6 +29,9 @@ type Phase struct {
 // New creates and launches the component which responsibility is to reduce the
 // candidates gathered as winner of the selection of all nodes in the committee
 // and reduce them to just one candidate obtaining 64% of the committee vote
+// NB: we cannot push the agreement directly within the agreementChannel
+// until we have a way to deduplicate it from the peer (the dupemap will not be
+// notified of duplicates)
 func New(e *consensus.Emitter, timeOut time.Duration) *Phase {
 	return &Phase{
 		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
@@ -160,6 +163,12 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 		return nil
 	}
 
+	lg.WithFields(log.Fields{
+		"round":         round,
+		"step":          step,
+		"result_empty?": r.IsEmpty(),
+	}).Debugln("quorum reached")
+
 	// quorum has been reached. However hash&votes can be empty
 	return &message.StepVotesMsg{
 		Header: header.Header{
@@ -173,6 +182,11 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 }
 
 func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMsg) error {
+	lg.WithFields(log.Fields{
+		"round": round,
+		"step":  step,
+	}).Traceln("sending_agreement")
+
 	hdr := header.Header{
 		Round:     round,
 		Step:      step,
@@ -185,6 +199,11 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 		return err
 	}
 
+	lg.WithFields(log.Fields{
+		"round": round,
+		"step":  step,
+	}).Traceln("agreement_signed")
+
 	// then we create the full BLS signed Agreement
 	// XXX: the StepVotes are NOT signed (i.e. the message.SignAgreement is not used).
 	// This exposes the Agreement to some malleability attack. Double check
@@ -196,6 +215,10 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 		&svm.StepVotes,
 	}
 
+	lg.WithFields(log.Fields{
+		"round": round,
+		"step":  step,
+	}).Traceln("gossiping_agreement")
 	return p.Gossip(message.New(topics.Agreement, *ev))
 }
 

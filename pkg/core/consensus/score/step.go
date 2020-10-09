@@ -112,6 +112,7 @@ func (p *Phase) generate(ctx context.Context, r consensus.RoundUpdate, step uint
 	if p.threshold.Exceeds(scoreTx.Score) {
 		//TODO: log the error
 		//return errors.New("proof score is below threshold")
+		p.lock.Unlock()
 		return
 	}
 	p.lock.Unlock()

@@ -23,7 +23,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-// TestSendReduction tests that the reduction step completes without problems
+// PrepareSendReductionTest tests that the reduction step completes without problems
 // and produces a StepVotesMsg in case it receives enough valid Reduction messages
 func PrepareSendReductionTest(hlp *Helper, stepFn consensus.PhaseFn) func(t *testing.T) {
 	return func(t *testing.T) {

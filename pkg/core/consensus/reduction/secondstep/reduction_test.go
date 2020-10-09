@@ -2,15 +2,19 @@ package secondstep
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 // TestSendReduction tests that the reduction step completes without problems
@@ -39,16 +43,17 @@ func TestSendReduction(t *testing.T) {
 }
 
 type reductionTest struct {
-	batchEvents       func() chan message.Message
+	batchEvents       func(*reduction.Helper) chan message.Message
 	testResultFactory consensus.TestCallback
 	testStep          func(*testing.T, consensus.Phase)
 }
 
-func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte, round uint64, step uint8, savedStepVotes *message.StepVotesMsg) map[string]reductionTest {
+// nolint
+func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step uint8) map[string]reductionTest {
 
 	return map[string]reductionTest{
 		"HappyPath": {
-			batchEvents: func() chan message.Message {
+			batchEvents: func(hlp *reduction.Helper) chan message.Message {
 				evChan := make(chan message.Message, hlp.Nr)
 
 				// creating a batch of Reduction events
@@ -59,24 +64,24 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 				return evChan
 			},
 
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket) error {
-				require.NotNil(packet)
+			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) error {
+				_, err := streamer.Read()
+				require.NoError(err)
 
-				if stepVoteMessage, ok := packet.(message.StepVotesMsg); ok {
-					require.False(stepVoteMessage.IsEmpty())
-
-					// Retrieve StepVotes
-					require.Equal(hash, stepVoteMessage.State().BlockHash)
-
-					// StepVotes should be valid
-					require.NoError(hlp.Verify(hash, stepVoteMessage.StepVotes, round, step))
-
-					savedStepVotes = &stepVoteMessage
-
-					return nil
+				for i := 0; ; i++ {
+					if i == 2 {
+						break
+					}
+					tpcs := streamer.SeenTopics()
+					for _, tpc := range tpcs {
+						if tpc == topics.Agreement {
+							return nil
+						}
+					}
+					streamer.Read()
 				}
 
-				return fmt.Errorf("unexpected not-nil packet: %v", packet)
+				return fmt.Errorf("no agreement received")
 			},
 
 			// testing that the timeout remained the same after a successful run
@@ -89,19 +94,38 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 
 		"Timeout": {
 			// no need to create events as we are testing timeouts
-			batchEvents: func() chan message.Message {
+			batchEvents: func(hlp *reduction.Helper) chan message.Message {
 				return make(chan message.Message, hlp.Nr)
 			},
 
-			// the result of the test should be empty step votes
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket) error {
-				require.NotNil(packet)
-
-				if stepVoteMessage, ok := packet.(message.StepVotesMsg); ok {
-					require.True(stepVoteMessage.IsEmpty())
+			// no agreement should be sent at the end of a failing second step reduction
+			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) error {
+				wrongChan := make(chan struct{}, 1)
+				go func() {
+					for i := 0; ; i++ {
+						if i == 2 {
+							break
+						}
+						tpcs := streamer.SeenTopics()
+						for _, tpc := range tpcs {
+							if tpc == topics.Agreement {
+								wrongChan <- struct{}{}
+								return
+							}
+						}
+						streamer.Read()
+					}
+				}()
+				// 200 milliseconds should be plenty to receive an Agreement,
+				// especially since this happens at the end of the
+				// reduction step
+				c := time.After(200 * time.Millisecond)
+				select {
+				case <-wrongChan:
+					return errors.New("unexpected Agreement message")
+				case <-c:
 					return nil
 				}
-				return fmt.Errorf("unexpected not-nil packet: %v", packet)
 			},
 
 			// testing that the timeout doubled
@@ -121,18 +145,24 @@ func TestSecondStepReduction(t *testing.T) {
 	require.NoError(t, err)
 	timeout := time.Second
 
-	hlp := reduction.NewHelper(messageToSpawn, timeout)
-	var savedStepVotes *message.StepVotesMsg
-
-	table := initiateTableTest(hlp, timeout, hash, round, step, savedStepVotes)
+	table := initiateTableTest(timeout, hash, round, step)
 	for name, ttest := range table {
 
+		streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+		streamListener := eventbus.NewStreamListener(streamer)
+
+		// creating the Helper
+		hlp := reduction.NewHelper(messageToSpawn, timeout)
+		// wiring the Gossip streamer to capture the gossiped messages
+		id := hlp.EventBus.Subscribe(topics.Gossip, streamListener)
+
+		// running the subtest
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 			queue := consensus.NewQueue()
-			// create the helper
-			// setting up the message channel with predefined messages in it
-			evChan := ttest.batchEvents()
+
+			// setting up the message channel with test-specific messages in it
+			evChan := ttest.batchEvents(hlp)
 
 			// running the reduction step
 			ctx := context.Background()
@@ -146,28 +176,12 @@ func TestSecondStepReduction(t *testing.T) {
 			// spin secondStepVotes
 			secondStepReduction := New(hlp.Emitter, timeout)
 
-			round := uint64(1)
-			messageToSpawn := 50
-			hash, err := crypto.RandEntropy(32)
-			require.NoError(err)
-
-			timeout := time.Second
-
-			hlp := reduction.NewHelper(messageToSpawn, timeout)
-
 			// Generate second StepVotes
 			svs := message.GenVotes(hash, 1, 2, hlp.ProvisionersKeys, hlp.P)
 			msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0])
 
-			//scoreStep, err := score.New(nil, hlp.Emitter, blockGen)
-			cb := func(ctx context.Context) (bool, error) {
-				packet := ctx.Value("Packet")
-				require.NotNil(t, packet)
-				return true, nil
-			}
-
-			mockPhase := consensus.MockPhase(cb)
-			secondStepReduction.SetNext(mockPhase)
+			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, streamer)
+			secondStepReduction.SetNext(testPhase)
 
 			// injecting the stepVotes into secondStep
 			secondStepReduction.Fn(msg)
@@ -180,7 +194,8 @@ func TestSecondStepReduction(t *testing.T) {
 			_, err = runTestCallback(ctx, queue, evChan, r, step+1)
 			// hopefully with no error
 			require.NoError(err)
-
 		})
+
+		hlp.EventBus.Unsubscribe(topics.Gossip, id)
 	}
 }

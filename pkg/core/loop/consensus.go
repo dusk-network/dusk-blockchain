@@ -117,11 +117,11 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 	}()
 
 	// score generation phase is the first step in the consensus
-	phase := c.score.Fn(nil)
+	phaseFunction := c.score.Fn(nil)
 	// synchronous consensus loop keeps running until the agreement invokes
 	// context.Done or the context is canceled some other way
-	for step := uint8(1); phase != nil; step++ {
-		phase, err = phase(ctx, c.eventQueue, c.eventChan, round, step)
+	for step := uint8(1); phaseFunction != nil; step++ {
+		phaseFunction, err = phaseFunction(ctx, c.eventQueue, c.eventChan, round, step)
 		if err != nil {
 			// an unrecoverable error happened. We return control to the caller
 			// which probably needs to resync or panic
