@@ -2,7 +2,6 @@ package score
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -148,7 +147,8 @@ func (g *Generator) generateScore() error {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	if g.threshold.Exceeds(scoreTx.Score) {
-		return errors.New("proof score is below threshold")
+		log.Warn("proof score is below threshold")
+		return nil
 	}
 
 	score := g.signer.Compose(newFactory(g.seed, scoreTx))

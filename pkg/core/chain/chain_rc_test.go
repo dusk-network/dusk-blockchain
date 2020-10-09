@@ -39,7 +39,7 @@ func TestConcurrentBlock(t *testing.T) {
 	chain.onBeginAccepting = func(blk *block.Block) bool { return true }
 
 	// Switch to syncing mode so that requestRoundResults will be called
-	chain.counter.StartSyncing(1)
+	chain.counter.StartSyncing(1, "test_peer_addr")
 
 	time.Sleep(1 * time.Second)
 	var wg sync.WaitGroup

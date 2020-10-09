@@ -114,7 +114,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	}
 
 	// Now, test accepting a block with 1 on the sync counter
-	c.counter.StartSyncing(1)
+	c.counter.StartSyncing(1, "test_peer_addr")
 
 	blk = mockAcceptableBlock(c.tip.Get())
 	msg = message.New(topics.AcceptedBlock, *blk)

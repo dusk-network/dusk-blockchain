@@ -206,7 +206,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	}
 
 	// Hook the chain up to the required topics
-	chain.blockChan = make(chan message.Message, 100)
+	chain.blockChan = make(chan message.Message, 600)
 	eventBus.Subscribe(topics.Block, eventbus.NewChanListener(chain.blockChan))
 
 	chain.initializationChan = make(chan message.Message, 1)
@@ -256,7 +256,7 @@ func (c *Chain) beginAccepting(blk *block.Block) bool {
 	// started yet
 
 	if !c.counter.IsSyncing() {
-		lg.Error("could not accept block since we are syncing")
+		lg.Warn("could not accept block since we are syncing")
 		return false
 	}
 
@@ -357,6 +357,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	// Caching the provisioners
 	// TODO: add bidList ?
 	c.p = &provisioners
+	c.tip.Set(&blk)
 
 	if config.Get().API.Enabled {
 		go func() {
@@ -381,8 +382,6 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 		l.WithError(err).Error("block advertising failed")
 		return err
 	}
-
-	c.tip.Set(&blk)
 
 	// 6. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
@@ -573,7 +572,7 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 
 	// We wait 5 seconds for a response. We time out otherwise and
 	// attempt catching up later.
-	timer := time.NewTimer(5 * time.Second)
+	timer := time.NewTimer(1 * time.Second)
 
 	for {
 		select {

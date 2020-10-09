@@ -43,7 +43,7 @@ func (c *certificateCollector) Collect(m message.Message) error {
 }
 
 func initHighestSeenCollector(sub eventbus.Subscriber) <-chan uint64 {
-	highestSeenChan := make(chan uint64, 1)
+	highestSeenChan := make(chan uint64, 100)
 	collector := &highestSeenCollector{highestSeenChan}
 	collectListener := eventbus.NewCallbackListener(collector.Collect)
 	if config.Get().General.SafeCallbackListener {

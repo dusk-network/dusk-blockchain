@@ -72,7 +72,7 @@ func (r *roundCollector) Collect(m message.Message) error {
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
 func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, uint32) {
-	acceptedBlockChan := make(chan block.Block)
+	acceptedBlockChan := make(chan block.Block, 500)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
 	collectListener := eventbus.NewCallbackListener(collector.Collect)
 	if config.Get().General.SafeCallbackListener {
