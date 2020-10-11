@@ -31,7 +31,7 @@ func TestSendReduction(t *testing.T) {
 	hlp := reduction.NewHelper(messageToSpawn, timeout)
 	secondStep := New(hlp.Emitter, 10*time.Second)
 
-	// Generate first StepVotes
+	// Generate second StepVotes
 	svs := message.GenVotes(hash, 1, 2, hlp.ProvisionersKeys, hlp.P)
 	msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0])
 
@@ -48,7 +48,6 @@ type reductionTest struct {
 	testStep          func(*testing.T, consensus.Phase)
 }
 
-// nolint
 func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step uint8) map[string]reductionTest {
 
 	return map[string]reductionTest{
@@ -176,7 +175,7 @@ func TestSecondStepReduction(t *testing.T) {
 			// spin secondStepVotes
 			secondStepReduction := New(hlp.Emitter, timeout)
 
-			// Generate first StepVotes
+			// Generate second StepVotes
 			svs := message.GenVotes(hash, 1, 2, hlp.ProvisionersKeys, hlp.P)
 			msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0])
 
