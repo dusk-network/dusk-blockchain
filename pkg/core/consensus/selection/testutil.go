@@ -1,119 +1,76 @@
 package selection
 
-/*
 import (
-	"context"
-	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
-var defaultScoreNr = 10
-
-// NOTE: looks like this is not used. In case, we need to use it, we need to
-// add the Header from the Helper through a callback
-type mockSigner struct {
-	pubkey []byte
-	bus    *eventbus.EventBus
-}
-
-func (m *mockSigner) Sign(header.Header) ([]byte, error) {
-	return make([]byte, 33), nil
-}
-
-func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
-	// message.Marshal takes care of prepending the topic, marshaling the
-	// header, etc
-	buf, err := message.Marshal(msg)
-	if err != nil {
-		return err
-	}
-
-	serialized := message.New(msg.Category(), buf)
-
-	// gossip away
-	errList := m.bus.Publish(topics.Gossip, serialized)
-	diagnostics.LogPublishErrors("(m *mockSigner) Gossip", errList)
-
-	return nil
-}
-
-func (m *mockSigner) Compose(pf consensus.PacketFactory) consensus.InternalPacket {
-	return pf.Create(m.pubkey, 0, 1)
-}
-
-func (m *mockSigner) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
-	errList := m.bus.Publish(topic, msg)
-	diagnostics.LogPublishErrors("(m *mockSigner) SendInternally", errList)
-
-	return nil
-}
+// ProvisionerNr is the default amount of Provisioners utilized in the
+// selection tests. This nr is just used to create the RoundUpdate and bares no
+// importance in the selection step
+var ProvisionerNr = 10
 
 // Helper for reducing selection test boilerplate
 type Helper struct {
-	*Factory
-	Selector *Selector
-	*consensus.SimplePlayer
-	signer consensus.Signer
-
-	BestScoreChan chan message.Message
-	scoreToSpawn  int
+	*consensus.Emitter
+	Round        uint64
+	Step         uint8
+	scoreToSpawn int
+	P            *user.Provisioners
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, scoreToSpawn ...int) *Helper {
-	scores := defaultScoreNr
-	if len(scoreToSpawn) > 0 {
-		scores = scoreToSpawn[0]
-	}
+func NewHelper(scoreToSpawn int) *Helper {
+	p, provisionersKeys := consensus.MockProvisioners(ProvisionerNr)
 	mockProxy := transactions.MockProxy{
 		P: transactions.PermissiveProvisioner{},
 	}
-	factory := NewFactory(context.Background(), eb, 1000*time.Millisecond, mockProxy)
-	s := factory.Instantiate()
-	sel := s.(*Selector)
-	keys, _ := key.NewRandKeys()
+	emitter := consensus.MockEmitter(time.Second, mockProxy)
+	emitter.Keys = provisionersKeys[0]
+
 	hlp := &Helper{
-		Factory:       factory,
-		Selector:      sel,
-		SimplePlayer:  consensus.NewSimplePlayer(),
-		signer:        &mockSigner{keys.BLSPubKeyBytes, eb},
-		BestScoreChan: make(chan message.Message, 1),
-		scoreToSpawn:  scores,
+		Emitter:      emitter,
+		Round:        uint64(1),
+		Step:         uint8(1),
+		scoreToSpawn: scoreToSpawn,
+		P:            p,
 	}
-	hlp.createResultChan()
 	return hlp
 }
 
-func (h *Helper) createResultChan() {
-	listener := eventbus.NewChanListener(h.BestScoreChan)
-	h.Bus.Subscribe(topics.BestScore, listener)
+// RoundUpdate mocks a round update with the Round and Step embedded in the
+// Helper
+func (h *Helper) RoundUpdate() consensus.RoundUpdate {
+	hash, _ := crypto.RandEntropy(32)
+	seed, _ := crypto.RandEntropy(32)
+
+	return consensus.RoundUpdate{
+		Round: h.Round,
+		Hash:  hash,
+		Seed:  seed,
+		P:     *h.P,
+	}
 }
 
-// Initialize the selector with the given round update.
-func (h *Helper) Initialize(ru consensus.RoundUpdate) {
-	h.Selector.Initialize(h, h.signer, ru)
-}
-
-// Spawn 10 score events.
-func (h *Helper) Spawn(hash []byte) []message.Score {
+// Spawn a number of score events.
+func (h *Helper) Spawn() []message.Score {
 	evs := make([]message.Score, 0, h.scoreToSpawn)
 	for i := 0; i < h.scoreToSpawn; i++ {
+		hash, _ := crypto.RandEntropy(32)
 		keys, _ := key.NewRandKeys()
 		hdr := header.Header{
 			Round:     h.Round,
-			Step:      h.Step(),
+			Step:      h.Step,
 			PubKeyBLS: keys.BLSPubKeyBytes,
 			BlockHash: hash,
 		}
@@ -124,31 +81,3 @@ func (h *Helper) Spawn(hash []byte) []message.Score {
 	}
 	return evs
 }
-
-// StartSelection forces the Selector to start the selection
-func (h *Helper) StartSelection() {
-	h.Selector.startSelection()
-}
-
-// SendBatch generates a batch of score events and sends them to the selector.
-func (h *Helper) SendBatch(hash []byte) {
-	batch := h.Spawn(hash)
-	var wg sync.WaitGroup
-	// Tell the 'wg' WaitGroup how many threads/goroutines
-	//   that are about to run concurrently.
-	wg.Add(len(batch))
-	for i := 0; i < len(batch); i++ {
-		go func(i int) {
-			defer wg.Done()
-			ev := batch[i]
-			_ = h.Selector.CollectScoreEvent(ev)
-		}(i)
-	}
-}
-
-// SetHandler sets the handler on the Selector. Used for bypassing zkproof
-// verification calls during tests.
-func (h *Helper) SetHandler(handler Handler) {
-	h.Selector.handler = handler
-}
-*/

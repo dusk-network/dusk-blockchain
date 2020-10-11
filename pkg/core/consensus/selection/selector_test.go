@@ -7,64 +7,44 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-// TestSelectorRun tests that we can Run the selection
-func TestSelectorRun(t *testing.T) {
-	round := uint64(1)
-	step := uint8(1)
-	hash, _ := crypto.RandEntropy(32)
-	msg := consensus.MockScoreMsg(t,
-		&header.Header{
-			BlockHash: hash,
-			Round:     round,
-			Step:      step,
-		},
-	)
-
+func TestSelection(t *testing.T) {
 	consensusTimeOut := 300 * time.Millisecond
-	mockProxy := transactions.MockProxy{
-		P: transactions.PermissiveProvisioner{},
-	}
-	emitter := consensus.MockEmitter(consensusTimeOut, mockProxy)
 
-	cb := func(ctx context.Context) (bool, error) {
-		packet := ctx.Value("Packet")
-		require.NotNil(t, packet)
+	ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) error {
+		require.NotNil(p)
 
-		if messageScore, ok := packet.(message.Score); ok {
-			require.NotEmpty(t, messageScore.Score)
-
-			require.Equal(t, msg.Payload(), messageScore)
-
-			return true, nil
+		if messageScore, ok := p.(message.Score); ok {
+			require.NotEmpty(messageScore.Score)
+			return nil
 		}
-		return false, errors.New("cb: failed to validate Score")
+
+		return errors.New("cb: failed to validate Score")
 	}
 
-	mockPhase := consensus.MockPhase(cb)
-	sel := selection.New(mockPhase, emitter, consensusTimeOut)
+	require := require.New(t)
+	hlp := selection.NewHelper(10)
+	testPhase := consensus.NewTestPhase(t, ttestCB, nil)
+	sel := selection.New(testPhase, hlp.Emitter, consensusTimeOut)
+	selFn := sel.Fn(nil)
 
-	ctx, canc := context.WithTimeout(context.Background(), 2*time.Second)
-	defer canc()
-
-	queue := consensus.NewQueue()
-	evChan := make(chan message.Message, 10)
+	msgChan := make(chan message.Message, 1)
+	msgs := hlp.Spawn()
 	go func() {
-		evChan <- msg
+		for _, msg := range msgs {
+			msgChan <- message.New(topics.Score, msg)
+		}
 	}()
+	testCallback, err := selFn(context.Background(), consensus.NewQueue(), msgChan, hlp.RoundUpdate(), hlp.Step)
+	require.NoError(err)
 
-	phaseFn, err := sel.Run(ctx, queue, evChan, consensus.RoundUpdate{Round: round}, step)
-	require.Nil(t, err)
-	require.NotNil(t, phaseFn)
-
-	_, err = phaseFn(ctx, queue, evChan, consensus.RoundUpdate{Round: round}, step+1)
-	require.Nil(t, err)
+	_, err = testCallback(context.Background(), nil, nil, hlp.RoundUpdate(), hlp.Step+1)
+	require.NoError(err)
 }
