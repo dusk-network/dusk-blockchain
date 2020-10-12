@@ -226,11 +226,18 @@ func IntermediateCoinbase(reward uint64) *Transaction {
 	pk.AG.Data = startingPk[:len(startingPk)/2]
 	pk.BG.Data = startingPk[len(startingPk)/2:]
 
+	// XXX: as a hotfix, the PK is not encoded here, only an amount.
+	// This is to prevent annoying errors during test-harness execution.
+	// Since the actual workaround requires much more work, I will defer
+	// it until we can start integrating with actual Rusk.
 	tx := MockTx(false, make([]byte, 32))
 	buf := new(bytes.Buffer)
-	if err := keys.MarshalPublicKey(buf, pk); err != nil {
+	if err := encoding.WriteUint64LE(buf, 5000000000); err != nil {
 		panic(err)
 	}
+	// if err := keys.MarshalPublicKey(buf, pk); err != nil {
+	// 	panic(err)
+	// }
 
 	tx.TxPayload.CallData = buf.Bytes()
 	tx.TxPayload.Nullifiers = make([]*common.BlsScalar, 0)
@@ -252,12 +259,18 @@ func RandDistributeTx(reward uint64, provisionerNr int) *Transaction {
 
 	// _, pk := RandKeys()
 	tx := RandTx()
+	// set the output to 0
+	tx.TxPayload.Notes[0].Commitment.Data = make([]byte, 32)
 	buf := new(bytes.Buffer)
-	for _, pk := range ps {
-		if err := encoding.Write256(buf, pk); err != nil {
-			panic(err)
-		}
-	}
+	// if err := encoding.WriteVarInt(buf, uint64(provisionerNr)); err != nil {
+	// 	panic(err)
+	// }
+
+	// for _, pk := range ps {
+	// 	if err := encoding.Write256(buf, pk); err != nil {
+	// 		panic(err)
+	// 	}
+	// }
 
 	if err := encoding.WriteUint64LE(buf, rew); err != nil {
 		panic(err)

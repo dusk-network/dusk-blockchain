@@ -96,7 +96,7 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 
 	// Sync up the provisioners
 	genesis := legacy.DecodeGenesis()
-	// Note that we don't use `addConsensusNodes` here because the transaction types
+	// Note that we don't use `chain.addConsensusNodes` here because the transaction types
 	// are incompatible.
 	if err := srv.addConsensusNodes(genesis.Txs, 0); err != nil {
 		return nil, err

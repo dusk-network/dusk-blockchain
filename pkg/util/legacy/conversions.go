@@ -2,6 +2,7 @@ package legacy
 
 import (
 	"bytes"
+	"encoding/binary"
 	"math/big"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -13,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/sirupsen/logrus"
 )
 
 // OldBlockToNewBlock will convert a dusk-wallet block into a dusk-blockchain block.
@@ -117,12 +119,40 @@ func ContractCallsToTxs(calls []*rusk.Transaction) ([]transactions.Transaction, 
 	txs := make([]transactions.Transaction, len(calls))
 
 	for i, call := range calls {
-		tx, err := RuskTxToTx(call)
-		if err != nil {
-			return nil, err
-		}
+		switch call.Type {
+		// Transfer
+		case 0:
+			tx, err := RuskTxToTx(call)
+			if err != nil {
+				return nil, err
+			}
 
-		txs[i] = tx
+			txs[i] = tx
+		// Distribute
+		case 1:
+			tx, err := RuskDistributeToCoinbase(call)
+			if err != nil {
+				return nil, err
+			}
+
+			txs[i] = tx
+		// Bid
+		case 3:
+			tx, err := RuskBidToBid(call)
+			if err != nil {
+				return nil, err
+			}
+
+			txs[i] = tx
+		// Stake
+		case 4:
+			tx, err := RuskStakeToStake(call)
+			if err != nil {
+				return nil, err
+			}
+
+			txs[i] = tx
+		}
 	}
 
 	return txs, nil
@@ -187,10 +217,8 @@ func RuskTxToTx(tx *rusk.Transaction) (*transactions.Standard, error) {
 		Fee:     feeScalar,
 	}
 
-	if tx.Type != 1 {
-		if err := stx.RangeProof.Decode(bytes.NewBuffer(tx.TxPayload.SpendingProof.Data), true); err != nil {
-			return nil, err
-		}
+	if err := stx.RangeProof.Decode(bytes.NewBuffer(tx.TxPayload.SpendingProof.Data), true); err != nil {
+		return nil, err
 	}
 
 	return stx, nil
@@ -268,13 +296,13 @@ func BidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
 }
 
 // RuskBidToBid turns a rusk bid into a legacy bid.
-func RuskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
-	stx, err := RuskTxToTx(tx.Tx)
+func RuskBidToBid(tx *rusk.Transaction) (*transactions.Bid, error) {
+	stx, err := RuskTxToTx(tx)
 	if err != nil {
 		return nil, err
 	}
 
-	buf := bytes.NewBuffer(tx.Tx.TxPayload.CallData)
+	buf := bytes.NewBuffer(tx.TxPayload.CallData)
 	var expirationHeight uint64
 	if err := encoding.ReadUint64LE(buf, &expirationHeight); err != nil {
 		return nil, err
@@ -294,49 +322,45 @@ func RuskBidToBid(tx *rusk.BidTransaction) (*transactions.Bid, error) {
 	}, nil
 }
 
-/*
 // RuskDistributeToCoinbase turns a rusk distribute call to an equivalent legacy coinbase.
-func RuskDistributeToCoinbase(tx *rusk.DistributeTransaction) (*transactions.Coinbase, error) {
+func RuskDistributeToCoinbase(tx *rusk.Transaction) (*transactions.Coinbase, error) {
 	c := transactions.NewCoinbase(make([]byte, 10), make([]byte, 10), byte(2))
-	var amount ristretto.Scalar
-	amount.SetBigInt(big.NewInt(int64(tx.Tx.Outputs[0].Note.Value.(*rusk.Note_TransparentValue).TransparentValue)))
+	buf := bytes.NewBuffer(tx.TxPayload.CallData)
+	var amount uint64
+	if err := encoding.ReadUint64LE(buf, &amount); err != nil {
+		return nil, err
+	}
+	logrus.WithField("coinbase amount", amount).Infoln(amount)
+
+	var amountScalar ristretto.Scalar
+	amountScalar.SetBigInt(new(big.Int).SetUint64(amount))
 	var pk ristretto.Scalar
-	_ = pk.UnmarshalBinary(tx.BgPk.AG.Y)
+	pk.Rand()
 	c.Rewards = append(c.Rewards, &transactions.Output{
-		EncryptedAmount: amount,
+		EncryptedAmount: amountScalar,
 		EncryptedMask:   pk,
 	})
 	return c, nil
 }
 
 // CoinbaseToRuskDistribute turns a legacy coinbase into an equivalent rusk distribute call.
-func CoinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.DistributeTransaction, error) {
-	tx := &rusk.DistributeTransaction{
-		Tx: &rusk.Transaction{
-			Inputs: make([]*rusk.TransactionInput, 0),
-			Outputs: []*rusk.TransactionOutput{{
-				Note: &rusk.Note{
-					Value: &rusk.Note_TransparentValue{
-						TransparentValue: binary.LittleEndian.Uint64(cb.Rewards[0].EncryptedAmount.Bytes()),
-					},
-				},
-			}},
-			Proof: make([]byte, 0),
-			Data:  make([]byte, 0),
-		},
-		ProvisionersAddresses: make([][]byte, 0),
-		BgPk: &rusk.PublicKey{
-			AG: &rusk.CompressedPoint{
-				Y: cb.Rewards[0].EncryptedMask.Bytes(),
-			},
-			BG: &rusk.CompressedPoint{
-				Y: make([]byte, 0),
-			},
+func CoinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.Transaction, error) {
+	amount := cb.Rewards[0].EncryptedAmount.BigInt().Uint64()
+	amountBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(amountBytes, amount)
+	tx := &rusk.Transaction{
+		TxPayload: &rusk.TransactionPayload{
+			Anchor:        &rusk.BlsScalar{Data: make([]byte, 32)},
+			Nullifier:     make([]*rusk.BlsScalar, 0),
+			Notes:         make([]*rusk.Note, 0),
+			Crossover:     newtx.MockRuskCrossover(),
+			Fee:           newtx.MockRuskFee(),
+			SpendingProof: &rusk.Proof{Data: make([]byte, 0)},
+			CallData:      amountBytes,
 		},
 	}
 	return tx, nil
 }
-*/
 
 func inputsToRuskInputs(inputs transactions.Inputs) ([]*rusk.BlsScalar, error) {
 	rInputs := make([]*rusk.BlsScalar, len(inputs))
