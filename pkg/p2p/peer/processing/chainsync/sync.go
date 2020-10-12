@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -34,10 +33,12 @@ type ChainSynchronizer struct {
 	*Counter
 	responseChan chan<- *bytes.Buffer
 
-	// Highest block we've seen. We keep track of it, so that we do not
-	// spam the `Chain` with messages during a sync.
-	lock        sync.RWMutex
-	highestSeen uint64
+	/*
+		// Highest block we've seen. We keep track of it, so that we do not
+		// spam the `Chain` with messages during a sync.
+		lock        sync.RWMutex
+		highestSeen uint64
+	*/
 }
 
 // NewChainSynchronizer returns an initialized ChainSynchronizer. The passed responseChan
@@ -75,10 +76,10 @@ func (s *ChainSynchronizer) HandleBlock(blkBuf *bytes.Buffer, sendingPeerAddr st
 
 	// Notify `Chain` of our highest seen block
 	// TODO: Chain processing should not be disturbed with highestSeen req
-	if s.getHighestSeen() < recvBlockHeight {
-		s.setHighestSeen(recvBlockHeight)
-		s.publishHighestSeen(recvBlockHeight)
-	}
+	//if s.getHighestSeen() < recvBlockHeight {
+	//	s.setHighestSeen(recvBlockHeight)
+	//	s.publishHighestSeen(recvBlockHeight)
+	//}
 
 	// Request blockchain last block
 	lastBlk, err := s.getLastBlock()
@@ -223,12 +224,14 @@ func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
 }
 
 //  TODO: To be moved out of ChainSynchronizer
+/*
 func (s *ChainSynchronizer) getHighestSeen() uint64 {
 	s.lock.RLock()
 	height := s.highestSeen
 	s.lock.RUnlock()
 	return height
 }
+
 
 func (s *ChainSynchronizer) setHighestSeen(height uint64) {
 	s.lock.Lock()
@@ -241,6 +244,7 @@ func (s *ChainSynchronizer) publishHighestSeen(height uint64) {
 	errList := s.publisher.Publish(topics.HighestSeen, msg)
 	diagnostics.LogPublishErrors("", errList)
 }
+*/
 
 func createGetBlocksMsg(latestHash []byte) *peermsg.GetBlocks {
 	msg := &peermsg.GetBlocks{}
