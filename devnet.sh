@@ -13,6 +13,7 @@ SEND_BID=false
 
 currentDir=$(pwd)
 RACE=false
+DEBUG=false
 
 # define command exec location
 duskCMD="../bin/dusk"
@@ -28,12 +29,13 @@ usage() {
   echo "-f <boolean>  -- FILEBEAT instances (true or false). default: false"
   echo "-b <boolean>  -- SEND_BID tx to instances (true or false). default: false"
   echo "-r <number>  -- RACE enabled (true or false). eg: true"
+  echo "-d <number>  -- DEBUG enabled (true or false). eg: true"
 
   exit 1
 }
 
 
-while getopts "h?c:q:s:i:m:r:f:b:" args; do
+while getopts "h?c:q:s:i:m:f:b:r:d:" args; do
 case $args in
     h|\?)
       usage;
@@ -46,12 +48,17 @@ case $args in
     f ) FILEBEAT=${OPTARG};;
     b ) SEND_BID=${OPTARG};;
     r ) RACE=${OPTARG};;
+    d ) DEBUG=${OPTARG};;
   esac
 done
 
 set -euxo pipefail
-if [[ "${TYPE}" == "branch" && "${RACE}" == "true" ]]; then
-  GOBIN=$(pwd)/bin go run scripts/build.go install - race
+if [[ "${TYPE}" == "branch" && "${RACE}" == "true" && "${DEBUG}" == "true" ]]; then
+  GOBIN=$(pwd)/bin go run scripts/build.go install -race -debug
+elif [[ "${TYPE}" == "branch" && "${RACE}" == "true" ]]; then
+  GOBIN=$(pwd)/bin go run scripts/build.go install -race
+elif [[ "${TYPE}" == "branch" && "${DEBUG}" == "true" ]]; then
+  GOBIN=$(pwd)/bin go run scripts/build.go install -debug
 elif [[ "${TYPE}" == "branch" ]]; then
   GOBIN=$(pwd)/bin go run scripts/build.go install
 fi
@@ -101,7 +108,8 @@ init_dusk_func() {
   timeoutgetmempooltxs = 3
   timeoutgetroundresults = 5
   timeoutbrokergetcandidate = 2
-
+  timeoutreadwrite = 60
+  timeoutkeepalivetime = 30
 [genesis]
   legacy = true
 
@@ -146,7 +154,7 @@ enabled = false
   file = "${currentDir}/harness/data/wallet-$((9000+$i)).dat"
   store = "${DDIR}/walletDB/"
 [api]
-  enabled=true
+  enabled=false
   enableTLS = false
   address="127.0.0.1:$((9490+$i))"
   dbfile="${DDIR}/chain/api.db"

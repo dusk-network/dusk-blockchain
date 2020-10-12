@@ -4,12 +4,6 @@ import (
 	"errors"
 	"sync"
 	"time"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 var syncTime = 30 * time.Second
@@ -36,22 +30,18 @@ type Counter struct {
 }
 
 // NewCounter returns an initialized counter. It will decrement each time we accept a new block.
-func NewCounter(subscriber eventbus.Subscriber) *Counter {
-	sc := &Counter{stopChan: make(chan struct{})}
-	decrementListener := eventbus.NewCallbackListener(sc.decrement)
-	if config.Get().General.SafeCallbackListener {
-		decrementListener = eventbus.NewSafeCallbackListener(sc.decrement)
+func NewCounter() *Counter {
+	sc := &Counter{
+		stopChan: make(chan struct{}),
 	}
-	subscriber.Subscribe(topics.AcceptedBlock, decrementListener)
 	return sc
 }
 
-// decrement decrements blockRemaining if a new block is accepted by the chain
-func (s *Counter) decrement(m message.Message) error {
+// Decrement decrements blockRemaining if a new block is accepted by the chain
+func (s *Counter) Decrement() {
 
 	if !s.IsSyncing() {
-		// no need to decrement in non-syncing mode
-		return nil
+		return
 	}
 
 	s.lock.Lock()
@@ -63,7 +53,7 @@ func (s *Counter) decrement(m message.Message) error {
 		if s.blocksRemaining == 0 {
 			s.syncingPeerAddr = ""
 			s.stopChan <- struct{}{}
-			return nil
+			return
 		}
 
 		// Refresh the timer whenever we get a new block during sync
@@ -72,7 +62,6 @@ func (s *Counter) decrement(m message.Message) error {
 		s.timer.Reset(syncTime)
 	}
 
-	return nil
 }
 
 // IsSyncing notifies whether the counter is syncing

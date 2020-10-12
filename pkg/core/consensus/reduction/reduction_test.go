@@ -24,7 +24,7 @@ import (
 // time we are done processing all events.
 func TestCorrectHeader(t *testing.T) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	c, hlp := wireReduction(t, bus, rpcBus)
+	c, hlp := wireReduction(bus, rpcBus)
 
 	// Subscribe to gossip topic. We will catch the outgoing reduction votes
 	// on this channel.
@@ -46,7 +46,7 @@ func TestCorrectHeader(t *testing.T) {
 	evs := append(evs1, evs2...)
 
 	// Queue the events in the coordinator
-	collectEvents(t, c, evs)
+	collectEvents(c, evs)
 
 	// Send a BestScore, triggering a step update and emptying the queue.
 	// This should set off the two-step reduction cycle in full
@@ -109,15 +109,14 @@ func sendBestScore(t *testing.T, bus *eventbus.EventBus, round uint64, step uint
 
 }
 
-func collectEvents(t *testing.T, c *consensus.Coordinator, evs []message.Reduction) {
+func collectEvents(c *consensus.Coordinator, evs []message.Reduction) {
 	for _, ev := range evs {
 		msg := message.New(topics.Reduction, ev)
-		err := c.CollectEvent(msg)
-		require.Nil(t, err)
+		c.CollectEvent(msg)
 	}
 }
 
-func wireReduction(t *testing.T, bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*consensus.Coordinator, *firststep.Helper) {
+func wireReduction(bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*consensus.Coordinator, *firststep.Helper) {
 	hlp := firststep.NewHelper(bus, rpcBus, 10, 1*time.Second, true)
 	f1 := firststep.NewFactory(bus, rpcBus, hlp.Keys[0], 1*time.Second)
 	f2 := secondstep.NewFactory(bus, rpcBus, hlp.Keys[0], 1*time.Second)
@@ -125,8 +124,6 @@ func wireReduction(t *testing.T, bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) 
 	// Starting the coordinator
 	ru := consensus.MockRoundUpdate(1, hlp.P)
 	msg := message.New(topics.RoundUpdate, ru)
-	if err := c.CollectRoundUpdate(msg); err != nil {
-		t.Fatal(err)
-	}
+	c.CollectRoundUpdate(msg)
 	return c, hlp
 }

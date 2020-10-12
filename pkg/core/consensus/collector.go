@@ -64,10 +64,8 @@ func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 
 // Collect as specified in the EventCollector interface. In this case Collect simply
 // performs unmarshaling of the round event
-func (r *roundCollector) Collect(m message.Message) error {
-	update := m.Payload().(RoundUpdate)
-	r.roundChan <- update
-	return nil
+func (r *roundCollector) Collect(m message.Message) {
+	r.roundChan <- m.Payload().(RoundUpdate)
 }
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
@@ -83,8 +81,6 @@ func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, 
 }
 
 // Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
-func (c *acceptedBlockCollector) Collect(m message.Message) error {
-	b := m.Payload().(block.Block)
-	c.blockChan <- b
-	return nil
+func (c *acceptedBlockCollector) Collect(m message.Message) {
+	c.blockChan <- m.Payload().(block.Block)
 }

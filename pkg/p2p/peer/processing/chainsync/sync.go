@@ -27,6 +27,9 @@ var log = logger.WithFields(logger.Fields{"process": "sync"})
 // rest of the network. It sits between the peer and the chain, as a sort of gateway for
 // incoming blocks. It keeps track of the local chain tip and compares it with each incoming
 // block to make sure we stay in sync with our peers.
+// NB: every peer reader has its own instance of ChainSynchronizer to which it
+// pipes a peer-specific responseChan. Internally, though, the
+// ChainSynchronizer uses a Counter that is accessed globally
 type ChainSynchronizer struct {
 	publisher eventbus.Publisher
 	rpcBus    *rpcbus.RPCBus

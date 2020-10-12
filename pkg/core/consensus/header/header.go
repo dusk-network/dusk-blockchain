@@ -4,10 +4,9 @@ package header
 
 import (
 	"bytes"
-	crand "crypto/rand"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -228,14 +227,16 @@ func Mock() Header {
 	k, _ := key.NewRandKeys()
 	pubkey := k.BLSPubKeyBytes
 	buf := make([]byte, 8)
-	_, _ = crand.Read(buf)
+	_, _ = rand.Read(buf)
 	round := binary.LittleEndian.Uint64(buf)
-	step := rand.Intn(8)
+
+	step := []byte{0}
+	_, _ = rand.Reader.Read(step)
 
 	return Header{
 		BlockHash: hash,
 		Round:     round,
-		Step:      uint8(step),
+		Step:      step[0],
 		PubKeyBLS: pubkey,
 	}
 }

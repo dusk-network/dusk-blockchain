@@ -31,9 +31,8 @@ func WireAgreement(nrProvisioners int) (*consensus.Coordinator, *Helper) {
 	// starting up the coordinator
 	ru := consensus.MockRoundUpdate(1, h.P)
 	msg := message.New(topics.RoundUpdate, ru)
-	if err := coordinator.CollectRoundUpdate(msg); err != nil {
-		panic(err)
-	}
+	coordinator.CollectRoundUpdate(msg)
+
 	// Play to step 3, as agreements can only be made on step 3 or later
 	// This prevents the mocked events from getting queued
 	coordinator.Play(h.Aggro.ID())
