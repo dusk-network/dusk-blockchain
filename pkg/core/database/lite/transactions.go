@@ -302,6 +302,9 @@ func (t *transaction) FetchBidValues() ([]byte, []byte, []byte, error) {
 			values = v
 		}
 	}
+	if values == nil {
+		return nil, nil, nil, errors.New("could not fetch bid values")
+	}
 
 	return values[0:32], values[32:64], values[64:], nil
 }

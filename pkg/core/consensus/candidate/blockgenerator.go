@@ -52,7 +52,7 @@ func (bg *generator) PropagateBlockAndScore(ctx context.Context, sev message.Sco
 
 	timeoutGetLastCommittee := time.Duration(config.Get().Timeout.TimeoutGetLastCommittee) * time.Second
 
-	// XXX: PRCBus must be able to operate on context cancelation
+	// XXX: PRCBus must be able to operate on context cancellation
 	resp, err := bg.RPCBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), timeoutGetLastCommittee)
 	if err != nil {
 		log.
