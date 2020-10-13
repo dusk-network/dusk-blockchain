@@ -154,6 +154,7 @@ func (t Transaction) StandardTx() *TransactionPayload {
 }
 
 // CalculateHash returns the SHA3-256 hash digest of the transaction.
+// TODO: this needs to correspond with how rusk hashes transactions.
 func (t Transaction) CalculateHash() ([]byte, error) {
 	b := new(bytes.Buffer)
 	if err := Marshal(b, &t); err != nil {

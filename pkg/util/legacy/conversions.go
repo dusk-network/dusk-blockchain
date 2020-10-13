@@ -181,8 +181,8 @@ func TxToRuskTx(tx transactions.Transaction) (*rusk.Transaction, error) {
 			// XXX: fix typo in rusk-schema
 			Nullifier: inputs,
 			Notes:     outputs,
-			Crossover: newtx.MockRuskCrossover(),
-			Fee:       newtx.MockRuskFee(),
+			Crossover: newtx.MockRuskCrossover(false),
+			Fee:       newtx.MockRuskFee(false),
 			SpendingProof: &rusk.Proof{
 				Data: buf.Bytes(),
 			},
@@ -353,8 +353,8 @@ func CoinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.Transaction, err
 			Anchor:        &rusk.BlsScalar{Data: make([]byte, 32)},
 			Nullifier:     make([]*rusk.BlsScalar, 0),
 			Notes:         make([]*rusk.Note, 0),
-			Crossover:     newtx.MockRuskCrossover(),
-			Fee:           newtx.MockRuskFee(),
+			Crossover:     newtx.MockRuskCrossover(false),
+			Fee:           newtx.MockRuskFee(false),
 			SpendingProof: &rusk.Proof{Data: make([]byte, 0)},
 			CallData:      amountBytes,
 		},

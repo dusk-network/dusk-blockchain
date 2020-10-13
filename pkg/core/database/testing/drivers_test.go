@@ -48,24 +48,23 @@ var (
 //
 // Note TestMain must clean up all resources on completion
 func TestMain(m *testing.M) {
-
 	var code int
+
 	// Run on all registered drivers.
 	for _, driverName := range database.Drivers() {
-
 		code = _TestDriver(m, driverName)
 		// the exit code might be needed on proper CI execution
 		if code != 0 {
 			os.Exit(code)
 		}
 	}
+
 	os.Exit(code)
 }
 
 // _TestDriver executes all tests (declared in this file) in the context of a
 // driver specified by driverName
 func _TestDriver(m *testing.M, driverName string) int {
-
 	// Cleanup TestMain iteration context
 	defer func() {
 		blocks = make([]*block.Block, 0)
@@ -142,7 +141,6 @@ func _TestDriver(m *testing.M, driverName string) int {
 }
 
 func TestStoreBlock(test *testing.T) {
-
 	// Generate additional blocks to store
 	genBlocks, err := generateChainBlocks(2)
 	if err != nil {
@@ -187,7 +185,6 @@ func TestStoreBlock(test *testing.T) {
 	}
 }
 func TestFetchBlockExists(test *testing.T) {
-
 	test.Parallel()
 
 	// Verify all blocks can be found by Header.Hash

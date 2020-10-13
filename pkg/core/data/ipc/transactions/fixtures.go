@@ -188,16 +188,16 @@ func RandTx() *Transaction {
 		panic(err)
 	}
 
-	return MockTx(RandBool(), bf)
+	return MockTx(RandBool(), bf, true)
 }
 
 // MockTx mocks a transfer transaction. For simplicity it includes a single
 // output with the amount specified. The blinding factor can be left to nil if
 // the test is not interested in Transaction equality/differentiation.
 // Otherwise it can be used to identify/differentiate the transaction
-func MockTx(obfuscated bool, blindingFactor []byte) *Transaction {
+func MockTx(obfuscated bool, blindingFactor []byte, randomized bool) *Transaction {
 	ccTx := NewTransaction()
-	rtx := mockRuskTx(obfuscated, blindingFactor)
+	rtx := mockRuskTx(obfuscated, blindingFactor, randomized)
 	UTransaction(rtx, ccTx)
 
 	return ccTx
@@ -230,7 +230,7 @@ func IntermediateCoinbase(reward uint64) *Transaction {
 	// This is to prevent annoying errors during test-harness execution.
 	// Since the actual workaround requires much more work, I will defer
 	// it until we can start integrating with actual Rusk.
-	tx := MockTx(false, make([]byte, 32))
+	tx := MockTx(false, make([]byte, 32), false)
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64LE(buf, 5000000000); err != nil {
 		panic(err)
@@ -292,13 +292,13 @@ func RandStakeTx(expiration uint64) *Transaction {
 	if expiration < 1 {
 		expiration = RandUint64()
 	}
-	return MockStakeTx(expiration, Rand32Bytes())
+	return MockStakeTx(expiration, Rand32Bytes(), true)
 }
 
 // MockStakeTx creates a StakeTransaction
-func MockStakeTx(expiration uint64, blsKey []byte) *Transaction {
+func MockStakeTx(expiration uint64, blsKey []byte, randomized bool) *Transaction {
 	stx := NewTransaction()
-	rtx := mockRuskTx(false, Rand32Bytes())
+	rtx := mockRuskTx(false, Rand32Bytes(), randomized)
 	UTransaction(rtx, stx)
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteVarBytes(buf, blsKey); err != nil {
@@ -324,14 +324,14 @@ func RandBidTx(expiration uint64) *Transaction {
 	if expiration < 1 {
 		expiration = RandUint64()
 	}
-	return MockBidTx(expiration, Rand32Bytes(), Rand32Bytes())
+	return MockBidTx(expiration, Rand32Bytes(), Rand32Bytes(), true)
 }
 
 // MockBidTx creates a BidTransaction
-func MockBidTx(expiration uint64, edPk, seed []byte) *Transaction {
+func MockBidTx(expiration uint64, edPk, seed []byte, randomized bool) *Transaction {
 	stx := NewTransaction()
 	// amount is set directly in the underlying ContractCallTx
-	rtx := mockRuskTx(true, Rand32Bytes())
+	rtx := mockRuskTx(true, Rand32Bytes(), randomized)
 	UTransaction(rtx, stx)
 	buf := new(bytes.Buffer)
 
@@ -365,7 +365,7 @@ func MockBidTx(expiration uint64, edPk, seed []byte) *Transaction {
 func MockDeterministicBid(expiration uint64, edPk, seed []byte) *Transaction {
 	stx := NewTransaction()
 	// amount is set directly in the underlying ContractCallTx
-	rtx := mockRuskTx(true, make([]byte, 32))
+	rtx := mockRuskTx(true, make([]byte, 32), false)
 	UTransaction(rtx, stx)
 	buf := new(bytes.Buffer)
 
@@ -397,17 +397,22 @@ func MockDeterministicBid(expiration uint64, edPk, seed []byte) *Transaction {
 /** Transfer Transaction **/
 /**************************/
 
-func mockRuskTx(obfuscated bool, blindingFactor []byte) *rusk.Transaction {
+func mockRuskTx(obfuscated bool, blindingFactor []byte, randomized bool) *rusk.Transaction {
+	anchorBytes := make([]byte, 32)
+	if randomized {
+		anchorBytes = Rand32Bytes()
+	}
+
 	if obfuscated {
 		return &rusk.Transaction{
 			TxPayload: &rusk.TransactionPayload{
 				Anchor: &rusk.BlsScalar{
-					Data: make([]byte, 32),
+					Data: anchorBytes,
 				},
 				Nullifier: []*rusk.BlsScalar{RuskTransparentTxIn()},
 				Notes:     []*rusk.Note{mockRuskObfuscatedOutput(blindingFactor)},
-				Fee:       MockRuskFee(),
-				Crossover: MockRuskCrossover(),
+				Fee:       MockRuskFee(randomized),
+				Crossover: MockRuskCrossover(randomized),
 				SpendingProof: &rusk.Proof{
 					Data: []byte{0xaa, 0xbb},
 				},
@@ -419,12 +424,12 @@ func mockRuskTx(obfuscated bool, blindingFactor []byte) *rusk.Transaction {
 	return &rusk.Transaction{
 		TxPayload: &rusk.TransactionPayload{
 			Anchor: &rusk.BlsScalar{
-				Data: make([]byte, 32),
+				Data: anchorBytes,
 			},
 			Nullifier: []*rusk.BlsScalar{RuskTransparentTxIn()},
 			Notes:     []*rusk.Note{mockRuskTransparentOutput(blindingFactor)},
-			Fee:       MockRuskFee(),
-			Crossover: MockRuskCrossover(),
+			Fee:       MockRuskFee(randomized),
+			Crossover: MockRuskCrossover(randomized),
 			SpendingProof: &rusk.Proof{
 				Data: []byte{0xab, 0xbc},
 			},
@@ -442,8 +447,8 @@ func RuskTx() *rusk.Transaction {
 			},
 			Nullifier: []*rusk.BlsScalar{RuskTransparentTxIn()},
 			Notes:     []*rusk.Note{RuskTransparentTxOut(Rand32Bytes())},
-			Fee:       MockRuskFee(),
-			Crossover: MockRuskCrossover(),
+			Fee:       MockRuskFee(false),
+			Crossover: MockRuskCrossover(false),
 			SpendingProof: &rusk.Proof{
 				Data: []byte{0xaa, 0xbb},
 			},
@@ -532,13 +537,23 @@ func RuskObfuscatedNote() *rusk.Note {
 }
 
 // MockCrossover returns a mocked Crossover struct.
-func MockCrossover() *Crossover {
+func MockCrossover(randomized bool) *Crossover {
+	valueCommBytes := make([]byte, 32)
+	if randomized {
+		valueCommBytes = Rand32Bytes()
+	}
+
+	nonceBytes := make([]byte, 32)
+	if randomized {
+		nonceBytes = Rand32Bytes()
+	}
+
 	return &Crossover{
 		ValueComm: &common.JubJubCompressed{
-			Data: make([]byte, 32),
+			Data: valueCommBytes,
 		},
 		Nonce: &common.BlsScalar{
-			Data: make([]byte, 32),
+			Data: nonceBytes,
 		},
 		EncryptedData: &common.PoseidonCipher{
 			Data: make([]byte, 96),
@@ -547,13 +562,23 @@ func MockCrossover() *Crossover {
 }
 
 // MockRuskCrossover returns a mocked rusk.Crossover struct.
-func MockRuskCrossover() *rusk.Crossover {
+func MockRuskCrossover(randomized bool) *rusk.Crossover {
+	valueCommBytes := make([]byte, 32)
+	if randomized {
+		valueCommBytes = Rand32Bytes()
+	}
+
+	nonceBytes := make([]byte, 32)
+	if randomized {
+		nonceBytes = Rand32Bytes()
+	}
+
 	return &rusk.Crossover{
 		ValueComm: &rusk.JubJubCompressed{
-			Data: make([]byte, 32),
+			Data: valueCommBytes,
 		},
 		Nonce: &rusk.BlsScalar{
-			Data: make([]byte, 32),
+			Data: nonceBytes,
 		},
 		EncyptedData: &rusk.PoseidonCipher{
 			Data: make([]byte, 96),
@@ -562,23 +587,33 @@ func MockRuskCrossover() *rusk.Crossover {
 }
 
 // MockFee returns a mocked Fee struct.
-func MockFee() *Fee {
+func MockFee(randomized bool) *Fee {
+	rBytes := make([]byte, 32)
+	if randomized {
+		rBytes = Rand32Bytes()
+	}
+
+	pkRBytes := make([]byte, 32)
+	if randomized {
+		pkRBytes = Rand32Bytes()
+	}
+
 	return &Fee{
 		GasLimit: 50000,
 		GasPrice: 100,
 		R: &common.JubJubCompressed{
-			Data: make([]byte, 32),
+			Data: rBytes,
 		},
 		PkR: &common.JubJubCompressed{
-			Data: make([]byte, 32),
+			Data: pkRBytes,
 		},
 	}
 }
 
 // MockRuskFee returns a mocked rusk.Fee struct.
-func MockRuskFee() *rusk.Fee {
+func MockRuskFee(randomized bool) *rusk.Fee {
 	c := new(rusk.Fee)
-	MFee(c, MockFee())
+	MFee(c, MockFee(randomized))
 	return c
 }
 
