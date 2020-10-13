@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"sync"
 	"testing"
 	"time"
@@ -184,7 +185,9 @@ func (hlp *Helper) processLastCommittee() {
 	}
 	for {
 		r := <-v
-		r.RespChan <- rpcbus.NewResponse([][]byte{}, nil)
+		com := make([][]byte, 0)
+		com = append(com, []byte{1, 2, 3}) //nolint
+		r.RespChan <- rpcbus.NewResponse(make([][]byte, 0), nil)
 	}
 }
 
@@ -195,7 +198,10 @@ func (hlp *Helper) processLastCertificate() {
 	}
 	for {
 		r := <-v
-		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, nil)
+		buf := new(bytes.Buffer)
+		cert := block.EmptyCertificate()
+		err := message.MarshalCertificate(buf, cert)
+		r.RespChan <- rpcbus.NewResponse(*buf, err)
 	}
 }
 

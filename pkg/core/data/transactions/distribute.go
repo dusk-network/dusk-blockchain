@@ -169,8 +169,9 @@ func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
 		}
 	}
 
-	if len(s.BgPk.BG.Y) == 0 || len(s.BgPk.AG.Y) == 0 {
-		return errors.New("could not find a valid pub key reward on the DistributeTransaction")
+	//TODO: check if panic is the most correct way of doing this
+	if s.BgPk == nil || (s.BgPk.BG == nil || s.BgPk.AG == nil) || len(s.BgPk.BG.Y) == 0 || len(s.BgPk.AG.Y) == 0 {
+		panic("could not find a valid pub key reward on the DistributeTransaction")
 	}
 
 	if err := MarshalPublicKey(r, *s.BgPk); err != nil {
