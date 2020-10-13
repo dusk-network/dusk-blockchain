@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 
@@ -156,7 +157,7 @@ type FilteringListener struct {
 // NewFilteringListener creates a FilteringListener
 func NewFilteringListener(callback func(InternalPacket) error, filter func(header.Header) bool, priority Priority, paused bool) Listener {
 	// #654
-	nBig, err := rand.Int(rand.Reader, big.NewInt(32))
+	nBig, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	if err != nil {
 		panic(err)
 	}
