@@ -55,6 +55,11 @@ func New(next consensus.Phase, e *consensus.Emitter, bg candidate.Generator) (*P
 	}, nil
 }
 
+// SetNext sets the next step to be returned at the end of this one
+func (p *Phase) SetNext(next consensus.Phase) {
+	p.next = next
+}
+
 // Fn returns the Phase state function
 func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
 	return p.Run

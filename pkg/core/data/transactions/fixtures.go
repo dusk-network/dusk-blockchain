@@ -7,10 +7,12 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"math/big"
 	mrand "math/rand"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-crypto/hash"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
@@ -68,7 +70,40 @@ type MockBlockGenerator struct{}
 
 // GenerateScore obeys the BlockGenerator interface
 func (b MockBlockGenerator) GenerateScore(context.Context, ScoreRequest) (Score, error) {
-	return Score{}, nil
+	var scoreFinal Score
+	limit, _ := big.NewInt(0).SetString("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 16)
+
+	for i := 0; i < 1000; i++ {
+		var proof, err = crypto.RandEntropy(400)
+		if err != nil {
+			return Score{}, nil
+		}
+
+		score, err := crypto.RandEntropy(32)
+		if err != nil {
+			return Score{}, nil
+		}
+
+		identity, err := crypto.RandEntropy(32)
+		if err != nil {
+			return Score{}, nil
+		}
+
+		scoreFinal = Score{
+			Proof: proof,
+			Score: score,
+			//Seed:     req.Seed,
+			Identity: identity,
+		}
+
+		scoreInt := big.NewInt(0).SetBytes(scoreFinal.Score)
+		if scoreInt.Cmp(limit) != -1 {
+			break
+		}
+	}
+
+	return scoreFinal, nil
+
 }
 
 // MockProxy mocks a proxy for ease of testing

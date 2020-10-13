@@ -66,7 +66,8 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	p, provisionersKeys := consensus.MockProvisioners(provisioners)
 
 	mockProxy := transactions.MockProxy{
-		P: transactions.PermissiveProvisioner{},
+		P:  transactions.PermissiveProvisioner{},
+		BG: transactions.MockBlockGenerator{},
 	}
 	emitter := consensus.MockEmitter(timeOut, mockProxy)
 	emitter.Keys = provisionersKeys[0]
@@ -85,6 +86,10 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 
 	go hlp.provideCandidateBlock()
 	go hlp.processCandidateVerificationRequest()
+
+	go hlp.processLastCommittee()
+	go hlp.processLastCertificate()
+	go hlp.processMempoolTxsBySize()
 
 	return hlp
 }
@@ -169,5 +174,38 @@ func (hlp *Helper) processCandidateVerificationRequest() {
 		}
 
 		r.RespChan <- rpcbus.NewResponse(nil, nil)
+	}
+}
+
+func (hlp *Helper) processLastCommittee() {
+	v := make(chan rpcbus.Request, 1)
+	if err := hlp.RPCBus.Register(topics.GetLastCommittee, v); err != nil {
+		panic(err)
+	}
+	for {
+		r := <-v
+		r.RespChan <- rpcbus.NewResponse([][]byte{}, nil)
+	}
+}
+
+func (hlp *Helper) processLastCertificate() {
+	v := make(chan rpcbus.Request, 1)
+	if err := hlp.RPCBus.Register(topics.GetLastCertificate, v); err != nil {
+		panic(err)
+	}
+	for {
+		r := <-v
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, nil)
+	}
+}
+
+func (hlp *Helper) processMempoolTxsBySize() {
+	v := make(chan rpcbus.Request, 1)
+	if err := hlp.RPCBus.Register(topics.GetMempoolTxsBySize, v); err != nil {
+		panic(err)
+	}
+	for {
+		r := <-v
+		r.RespChan <- rpcbus.NewResponse([]transactions.ContractCall{}, nil)
 	}
 }

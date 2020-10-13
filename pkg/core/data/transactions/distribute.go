@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
@@ -146,6 +147,9 @@ func UDistribute(r *rusk.DistributeTransaction, t *DistributeTransaction) error 
 
 //MarshalDistribute into a buffer
 func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
+	if s.Tx == nil || len(s.Tx.Outputs) == 0 || s.Tx.Outputs[0].Note == nil {
+		return errors.New("could not find the coinbase reward on the DistributeTransaction")
+	}
 	reward := s.Tx.Outputs[0].Note.TransparentValue
 	if err := encoding.WriteUint64LE(r, reward); err != nil {
 		return err
@@ -163,6 +167,10 @@ func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
 		if err := encoding.WriteVarBytes(r, p); err != nil {
 			return err
 		}
+	}
+
+	if len(s.BgPk.BG.Y) == 0 || len(s.BgPk.AG.Y) == 0 {
+		return errors.New("could not find a valid pub key reward on the DistributeTransaction")
 	}
 
 	if err := MarshalPublicKey(r, *s.BgPk); err != nil {
