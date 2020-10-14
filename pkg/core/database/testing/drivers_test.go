@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -48,24 +48,23 @@ var (
 //
 // Note TestMain must clean up all resources on completion
 func TestMain(m *testing.M) {
-
 	var code int
+
 	// Run on all registered drivers.
 	for _, driverName := range database.Drivers() {
-
 		code = _TestDriver(m, driverName)
 		// the exit code might be needed on proper CI execution
 		if code != 0 {
 			os.Exit(code)
 		}
 	}
+
 	os.Exit(code)
 }
 
 // _TestDriver executes all tests (declared in this file) in the context of a
 // driver specified by driverName
 func _TestDriver(m *testing.M, driverName string) int {
-
 	// Cleanup TestMain iteration context
 	defer func() {
 		blocks = make([]*block.Block, 0)
@@ -142,7 +141,6 @@ func _TestDriver(m *testing.M, driverName string) int {
 }
 
 func TestStoreBlock(test *testing.T) {
-
 	// Generate additional blocks to store
 	genBlocks, err := generateChainBlocks(2)
 	if err != nil {
@@ -187,7 +185,6 @@ func TestStoreBlock(test *testing.T) {
 	}
 }
 func TestFetchBlockExists(test *testing.T) {
-
 	test.Parallel()
 
 	// Verify all blocks can be found by Header.Hash
@@ -268,7 +265,6 @@ func TestFetchBlockHeader(test *testing.T) {
 	})
 }
 func TestFetchBlockTxs(test *testing.T) {
-
 	test.Parallel()
 
 	// Verify all blocks transactions can be fetched by Header.Hash
@@ -545,11 +541,9 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 }
 
 func TestFetchBlockTxByHash(test *testing.T) {
-
 	test.Parallel()
 
 	var maxTxToFetch uint16 = 30
-
 	done := false
 
 	// Ensure we can fetch one by one each transaction by its TxID without
@@ -557,11 +551,9 @@ func TestFetchBlockTxByHash(test *testing.T) {
 	err := db.View(func(t database.Transaction) error {
 		for _, blk := range blocks {
 			for txIndex, originTx := range blk.Txs {
-
 				// FetchBlockTxByHash
 				txID, _ := originTx.CalculateHash()
 				fetchedTx, fetchedIndex, _, err := t.FetchBlockTxByHash(txID)
-
 				if err != nil {
 					test.Fatal(err.Error())
 				}
@@ -599,6 +591,7 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 			}
 		}
+
 		return nil
 	})
 
@@ -629,6 +622,7 @@ func TestFetchBlockTxByHash(test *testing.T) {
 		if tx != nil || fetchedBlockHash != nil {
 			test.Fatal("Found non-existing tx?")
 		}
+
 		return nil
 	})
 }

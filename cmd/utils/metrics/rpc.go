@@ -13,7 +13,7 @@ import (
 // the server on startup, and then handles requests from other components
 // over the RPCBus.
 type Client struct {
-	//rusk.RuskClient
+	//rusk.StateClient
 	//node.WalletClient
 	//node.TransactorClient
 	conn *grpc.ClientConn
@@ -35,7 +35,7 @@ func InitRPCClients(ctx context.Context, address string) *Client {
 	}
 
 	return &Client{
-		//RuskClient:       rusk.NewRuskClient(conn),
+		//StateClient:       rusk.NewStateClient(conn),
 		//WalletClient:     node.NewWalletClient(conn),
 		//TransactorClient: node.NewTransactorClient(conn),
 		conn: conn,

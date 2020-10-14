@@ -1,14 +1,16 @@
 package chain
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -25,16 +27,28 @@ func setupBidValues() error {
 }
 
 // ReconstructCommittee will fill in the committee members that are present from genesis.
+//nolint
 func reconstructCommittee(p *user.Provisioners, b *block.Block) error {
 	// We should properly reconstruct the committee, though. This is because the keys
 	// need to match up with what's found in the wallet.
 	for _, tx := range b.Txs {
-		switch t := tx.(type) {
-		case *transactions.StakeTransaction:
-			amountBytes := t.ContractTx.Tx.Outputs[0].Note.ValueCommitment.Data
+		t := tx.Type()
+		switch t {
+		case transactions.Stake:
+			amountBytes := tx.(*transactions.Transaction).TxPayload.Notes[0].Commitment.Data
 			amount := binary.LittleEndian.Uint64(amountBytes[0:8])
+			buf := bytes.NewBuffer(tx.(*transactions.Transaction).TxPayload.CallData)
+			var expirationHeight uint64
+			if err := encoding.ReadUint64LE(buf, &expirationHeight); err != nil {
+				return err
+			}
 
-			if err := p.Add(t.BlsKey, amount, 0, t.ExpirationHeight); err != nil {
+			blsKey := make([]byte, 0)
+			if err := encoding.ReadVarBytes(buf, &blsKey); err != nil {
+				return err
+			}
+
+			if err := p.Add(blsKey, amount, 0, expirationHeight); err != nil {
 				return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
 			}
 		}

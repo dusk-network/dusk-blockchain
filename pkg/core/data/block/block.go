@@ -1,7 +1,7 @@
 package block
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 )
@@ -55,7 +55,7 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 }
 
 // AddTx will add a transaction to the block.
-func (b *Block) AddTx(tx transactions.ContractCall) {
+func (b *Block) AddTx(tx *transactions.Transaction) {
 	b.Txs = append(b.Txs, tx)
 }
 

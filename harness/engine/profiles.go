@@ -92,12 +92,10 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("api.enabletls", false)
 	viper.Set("api.address", "127.0.0.1:9199")
 	viper.Set("api.expirationtime", 300)
-
 }
 
 // Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing)
 func Profile2(index int, node *DuskNode, walletPath string) {
-
 	Profile1(index, node, walletPath)
 	viper.Set("database.driver", lite.DriverName)
 }

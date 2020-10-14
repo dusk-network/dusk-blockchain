@@ -200,7 +200,6 @@ func (n *Network) Teardown() {
 
 // StartNode locally
 func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
-
 	blockchainExec, utilsExec, _, err := n.getExec()
 	if err != nil {
 		return err
@@ -236,6 +235,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 			return startErr
 		}
 	}
+
 	// Run dusk-blockchain node process
 	if startErr := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); startErr != nil {
 		return startErr
@@ -256,7 +256,6 @@ func (n *Network) GetGrpcConn(i uint, opts ...grpc.DialOption) (*grpc.ClientConn
 // index
 // It's based on viper global var so it cannot be called concurrently
 func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, error) {
-
 	node := n.nodes[nodeIndex]
 
 	// Load config profile from the global parameter profileList
@@ -320,7 +319,6 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 // getExec returns paths of all node executables
 // dusk-blockchain, blindbid and seeder
 func (n *Network) getExec() (string, string, string, error) {
-
 	blockchainExec, err := getEnv("DUSK_BLOCKCHAIN")
 	if err != nil {
 		return "", "", "", err
@@ -340,7 +338,6 @@ func (n *Network) getExec() (string, string, string, error) {
 }
 
 func getEnv(envVarName string) (string, error) {
-
 	execPath := os.Getenv(envVarName)
 	if len(execPath) == 0 {
 		return "", fmt.Errorf("ENV variable %s is not declared", envVarName)

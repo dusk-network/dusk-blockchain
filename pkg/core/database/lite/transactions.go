@@ -8,7 +8,7 @@ import (
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -25,7 +25,6 @@ type transaction struct {
 // in a slice.
 // NB: A single slice of all blocks to be used to avoid all duplications
 func (t *transaction) StoreBlock(b *block.Block) error {
-
 	if !t.writable {
 		return errors.New("read-only transaction")
 	}
@@ -105,7 +104,6 @@ func (t *transaction) Commit() error {
 }
 
 func (t transaction) FetchBlockExists(hash []byte) (bool, error) {
-
 	if _, ok := t.db.storage[blocksInd][toKey(hash)]; !ok {
 		return false, database.ErrBlockNotFound
 	}
@@ -113,7 +111,6 @@ func (t transaction) FetchBlockExists(hash []byte) (bool, error) {
 }
 
 func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
-
 	var data []byte
 	var exists bool
 	if data, exists = t.db.storage[blocksInd][toKey(hash)]; !exists {
@@ -129,7 +126,6 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 }
 
 func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.ContractCall, error) {
-
 	var data []byte
 	var exists bool
 	if data, exists = t.db.storage[blocksInd][toKey(hash)]; !exists {
@@ -145,7 +141,6 @@ func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.ContractCall, er
 }
 
 func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
-
 	heightBuf := new(bytes.Buffer)
 
 	// Append height value
@@ -168,7 +163,6 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 }
 
 func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall, uint32, []byte, error) {
-
 	var data []byte
 	var exists bool
 	if data, exists = t.db.storage[txsInd][toKey(txID)]; !exists {

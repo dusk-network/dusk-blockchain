@@ -129,6 +129,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 		if m, e = p.MemberAt(i); e != nil {
 			// handling the eventuality of an out of bound error
 			m, e = p.MemberAt(0)
+			i = 0
 			if e != nil {
 				//FIXME: shall this panic ?
 				log.Panic(e)

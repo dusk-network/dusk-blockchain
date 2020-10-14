@@ -3,10 +3,10 @@ package txrecords
 import (
 	"bytes"
 	"encoding/binary"
+	"log"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	log "github.com/sirupsen/logrus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
 // Direction is an enum which tells us whether a transaction is
@@ -78,14 +78,14 @@ func (t TxRecord) View() TxView {
 
 	view.Amount, view.Fee = t.Transaction.Values()
 
-	switch tx := t.Transaction.(type) {
-	case *transactions.BidTransaction:
-		view.Timelock = tx.ExpirationHeight
-	case *transactions.StakeTransaction:
-		view.Timelock = tx.ExpirationHeight
-	case *transactions.Transaction:
-		view.Data = tx.Data
-	}
+	// switch tx := t.Transaction.(type) {
+	// case *transactions.BidTransaction:
+	// 	view.Timelock = tx.ExpirationHeight
+	// case *transactions.StakeTransaction:
+	// 	view.Timelock = tx.ExpirationHeight
+	// case *transactions.Transaction:
+	// 	view.Data = tx.Data
+	// }
 
 	return view
 }
@@ -125,11 +125,11 @@ func Decode(b *bytes.Buffer, t *TxRecord) error {
 		return err
 	}
 
-	call, err := transactions.Unmarshal(b)
-	if err != nil {
+	call := new(transactions.Transaction)
+	if err := transactions.Unmarshal(b, call); err != nil {
 		return err
 	}
 
-	t.Transaction = call
+	t.Transaction = *call
 	return nil
 }

@@ -189,13 +189,17 @@ func (r *Reducer) Halt(hash []byte, stepVotes []*message.StepVotes) {
 
 	// Sending of agreement happens on it's own step
 	step := r.eventPlayer.Forward(r.ID())
-	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(stepVotes) && r.handler.AmMember(r.round, step) {
-		lg.
-			WithField("step", step).
-			WithField("id", r.reductionID).
-			WithField("round", r.round).
-			Debug("sending agreement")
-		r.sendAgreement(step, hash, stepVotes)
+	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(stepVotes) {
+		// We check separately if we are part of the committee, to avoid increasing
+		// the timeout even if the result was correct.
+		if r.handler.AmMember(r.round, step) {
+			lg.
+				WithField("step", step).
+				WithField("id", r.reductionID).
+				WithField("round", r.round).
+				Debug("sending agreement")
+			r.sendAgreement(step, hash, stepVotes)
+		}
 	} else {
 		// Increase timeout if we had no agreement
 		r.timeOut = r.timeOut * 2

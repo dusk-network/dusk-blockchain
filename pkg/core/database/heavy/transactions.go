@@ -8,7 +8,7 @@ import (
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -78,7 +78,6 @@ type transaction struct {
 // It is assumed that StoreBlock would be called much less times than Fetch*
 // APIs. Based on that, extra indexing data is put to provide fast-read lookups
 func (t transaction) StoreBlock(b *block.Block) error {
-
 	if t.batch == nil {
 		// t.batch is initialized only on a open, read-write transaction
 		// (built with transaction.Update())
@@ -125,11 +124,9 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// Value = index + block.transaction[index]
 		//
 		// For the retrival of transactions data by block.header.hash
-
 		keys := append(TxPrefix, b.Header.Hash...)
 		keys = append(keys, txID...)
 		entry, err := utils.EncodeBlockTx(tx, uint32(i))
-
 		if err != nil {
 			return err
 		}
@@ -142,7 +139,6 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// Value = block.header.hash
 		//
 		// For the retrival of a single transaction by TxId
-
 		t.put(append(TxIDPrefix, txID...), b.Header.Hash)
 	}
 
@@ -150,7 +146,6 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Value = block.header.hash
 	//
 	// To support fast header lookup by height
-
 	heightBuf := new(bytes.Buffer)
 
 	// Append height value
@@ -274,7 +269,6 @@ func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
 }
 
 func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
-
 	key := append(HeaderPrefix, hash...)
 	value, err := t.snapshot.Get(key, nil)
 
@@ -298,7 +292,6 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 }
 
 func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.ContractCall, error) {
-
 	scanFilter := append(TxPrefix, hashHeader...)
 	tempTxs := make(map[uint32]transactions.ContractCall)
 
@@ -310,7 +303,6 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.ContractCa
 	for iterator.Next() {
 		value := iterator.Value()
 		tx, txIndex, err := utils.DecodeBlockTx(value, database.AnyTxType)
-
 		if err != nil {
 			return nil, err
 		}
@@ -379,13 +371,11 @@ func (t transaction) put(key []byte, value []byte) {
 }
 
 func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall, uint32, []byte, error) {
-
 	txIndex := uint32(math.MaxUint32)
 
 	// Fetch the block header hash that this Tx belongs to
 	key := append(TxIDPrefix, txID...)
 	hashHeader, err := t.snapshot.Get(key, nil)
-
 	if err != nil {
 		if err == leveldb.ErrNotFound {
 			// overwrite error message
@@ -402,7 +392,6 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 	defer iterator.Release()
 
 	for iterator.Next() {
-
 		// Extract TxID from the key to avoid the need of CalculateHash
 		reader := bytes.NewReader(iterator.Key())
 		fetchedTxID := make([]byte, len(txID))

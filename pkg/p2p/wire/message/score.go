@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
@@ -42,13 +42,13 @@ func EmptyScoreProposal(hdr header.Header) ScoreProposal {
 }
 
 // NewScoreProposal creates a new ScoreProposa
-func NewScoreProposal(hdr header.Header, seed []byte, score transactions.Score) ScoreProposal {
+func NewScoreProposal(hdr header.Header, seed []byte, score blindbid.GenerateScoreResponse) ScoreProposal {
 	return ScoreProposal{
 		hdr:      hdr,
-		Score:    score.Score,
-		Proof:    score.Proof,
+		Score:    score.Score.Data,
+		Proof:    score.BlindbidProof.Data,
 		Seed:     seed,
-		Identity: score.Identity,
+		Identity: score.ProverIdentity.Data,
 	}
 }
 

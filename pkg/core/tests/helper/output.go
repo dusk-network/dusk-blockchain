@@ -3,11 +3,11 @@ package helper
 import (
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
 // RandomOutput returns a random output for testing
-func RandomOutput(t *testing.T) *transactions.TransactionOutput {
+func RandomOutput(t *testing.T) *transactions.Note {
 	/*
 		seed := RandomSlice(t, 128)
 		keyPair := key.NewKeyPair(seed)
@@ -31,7 +31,7 @@ func RandomOutput(t *testing.T) *transactions.TransactionOutput {
 }
 
 // RandomOutputs returns a slice of random outputs for testing
-func RandomOutputs(t *testing.T, size int) []*transactions.TransactionOutput {
+func RandomOutputs(t *testing.T, size int) []*transactions.Note {
 	/*
 
 		var outs transactions.Outputs
