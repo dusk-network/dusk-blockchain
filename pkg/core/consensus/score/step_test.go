@@ -3,14 +3,14 @@ package score
 import (
 	"context"
 	"fmt"
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"os"
 	"testing"
 	"time"
+
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 
@@ -27,12 +27,12 @@ func testResultFactory(require *require.Assertions, _ consensus.InternalPacket, 
 	require.NoError(err)
 
 	for i := 0; ; i++ {
-		if i == 2 {
+		if i == 5 {
 			break
 		}
 		tpcs := streamer.SeenTopics()
 		for _, tpc := range tpcs {
-			if tpc == topics.Agreement {
+			if tpc == topics.Score {
 				return nil
 			}
 		}
@@ -56,7 +56,7 @@ func TestScoreStepRun(t *testing.T) {
 	cfg.Mock(&r)
 
 	// creating the Helper
-	hlp := reduction.NewHelper(50, time.Second)
+	hlp := NewHelper(50, time.Second)
 
 	cb := func(ctx context.Context) (bool, error) {
 		return true, nil
@@ -67,7 +67,9 @@ func TestScoreStepRun(t *testing.T) {
 	edPk, _ := crypto.RandEntropy(32)
 
 	mockPhase := consensus.MockPhase(cb)
-	blockGen := candidate.New(hlp.Emitter, &transactions.PublicKey{})
+	_, pk := transactions.MockKeys()
+
+	blockGen := candidate.New(hlp.Emitter, pk)
 
 	scoreInstance := Phase{
 		Emitter:   hlp.Emitter,

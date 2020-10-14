@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"sync"
 	"testing"
 	"time"
@@ -87,10 +86,6 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 
 	go hlp.provideCandidateBlock()
 	go hlp.processCandidateVerificationRequest()
-
-	go hlp.processLastCommittee()
-	go hlp.processLastCertificate()
-	go hlp.processMempoolTxsBySize()
 
 	return hlp
 }
@@ -175,43 +170,5 @@ func (hlp *Helper) processCandidateVerificationRequest() {
 		}
 
 		r.RespChan <- rpcbus.NewResponse(nil, nil)
-	}
-}
-
-func (hlp *Helper) processLastCommittee() {
-	v := make(chan rpcbus.Request, 1)
-	if err := hlp.RPCBus.Register(topics.GetLastCommittee, v); err != nil {
-		panic(err)
-	}
-	for {
-		r := <-v
-		com := make([][]byte, 0)
-		com = append(com, []byte{1, 2, 3}) //nolint
-		r.RespChan <- rpcbus.NewResponse(make([][]byte, 0), nil)
-	}
-}
-
-func (hlp *Helper) processLastCertificate() {
-	v := make(chan rpcbus.Request, 1)
-	if err := hlp.RPCBus.Register(topics.GetLastCertificate, v); err != nil {
-		panic(err)
-	}
-	for {
-		r := <-v
-		buf := new(bytes.Buffer)
-		cert := block.EmptyCertificate()
-		err := message.MarshalCertificate(buf, cert)
-		r.RespChan <- rpcbus.NewResponse(*buf, err)
-	}
-}
-
-func (hlp *Helper) processMempoolTxsBySize() {
-	v := make(chan rpcbus.Request, 1)
-	if err := hlp.RPCBus.Register(topics.GetMempoolTxsBySize, v); err != nil {
-		panic(err)
-	}
-	for {
-		r := <-v
-		r.RespChan <- rpcbus.NewResponse([]transactions.ContractCall{}, nil)
 	}
 }
