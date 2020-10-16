@@ -66,7 +66,8 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	p, provisionersKeys := consensus.MockProvisioners(provisioners)
 
 	mockProxy := transactions.MockProxy{
-		P: transactions.PermissiveProvisioner{},
+		P:  transactions.PermissiveProvisioner{},
+		BG: transactions.MockBlockGenerator{},
 	}
 	emitter := consensus.MockEmitter(timeOut, mockProxy)
 	emitter.Keys = provisionersKeys[0]

@@ -3,7 +3,6 @@ package transactions
 import (
 	"bytes"
 	"encoding/json"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -163,6 +162,10 @@ func MarshalDistribute(r *bytes.Buffer, s DistributeTransaction) error {
 		if err := encoding.WriteVarBytes(r, p); err != nil {
 			return err
 		}
+	}
+
+	if s.BgPk == nil || (s.BgPk.BG == nil || s.BgPk.AG == nil) || len(s.BgPk.BG.Y) == 0 || len(s.BgPk.AG.Y) == 0 {
+		panic("could not find a valid pub key reward on the DistributeTransaction")
 	}
 
 	if err := MarshalPublicKey(r, *s.BgPk); err != nil {
