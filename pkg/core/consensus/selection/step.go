@@ -22,7 +22,7 @@ var lg = log.WithField("process", "selector")
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
-	publisher eventbus.Publisher
+	*consensus.Emitter
 	handler   Handler
 	bestEvent message.Score
 
@@ -37,13 +37,15 @@ type Phase struct {
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
 func New(next consensus.Phase, e *consensus.Emitter, timeout time.Duration) *Phase {
+
 	selector := &Phase{
+		Emitter:     e,
 		timeout:     timeout,
-		publisher:   e.EventBus,
 		bestEvent:   message.EmptyScore(),
 		provisioner: e.Proxy.Provisioner(),
 		keys:        e.Keys,
-		next:        next,
+
+		next: next,
 	}
 	CUSTOM_SELECTOR_TIMEOUT := os.Getenv("CUSTOM_SELECTOR_TIMEOUT")
 	if CUSTOM_SELECTOR_TIMEOUT != "" {
@@ -73,6 +75,19 @@ func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
 // Run executes the logic for this phase
 // In this case the selection listens to new Score/Candidate messages
 func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) (consensus.PhaseFn, error) {
+	// the internalScoreChan is the channel where the BlockGenerator of this
+	// node publishes the score. This channel needs to be active solely during
+	// the selection
+	internalScoreChan := make(chan message.Message, 1)
+	lstnr := eventbus.NewSafeChanListener(internalScoreChan)
+	id := p.EventBus.Subscribe(topics.ScoreEvent, lstnr)
+
+	// at the end of this selection, we unsubscribe from the eventbus and let
+	// eventual internal score be discarded
+	defer func() {
+		p.EventBus.Unsubscribe(topics.ScoreEvent, id)
+	}()
+
 	p.handler = NewScoreHandler(p.provisioner)
 	timeoutChan := time.After(p.timeout)
 	for _, ev := range queue.GetEvents(r.Round, step) {
@@ -83,6 +98,8 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	for {
 		select {
+		case internalScoreResult := <-internalScoreChan:
+			p.collectScore(ctx, internalScoreResult.Payload().(message.Score))
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
 				p.collectScore(ctx, ev.Payload().(message.Score))
@@ -133,7 +150,7 @@ func (p *Phase) collectScore(ctx context.Context, sc message.Score) {
 
 	// Publish internally topics.Candidate with bestEvent(highest score candidate block)
 	msg := message.New(topics.Candidate, sc.Candidate)
-	p.publisher.Publish(topics.Candidate, msg)
+	p.EventBus.Publish(topics.Candidate, msg)
 
 	// Only check for priority if we already have a best event
 	if !p.bestEvent.IsEmpty() {

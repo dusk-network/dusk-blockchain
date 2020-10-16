@@ -101,6 +101,10 @@ func (bg *generator) PropagateBlockAndScore(ctx context.Context, sev message.Sco
 		Debugln("sending score")
 
 	msg := message.New(topics.Score, &score)
+	// propagate internally
+	_ = bg.EventBus.Publish(topics.ScoreEvent, msg)
+
+	// gossip externally
 	if err := bg.Gossip(msg); err != nil {
 		return err
 	}
