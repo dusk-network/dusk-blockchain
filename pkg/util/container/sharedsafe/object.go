@@ -15,12 +15,16 @@ type Object struct {
 }
 
 // Set updates inner value with a deep copy
+// If n is nil, inner value is reset
 // concurrency safe
 func (s *Object) Set(n payload.Safe) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if n != nil {
 		s.data = n.Copy()
+	} else {
+		// reset payload
+		n = nil
 	}
 }
 
