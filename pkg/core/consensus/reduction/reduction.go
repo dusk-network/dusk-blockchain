@@ -59,7 +59,7 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 }
 
 // SendReduction to the other peers
-func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) error {
+func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
 	hdr := header.Header{
 		Round:     round,
 		Step:      step,
@@ -69,13 +69,14 @@ func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) error {
 
 	sig, err := r.Sign(hdr)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
-	_ = r.Gossip(message.New(topics.Reduction, *red))
-	return nil
+	if err := r.Gossip(message.New(topics.Reduction, *red)); err != nil {
+		panic(err)
+	}
 }
 
 // ShouldProcess checks whether a message is consistent with the current round

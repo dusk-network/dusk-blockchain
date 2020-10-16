@@ -2,7 +2,6 @@ package selection_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -18,18 +17,12 @@ import (
 func TestSelection(t *testing.T) {
 	consensusTimeOut := 300 * time.Millisecond
 
-	ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) error {
+	ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) {
 		require.NotNil(p)
-
-		if messageScore, ok := p.(message.Score); ok {
-			require.NotEmpty(messageScore.Score)
-			return nil
-		}
-
-		return errors.New("cb: failed to validate Score")
+		messageScore := p.(message.Score)
+		require.NotEmpty(messageScore.Score)
 	}
 
-	require := require.New(t)
 	hlp := selection.NewHelper(10)
 	testPhase := consensus.NewTestPhase(t, ttestCB, nil)
 	sel := selection.New(testPhase, hlp.Emitter, consensusTimeOut)
@@ -42,9 +35,6 @@ func TestSelection(t *testing.T) {
 			msgChan <- message.New(topics.Score, msg)
 		}
 	}()
-	testCallback, err := selFn(context.Background(), consensus.NewQueue(), msgChan, hlp.RoundUpdate(), hlp.Step)
-	require.NoError(err)
-
-	_, err = testCallback(context.Background(), nil, nil, hlp.RoundUpdate(), hlp.Step+1)
-	require.NoError(err)
+	testCallback := selFn(context.Background(), consensus.NewQueue(), msgChan, hlp.RoundUpdate(), hlp.Step)
+	_ = testCallback(context.Background(), nil, nil, hlp.RoundUpdate(), hlp.Step+1)
 }

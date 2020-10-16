@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -51,7 +52,7 @@ func (p *Phase) Fn(re consensus.InternalPacket) consensus.PhaseFn {
 
 // Run the first reduction step until either there is a timeout, we reach 64%
 // of votes, or we experience an unrecoverable error
-func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) (consensus.PhaseFn, error) {
+func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	lg.
 		WithField("round", r.Round).
 		WithField("step", step).
@@ -59,11 +60,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	p.handler = reduction.NewHandler(p.Keys, r.P)
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
-		if err := p.SendReduction(r.Round, step, p.firstStepVotesMsg.BlockHash); err != nil {
-			// in case of error we need to tell the consensus loop as we cannot
-			// really recover from here
-			return nil, err
-		}
+		p.SendReduction(r.Round, step, p.firstStepVotesMsg.BlockHash)
 	}
 
 	timeoutChan := time.After(p.TimeOut)
@@ -76,21 +73,15 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			}
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
-			svm, err := p.collectReduction(rMsg, r.Round, step)
-			if err != nil {
-				return nil, err
-			}
-
+			svm := p.collectReduction(rMsg, r.Round, step)
 			if svm == nil {
 				continue
 			}
 
 			if stepVotesAreValid(&p.firstStepVotesMsg, svm) && p.handler.AmMember(r.Round, step) {
-				if err := p.sendAgreement(r.Round, step, svm); err != nil {
-					return nil, err
-				}
+				p.sendAgreement(r.Round, step, svm)
 			}
-			return p.next.Fn(nil), nil
+			return p.next.Fn(nil)
 		}
 	}
 
@@ -102,10 +93,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
 					continue
 				}
-				svm, err := p.collectReduction(rMsg, r.Round, step)
-				if err != nil {
-					return nil, err
-				}
+				svm := p.collectReduction(rMsg, r.Round, step)
 
 				if svm == nil {
 					continue
@@ -116,49 +104,49 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 				}()
 
 				if stepVotesAreValid(&p.firstStepVotesMsg, svm) && p.handler.AmMember(r.Round, step) {
-					if err := p.sendAgreement(r.Round, step, svm); err != nil {
-						return nil, err
-					}
+					p.sendAgreement(r.Round, step, svm)
 				}
-				return p.next.Fn(nil), nil
+				return p.next.Fn(nil)
 			}
 
 		case <-timeoutChan:
 			// in case of timeout we increase the timeout and that's it
 			p.IncreaseTimeout(r.Round)
-			return p.next.Fn(nil), nil
+			return p.next.Fn(nil)
 
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
 				<-timeoutChan
 			}()
-			return nil, nil
+			return nil
 		}
 	}
 }
 
-// FIXME: collectReduction should not return error
-func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) (*message.StepVotesMsg, error) {
-	// FIXME: a failed reduction verification should not return error
-	// triggering a resync
+func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
+	hdr := r.State()
 	if err := p.handler.VerifySignature(r); err != nil {
-		return nil, err
+		lg.
+			WithError(err).
+			WithFields(log.Fields{
+				"round":  hdr.Round,
+				"step":   hdr.Step,
+				"sender": util.StringifyBytes(hdr.Sender()),
+				"hash":   util.StringifyBytes(hdr.BlockHash),
+			}).
+			Warn("signature verification error for second step reduction, discarding")
+		return nil
 	}
 
-	hdr := r.State()
 	lg.WithFields(log.Fields{
 		"round": hdr.Round,
 		"step":  hdr.Step,
 		//"sender": hex.EncodeToString(hdr.Sender()),
 		//"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received_2nd_step_reduction")
-	result, err := p.aggregator.CollectVote(r)
-	if err != nil {
-		return nil, err
-	}
-
-	return p.createStepVoteMessage(result, round, step), nil
+	result := p.aggregator.CollectVote(r)
+	return p.createStepVoteMessage(result, round, step)
 }
 
 func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8) *message.StepVotesMsg {
@@ -184,7 +172,7 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 	}
 }
 
-func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMsg) error {
+func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMsg) {
 	lg.WithFields(log.Fields{
 		"round": round,
 		"step":  step,
@@ -199,7 +187,7 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 
 	sig, err := p.Sign(hdr)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	lg.WithFields(log.Fields{
@@ -222,7 +210,11 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 		"round": round,
 		"step":  step,
 	}).Traceln("gossiping_agreement")
-	return p.Gossip(message.New(topics.Agreement, *ev))
+	if err := p.Gossip(message.New(topics.Agreement, *ev)); err != nil {
+		lg.
+			WithError(err).
+			Error("gossip the agreement reported error, consensus is continuing but this needs to be investigated!")
+	}
 }
 
 func stepVotesAreValid(svs ...*message.StepVotesMsg) bool {

@@ -40,7 +40,7 @@ func NewAggregator(handler *Handler) *Aggregator {
 // quorum, a result is created with the voted hash and the related StepVotes
 // added. The validation of the candidate block is left to the caller
 // FIXME: this function should not return error. If it does, it should panic
-func (a *Aggregator) CollectVote(ev message.Reduction) (*Result, error) {
+func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 	hdr := ev.State()
 	hash := string(hdr.BlockHash)
 	sv, found := a.voteSets[hash]
@@ -51,7 +51,7 @@ func (a *Aggregator) CollectVote(ev message.Reduction) (*Result, error) {
 
 	if err := sv.StepVotes.Add(ev.SignedHash, hdr.PubKeyBLS, hdr.Step); err != nil {
 		// adding the vote to the cluster failed. This is a programming error
-		return nil, err
+		panic(err)
 	}
 
 	votes := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
@@ -62,11 +62,11 @@ func (a *Aggregator) CollectVote(ev message.Reduction) (*Result, error) {
 	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum(hdr.Round) {
 		// quorum reached
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
-		return &Result{hdr.BlockHash, *sv.StepVotes}, nil
+		return &Result{hdr.BlockHash, *sv.StepVotes}
 	}
 
 	// quorum not reached
-	return nil, nil
+	return nil
 }
 
 func (a *Aggregator) addBitSet(sv *message.StepVotes, cluster sortedset.Cluster, round uint64, step uint8) {

@@ -2,8 +2,6 @@ package secondstep
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -63,7 +61,7 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 				return evChan
 			},
 
-			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) error {
+			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) {
 				_, err := streamer.Read()
 				require.NoError(err)
 
@@ -74,13 +72,13 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 					tpcs := streamer.SeenTopics()
 					for _, tpc := range tpcs {
 						if tpc == topics.Agreement {
-							return nil
+							return
 						}
 					}
 					streamer.Read()
 				}
 
-				return fmt.Errorf("no agreement received")
+				require.FailNow("no agreement received")
 			},
 
 			// testing that the timeout remained the same after a successful run
@@ -98,7 +96,7 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 			},
 
 			// no agreement should be sent at the end of a failing second step reduction
-			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) error {
+			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) {
 				wrongChan := make(chan struct{}, 1)
 				go func() {
 					for i := 0; ; i++ {
@@ -121,9 +119,9 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 				c := time.After(200 * time.Millisecond)
 				select {
 				case <-wrongChan:
-					return errors.New("unexpected Agreement message")
+					require.FailNow("unexpected Agreement message")
 				case <-c:
-					return nil
+					return
 				}
 			},
 
@@ -157,7 +155,6 @@ func TestSecondStepReduction(t *testing.T) {
 
 		// running the subtest
 		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
 			queue := consensus.NewQueue()
 
 			// setting up the message channel with test-specific messages in it
@@ -185,14 +182,11 @@ func TestSecondStepReduction(t *testing.T) {
 			// injecting the stepVotes into secondStep
 			secondStepReduction.Fn(msg)
 
-			runTestCallback, err := secondStepReduction.Run(ctx, queue, evChan, r, step)
-			require.NoError(err)
+			runTestCallback := secondStepReduction.Run(ctx, queue, evChan, r, step)
 			// testing the status of the step
 			ttest.testStep(t, secondStepReduction)
 			// here the tests are performed on the result of the step
-			_, err = runTestCallback(ctx, queue, evChan, r, step+1)
-			// hopefully with no error
-			require.NoError(err)
+			_ = runTestCallback(ctx, queue, evChan, r, step+1)
 		})
 
 		hlp.EventBus.Unsubscribe(topics.Gossip, id)

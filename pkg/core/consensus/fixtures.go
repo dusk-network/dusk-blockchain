@@ -87,7 +87,7 @@ func MockMember(keys key.Keys) *user.Member {
 }
 
 type mockPhase struct {
-	callback func(ctx context.Context) (bool, error)
+	callback func(ctx context.Context) bool
 	packet   InternalPacket
 }
 
@@ -97,31 +97,29 @@ func (m *mockPhase) Fn(packet InternalPacket) PhaseFn {
 }
 
 // nolint
-func (m *mockPhase) Run(ctx context.Context, queue *Queue, evChan chan message.Message, r RoundUpdate, step uint8) (PhaseFn, error) {
+func (m *mockPhase) Run(ctx context.Context, queue *Queue, evChan chan message.Message, r RoundUpdate, step uint8) PhaseFn {
 	ctx = context.WithValue(ctx, "Packet", m.packet)
-	if stop, err := m.callback(ctx); err != nil {
-		return nil, err
-	} else if stop {
-		return nil, nil
+	if stop := m.callback(ctx); stop {
+		return nil
 	}
-	return m.Run, nil
+	return m.Run
 }
 
 // MockPhase mocks up a consensus phase. It accepts a (recursive) function which returns a
 // boolean indicating whether the consensus loop needs to return, or an error.
 // If function returns true, it halts the consensus loop. An error indicates
 // unrecoverable situation
-func MockPhase(cb func(ctx context.Context) (bool, error)) Phase {
+func MockPhase(cb func(ctx context.Context) bool) Phase {
 	if cb == nil {
-		cb = func(ctx context.Context) (bool, error) {
-			return true, nil
+		cb = func(ctx context.Context) bool {
+			return true
 		}
 	}
 	return &mockPhase{cb, nil}
 }
 
 // TestCallback is a callback to allow for table testing based on step results
-type TestCallback func(*require.Assertions, InternalPacket, *eventbus.GossipStreamer) error
+type TestCallback func(*require.Assertions, InternalPacket, *eventbus.GossipStreamer)
 
 // TestPhase is the phase to inject in the step under test to allow for table
 // testing. It treats the packet injected through the Fn method as the result
@@ -149,8 +147,9 @@ func (t *TestPhase) Fn(sv InternalPacket) PhaseFn {
 }
 
 // Run does nothing else than delegating to the specified callback
-func (t *TestPhase) Run(_ context.Context, queue *Queue, _ chan message.Message, _ RoundUpdate, _ uint8) (PhaseFn, error) {
-	return nil, t.callback(t.req, t.packet, t.streamer)
+func (t *TestPhase) Run(_ context.Context, queue *Queue, _ chan message.Message, _ RoundUpdate, _ uint8) PhaseFn {
+	t.callback(t.req, t.packet, t.streamer)
+	return nil
 }
 
 // MockScoreMsg ...

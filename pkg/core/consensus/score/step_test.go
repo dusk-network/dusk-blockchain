@@ -2,7 +2,6 @@ package score
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -22,7 +21,7 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
-func testResultFactory(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) error {
+func testResultFactory(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) {
 	_, err := streamer.Read()
 	require.NoError(err)
 
@@ -33,13 +32,13 @@ func testResultFactory(require *require.Assertions, _ consensus.InternalPacket, 
 		tpcs := streamer.SeenTopics()
 		for _, tpc := range tpcs {
 			if tpc == topics.Score {
-				return nil
+				return
 			}
 		}
 		streamer.Read()
 	}
 
-	return fmt.Errorf("no agreement received")
+	require.FailNow("no agreement received")
 }
 
 // TestSelectorRun tests that we can run the score
@@ -58,8 +57,8 @@ func TestScoreStepRun(t *testing.T) {
 	// creating the Helper
 	hlp := NewHelper(50, time.Second)
 
-	cb := func(ctx context.Context) (bool, error) {
-		return true, nil
+	cb := func(ctx context.Context) bool {
+		return true
 	}
 
 	d, _ := crypto.RandEntropy(32)
@@ -93,11 +92,10 @@ func TestScoreStepRun(t *testing.T) {
 	ctx, canc := context.WithTimeout(context.Background(), 2*time.Second)
 	defer canc()
 
-	phaseFn, err := scoreInstance.Run(ctx, nil, nil, consensus.RoundUpdate{Round: round}, step)
-	require.Nil(t, err)
+	phaseFn := scoreInstance.Run(ctx, nil, nil, consensus.RoundUpdate{Round: round}, step)
 	require.NotNil(t, phaseFn)
 
-	_, err = phaseFn(ctx, nil, nil, consensus.RoundUpdate{Round: round}, step+1)
+	_ = phaseFn(ctx, nil, nil, consensus.RoundUpdate{Round: round}, step+1)
 	require.Nil(t, err)
 
 	hlp.EventBus.Unsubscribe(topics.Gossip, id)

@@ -74,7 +74,7 @@ func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
 
 // Run executes the logic for this phase
 // In this case the selection listens to new Score/Candidate messages
-func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) (consensus.PhaseFn, error) {
+func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	// the internalScoreChan is the channel where the BlockGenerator of this
 	// node publishes the score. This channel needs to be active solely during
 	// the selection
@@ -106,14 +106,13 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			}
 
 		case <-timeoutChan:
-			phase := p.endSelection(r.Round, step)
-			return phase, nil
+			return p.endSelection(r.Round, step)
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
 				<-timeoutChan
 			}()
-			return nil, nil
+			return nil
 		}
 	}
 }

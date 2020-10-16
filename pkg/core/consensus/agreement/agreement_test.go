@@ -10,7 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestMockValidity ensures that we don't go into a wild goose chase if our
@@ -46,8 +45,7 @@ func TestAgreement(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(hash))
-	require.NoError(t, err)
+	loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(hash))
 
 	res := <-hlp.CertificateChan
 	cert := res.Payload().(message.Certificate)

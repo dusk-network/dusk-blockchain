@@ -67,12 +67,12 @@ func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
 
 // Run the generation phase. This runs concurrently with the Selection phase
 // and therefore we return the Selection phase immediately
-func (p *Phase) Run(ctx context.Context, _ *consensus.Queue, _ chan message.Message, r consensus.RoundUpdate, step uint8) (consensus.PhaseFn, error) {
+func (p *Phase) Run(ctx context.Context, _ *consensus.Queue, _ chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	go p.generate(ctx, r, step)
 
 	// since the generation runs in parallel with the selection, we cannot
 	// inject our own score and need to add it to the chan
-	return p.next.Fn(nil), nil
+	return p.next.Fn(nil)
 }
 
 func (p *Phase) sign(seed []byte) ([]byte, error) {

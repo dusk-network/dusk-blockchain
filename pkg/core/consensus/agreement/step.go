@@ -35,7 +35,7 @@ func (s *Loop) GetControlFn() consensus.ControlFn {
 }
 
 // Run the agreement step loop
-func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) error {
+func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) {
 	// creating accumulator and handler
 	h := NewHandler(s.Keys, r.P)
 	acc := newAccumulator(h, WorkerAmount)
@@ -66,14 +66,13 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 
 			// Send the Agreement to the Certificate Collector within the Chain
 			if err := s.sendCertificate(h, evs[0]); err != nil {
-				return err
+				panic(err)
 			}
+			return
 
-			// nothing to finalize
-			return nil
 		case <-ctx.Done():
 			// finalize the worker pool
-			return nil
+			return
 		}
 	}
 }

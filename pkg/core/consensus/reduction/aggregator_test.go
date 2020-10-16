@@ -70,12 +70,9 @@ func TestAggregation(t *testing.T) {
 			// sending Reduction messages to the aggregator
 			var res *Result
 			for _, ev := range evs {
-				var err error
 				// if the aggregator returns a result, the quorum has been
 				// reached. Otherwise it returns nil
-				res, err = aggregator.CollectVote(ev)
-				require.Nil(err)
-				if res != nil {
+				if res = aggregator.CollectVote(ev); res != nil {
 					break
 				}
 			}

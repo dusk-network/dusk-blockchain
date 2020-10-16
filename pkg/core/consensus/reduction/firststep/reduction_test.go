@@ -2,7 +2,6 @@ package firststep
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -51,21 +50,17 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 				return evChan
 			},
 
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer) error {
+			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer) {
 				require.NotNil(packet)
 
-				if stepVoteMessage, ok := packet.(message.StepVotesMsg); ok {
-					require.False(stepVoteMessage.IsEmpty())
+				stepVoteMessage := packet.(message.StepVotesMsg)
+				require.False(stepVoteMessage.IsEmpty())
 
-					// Retrieve StepVotes
-					require.Equal(hash, stepVoteMessage.State().BlockHash)
+				// Retrieve StepVotes
+				require.Equal(hash, stepVoteMessage.State().BlockHash)
 
-					// StepVotes should be valid
-					require.NoError(hlp.Verify(hash, stepVoteMessage.StepVotes, round, step))
-
-					return nil
-				}
-				return fmt.Errorf("unexpected not-nil packet: %v", packet)
+				// StepVotes should be valid
+				require.NoError(hlp.Verify(hash, stepVoteMessage.StepVotes, round, step))
 			},
 
 			// testing that the timeout remained the same after a successful run
@@ -82,14 +77,10 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 			},
 
 			// the result of the test should be empty step votes
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer) error {
+			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer) {
 				require.NotNil(packet)
-
-				if stepVoteMessage, ok := packet.(message.StepVotesMsg); ok {
-					require.True(stepVoteMessage.IsEmpty())
-					return nil
-				}
-				return fmt.Errorf("unexpected not-nil packet: %v", packet)
+				stepVoteMessage := packet.(message.StepVotesMsg)
+				require.True(stepVoteMessage.IsEmpty())
 			},
 
 			// testing that the timeout doubled
@@ -114,7 +105,6 @@ func TestFirstStepReduction(t *testing.T) {
 	for name, ttest := range table {
 
 		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
 			queue := consensus.NewQueue()
 			// create the helper
 			// setting up the message channel with predefined messages in it
@@ -137,14 +127,11 @@ func TestFirstStepReduction(t *testing.T) {
 				Seed:  hash,
 			}
 
-			runTestCallback, err := firstStepReduction.Run(ctx, queue, evChan, r, step)
-			require.NoError(err)
+			runTestCallback := firstStepReduction.Run(ctx, queue, evChan, r, step)
 			// testing the status of the step
 			ttest.testStep(t, firstStepReduction)
 			// here the tests are performed on the result of the step
-			_, err = runTestCallback(ctx, queue, evChan, r, step+1)
-			// hopefully with no error
-			require.NoError(err)
+			_ = runTestCallback(ctx, queue, evChan, r, step+1)
 		})
 	}
 }

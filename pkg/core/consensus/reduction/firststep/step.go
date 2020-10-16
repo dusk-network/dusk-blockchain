@@ -12,6 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
@@ -48,16 +49,12 @@ func (p *Phase) Fn(re consensus.InternalPacket) consensus.PhaseFn {
 
 // Run the first reduction step until either there is a timeout, we reach 64%
 // of votes, or we experience an unrecoverable error
-func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) (consensus.PhaseFn, error) {
+func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	p.handler = reduction.NewHandler(p.Keys, r.P)
 
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
-		if err := p.SendReduction(r.Round, step, p.selectionResult.State().BlockHash); err != nil {
-			// in case of error we need to tell the consensus loop as we cannot
-			// really recover from here
-			return nil, err
-		}
+		p.SendReduction(r.Round, step, p.selectionResult.State().BlockHash)
 	}
 
 	timeoutChan := time.After(p.TimeOut)
@@ -76,13 +73,8 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
-			sv, err := p.collectReduction(rMsg, r.Round, step)
-			if err != nil {
-				return nil, err
-			}
-
-			if sv != nil {
-				return p.next.Fn(*sv), nil
+			if sv := p.collectReduction(rMsg, r.Round, step); sv != nil {
+				return p.next.Fn(*sv)
 			}
 		}
 	}
@@ -96,38 +88,40 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 					continue
 				}
 
-				sv, err := p.collectReduction(rMsg, r.Round, step)
-				if err != nil {
-					return nil, err
-				}
-
+				sv := p.collectReduction(rMsg, r.Round, step)
 				if sv != nil {
 					// preventing timeout leakage
 					go func() {
 						<-timeoutChan
 					}()
-					return p.next.Fn(*sv), nil
+					return p.next.Fn(*sv)
 				}
 			}
 
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
 			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step)
-			return p.next.Fn(*sv), nil
+			return p.next.Fn(*sv)
 
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
 				<-timeoutChan
 			}()
-			return nil, nil
+			return nil
 		}
 	}
 }
 
-func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) (*message.StepVotesMsg, error) {
+func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
 	if err := p.handler.VerifySignature(r); err != nil {
-		return nil, err
+		lg.
+			WithError(err).
+			WithField("round", r.State().Round).
+			WithField("step", r.State().Step).
+			WithField("hash", util.StringifyBytes(r.State().BlockHash)).
+			Warn("error in verifying reduction, message discarded")
+		return nil
 	}
 
 	hdr := r.State()
@@ -138,15 +132,12 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		//"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received_event")
 
-	result, err := p.aggregator.CollectVote(r)
-	if err != nil {
-		return nil, err
-	}
+	result := p.aggregator.CollectVote(r)
 
 	// if the votes converged for an empty hash we invoke halt with no
 	// StepVotes
 	if bytes.Equal(hdr.BlockHash, reduction.EmptyHash[:]) {
-		return p.createStepVoteMessage(reduction.EmptyResult, round, step), nil
+		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
 	}
 
 	if err := p.verifyCandidateBlock(hdr.BlockHash); err != nil {
@@ -155,10 +146,10 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 			WithField("round", hdr.Round).
 			WithField("step", hdr.Step).
 			Error("firststep_verifyCandidateBlock the candidate block failed")
-		return p.createStepVoteMessage(reduction.EmptyResult, round, step), nil
+		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
 	}
 
-	return p.createStepVoteMessage(result, round, step), nil
+	return p.createStepVoteMessage(result, round, step)
 }
 
 func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8) *message.StepVotesMsg {

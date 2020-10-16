@@ -96,12 +96,8 @@ func New(e *consensus.Emitter, scr consensus.Phase, ag consensus.Controller) *Co
 // loop (acting step-wise)
 // TODO: consider stopping the phase loop with a Done phase, instead of nil
 func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error {
-	var err error
 	// cancel
 	ctx, cancel := context.WithCancel(ctx)
-
-	// errors thrown by the Agreement
-	errChan := make(chan error, 1)
 
 	// the agreement loop needs to be running until either the consensus
 	// reaches a maximum amount of iterations (approx. 213 steps), or we get
@@ -109,11 +105,10 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 	// (in which case we should probably re-sync)
 	go func() {
 		agreementLoop := c.agreement.GetControlFn()
-		aerr := agreementLoop(ctx, c.roundQueue, c.agreementChan, round)
+		agreementLoop(ctx, c.roundQueue, c.agreementChan, round)
 		// canceling the consensus phase loop when Agreement is done (either
 		// because the parent canceled or because a consensus has been reached)
 		cancel()
-		errChan <- aerr
 	}()
 
 	// score generation phase is the first step in the consensus
@@ -121,15 +116,13 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 	// synchronous consensus loop keeps running until the agreement invokes
 	// context.Done or the context is canceled some other way
 	for step := uint8(1); phaseFunction != nil; step++ {
-		phaseFunction, err = phaseFunction(ctx, c.eventQueue, c.eventChan, round, step)
-		if err != nil {
-			// an unrecoverable error happened. We return control to the caller
-			// which probably needs to resync or panic
-			// TODO: errors should be diversified here so to ease the decision
-			// to panic or resync
-			cancel()
-			return err
-		}
+		phaseFunction = phaseFunction(ctx, c.eventQueue, c.eventChan, round, step)
+		lg.
+			WithFields(log.Fields{
+				"round": round.Round,
+				"step":  step,
+			}).
+			Trace("new phase")
 
 		if config.Get().API.Enabled {
 			go report(round.Round, step)
@@ -149,7 +142,7 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 	// - we reached the maximum amount of steps (~213) and the consensus should
 	// halt. In this case, cancel() will take care of stopping the Agreement
 	// loop
-	return <-errChan
+	return nil
 }
 
 var steps = []string{"selection", "reduction1", "reduction2"}

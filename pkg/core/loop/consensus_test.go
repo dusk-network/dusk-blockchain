@@ -16,14 +16,14 @@ import (
 func TestContextCancellation(t *testing.T) {
 	e := consensus.MockEmitter(time.Second, nil)
 
-	cb := func(ctx context.Context) (bool, error) {
+	cb := func(ctx context.Context) bool {
 		// avoiding spinning too fast
 		t := time.After(10 * time.Millisecond)
 		select {
 		case <-ctx.Done():
-			return true, nil
+			return true
 		case <-t:
-			return false, nil
+			return false
 		}
 	}
 

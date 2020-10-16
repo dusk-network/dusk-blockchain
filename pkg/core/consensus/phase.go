@@ -16,7 +16,7 @@ type (
 	}
 
 	// PhaseFn represents the recursive consensus state function
-	PhaseFn func(context.Context, *Queue, chan message.Message, RoundUpdate, uint8) (PhaseFn, error)
+	PhaseFn func(context.Context, *Queue, chan message.Message, RoundUpdate, uint8) PhaseFn
 
 	// Controller is a factory for the ControlFn. It basically relates to the
 	// Agreement, which needs a different execution each round
@@ -27,5 +27,5 @@ type (
 
 	// ControlFn represents the asynchronous loop controlling the commencement
 	// ofthe Phase transition
-	ControlFn func(context.Context, *Queue, <-chan message.Message, RoundUpdate) error
+	ControlFn func(context.Context, *Queue, <-chan message.Message, RoundUpdate)
 )
