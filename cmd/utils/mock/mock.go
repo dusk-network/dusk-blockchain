@@ -16,7 +16,7 @@ import (
 func RunMock(grpcMockHost string) error {
 
 	s := grpc.NewServer()
-	rusk.RegisterRuskServer(s, &rusk.RuskMock{})
+	rusk.RegisterStateServer(s, &rusk.StateMock{})
 	node.RegisterWalletServer(s, &node.WalletMock{})
 	node.RegisterTransactorServer(s, &node.TransactorMock{})
 

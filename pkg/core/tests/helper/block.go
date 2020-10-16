@@ -7,7 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/stretchr/testify/assert"
 )
@@ -74,7 +74,6 @@ func RandomCertificate() *block.Certificate {
 // RandomHeader returns a random header for testing. `height` randomness is up
 // to the caller. A global atomic counter per pkg can handle it
 func RandomHeader(height uint64) *block.Header {
-
 	h := &block.Header{
 		Version:   0,
 		Height:    height,

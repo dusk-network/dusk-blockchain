@@ -79,7 +79,6 @@ func (b *Broker) Listen() {
 
 // TODO: interface - rpcBus encoding will be removed
 func (b *Broker) provideCandidate(r rpcbus.Request) {
-
 	// Read params from request
 	params := r.Params.(bytes.Buffer)
 

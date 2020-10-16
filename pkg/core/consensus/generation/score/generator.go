@@ -7,7 +7,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -24,12 +26,15 @@ var lg = log.WithField("process", "score generator")
 // It forwards the resulting information to the candidate generator, in a ScoreEvent
 // message.
 type Generator struct {
-	publisher        eventbus.Publisher
-	roundInfo        consensus.RoundUpdate
-	seed, d, k, edPk []byte
+	publisher eventbus.Publisher
+	roundInfo consensus.RoundUpdate
+	k         *common.BlsScalar
 	key.Keys
+	seed      *common.BlsScalar
+	secret    *common.JubJubCompressed
 	lock      sync.RWMutex
 	threshold *consensus.Threshold
+	index     uint64
 
 	signer         consensus.Signer
 	generationID   uint32
@@ -39,13 +44,13 @@ type Generator struct {
 }
 
 // NewComponent returns an uninitialized Generator.
-func NewComponent(ctx context.Context, publisher eventbus.Publisher, consensusKeys key.Keys, d, k, edPk []byte, bg transactions.BlockGenerator) *Generator {
+func NewComponent(ctx context.Context, publisher eventbus.Publisher, k, seed *common.BlsScalar, secret *common.JubJubCompressed, bg transactions.BlockGenerator, consensusKeys key.Keys) *Generator {
 	return &Generator{
 		publisher: publisher,
-		Keys:      consensusKeys,
-		edPk:      edPk,
 		k:         k,
-		d:         d,
+		Keys:      consensusKeys,
+		seed:      seed,
+		secret:    secret,
 		threshold: consensus.NewThreshold(),
 		bg:        bg,
 		ctx:       ctx,
@@ -57,10 +62,10 @@ func NewComponent(ctx context.Context, publisher eventbus.Publisher, consensusKe
 // be created
 type scoreFactory struct {
 	seed  []byte
-	score transactions.Score
+	score blindbid.GenerateScoreResponse
 }
 
-func newFactory(seed []byte, score transactions.Score) scoreFactory {
+func newFactory(seed []byte, score blindbid.GenerateScoreResponse) scoreFactory {
 	return scoreFactory{seed, score}
 }
 
@@ -88,7 +93,7 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 		return nil
 	}
 
-	g.seed = signedSeed
+	g.seed = &common.BlsScalar{Data: signedSeed}
 
 	// TODO: RUSK is the only one to know if this generator is in the bid list.
 	// If we are not, we should probably not receive messages (akin to the old
@@ -125,15 +130,17 @@ func (g *Generator) Collect(e consensus.InternalPacket) error {
 		defer g.lock.Unlock()
 		g.threshold.Lower()
 	}()
-	return g.generateScore()
+	return g.generateScore(e.State().Step)
 }
 
-func (g *Generator) generateScore() error {
-	sr := transactions.ScoreRequest{
-		D:    g.d,
-		K:    g.k,
-		Seed: g.seed,
-		EdPk: g.edPk,
+func (g *Generator) generateScore(step uint8) error {
+	sr := blindbid.GenerateScoreRequest{
+		K:              g.k,
+		Seed:           g.seed,
+		Secret:         g.secret,
+		Round:          uint32(g.roundInfo.Round),
+		Step:           uint32(step),
+		IndexStoredBid: g.index,
 	}
 	scoreTx, err := g.bg.GenerateScore(g.ctx, sr)
 	// GenerateScore would return error if we are not in this round bidlist, or
@@ -146,12 +153,12 @@ func (g *Generator) generateScore() error {
 
 	g.lock.RLock()
 	defer g.lock.RUnlock()
-	if g.threshold.Exceeds(scoreTx.Score) {
+	if g.threshold.Exceeds(scoreTx.Score.Data) {
 		log.Warn("proof score is below threshold")
 		return nil
 	}
 
-	score := g.signer.Compose(newFactory(g.seed, scoreTx))
+	score := g.signer.Compose(newFactory(g.seed.Data, scoreTx))
 	msg := message.New(topics.ScoreEvent, score)
 	return g.signer.SendInternally(topics.ScoreEvent, msg, g.ID())
 }
