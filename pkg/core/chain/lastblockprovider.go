@@ -1,17 +1,21 @@
 package chain
 
 import (
+	"sync"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/container/sharedsafe"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 // lastBlockProvider stores and provides blockchain tip of the local chain state
 // Last Block will be the same with network tip only if the node is fully synced
 type lastBlockProvider struct {
-	lastBlock *sharedsafe.Object
-	reqChan   <-chan rpcbus.Request
+	mu        sync.RWMutex
+	lastBlock payload.Safe
+
+	reqChan <-chan rpcbus.Request
 }
 
 func newLastBlockProvider(rpcBus *rpcbus.RPCBus, b *block.Block) (*lastBlockProvider, error) {
@@ -24,7 +28,7 @@ func newLastBlockProvider(rpcBus *rpcbus.RPCBus, b *block.Block) (*lastBlockProv
 
 	p := &lastBlockProvider{
 		reqChan:   reqChan,
-		lastBlock: new(sharedsafe.Object),
+		lastBlock: nil,
 	}
 
 	p.Set(b)
@@ -35,12 +39,27 @@ func newLastBlockProvider(rpcBus *rpcbus.RPCBus, b *block.Block) (*lastBlockProv
 
 // Set updates last block with a full copy of the new block
 func (p *lastBlockProvider) Set(n *block.Block) {
-	p.lastBlock.Set(n)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if n != nil {
+		p.lastBlock = n.Copy()
+	} else {
+		// reset payload
+		p.lastBlock = nil
+	}
 }
 
 // Get returns a safe copy of last block
 func (p *lastBlockProvider) Get() block.Block {
-	return p.lastBlock.Get().(block.Block)
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.lastBlock == nil {
+		return *block.NewBlock()
+	}
+
+	return p.lastBlock.(block.Block)
 }
 
 // Listen provides response to the topics.GetLastBlock rpcbus call
