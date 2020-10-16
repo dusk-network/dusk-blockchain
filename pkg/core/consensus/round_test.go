@@ -111,8 +111,15 @@ func TestPausePlay(t *testing.T) {
 // Test that Agreement messages are filtered differently from other topics.
 func TestEventFilter(t *testing.T) {
 	c, comp := initCoordinatorTest(t, topics.Reduction, topics.Agreement)
-	redComp := comp[0].(*mockComponent)
-	agComp := comp[1].(*mockComponent)
+	// TODO: Find out why the order is not deterministic
+	var redComp, agComp *mockComponent
+	if comp[0].(*mockComponent).topic == topics.Reduction {
+		redComp = comp[0].(*mockComponent)
+		agComp = comp[1].(*mockComponent)
+	} else {
+		redComp = comp[1].(*mockComponent)
+		agComp = comp[0].(*mockComponent)
+	}
 
 	// Send a Reduction event with the correct state. It should be received
 	ev := mockMessage(topics.Reduction, 1, 0)

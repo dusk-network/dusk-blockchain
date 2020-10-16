@@ -114,9 +114,9 @@ func TestAcceptFromPeer(t *testing.T) {
 	}
 
 	// Now, test accepting a block with 1 on the sync counter
-	c.counter.StartSyncing(1)
+	c.counter.StartSyncing(1, "test_peer_addr")
 
-	blk = mockAcceptableBlock(c.prevBlock)
+	blk = mockAcceptableBlock(c.tip.Get())
 	msg = message.New(topics.AcceptedBlock, *blk)
 
 	errChan := make(chan error, 1)
@@ -223,7 +223,7 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	assert.Empty(errList)
 
 	// Save current prevBlock
-	currPrevBlock := c.prevBlock
+	currPrevBlock := c.tip.Get()
 	// set intermediate block to nil
 	c.intermediateBlock = nil
 
@@ -231,7 +231,8 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert, nil})
 
 	// Ensure everything is still the same
-	assert.True(currPrevBlock.Equals(&c.prevBlock))
+	prevBlock := c.tip.Get()
+	assert.True(currPrevBlock.Equals(&prevBlock))
 	assert.Nil(c.intermediateBlock)
 }
 
@@ -283,7 +284,7 @@ func TestFetchTip(t *testing.T) {
 	})
 
 	assert.NoError(err)
-	assert.Equal(chain.prevBlock.Header.Hash, s.TipHash)
+	assert.Equal(chain.tip.Get().Header.Hash, s.TipHash)
 }
 
 func TestRebuildChain(t *testing.T) {
@@ -297,14 +298,15 @@ func TestRebuildChain(t *testing.T) {
 
 	// Add a block so that we have a bit of chain state
 	// to check against.
-	blk := mockAcceptableBlock(c.prevBlock)
+	blk := mockAcceptableBlock(c.tip.Get())
 
 	assert.NoError(t, c.AcceptBlock(context.Background(), *blk))
 
 	// Chain prevBlock should now no longer be genesis
 	genesis := c.loader.(*DBLoader).genesis
 	//genesis := cfg.DecodeGenesis()
-	assert.False(t, genesis.Equals(&c.prevBlock))
+	prevBlock := c.tip.Get()
+	assert.False(t, genesis.Equals(&prevBlock))
 
 	p, ks := consensus.MockProvisioners(10)
 	c.lastCertificate = createMockedCertificate(c.intermediateBlock.Header.Hash, 2, ks, p)
@@ -315,10 +317,11 @@ func TestRebuildChain(t *testing.T) {
 	assert.NoError(t, err)
 
 	// We should be back at the genesis chain state
-	assert.True(t, genesis.Equals(&c.prevBlock))
+	prevBlock = c.tip.Get()
+	assert.True(t, genesis.Equals(&prevBlock))
 
 	assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
-	intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
+	intermediateBlock, err := mockFirstIntermediateBlock(prevBlock.Header)
 	assert.NoError(t, err)
 	assert.True(t, c.intermediateBlock.Equals(intermediateBlock))
 

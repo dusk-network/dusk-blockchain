@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net"
@@ -318,10 +319,15 @@ func (p *Reader) readLoop() {
 
 		// TODO: error here should be checked in order to decrease reputation
 		// or blacklist spammers
-		err = p.router.Collect(message)
-		if err != nil {
-			log.WithError(err).Errorln("error routing message")
+		startTime := time.Now().UnixNano()
+		if err := p.router.Collect(message); err != nil {
+			l.WithError(err).Error("message routing")
 		}
+
+		duration := float64(time.Now().UnixNano()-startTime) / 1000000
+		l.WithField("cs", hex.EncodeToString(cs)).
+			WithField("len", len(message)).
+			WithField("ms", duration).Debug("trace message routing")
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)

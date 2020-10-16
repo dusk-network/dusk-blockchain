@@ -8,6 +8,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
 // roundCollector is a simple wrapper over a channel to get round notifications.
@@ -70,7 +72,7 @@ func (r *roundCollector) Collect(m message.Message) {
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
 func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, uint32) {
-	acceptedBlockChan := make(chan block.Block)
+	acceptedBlockChan := make(chan block.Block, cfg.MaxInvBlocks)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
 	collectListener := eventbus.NewCallbackListener(collector.Collect)
 	if config.Get().General.SafeCallbackListener {
