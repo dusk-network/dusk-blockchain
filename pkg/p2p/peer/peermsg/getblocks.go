@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
@@ -37,7 +38,7 @@ func (g *GetBlocks) Decode(r *bytes.Buffer) error {
 
 	// lenLocators should never exceed 500, as that is the maximum amount
 	// of blocks a peer can request
-	if lenLocators > 500 {
+	if lenLocators > cfg.MaxInvBlocks {
 		return errors.New("too many locators in GetBlocks message")
 	}
 

@@ -206,7 +206,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	}
 
 	// Hook the chain up to the required topics
-	chain.blockChan = make(chan message.Message, 600)
+	chain.blockChan = make(chan message.Message, config.MaxInvBlocks)
 	eventBus.Subscribe(topics.Block, eventbus.NewChanListener(chain.blockChan))
 
 	chain.initializationChan = make(chan message.Message, 1)

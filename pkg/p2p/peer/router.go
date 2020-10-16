@@ -33,11 +33,11 @@ type messageRouter struct {
 	peerInfo string
 }
 
-func (m *messageRouter) Collect(packet []byte) (topics.Topic, error) {
+func (m *messageRouter) Collect(packet []byte) error {
 	b := bytes.NewBuffer(packet)
 	msg, err := message.Unmarshal(b)
 	if err != nil {
-		return topics.Unknown, err
+		return err
 	}
 	return m.route(*b, msg)
 }
@@ -56,7 +56,7 @@ func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 	return false
 }
 
-func (m *messageRouter) route(b bytes.Buffer, msg message.Message) (topics.Topic, error) {
+func (m *messageRouter) route(b bytes.Buffer, msg message.Message) error {
 	var err error
 	category := msg.Category()
 	switch category {
@@ -106,5 +106,5 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) (topics.Topic
 		}
 	}
 
-	return category, err
+	return err
 }
