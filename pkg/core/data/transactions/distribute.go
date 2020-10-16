@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"encoding/json"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/hash"

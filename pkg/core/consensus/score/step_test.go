@@ -42,7 +42,7 @@ func testResultFactory(require *require.Assertions, _ consensus.InternalPacket, 
 	return fmt.Errorf("no agreement received")
 }
 
-// TestSelectorRun tests that we can Run the selection
+// TestSelectorRun tests that we can run the score
 func TestScoreStepRun(t *testing.T) {
 	round := uint64(1)
 	step := uint8(1)

@@ -198,7 +198,7 @@ func RandContractCalls(amount, invalid int, includeCoinbase bool) []ContractCall
 	for i := 0; i < invalid; {
 		// pick a random tx within the set and invalidate it until we reach the
 		// invalid amount
-		idx := mrand.Intn(amount)
+		idx := mrand.Intn(amount) // nolint
 		if !IsMockInvalid(cc[idx]) {
 			Invalidate(cc[idx])
 			i++
@@ -682,6 +682,6 @@ func RandBool() bool {
 
 // RandTxType returns a random TxType
 func RandTxType() TxType {
-	t := mrand.Intn(8)
+	t := mrand.Intn(8) // nolint
 	return TxType(uint8(t))
 }

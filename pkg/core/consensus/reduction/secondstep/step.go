@@ -138,7 +138,10 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 }
 
+// FIXME: collectReduction should not return error
 func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) (*message.StepVotesMsg, error) {
+	// FIXME: a failed reduction verification should not return error
+	// triggering a resync
 	if err := p.handler.VerifySignature(r); err != nil {
 		return nil, err
 	}
