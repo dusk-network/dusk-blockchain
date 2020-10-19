@@ -80,6 +80,9 @@ type Executor interface {
 	// ExecuteStateTransition performs a global state mutation and steps the
 	// block-height up
 	ExecuteStateTransition(context.Context, []ContractCall, uint64) (user.Provisioners, error)
+
+	// GetProvisioners returns the current set of provisioners
+	GetProvisioners(ctx context.Context) (user.Provisioners, error)
 }
 
 // Provisioner encapsulates the operations common to a Provisioner during the
@@ -359,6 +362,28 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 		return user.Provisioners{}, errors.New("unsuccessful state transition function execution")
 	}
 
+	provisioners := user.NewProvisioners()
+	memberMap := make(map[string]*user.Member)
+	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})
+	if err != nil {
+		return user.Provisioners{}, err
+	}
+
+	for i := range pres.Provisioners {
+		member := new(user.Member)
+		UMember(pres.Provisioners[i], member)
+		memberMap[string(member.PublicKeyBLS)] = member
+		provisioners.Set.Insert(member.PublicKeyBLS)
+	}
+	provisioners.Members = memberMap
+
+	return *provisioners, nil
+}
+
+func (e *executor) GetProvisioners(ctx context.Context) (user.Provisioners, error) {
+
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
+	defer cancel()
 	provisioners := user.NewProvisioners()
 	memberMap := make(map[string]*user.Member)
 	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})

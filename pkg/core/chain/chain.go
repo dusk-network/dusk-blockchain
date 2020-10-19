@@ -334,28 +334,46 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 		return err
 	}
 
+	var provisioners user.Provisioners
+	var err error
+	provisioners, err = c.executor.GetProvisioners(ctx)
+	if err != nil {
+		l.WithError(err).Error("Error in getting provisioners")
+		return err
+	}
+
+	// Set provisioners list.
+	// chain.provisioners and provisioners GetProvisioners result are expected to differ only on
+	// first run after node restart
+	c.p = &provisioners
+
 	// 2. Check the certificate
 	// This check should avoid a possible race condition between accepting two blocks
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
 	l.Trace("verifying block certificate")
-	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
+	if err = verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
 		l.WithError(err).Error("certificate verification failed")
 		return err
 	}
 
 	// 3. Call ExecuteStateTransitionFunction
-	l.Debug("calling ExecuteStateTransitionFunction")
-	provisioners, err := c.executor.ExecuteStateTransition(ctx, blk.Txs, blk.Header.Height)
+	prov_num := c.p.Set.Len()
+	l.WithField("provisioners", prov_num).Info("calling ExecuteStateTransitionFunction")
+
+	provisioners, err = c.executor.ExecuteStateTransition(ctx, blk.Txs, blk.Header.Height)
 	if err != nil {
 		l.WithError(err).Error("Error in executing the state transition")
 		return err
 	}
 
-	// Caching the provisioners
-	// TODO: add bidList ?
+	// Update the provisioners as blk.Txs may bring new provisioners to the current state
 	c.p = &provisioners
 	c.tip.Set(&blk)
+
+	l.WithField("provisioners", c.p.Set.Len()).
+		WithField("added", c.p.Set.Len()-prov_num).
+		Info("after ExecuteStateTransitionFunction")
 
 	if config.Get().API.Enabled {
 		go func() {
