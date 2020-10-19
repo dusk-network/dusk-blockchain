@@ -352,7 +352,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
 	l.Trace("verifying block certificate")
-	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
+	if err = verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
 		l.WithError(err).Error("certificate verification failed")
 		return err
 	}
