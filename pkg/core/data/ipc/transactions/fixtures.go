@@ -47,6 +47,11 @@ func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []Co
 	return *p.P, nil
 }
 
+// GetProvisioners returns current state of provisioners
+func (p *PermissiveExecutor) GetProvisioners(ctx context.Context) (user.Provisioners, error) {
+	return *p.P, nil
+}
+
 // PermissiveProvisioner mocks verification of scores
 type PermissiveProvisioner struct {
 }
