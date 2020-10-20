@@ -449,24 +449,21 @@ func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
 
 	cm := r.Params.(message.Candidate)
 
-	prevBlock := c.tip.Get()
+	candidateBlock := *cm.Block
+	chainTip := c.tip.Get()
 
 	// We first perform a quick check on the Block Header and
-	if err := c.verifier.SanityCheckBlock(prevBlock, *cm.Block); err != nil {
+	if err := c.verifier.SanityCheckBlock(chainTip, candidateBlock); err != nil {
 		res.Err = err
 		r.RespChan <- res
 		return
 	}
 
-	calls, err := c.executor.VerifyStateTransition(c.ctx, prevBlock.Txs, prevBlock.Header.Height)
+	_, err := c.executor.VerifyStateTransition(c.ctx, candidateBlock.Txs, candidateBlock.Header.Height)
 	if err != nil {
 		res.Err = err
 		r.RespChan <- res
 		return
-	}
-
-	if len(calls) != len(prevBlock.Txs) {
-		res.Err = errors.New("block contains invalid transactions")
 	}
 
 	r.RespChan <- res
