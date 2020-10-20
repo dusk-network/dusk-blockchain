@@ -586,18 +586,15 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 		case m := <-roundResultsChan:
 			cm := m.Payload().(message.Candidate)
 
-			prevBlock := c.tip.Get()
+			candidateBlock := *cm.Block
+			chainTip := c.tip.Get()
 			// Check block and certificate for correctness
-			if err := c.verifier.SanityCheckBlock(prevBlock, *cm.Block); err != nil {
+			if err := c.verifier.SanityCheckBlock(chainTip, candidateBlock); err != nil {
 				continue
 			}
 
-			calls, err := c.executor.VerifyStateTransition(c.ctx, prevBlock.Txs, prevBlock.Header.Height)
+			_, err := c.executor.VerifyStateTransition(c.ctx, candidateBlock.Txs, candidateBlock.Header.Height)
 			if err != nil {
-				continue
-			}
-
-			if len(calls) != len(prevBlock.Txs) {
 				continue
 			}
 
