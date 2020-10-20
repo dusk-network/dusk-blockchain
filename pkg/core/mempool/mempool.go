@@ -57,9 +57,8 @@ type Mempool struct {
 	// verified txs to be included in next block
 	verified Pool
 
-	// the collector to listen for new intermediate blocks
-	intermediateBlockChan <-chan block.Block
-	acceptedBlockChan     <-chan block.Block
+	// the collector to listen for new accepted blocks
+	acceptedBlockChan <-chan block.Block
 
 	// used by tx verification procedure
 	latestBlockTimestamp int64
@@ -106,7 +105,6 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 		log.WithError(err).Error("failed to register topics.SendMempoolTx")
 	}
 
-	intermediateBlockChan := initIntermediateBlockCollector(eventBus)
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
 	m := &Mempool{
@@ -114,7 +112,6 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 		eventBus:                eventBus,
 		latestBlockTimestamp:    math.MinInt32,
 		quitChan:                make(chan struct{}),
-		intermediateBlockChan:   intermediateBlockChan,
 		acceptedBlockChan:       acceptedBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
@@ -159,9 +156,6 @@ func (m *Mempool) Run() {
 				handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
 			case r := <-m.getMempoolTxsBySizeChan:
 				handleRequest(r, m.processGetMempoolTxsBySizeRequest, "GetMempoolTxsBySize")
-			// Mempool input channels
-			case b := <-m.intermediateBlockChan:
-				m.onBlock(b)
 			case b := <-m.acceptedBlockChan:
 				m.onBlock(b)
 			case tx := <-m.pending:

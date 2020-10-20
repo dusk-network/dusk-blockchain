@@ -155,15 +155,16 @@ func TestAcceptFromPeer(t *testing.T) {
 
 // This test ensures the correct behavior when accepting a block
 // directly from the consensus.
-func TestAcceptIntermediate(t *testing.T) {
+func TestAcceptBlock(t *testing.T) {
 	assert := assert.New(t)
-	startingHeight := uint64(2)
+	startingHeight := uint64(1)
 
 	eb, rpc, c := setupChainTest(t, startingHeight)
 	go c.Listen()
 
-	intermediateChan := make(chan message.Message, 1)
-	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
+	acceptedBlockChan := make(chan message.Message, 1)
+	eb.Subscribe(topics.AcceptedBlock, eventbus.NewChanListener(acceptedBlockChan))
+
 	roundUpdateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.RoundUpdate, eventbus.NewChanListener(roundUpdateChan))
 
@@ -180,14 +181,15 @@ func TestAcceptIntermediate(t *testing.T) {
 
 	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert, nil})
 
-	// Should have `blk` as intermediate block now
-	assert.True(blk.Equals(c.intermediateBlock))
+	// Should have `blk` as blockchain head now
+	prevBlock := c.tip.Get()
+	assert.True(blk.Equals(&prevBlock))
 
 	// lastCertificate should be `cert`
 	assert.True(cert.Equals(c.lastCertificate))
 
-	// Should have gotten `blk` over topics.IntermediateBlock
-	blkMsg := <-intermediateChan
+	// Should have gotten `blk` over topics.AcceptBlock
+	blkMsg := <-acceptedBlockChan
 	decodedBlk := blkMsg.Payload().(block.Block)
 
 	assert.True(decodedBlk.Equals(blk))
@@ -209,8 +211,6 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	startingHeight := uint64(2)
 
 	eb, _, c := setupChainTest(t, startingHeight)
-	intermediateChan := make(chan message.Message, 1)
-	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
 
 	// Make a 'winning' candidate message
 	blk := helper.RandomBlock(startingHeight, 1)
@@ -224,8 +224,6 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 
 	// Save current prevBlock
 	currPrevBlock := c.tip.Get()
-	// set intermediate block to nil
-	c.intermediateBlock = nil
 
 	// Now pretend we finalized on it
 	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert, nil})
@@ -233,7 +231,6 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	// Ensure everything is still the same
 	prevBlock := c.tip.Get()
 	assert.True(currPrevBlock.Equals(&prevBlock))
-	assert.Nil(c.intermediateBlock)
 }
 
 //nolint:unused
@@ -309,8 +306,7 @@ func TestRebuildChain(t *testing.T) {
 	assert.False(t, genesis.Equals(&prevBlock))
 
 	p, ks := consensus.MockProvisioners(10)
-	c.lastCertificate = createMockedCertificate(c.intermediateBlock.Header.Hash, 2, ks, p)
-	c.intermediateBlock = helper.RandomBlock(2, 2)
+	c.lastCertificate = createMockedCertificate(prevBlock.Header.Hash, 2, ks, p)
 
 	// Now, send a request to rebuild the chain
 	_, err := c.RebuildChain(context.Background(), &node.EmptyRequest{})
@@ -321,9 +317,6 @@ func TestRebuildChain(t *testing.T) {
 	assert.True(t, genesis.Equals(&prevBlock))
 
 	assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
-	intermediateBlock, err := mockFirstIntermediateBlock(prevBlock.Header)
-	assert.NoError(t, err)
-	assert.True(t, c.intermediateBlock.Equals(intermediateBlock))
 
 	// Ensure we got a `StopConsensus` message
 	<-stopConsensusChan

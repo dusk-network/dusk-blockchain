@@ -278,8 +278,8 @@ func TestRemoveAccepted(t *testing.T) {
 
 	root, _ := b.CalculateRoot()
 	b.Header.TxRoot = root
-	blockMsg := message.New(topics.IntermediateBlock, *b)
-	errList := c.bus.Publish(topics.IntermediateBlock, blockMsg)
+	blockMsg := message.New(topics.AcceptedBlock, *b)
+	errList := c.bus.Publish(topics.AcceptedBlock, blockMsg)
 	assert.Empty(errList)
 
 	c.assert(t, false)
