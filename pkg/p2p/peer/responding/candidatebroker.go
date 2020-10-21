@@ -8,7 +8,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/sirupsen/logrus"
 )
+
+var lg = logrus.WithField("process", "candidate_broker")
 
 // CandidateBroker holds instances to RPCBus and responseChan
 type CandidateBroker struct {

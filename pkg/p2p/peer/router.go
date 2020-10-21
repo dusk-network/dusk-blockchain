@@ -22,13 +22,12 @@ type messageRouter struct {
 	dupeMap   *dupemap.DupeMap
 
 	// 1-to-1 components
-	blockHashBroker   *responding.BlockHashBroker
-	dataRequestor     *responding.DataRequestor
-	dataBroker        *responding.DataBroker
-	roundResultBroker *responding.RoundResultBroker
-	candidateBroker   *responding.CandidateBroker
-	synchronizer      *chainsync.ChainSynchronizer
-	ponger            processing.Ponger
+	blockHashBroker *responding.BlockHashBroker
+	dataRequestor   *responding.DataRequestor
+	dataBroker      *responding.DataBroker
+	candidateBroker *responding.CandidateBroker
+	synchronizer    *chainsync.ChainSynchronizer
+	ponger          processing.Ponger
 
 	peerInfo string
 }
@@ -76,8 +75,6 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) error {
 		// Just here to avoid the error message, as pong is unroutable but
 		// otherwise carries no relevant information beyond the receiving
 		// of this message
-	case topics.GetRoundResults:
-		err = m.roundResultBroker.ProvideRoundResult(&b)
 	case topics.GetCandidate:
 		// We only accept a certain request once, to avoid infinitely
 		// requesting the same block

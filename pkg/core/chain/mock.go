@@ -1,9 +1,7 @@
 package chain
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
 // MockVerifier is a mock for the chain.Verifier interface
@@ -65,31 +63,4 @@ func (m *MockLoader) Append(blk *block.Block) error {
 // BlockAt the block to the internal blockchain representation
 func (m *MockLoader) BlockAt(index uint64) (block.Block, error) {
 	return m.blockchain[index], nil
-}
-
-// mocks an intermediate block with a coinbase attributed to a standard
-// address. For use only when bootstrapping the network.
-func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, error) {
-	blk := block.NewBlock()
-	blk.Header.Seed = make([]byte, 33)
-	blk.Header.Height = 1
-	// Something above the genesis timestamp
-	blk.Header.Timestamp = 1570000000
-	blk.SetPrevBlock(prevBlockHeader)
-
-	tx := transactions.IntermediateCoinbase(config.GeneratorReward)
-	blk.AddTx(tx)
-	root, err := blk.CalculateRoot()
-	if err != nil {
-		return nil, err
-	}
-	blk.Header.TxRoot = root
-
-	hash, err := blk.CalculateHash()
-	if err != nil {
-		return nil, err
-	}
-	blk.Header.Hash = hash
-
-	return blk, nil
 }
