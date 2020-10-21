@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -11,7 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -25,20 +24,12 @@ func MockEmitter(consTimeout time.Duration, proxy transactions.Proxy) *Emitter {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	keys, _ := key.NewRandKeys()
-	_, pk := transactions.MockKeys()
-
-	buf := new(bytes.Buffer)
-	err := transactions.MarshalPublicKey(buf, *pk)
-	if err != nil {
-		panic("MockEmitter transactions.MarshalPublicKey")
-	}
 
 	return &Emitter{
 		EventBus:    eb,
 		RPCBus:      rpc,
 		Keys:        keys,
 		Proxy:       proxy,
-		PubkeyBuf:   *buf,
 		TimerLength: consTimeout,
 	}
 }

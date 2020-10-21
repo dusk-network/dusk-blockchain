@@ -9,7 +9,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -30,12 +32,12 @@ func TestGenerateGenesis(t *testing.T) {
 	pkBytes, err := hex.DecodeString(pk)
 	require.Nil(t, err)
 
-	publicKey := &transactions.PublicKey{
-		AG: &transactions.CompressedPoint{
-			Y: pkBytes[0:32],
+	publicKey := &keys.PublicKey{
+		AG: &common.JubJubCompressed{
+			Data: pkBytes[0:32],
 		},
-		BG: &transactions.CompressedPoint{
-			Y: pkBytes[32:64],
+		BG: &common.JubJubCompressed{
+			Data: pkBytes[32:64],
 		},
 	}
 

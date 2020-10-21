@@ -8,7 +8,7 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
-	core "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	core "github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -59,19 +59,18 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	qd.TxType = tx.Type()
 
 	qd.Outputs = make([]queryOutput, 0)
-	for _, output := range tx.StandardTx().Outputs {
+	for _, output := range tx.StandardTx().Notes {
 
 		if IsNil(output) {
 			continue
 		}
 
-		pubkey := append(output.Pk.AG.Y, output.Pk.BG.Y...)
-		qd.Outputs = append(qd.Outputs, queryOutput{pubkey})
+		qd.Outputs = append(qd.Outputs, queryOutput{output.PkR.Data})
 	}
 
 	qd.Inputs = make([]queryInput, 0)
-	for _, input := range tx.StandardTx().Inputs {
-		keyimage := input.Nullifier.H.Data
+	for _, input := range tx.StandardTx().Nullifiers {
+		keyimage := input.Data
 		qd.Inputs = append(qd.Inputs, queryInput{keyimage})
 	}
 
@@ -89,33 +88,8 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 }
 
 // IsNil will check for nil in a output
-func IsNil(output *core.TransactionOutput) bool {
-	if output.Pk == nil {
-		//log.Warn("invalid output, Pk field is nil")
-		return true
-	}
-
-	if output.Pk.AG == nil {
-		//log.Warn("invalid output, Pk.AG field is nil")
-		return true
-	}
-
-	if output.Pk.AG.Y == nil {
-		//log.Warn("invalid output, Pk.AG.Y is nil")
-		return true
-	}
-
-	if output.Pk.BG == nil {
-		//log.Warn("invalid output, Pk.BG is nil")
-		return true
-	}
-
-	if output.Pk.BG.Y == nil {
-		//log.Warn("invalid output, Pk.BG.Y is nil")
-		return true
-	}
-
-	return false
+func IsNil(output *core.Note) bool {
+	return output.PkR.Data == nil
 }
 
 func (t transactions) getQuery() *graphql.Field {

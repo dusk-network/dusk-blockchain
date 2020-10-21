@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	assert "github.com/stretchr/testify/require"
 )
@@ -30,7 +30,6 @@ func TestSortedKeys(t *testing.T) {
 	prevVal = math.MaxUint64
 
 	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-
 		_, fee := t.tx.Values()
 		if prevVal < fee {
 			return false, errors.New("keys not in a descending order")
@@ -44,15 +43,12 @@ func TestSortedKeys(t *testing.T) {
 }
 
 func TestStableSortedKeys(t *testing.T) {
-
 	pool := HashMap{Capacity: 100}
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
-
-		amount := transactions.RandUint64()
 		bf := transactions.RandBlind()
-		tx := transactions.MockTx(amount, uint64(20), false, bf)
+		tx := transactions.MockTx(false, bf, true)
 		td := TxDesc{tx: tx, received: time.Now()}
 		if err := pool.Put(td); err != nil {
 			t.Fatal(err.Error())
@@ -86,9 +82,8 @@ func TestGet(t *testing.T) {
 	// Generate 10 random txs
 	hashes := make([][]byte, txsCount)
 	for i := 0; i < txsCount; i++ {
-		amount := transactions.RandUint64()
 		bf := transactions.RandBlind()
-		tx := transactions.MockTx(amount, uint64(20), false, bf)
+		tx := transactions.MockTx(false, bf, true)
 		hash, _ := tx.CalculateHash()
 		hashes[i] = hash
 

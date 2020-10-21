@@ -71,7 +71,7 @@ const (
 	GetLastCertificate
 	GetLastCommittee
 	SendMempoolTx
-	ValidateStateTransition
+	VerifyStateTransition
 	ExecuteStateTransition
 
 	// Cross-process RPCBus topics
@@ -96,7 +96,6 @@ const (
 	StopProfile
 
 	// Cross-network RPCBus topics
-	GetRoundResults
 	GetCandidate
 
 	// Monitoring topics
@@ -160,7 +159,7 @@ var Topics = [...]topicBuf{
 	{GetLastCertificate, *(bytes.NewBuffer([]byte{byte(GetLastCertificate)})), "getlastcertificate"},
 	{GetLastCommittee, *(bytes.NewBuffer([]byte{byte(GetLastCommittee)})), "getlastcommittee"},
 	{SendMempoolTx, *(bytes.NewBuffer([]byte{byte(SendMempoolTx)})), "sendmempooltx"},
-	{ValidateStateTransition, *(bytes.NewBuffer([]byte{byte(ValidateStateTransition)})), "validatestatetransition"},
+	{VerifyStateTransition, *(bytes.NewBuffer([]byte{byte(VerifyStateTransition)})), "validatestatetransition"},
 	{ExecuteStateTransition, *(bytes.NewBuffer([]byte{byte(ExecuteStateTransition)})), "executestatetransition"},
 	{GetMempoolView, *(bytes.NewBuffer([]byte{byte(GetMempoolView)})), "getmempoolview"},
 	{CreateWallet, *(bytes.NewBuffer([]byte{byte(CreateWallet)})), "createwallet"},
@@ -180,7 +179,6 @@ var Topics = [...]topicBuf{
 	{ClearWalletDatabase, *(bytes.NewBuffer([]byte{byte(ClearWalletDatabase)})), "clearwalletdatabase"},
 	{StartProfile, *(bytes.NewBuffer([]byte{byte(StartProfile)})), "startprofile"},
 	{StopProfile, *(bytes.NewBuffer([]byte{byte(StopProfile)})), "stopprofile"},
-	{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
 	{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 	{SyncProgress, *(bytes.NewBuffer([]byte{byte(SyncProgress)})), "syncprogress"},
 }

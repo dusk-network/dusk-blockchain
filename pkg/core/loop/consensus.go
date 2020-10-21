@@ -9,12 +9,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/score"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -46,7 +45,7 @@ type Consensus struct {
 
 // Wire creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing
-func Wire(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *transactions.PublicKey) (scoreStep consensus.Phase, agreementStep consensus.Controller, err error) {
+func Wire(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *keys.PublicKey) (scoreStep consensus.Phase, agreementStep consensus.Controller, err error) {
 	redu2 := secondstep.New(emitter, consensusTimeOut)
 	redu1 := firststep.New(redu2, emitter, consensusTimeOut)
 	sel := selection.New(redu1, emitter, consensusTimeOut)
@@ -145,20 +144,22 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 	return nil
 }
 
-var steps = []string{"selection", "reduction1", "reduction2"}
+var steps = []string{"selection", "reduction1", "reduction2"} // nolint
 
 func report(round uint64, step uint8) {
-	store := capi.GetBuntStoreInstance()
-	err := store.StoreRoundInfo(round, step, "Forward", steps[(step-1)%3])
-	if err != nil {
-		lg.
-			WithFields(log.Fields{
-				"round": round,
-				"step":  step,
-			}).
-			WithError(err).
-			Error("could not save StoreRoundInfo on api db")
-	}
+	/*
+		store := capi.GetBuntStoreInstance()
+		err := store.StoreRoundInfo(round, step, "Forward", steps[(step-1)%3])
+		if err != nil {
+			lg.
+				WithFields(log.Fields{
+					"round": round,
+					"step":  step,
+				}).
+				WithError(err).
+				Error("could not save StoreRoundInfo on api db")
+		}
+	*/
 }
 
 //phase should start by

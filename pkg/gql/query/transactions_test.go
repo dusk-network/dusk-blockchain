@@ -23,7 +23,7 @@ func TestTxByTxID(t *testing.T) {
 					{
 						"blockhash": "%s",
 						"txid": "%s",
-						"txtype": "bid"
+						"txtype": "3"
 					}
 				]
 			}
@@ -50,12 +50,12 @@ func TestTxByTxIDs(t *testing.T) {
 					{
 						"blockhash": "%s",
 						"txid": "%s",
-						"txtype": "bid"
+						"txtype": "3"
 					},
 					{
 						"blockhash": "%s",
 						"txid": "%s",
-						"txtype": "bid"
+						"txtype": "3"
 					}
 				]
 			}
@@ -81,11 +81,11 @@ func TestLastTxs(t *testing.T) {
 				"transactions": [
 					{
 						"txid": "%s",
-						"txtype": "bid"
+						"txtype": "3"
 					},
 					{
 						"txid": "%s",
-						"txtype": "bid"
+						"txtype": "3"
 					}
 				]
 			}
@@ -114,7 +114,7 @@ func TestTxOutput(t *testing.T) {
 				{
 					"output": [
 						{
-							"pubkey": "33443344"
+							"pubkey": "0000000000000000000000000000000000000000000000000000000000000000"
 						}
 					],
 					"txid": "%s"
@@ -147,7 +147,7 @@ func TestTxInput(t *testing.T) {
 				{
 					"input": [
 						{
-							"keyimage": "5566"
+							"keyimage": "0000000000000000000000000000000000000000000000000000000000000000"
 						}
 					],
 					"txid": "%s"
@@ -176,8 +176,8 @@ func TestTxSize(t *testing.T) {
 			"data": {
 				"transactions": [
 					{
-						"size": 322,
-						"txtype": "bid"
+						"size": 716,
+						"txtype": "3"
 					}
 				]
 			}

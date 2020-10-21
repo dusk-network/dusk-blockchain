@@ -7,7 +7,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -21,10 +23,14 @@ var lg = log.WithField("process", "score generator")
 // Phase of the consensus
 type Phase struct {
 	*consensus.Emitter
-	next       consensus.Phase
-	d, k, edPk []byte
-	bg         transactions.BlockGenerator
-	generator  candidate.Generator
+	next           consensus.Phase
+	bg             transactions.BlockGenerator
+	d              *common.JubJubCompressed
+	k              *common.BlsScalar
+	indexStoredBid uint64
+
+	//d, edPk []byte
+	generator candidate.Generator
 
 	lock      sync.Mutex
 	threshold *consensus.Threshold
@@ -32,26 +38,27 @@ type Phase struct {
 
 // New creates a new score generation step
 func New(next consensus.Phase, e *consensus.Emitter, bg candidate.Generator) (*Phase, error) {
-	var d, k, edPk []byte
+	var d, k []byte
+	var indexStoredBid uint64
 	_, db := heavy.CreateDBConnection()
 
 	if err := db.View(func(t database.Transaction) error {
 		var err error
-		d, k, edPk, err = t.FetchBidValues()
+		d, k, indexStoredBid, err = t.FetchBidValues()
 		return err
 	}); err != nil {
 		return nil, err
 	}
 
 	return &Phase{
-		Emitter:   e,
-		bg:        e.Proxy.BlockGenerator(),
-		d:         d,
-		k:         k,
-		edPk:      edPk,
-		threshold: consensus.NewThreshold(),
-		next:      next,
-		generator: bg,
+		Emitter:        e,
+		bg:             e.Proxy.BlockGenerator(),
+		d:              &common.JubJubCompressed{Data: d},
+		k:              &common.BlsScalar{Data: k},
+		threshold:      consensus.NewThreshold(),
+		next:           next,
+		generator:      bg,
+		indexStoredBid: indexStoredBid,
 	}, nil
 }
 
@@ -95,11 +102,13 @@ func (p *Phase) generate(ctx context.Context, r consensus.RoundUpdate, step uint
 		return
 	}
 
-	sr := transactions.ScoreRequest{
-		D:    p.d,
-		K:    p.k,
-		Seed: seed,
-		EdPk: p.edPk,
+	sr := blindbid.GenerateScoreRequest{
+		Commitment:     p.d,
+		K:              p.k,
+		Seed:           &common.BlsScalar{ Data: seed },
+		Round:          uint32(r.Round),
+		Step:           uint32(step),
+		IndexStoredBid: p.indexStoredBid,
 	}
 
 	scoreTx, err := p.bg.GenerateScore(ctx, sr)

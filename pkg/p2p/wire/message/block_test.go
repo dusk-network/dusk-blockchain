@@ -6,13 +6,13 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	assert "github.com/stretchr/testify/require"
 )
 
 func TestEncodeDecodeBlock(t *testing.T) {
-
 	assert := assert.New(t)
 
 	// random block
@@ -28,6 +28,16 @@ func TestEncodeDecodeBlock(t *testing.T) {
 
 	// Check both structs are equal
 	assert.True(blk.Equals(decBlk))
+
+	// Check that all txs are equal
+	for i := range blk.Txs {
+		hash1, err := blk.Txs[i].CalculateHash()
+		assert.NoError(err)
+		hash2, err := decBlk.Txs[i].CalculateHash()
+		assert.NoError(err)
+		assert.True(bytes.Equal(hash1, hash2))
+		assert.True(transactions.Equal(blk.Txs[i], decBlk.Txs[i]))
+	}
 }
 
 func TestEncodeDecodeCert(t *testing.T) {

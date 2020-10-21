@@ -2,11 +2,15 @@ package peer
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 
 	log "github.com/sirupsen/logrus"
 
@@ -20,9 +24,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
-
-var readWriteTimeout = 60 * time.Second // Max idle time for a peer
-var keepAliveTime = 30 * time.Second    // Send keepalive message after inactivity for this amount of time
 
 var l = log.WithField("process", "peer")
 
@@ -107,16 +108,15 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 		Connection: pconn,
 		exitChan:   exitChan,
 		router: &messageRouter{
-			publisher:         publisher,
-			dupeMap:           dupeMap,
-			blockHashBroker:   responding.NewBlockHashBroker(db, responseChan),
-			synchronizer:      chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
-			dataRequestor:     dataRequestor,
-			dataBroker:        responding.NewDataBroker(db, rpcBus, responseChan),
-			roundResultBroker: responding.NewRoundResultBroker(rpcBus, responseChan),
-			candidateBroker:   responding.NewCandidateBroker(rpcBus, responseChan),
-			ponger:            processing.NewPonger(responseChan),
-			peerInfo:          conn.RemoteAddr().String(),
+			publisher:       publisher,
+			dupeMap:         dupeMap,
+			blockHashBroker: responding.NewBlockHashBroker(db, responseChan),
+			synchronizer:    chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
+			dataRequestor:   dataRequestor,
+			dataBroker:      responding.NewDataBroker(db, rpcBus, responseChan),
+			candidateBroker: responding.NewCandidateBroker(rpcBus, responseChan),
+			ponger:          processing.NewPonger(responseChan),
+			peerInfo:        conn.RemoteAddr().String(),
 		},
 	}
 
@@ -155,6 +155,23 @@ func (w *Writer) Connect() error {
 		return err
 	}
 
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := w.Addr()
+			peerJSON := capi.PeerJSON{
+				Address:  addr,
+				Type:     "Writer",
+				Method:   "Connect",
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peer into StormDB")
+			}
+		}()
+	}
+
 	return nil
 }
 
@@ -165,12 +182,28 @@ func (p *Reader) Accept() error {
 		return err
 	}
 
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := p.Addr()
+			peerJSON := capi.PeerJSON{
+				Address:  addr,
+				Type:     "Reader",
+				Method:   "Accept",
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peer into StormDB")
+			}
+		}()
+	}
+
 	return nil
 }
 
 // Serve utilizes two different methods for writing to the open connection
 func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
-
 	defer w.onDisconnect()
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
@@ -187,10 +220,27 @@ func (w *Writer) onDisconnect() {
 	log.WithField("address", w.Connection.RemoteAddr().String()).Infof("Connection terminated")
 	_ = w.Conn.Close()
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
+
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := w.Addr()
+			peerJSON := capi.PeerJSON{
+				Address:  addr,
+				Type:     "Writer",
+				Method:   "onDisconnect",
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peer into StormDB")
+			}
+		}()
+	}
+
 }
 
 func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
-
 	for {
 		select {
 		case buf := <-writeQueueChan:
@@ -213,15 +263,14 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
 func (p *Reader) ReadLoop() {
-
 	// As the peer ReadLoop is at the front-line of P2P network, receiving a
 	// malformed frame by an adversary node could lead to a panic.
 	// In such situation, the node should survive but adversary conn gets dropped
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
+	// 	}
+	// }()
 
 	p.readLoop()
 }
@@ -230,6 +279,9 @@ func (p *Reader) readLoop() {
 	defer func() {
 		_ = p.Conn.Close()
 	}()
+
+	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second  // Max idle time for a peer
+	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
 
 	// Set up a timer, which triggers the sending of a `keepalive` message
 	// when fired.
@@ -255,7 +307,7 @@ func (p *Reader) readLoop() {
 
 		message, cs, err := checksum.Extract(b)
 		if err != nil {
-			l.WithError(err).Warnln("error reading message")
+			l.WithError(err).Warnln("error reading Extract message")
 			return
 		}
 
@@ -266,10 +318,15 @@ func (p *Reader) readLoop() {
 
 		// TODO: error here should be checked in order to decrease reputation
 		// or blacklist spammers
-		err = p.router.Collect(message)
-		if err != nil {
-			log.WithError(err).Errorln("error routing message")
+		startTime := time.Now().UnixNano()
+		if err := p.router.Collect(message); err != nil {
+			l.WithError(err).Error("message routing")
 		}
+
+		duration := float64(time.Now().UnixNano()-startTime) / 1000000
+		l.WithField("cs", hex.EncodeToString(cs)).
+			WithField("len", len(message)).
+			WithField("ms", duration).Debug("trace message routing")
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)
@@ -277,12 +334,15 @@ func (p *Reader) readLoop() {
 }
 
 func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
+	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
+
 	timer := time.NewTimer(keepAliveTime)
 	quitChan := make(chan struct{}, 1)
 	go func(p *Reader, t *time.Timer, quitChan chan struct{}) {
 		for {
 			select {
 			case <-t.C:
+				// TODO: why not check err returned ?
 				_ = p.Connection.keepAlive()
 			case <-quitChan:
 				t.Stop()
@@ -312,6 +372,8 @@ func (c *Connection) keepAlive() error {
 // Conn needs to be locked, as this function can be called both by the WriteLoop,
 // and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
+	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second // Max idle time for a peer
+
 	c.lock.Lock()
 	_ = c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	n, err := c.Conn.Write(b)

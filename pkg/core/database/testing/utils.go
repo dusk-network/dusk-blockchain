@@ -38,7 +38,6 @@ func storeBlocks(db database.DB, blocks []*block.Block) error {
 
 // A helper function to generate a set of blocks that can be chained
 func generateChainBlocks(blocksCount int) ([]*block.Block, error) {
-
 	overallBlockTxs := 1 + 4*int(sampleTxsBatchCount)
 	overallTxsCount := blocksCount * overallBlockTxs
 	fmt.Printf("--- MSG  Generate sample data of %d blocks with %d txs each (overall txs %d)\n", blocksCount, overallBlockTxs, overallTxsCount)

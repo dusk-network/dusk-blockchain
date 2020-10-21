@@ -6,7 +6,7 @@ import (
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
@@ -33,7 +33,6 @@ func MarshalBlock(r *bytes.Buffer, b *block.Block) error {
 
 // UnmarshalBlock unmarshals a block from a binary buffer
 func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
-
 	if err := UnmarshalHeader(r, b.Header); err != nil {
 		return err
 	}
@@ -51,8 +50,8 @@ func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
 
 	b.Txs = make([]transactions.ContractCall, lTxs)
 	for i := range b.Txs {
-		c, err := transactions.Unmarshal(r)
-		if err != nil {
+		c := transactions.NewTransaction()
+		if err := transactions.Unmarshal(r, c); err != nil {
 			return err
 		}
 		b.Txs[i] = c

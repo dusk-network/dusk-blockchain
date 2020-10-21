@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"time"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -25,7 +26,6 @@ type (
 		EventBus    *eventbus.EventBus
 		RPCBus      *rpcbus.RPCBus
 		Keys        key.Keys
-		PubkeyBuf   bytes.Buffer
 		Proxy       transactions.Proxy
 		TimerLength time.Duration
 	}
@@ -75,7 +75,7 @@ type (
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
 func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, uint32) {
-	acceptedBlockChan := make(chan block.Block)
+	acceptedBlockChan := make(chan block.Block, cfg.MaxInvBlocks)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
 	collectListener := eventbus.NewSafeCallbackListener(collector.Collect)
 	id := subscriber.Subscribe(topics.AcceptedBlock, collectListener)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
-	txs "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	txs "github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/graphql-go/graphql"

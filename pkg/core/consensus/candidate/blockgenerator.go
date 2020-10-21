@@ -10,7 +10,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -31,11 +32,11 @@ type Generator interface {
 
 type generator struct {
 	*consensus.Emitter
-	genPubKey *transactions.PublicKey
+	genPubKey *keys.PublicKey
 }
 
 // New creates a new block generator
-func New(e *consensus.Emitter, genPubKey *transactions.PublicKey) Generator {
+func New(e *consensus.Emitter, genPubKey *keys.PublicKey) Generator {
 	return &generator{
 		Emitter:   e,
 		genPubKey: genPubKey,
@@ -184,7 +185,8 @@ func (bg *generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 	txs = append(txs, resp.([]transactions.ContractCall)...)
 
 	// Construct and append coinbase Tx to reward the generator
-	coinbaseTx := transactions.NewDistribute(config.GeneratorReward, keys, *bg.genPubKey)
+	// XXX: this needs to be adjusted
+	coinbaseTx := transactions.RandDistributeTx(config.GeneratorReward, len(keys))
 	txs = append(txs, coinbaseTx)
 
 	return txs, nil

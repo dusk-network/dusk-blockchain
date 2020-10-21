@@ -119,7 +119,6 @@ func monitorNetwork() {
 // by all nodes in the network within a particular time frame and within
 // the same block
 func TestSendBidTransaction(t *testing.T) {
-
 	localNet.LoadNetworkWallets(t, localNet.Size())
 
 	t.Log("Send request to node 0 to generate and process a Bid transaction")
@@ -141,7 +140,6 @@ func TestSendBidTransaction(t *testing.T) {
 	t.Log("Ensure all nodes have accepted this transaction at the same height")
 	blockhash := ""
 	for i := 0; i < localNet.Size(); i++ {
-
 		bh := localNet.WaitUntilTx(t, uint(i), txID)
 
 		if len(bh) == 0 {
@@ -163,7 +161,6 @@ func TestSendBidTransaction(t *testing.T) {
 // TestCatchup tests that a node which falls behind during consensus
 // will properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
-
 	localNet.LoadNetworkWallets(t, localNet.Size())
 
 	t.Log("Wait till we are at height 3")
@@ -186,11 +183,10 @@ func TestCatchup(t *testing.T) {
 }
 
 func TestSendStakeTransaction(t *testing.T) {
-
 	localNet.LoadNetworkWallets(t, localNet.Size())
 
-	t.Log("Send request to node 1 to generate and process a Bid transaction")
-	txidBytes, err := localNet.SendStakeCmd(1, 10, 10)
+	t.Log("Send request to node 1 to generate and process a Stake transaction")
+	txidBytes, err := localNet.SendStakeCmd(0, 10, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +197,6 @@ func TestSendStakeTransaction(t *testing.T) {
 	t.Log("Ensure all nodes have accepted stake transaction at the same height")
 	blockhash := ""
 	for i := 0; i < localNet.Size(); i++ {
-
 		bh := localNet.WaitUntilTx(t, uint(i), txID)
 
 		if len(bh) == 0 {
@@ -224,7 +219,6 @@ func TestSendStakeTransaction(t *testing.T) {
 // should ensure that in a network of multiple Bidders and Provisioners
 // consensus is stable and consistent
 func TestMultipleBiddersProvisioners(t *testing.T) {
-
 	if !*engine.KeepAlive {
 		// Runnable in keepalive mode only
 		t.SkipNow()
@@ -253,4 +247,17 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 		}
 	}
 
+	deployNewNode := func() {
+		ind := localNetSize
+		node := engine.NewDuskNode(9500+ind, 9000+ind, "default", localNet.IsSessionRequired())
+		localNet.AddNode(node)
+
+		if err := localNet.StartNode(ind, node, workspace); err != nil {
+			fmt.Print("failed starting a node")
+		}
+	}
+
+	// Deploy new node an hour after bootstrapping the network
+	// This allows us to monitor re-sync process with more than 500 blocks difference
+	time.AfterFunc(1*time.Hour, deployNewNode)
 }

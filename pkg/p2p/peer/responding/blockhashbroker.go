@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -26,7 +27,7 @@ func NewBlockHashBroker(db database.DB, responseChan chan<- *bytes.Buffer) *Bloc
 }
 
 // AdvertiseMissingBlocks takes a GetBlocks wire message, finds the requesting peer's
-// height, and returns an inventory message of up to 500 blocks which follow the
+// height, and returns an inventory message of up to config.MaxInvBlocks blocks which follow the
 // provided locator.
 func (b *BlockHashBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 	msg := &peermsg.GetBlocks{}
@@ -59,7 +60,7 @@ func (b *BlockHashBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 		}
 
 		inv.AddItem(peermsg.InvTypeBlock, hash)
-		if len(inv.InvList) >= 500 {
+		if len(inv.InvList) >= cfg.MaxInvBlocks {
 			break
 		}
 	}

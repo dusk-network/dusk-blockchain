@@ -45,6 +45,12 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("timeout.timeoutgetmempooltxs", 3)
 	//roundresultsbroker.go
 	viper.Set("timeout.timeoutgetroundresults", 5)
+	//broker.go
+	viper.Set("timeout.timeoutbrokergetcandidate", 2)
+	//peer.go
+	viper.Set("timeout.timeoutreadwrite", 60)
+	//peer.go
+	viper.Set("timeout.timeoutkeepalivetime", 30)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
 	viper.Set("gql.address", node.Cfg.Gql.Address)
@@ -86,12 +92,10 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("api.enabletls", false)
 	viper.Set("api.address", "127.0.0.1:9199")
 	viper.Set("api.expirationtime", 300)
-
 }
 
 // Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing)
 func Profile2(index int, node *DuskNode, walletPath string) {
-
 	Profile1(index, node, walletPath)
 	viper.Set("database.driver", lite.DriverName)
 }

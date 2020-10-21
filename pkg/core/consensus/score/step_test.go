@@ -2,6 +2,7 @@ package score
 
 import (
 	"context"
+	"encoding/binary"
 	"os"
 	"testing"
 	"time"
@@ -14,7 +15,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -63,7 +65,8 @@ func TestScoreStepRun(t *testing.T) {
 
 	d, _ := crypto.RandEntropy(32)
 	k, _ := crypto.RandEntropy(32)
-	edPk, _ := crypto.RandEntropy(32)
+	idx, _ := crypto.RandEntropy(8)
+	indexStoredBid := binary.LittleEndian.Uint64(idx)
 
 	mockPhase := consensus.MockPhase(cb)
 	_, pk := transactions.MockKeys()
@@ -71,14 +74,14 @@ func TestScoreStepRun(t *testing.T) {
 	blockGen := candidate.New(hlp.Emitter, pk)
 
 	scoreInstance := Phase{
-		Emitter:   hlp.Emitter,
-		bg:        hlp.Emitter.Proxy.BlockGenerator(),
-		d:         d,
-		k:         k,
-		edPk:      edPk,
-		threshold: consensus.NewThreshold(),
-		next:      mockPhase,
-		generator: blockGen,
+		Emitter:        hlp.Emitter,
+		bg:             hlp.Emitter.Proxy.BlockGenerator(),
+		d:              &common.JubJubCompressed{Data: d},
+		k:              &common.BlsScalar{Data: k},
+		indexStoredBid: indexStoredBid,
+		threshold:      consensus.NewThreshold(),
+		next:           mockPhase,
+		generator:      blockGen,
 	}
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
