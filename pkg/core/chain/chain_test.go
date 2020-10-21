@@ -17,8 +17,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -121,8 +121,10 @@ func TestAcceptFromPeer(t *testing.T) {
 
 	errChan := make(chan error, 1)
 	go func(chan error) {
-		if err := c.onAcceptBlock(msg); err.Error() != "request timeout" {
-			errChan <- err
+		if err := c.onAcceptBlock(msg); err != nil {
+			if err.Error() != "request timeout" {
+				errChan <- err
+			}
 		}
 	}(errChan)
 
@@ -140,12 +142,14 @@ func TestAcceptFromPeer(t *testing.T) {
 		m, err := streamer.Read()
 		assert.NoError(err)
 
-		if streamer.SeenTopics()[i] == topics.GetRoundResults {
-			var round uint64
-			err = encoding.ReadUint64LE(bytes.NewBuffer(m), &round)
-			assert.NoError(err)
+		if streamer.SeenTopics()[i] == topics.Inv {
 
-			assert.Equal(uint64(2), round)
+			// Read hash of the advertised block
+			var decoder peermsg.Inv
+			decoder.Decode(bytes.NewBuffer(m))
+
+			assert.Equal(decoder.InvList[0].Type, peermsg.InvTypeBlock)
+			assert.True(bytes.Equal(decoder.InvList[0].Hash, blk.Header.Hash))
 			return
 		}
 	}

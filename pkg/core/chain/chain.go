@@ -101,7 +101,6 @@ type Chain struct {
 	// rpcbus channels
 	verifyCandidateBlockChan <-chan rpcbus.Request
 	getLastCertificateChan   <-chan rpcbus.Request
-	getRoundResultsChan      <-chan rpcbus.Request
 	getLastCommitteeChan     <-chan rpcbus.Request
 
 	ctx context.Context
@@ -124,7 +123,6 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	// set up rpcbus channels
 	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
 	getLastCertificateChan := make(chan rpcbus.Request, 1)
-	getRoundResultsChan := make(chan rpcbus.Request, 1)
 	getLastCommitteeChan := make(chan rpcbus.Request, 1)
 
 	if err := rpcBus.Register(topics.VerifyCandidateBlock, verifyCandidateBlockChan); err != nil {
@@ -133,9 +131,7 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 	if err := rpcBus.Register(topics.GetLastCertificate, getLastCertificateChan); err != nil {
 		return nil, err
 	}
-	if err := rpcBus.Register(topics.GetRoundResults, getRoundResultsChan); err != nil {
-		return nil, err
-	}
+
 	if err := rpcBus.Register(topics.GetLastCommittee, getLastCommitteeChan); err != nil {
 		return nil, err
 	}
@@ -149,7 +145,6 @@ func New(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus
 		highestSeenChan:          highestSeenChan,
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
 		getLastCertificateChan:   getLastCertificateChan,
-		getRoundResultsChan:      getRoundResultsChan,
 		getLastCommitteeChan:     getLastCommitteeChan,
 		lastCommittee:            make([][]byte, 0),
 		loader:                   loader,
@@ -220,8 +215,6 @@ func (c *Chain) Listen() {
 			c.processCandidateVerificationRequest(r)
 		case r := <-c.getLastCertificateChan:
 			c.provideLastCertificate(r)
-		case r := <-c.getRoundResultsChan:
-			c.provideRoundResults(r)
 		case r := <-c.getLastCommitteeChan:
 			c.provideLastCommittee(r)
 		case <-c.ctx.Done():
@@ -273,17 +266,11 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 		return err
 	}
 
+	c.lastCertificate = blk.Header.Certificate
+
 	// If we are no longer syncing after accepting this block,
 	// request a certificate for the second to last round.
 	if !c.counter.IsSyncing() {
-
-		_, cert, err := c.requestRoundResults(blk.Header.Height + 1)
-		if err != nil {
-			lg.WithError(err).Debug("could not requestRoundResults")
-			return err
-		}
-
-		c.lastCertificate = cert
 
 		// Once received, we can re-start consensus.
 		// This sets off a chain of processing which goes from sending the
@@ -553,64 +540,6 @@ func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 	}
 }
 
-// Send out a query for agreement messages and an intermediate block.
-func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certificate, error) {
-	roundResultsChan := make(chan message.Message, 10)
-	id := c.eventBus.Subscribe(topics.RoundResults, eventbus.NewChanListener(roundResultsChan))
-	defer c.eventBus.Unsubscribe(topics.RoundResults, id)
-
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, round); err != nil {
-		//TODO: shall this really panic ?
-		log.Panic(err)
-	}
-
-	// TODO: prepending the topic should be done at the recipient end of the
-	// Gossip (together with all the other encoding)
-	if err := topics.Prepend(buf, topics.GetRoundResults); err != nil {
-		//TODO: shall this really panic ?
-		log.Panic(err)
-	}
-	msg := message.New(topics.GetRoundResults, *buf)
-	errList := c.eventBus.Publish(topics.Gossip, msg)
-	diagnostics.LogPublishErrors("chain/chain.go, topics.Gossip, topics.GetRoundResults", errList)
-
-	// We wait 5 seconds for a response. We time out otherwise and
-	// attempt catching up later.
-	timer := time.NewTimer(1 * time.Second)
-
-	for {
-		select {
-		case <-timer.C:
-			return nil, nil, errors.New("request timeout")
-		case m := <-roundResultsChan:
-			cm := m.Payload().(message.Candidate)
-
-			candidateBlock := *cm.Block
-			chainTip := c.tip.Get()
-			// Check block and certificate for correctness
-			if err := c.verifier.SanityCheckBlock(chainTip, candidateBlock); err != nil {
-				continue
-			}
-
-			_, err := c.executor.VerifyStateTransition(c.ctx, candidateBlock.Txs, candidateBlock.Header.Height)
-			if err != nil {
-				continue
-			}
-
-			// Certificate needs to be on a block to be verified.
-			// Since this certificate is supposed to be for the
-			// intermediate block, we can just put it on there.
-			cm.Block.Header.Certificate = cm.Certificate
-			if err := verifiers.CheckBlockCertificate(*c.p, *cm.Block); err != nil {
-				continue
-			}
-
-			return cm.Block, cm.Certificate, nil
-		}
-	}
-}
-
 func (c *Chain) provideLastCertificate(r rpcbus.Request) {
 	if c.lastCertificate == nil {
 		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("no last certificate present"))
@@ -629,34 +558,6 @@ func (c *Chain) provideLastCommittee(r rpcbus.Request) {
 	}
 
 	r.RespChan <- rpcbus.NewResponse(c.lastCommittee, nil)
-}
-
-func (c *Chain) provideRoundResults(r rpcbus.Request) {
-	if c.lastCertificate == nil {
-		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("no intermediate block or certificate currently known"))
-		return
-	}
-	params := r.Params.(bytes.Buffer)
-
-	if params.Len() < 8 {
-		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("round cannot be read from request param"))
-		return
-	}
-
-	blk := c.tip.Get()
-
-	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, &blk); err != nil {
-		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, err)
-		return
-	}
-
-	if err := message.MarshalCertificate(buf, c.lastCertificate); err != nil {
-		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, err)
-		return
-	}
-
-	r.RespChan <- rpcbus.NewResponse(*buf, nil)
 }
 
 // GetSyncProgress returns how close the node is to being synced to the tip,

@@ -96,7 +96,6 @@ const (
 	StopProfile
 
 	// Cross-network RPCBus topics
-	GetRoundResults
 	GetCandidate
 
 	// Monitoring topics
@@ -180,7 +179,6 @@ var Topics = [...]topicBuf{
 	{ClearWalletDatabase, *(bytes.NewBuffer([]byte{byte(ClearWalletDatabase)})), "clearwalletdatabase"},
 	{StartProfile, *(bytes.NewBuffer([]byte{byte(StartProfile)})), "startprofile"},
 	{StopProfile, *(bytes.NewBuffer([]byte{byte(StopProfile)})), "stopprofile"},
-	{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
 	{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 	{SyncProgress, *(bytes.NewBuffer([]byte{byte(SyncProgress)})), "syncprogress"},
 }
