@@ -290,6 +290,9 @@ func (t *transaction) StoreBidValues(d, k []byte, index uint64, lockTime uint64)
 	return nil
 }
 
+// BidEncodingSize is the expected size of the serialized encoding of the bid
+var BidEncodingSize = 72
+
 func (t *transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
 	// Get bid values with lowest expiry height
 	lowestSeen := uint64(1<<64 - 1)
@@ -306,7 +309,7 @@ func (t *transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
 		return nil, nil, uint64(0), errors.New("could not fetch bid values")
 	}
 
-	index := binary.LittleEndian.Uint64(values[64:])
+	index := binary.LittleEndian.Uint64(values[64:72])
 	return values[0:32], values[32:64], index, nil
 }
 

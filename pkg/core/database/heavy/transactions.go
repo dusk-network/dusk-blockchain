@@ -510,6 +510,9 @@ func (t transaction) StoreBidValues(d, k []byte, index uint64, lockTime uint64) 
 	return nil
 }
 
+// BidEncodingSize is the expected size of the serialized encoding of the bid
+var BidEncodingSize = 72
+
 func (t transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
 	key := BidValuesPrefix
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
@@ -544,8 +547,8 @@ func (t transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
 	}
 
 	// Let's avoid any runtime panics by doing a sanity check on the value length before
-	if len(value) != 96 {
-		return nil, nil, uint64(0), errors.New("bid values non-existent or incorrectly encoded")
+	if len(value) != BidEncodingSize {
+		return nil, nil, uint64(0), fmt.Errorf("bid values non-existent or incorrectly encoded, expected %d bytes but found %d", BidEncodingSize, len(value))
 	}
 
 	D := value[0:32]
