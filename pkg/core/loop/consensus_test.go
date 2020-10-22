@@ -27,7 +27,7 @@ func TestContextCancellation(t *testing.T) {
 		}
 	}
 
-	l := loop.New(e, consensus.MockPhase(cb), agreement.New(e))
+	l := loop.New(e)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -37,5 +37,5 @@ func TestContextCancellation(t *testing.T) {
 
 	// the cancelation after 100ms should make the agreement end its loop with
 	// no error
-	require.NoError(t, l.Spin(ctx, consensus.RoundUpdate{Round: uint64(1)}))
+	require.NoError(t, l.Spin(ctx, consensus.MockPhase(cb), agreement.New(e), consensus.RoundUpdate{Round: uint64(1)}))
 }

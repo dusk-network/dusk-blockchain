@@ -39,19 +39,17 @@ type Consensus struct {
 
 	agreementChan chan message.Message
 	eventChan     chan message.Message
-	score         consensus.Phase
-	agreement     consensus.Controller
 }
 
-// Wire creates and link the steps in the consensus. It is kept separated from
+// CreateStateMachine creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing
-func Wire(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *keys.PublicKey) (scoreStep consensus.Phase, agreementStep consensus.Controller, err error) {
-	redu2 := secondstep.New(emitter, consensusTimeOut)
-	redu1 := firststep.New(redu2, emitter, consensusTimeOut)
-	sel := selection.New(redu1, emitter, consensusTimeOut)
-	blockGen := candidate.New(emitter, pubKey)
-	scoreStep, err = score.New(sel, emitter, blockGen)
-	agreementStep = agreement.New(emitter)
+func CreateStateMachine(e *consensus.Emitter, consensusTimeOut time.Duration, pubKey *keys.PublicKey) (scoreStep consensus.Phase, agreementStep consensus.Controller, err error) {
+	redu2 := secondstep.New(e, consensusTimeOut)
+	redu1 := firststep.New(redu2, e, consensusTimeOut)
+	sel := selection.New(redu1, e, consensusTimeOut)
+	blockGen := candidate.New(e, pubKey)
+	scoreStep, err = score.New(sel, e, blockGen)
+	agreementStep = agreement.New(e)
 	if err != nil {
 		return
 	}
@@ -62,7 +60,7 @@ func Wire(emitter *consensus.Emitter, consensusTimeOut time.Duration, pubKey *ke
 // New creates a new Consensus struct. The legacy StopConsensus and RoundUpdate
 // are now replaced with context cancellation and direct function call operated
 // by the chain component
-func New(e *consensus.Emitter, scr consensus.Phase, ag consensus.Controller) *Consensus {
+func New(e *consensus.Emitter) *Consensus {
 	// TODO: channel size should be configurable
 	agreementChan := make(chan message.Message, 1000)
 	eventChan := make(chan message.Message, 1000)
@@ -82,8 +80,6 @@ func New(e *consensus.Emitter, scr consensus.Phase, ag consensus.Controller) *Co
 		roundQueue:    consensus.NewQueue(),
 		agreementChan: agreementChan,
 		eventChan:     eventChan,
-		score:         scr,
-		agreement:     ag,
 	}
 
 	return c
@@ -94,7 +90,7 @@ func New(e *consensus.Emitter, scr consensus.Phase, ag consensus.Controller) *Co
 // Agreement loop (acting roundwise) runs concurrently with the generation-selection-reduction
 // loop (acting step-wise)
 // TODO: consider stopping the phase loop with a Done phase, instead of nil
-func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error {
+func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.Controller, round consensus.RoundUpdate) error {
 	// cancel
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -103,7 +99,7 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 	// agreements from future rounds and stopped receiving them for the current round
 	// (in which case we should probably re-sync)
 	go func() {
-		agreementLoop := c.agreement.GetControlFn()
+		agreementLoop := ag.GetControlFn()
 		agreementLoop(ctx, c.roundQueue, c.agreementChan, round)
 		// canceling the consensus phase loop when Agreement is done (either
 		// because the parent canceled or because a consensus has been reached)
@@ -111,7 +107,7 @@ func (c *Consensus) Spin(ctx context.Context, round consensus.RoundUpdate) error
 	}()
 
 	// score generation phase is the first step in the consensus
-	phaseFunction := c.score.Fn(nil)
+	phaseFunction := scr.Fn(nil)
 	// synchronous consensus loop keeps running until the agreement invokes
 	// context.Done or the context is canceled some other way
 	for step := uint8(1); phaseFunction != nil; step++ {
