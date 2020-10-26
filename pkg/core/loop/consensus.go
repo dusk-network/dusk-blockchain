@@ -91,8 +91,16 @@ func New(e *consensus.Emitter) *Consensus {
 // loop (acting step-wise)
 // TODO: consider stopping the phase loop with a Done phase, instead of nil
 func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.Controller, round consensus.RoundUpdate) error {
-	// cancel
-	ctx, cancel := context.WithCancel(ctx)
+	// we create two context cancelation from the same parent context. This way
+	// we can let the agreement interrupt the stateMachine's loop cycle.
+	// Similarly, the loop can invoke the Agreement cancelation if it throws
+	// an error. Granted, the latter is less important since the parent would
+	// likely invoke a cancelation when this function returns. However, the
+	// small redundancy is not likely to be problematic and is an acceptable
+	// overhead
+	stepCtx, finalizeStep := context.WithCancel(ctx)
+	agrCtx, cancelAgreement := context.WithCancel(stepCtx)
+	defer cancelAgreement()
 
 	// the agreement loop needs to be running until either the consensus
 	// reaches a maximum amount of iterations (approx. 213 steps), or we get
@@ -100,10 +108,10 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	// (in which case we should probably re-sync)
 	go func() {
 		agreementLoop := ag.GetControlFn()
-		agreementLoop(ctx, c.roundQueue, c.agreementChan, round)
+		agreementLoop(agrCtx, c.roundQueue, c.agreementChan, round)
 		// canceling the consensus phase loop when Agreement is done (either
 		// because the parent canceled or because a consensus has been reached)
-		cancel()
+		finalizeStep()
 	}()
 
 	// score generation phase is the first step in the consensus
@@ -111,7 +119,7 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	// synchronous consensus loop keeps running until the agreement invokes
 	// context.Done or the context is canceled some other way
 	for step := uint8(1); phaseFunction != nil; step++ {
-		phaseFunction = phaseFunction(ctx, c.eventQueue, c.eventChan, round, step)
+		phaseFunction = phaseFunction(stepCtx, c.eventQueue, c.eventChan, round, step)
 		lg.
 			WithFields(log.Fields{
 				"round": round.Round,
