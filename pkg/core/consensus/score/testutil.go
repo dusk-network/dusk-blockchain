@@ -44,9 +44,11 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 		Emitter:          emitter,
 	}
 
-	go hlp.processLastCommittee(provisionersKeys)
-	go hlp.processLastCertificate()
-	go hlp.processMempoolTxsBySize()
+	/*
+		go hlp.processLastCommittee(provisionersKeys)
+		go hlp.processLastCertificate()
+		go hlp.processMempoolTxsBySize()
+	*/
 
 	return hlp
 }
