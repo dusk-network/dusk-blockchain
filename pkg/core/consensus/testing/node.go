@@ -3,9 +3,12 @@ package testing
 import (
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/score"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -13,35 +16,53 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:unused
 type mockNode struct {
-	hlp   *score.Helper
 	chain *mockChain
+	*consensus.Emitter
+
+	ThisSender       []byte
+	ProvisionersKeys []key.Keys
+	P                *user.Provisioners
 }
 
+//nolint:unused
 func newMockNode(pubKey *keys.PublicKey, gossipListener eventbus.Listener, assert *assert.Assertions) *mockNode {
 
+	provisioners := 10
+	p, provisionersKeys := consensus.MockProvisioners(provisioners)
+
+	mockProxy := transactions.MockProxy{
+		P:  transactions.PermissiveProvisioner{},
+		BG: transactions.MockBlockGenerator{},
+	}
+	emitter := consensus.MockEmitter(10*time.Second, mockProxy)
+	emitter.Keys = provisionersKeys[0]
+
 	// Initialize hlp component
-	hlp := score.NewHelper(50, time.Second)
-	_ = hlp.EventBus.Subscribe(topics.Gossip, gossipListener)
+	_ = emitter.EventBus.Subscribe(topics.Gossip, gossipListener)
 
 	// Initialize Chain component
-	chain, err := newMockChain(*hlp.Emitter, 10*time.Second, pubKey, assert)
+	chain, err := newMockChain(*emitter, 10*time.Second, pubKey, assert)
 	assert.NoError(err)
 
 	return &mockNode{
-		hlp:   hlp,
-		chain: chain,
+		chain:            chain,
+		ThisSender:       emitter.Keys.BLSPubKeyBytes,
+		ProvisionersKeys: provisionersKeys,
+		P:                p,
+		Emitter:          emitter,
 	}
 }
 
 func (n *mockNode) run(assert *assert.Assertions) {
 	// Start Main Loop
-	go n.chain.MainLoop(n.hlp.P, assert)
+	go n.chain.MainLoop(n.P, assert)
 }
 
 func (n *mockNode) getLastBlock() (block.Block, error) {
 	req := rpcbus.NewRequest(nil)
-	resp, err := n.hlp.RPCBus.Call(topics.GetLastBlock, req, time.Second)
+	resp, err := n.RPCBus.Call(topics.GetLastBlock, req, time.Second)
 	if err != nil {
 		logrus.WithError(err).Error("timeout topics.GetLastBlock")
 		return block.Block{}, err

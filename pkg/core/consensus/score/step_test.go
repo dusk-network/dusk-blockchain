@@ -95,7 +95,9 @@ func TestScoreStepRun(t *testing.T) {
 	ctx, canc := context.WithTimeout(context.Background(), 2*time.Second)
 	defer canc()
 
-	phaseFn := scoreInstance.Run(ctx, nil, nil, consensus.RoundUpdate{Round: round}, step)
+	hash, _ := crypto.RandEntropy(32)
+
+	phaseFn := scoreInstance.Run(ctx, nil, nil, consensus.RoundUpdate{Round: round, Hash: hash}, step)
 	require.NotNil(t, phaseFn)
 
 	_ = phaseFn(ctx, nil, nil, consensus.RoundUpdate{Round: round}, step+1)

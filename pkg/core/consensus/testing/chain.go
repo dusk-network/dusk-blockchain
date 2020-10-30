@@ -22,8 +22,7 @@ const (
 	quit  signalType = 0
 )
 
-//TODO: n.reg.ResetCandidates(round)
-
+//nolint:unused
 type mockChain struct {
 
 	// Blockchain and consensus state
@@ -48,6 +47,7 @@ type mockChain struct {
 	prntCancel context.CancelFunc
 }
 
+//nolint:unused
 func newMockChain(e consensus.Emitter, consensusTimeOut time.Duration, pubKey *keys.PublicKey, assert *assert.Assertions) (*mockChain, error) {
 
 	// Open database driver
@@ -98,12 +98,14 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 	go c.acceptor.loop(c.prntCtx, assert)
 
 	// Provides async access (read/write) to SafeRegistry
-	go c.broker.loop(c.prntCtx, assert)
+	go c.broker.loop(c.prntCtx)
 
 	// Chain main loop
 	for {
 		ctx, cancel := context.WithCancel(context.Background())
 
+		// TODO: Instead of relying on GetChainTip, to avoid race condition we
+		// need to wait here for topics.RoundUpdate from accepting latest block
 		b := c.reg.GetChainTip()
 		lastRound := b.Header.Height
 
@@ -118,6 +120,8 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 			Seed:  seed,
 		}
 
+		c.reg.ResetCandidates(b.Header.Height)
+
 		// Trigger consensus
 		go func() {
 			// Consensus spin is started in a separate goroutine
@@ -127,6 +131,9 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 
 			err = c.loop.Spin(ctx, scr, agr, ru)
 			assert.NoError(err)
+
+			// if loop.spin is done with this round, start another loop.spin
+			c.StartLoopChan <- true
 		}()
 
 		// Support start/stop consensus spin
@@ -161,5 +168,6 @@ func (c *mockChain) teardown() {
 	// Terminate child goroutines
 	c.prntCancel()
 
-	// TODO: Close DB
+	// Close DB
+	_ = c.db.Close()
 }

@@ -21,6 +21,7 @@ import (
 
 // mockAcceptor accepts block on topics.Certificate, topics.Block and provides VerifyCandidateBlock
 // mockAcceptor owns mockConsensusRegistry and has direct read/write access to it
+//nolint:unused
 type mockAcceptor struct {
 	certficateChan           chan message.Message
 	blockChan                chan message.Message
@@ -32,6 +33,7 @@ type mockAcceptor struct {
 	// executor
 }
 
+//nolint:unused
 func newMockAcceptor(e consensus.Emitter, db database.DB, reg *mockSafeRegistry) (*mockAcceptor, error) {
 
 	// Subscriptions
@@ -83,14 +85,14 @@ func newMockAcceptor(e consensus.Emitter, db database.DB, reg *mockSafeRegistry)
 // Non-duplicated block
 // Valid block certificate
 // Valid block header
-func (c *mockAcceptor) acceptBlock(b block.Block) error {
+func (a *mockAcceptor) acceptBlock(b block.Block) error {
 
 	if len(b.Header.Hash) == 32 {
 		return errors.New("invalid hash")
 	}
 
 	// 1. Check if the block is a duplicate
-	err := c.db.View(func(t database.Transaction) error {
+	err := a.db.View(func(t database.Transaction) error {
 		_, err := t.FetchBlockExists(b.Header.Hash)
 		return err
 	})
@@ -103,7 +105,7 @@ func (c *mockAcceptor) acceptBlock(b block.Block) error {
 	}
 
 	// SanityCheck block header to ensure consensus has worked a chainTip
-	if err := verifiers.CheckBlockHeader(c.reg.GetChainTip(), b); err != nil {
+	if err = verifiers.CheckBlockHeader(a.reg.GetChainTip(), b); err != nil {
 		return err
 	}
 
@@ -118,23 +120,23 @@ func (c *mockAcceptor) acceptBlock(b block.Block) error {
 	// TODO: Provide provisioners (Get/Set)
 
 	// Store block in the in-memory database
-	err = c.db.Update(func(t database.Transaction) error {
+	err = a.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&b)
 	})
 
 	// Update registry
-	c.reg.SetChainTip(b)
+	a.reg.SetChainTip(b)
 
 	return err
 }
 
-func (c mockAcceptor) processCandidateVerificationRequest(r rpcbus.Request) {
+func (a *mockAcceptor) processCandidateVerificationRequest(r rpcbus.Request) {
 	var res rpcbus.Response
 
 	cm := r.Params.(message.Candidate)
 
 	candidateBlock := *cm.Block
-	chainTip := c.reg.GetChainTip()
+	chainTip := a.reg.GetChainTip()
 
 	if chainTip.Header.Height+1 > candidateBlock.Header.Height {
 		res.Err = errors.New("invalid height")
@@ -182,7 +184,7 @@ func (a *mockAcceptor) loop(pctx context.Context, assert *assert.Assertions) {
 			assert.NoError(err)
 
 		// Handles topics.Block from the wire.
-		case _ = <-a.blockChan:
+		case <-a.blockChan:
 			// Not needed in testing for now
 		case req := <-a.verifyCandidateBlockChan:
 			a.processCandidateVerificationRequest(req)

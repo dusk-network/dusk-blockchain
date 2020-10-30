@@ -12,25 +12,25 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/stretchr/testify/assert"
 )
 
 // Provides GetLastCommitte, GetLastCertificate, VerifyCandidateBlock and GetCandidate,
 // Updates topics.Candidate
 // rpcbus-friendly component
+//nolint:unused
 type mockSafeRegistryBroker struct {
 	getLastCertificateChan <-chan rpcbus.Request
 	getLastCommitteeChan   <-chan rpcbus.Request
 	getLastBlock           <-chan rpcbus.Request
 	getCandidate           <-chan rpcbus.Request
-	// TODO: Remove from here
-	getMempoool <-chan rpcbus.Request
+	getMempoool            <-chan rpcbus.Request
 
 	candidateChan chan message.Message
 
 	reg *mockSafeRegistry
 }
 
+//nolint:unused
 func newMockSafeRegistryBroker(e consensus.Emitter, reg *mockSafeRegistry) (*mockSafeRegistryBroker, error) {
 
 	// Subscriptions
@@ -81,13 +81,11 @@ func newMockSafeRegistryBroker(e consensus.Emitter, reg *mockSafeRegistry) (*moc
 /// Replace Candidate Broker
 // Merge CandidateBroker and LastBlockProvider routine
 // mockConsensusRegistryProvider provides async read-only access to ConsensusRegistry needed by P2P layer
-func (c *mockSafeRegistryBroker) loop(pctx context.Context, assert *assert.Assertions) {
+func (c *mockSafeRegistryBroker) loop(pctx context.Context) {
 	for {
 		select {
 		case r := <-c.getMempoool:
 			r.RespChan <- rpcbus.NewResponse([]transactions.ContractCall{}, nil)
-
-		// TODO: HighestSeen
 		case r := <-c.getCandidate:
 			c.provideCandidate(r)
 		case r := <-c.getLastBlock:

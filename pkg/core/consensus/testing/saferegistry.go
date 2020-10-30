@@ -13,10 +13,11 @@ import (
 
 // ConsensusRegistry holds all consensus-related data structures
 // It should provide concurrency-safe accessors
+//nolint:unused
 type mockSafeRegistry struct {
 
 	// lock protection per registry instance
-	// TODO: a mutex instance per a member
+	// Option: a mutex instance per a member
 	lock sync.RWMutex
 
 	p               *user.Provisioners
@@ -26,6 +27,7 @@ type mockSafeRegistry struct {
 	candidates      []message.Candidate
 }
 
+//nolint:unused
 func newMockSafeRegistry() *mockSafeRegistry {
 
 	randomGenesis := helper.RandomBlock(0, 3)
@@ -103,4 +105,21 @@ func (r *mockSafeRegistry) AddCandidate(m message.Candidate) {
 		r.candidates = make([]message.Candidate, 0)
 	}
 	r.candidates = append(r.candidates, m)
+}
+
+// ResetCandidates cleans up all obsolete candidates
+func (r *mockSafeRegistry) ResetCandidates(round uint64) {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	candidates := make([]message.Candidate, 0)
+	for n := 0; n < len(r.candidates); n++ {
+		cm := r.candidates[n]
+		b := cm.Block
+		if b.Header.Height > round {
+			candidates = append(candidates, cm)
+		}
+	}
+
+	r.candidates = candidates
 }
