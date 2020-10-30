@@ -101,7 +101,7 @@ func (bg *generator) PropagateBlockAndScore(ctx context.Context, sev message.Sco
 		WithField("round", r.Round).
 		Debugln("sending score")
 
-	msg := message.New(topics.Score, &score)
+	msg := message.New(topics.Score, *score)
 	// propagate internally
 	_ = bg.EventBus.Publish(topics.ScoreEvent, msg)
 
