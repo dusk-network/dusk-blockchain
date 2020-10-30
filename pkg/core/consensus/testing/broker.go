@@ -2,9 +2,12 @@ package testing
 
 import (
 	"bytes"
+	"context"
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -19,6 +22,9 @@ type mockSafeRegistryBroker struct {
 	getLastCertificateChan <-chan rpcbus.Request
 	getLastCommitteeChan   <-chan rpcbus.Request
 	getLastBlock           <-chan rpcbus.Request
+	getCandidate           <-chan rpcbus.Request
+	// TODO: Remove from here
+	getMempoool <-chan rpcbus.Request
 
 	candidateChan chan message.Message
 
@@ -38,6 +44,7 @@ func newMockSafeRegistryBroker(e consensus.Emitter, reg *mockSafeRegistry) (*moc
 	getLastCertificateChan := make(chan rpcbus.Request, 1)
 	getLastCommitteeChan := make(chan rpcbus.Request, 1)
 	getLastBlock := make(chan rpcbus.Request, 1)
+	getCandidate := make(chan rpcbus.Request, 1)
 
 	if err := e.RPCBus.Register(topics.GetLastCertificate, getLastCertificateChan); err != nil {
 		return nil, err
@@ -51,20 +58,38 @@ func newMockSafeRegistryBroker(e consensus.Emitter, reg *mockSafeRegistry) (*moc
 		return nil, err
 	}
 
+	if err := e.RPCBus.Register(topics.GetCandidate, getCandidate); err != nil {
+		return nil, err
+	}
+
+	getMempoool := make(chan rpcbus.Request, 10)
+	if err := e.RPCBus.Register(topics.GetMempoolTxsBySize, getMempoool); err != nil {
+		panic(err)
+	}
+
 	return &mockSafeRegistryBroker{
 		candidateChan:          candidateChan,
 		reg:                    reg,
 		getLastCertificateChan: getLastCertificateChan,
 		getLastCommitteeChan:   getLastCommitteeChan,
 		getLastBlock:           getLastBlock,
+		getMempoool:            getMempoool,
+		getCandidate:           getCandidate,
 	}, nil
 }
 
+/// Replace Candidate Broker
+// Merge CandidateBroker and LastBlockProvider routine
 // mockConsensusRegistryProvider provides async read-only access to ConsensusRegistry needed by P2P layer
-func (c *mockSafeRegistryBroker) loop(assert *assert.Assertions) {
+func (c *mockSafeRegistryBroker) loop(pctx context.Context, assert *assert.Assertions) {
 	for {
 		select {
-		// HighestSeen
+		case r := <-c.getMempoool:
+			r.RespChan <- rpcbus.NewResponse([]transactions.ContractCall{}, nil)
+
+		// TODO: HighestSeen
+		case r := <-c.getCandidate:
+			c.provideCandidate(r)
 		case r := <-c.getLastBlock:
 			c.provideLastBlock(r)
 		case r := <-c.getLastCertificateChan:
@@ -79,8 +104,30 @@ func (c *mockSafeRegistryBroker) loop(assert *assert.Assertions) {
 			//	return
 			//}
 			c.reg.AddCandidate(cm)
+		case <-pctx.Done():
+			return
 		}
 	}
+}
+
+func (c *mockSafeRegistryBroker) provideCandidate(r rpcbus.Request) {
+	// Read params from request
+	params := r.Params.(bytes.Buffer)
+
+	// Mandatory param
+	hash := make([]byte, 32)
+	if err := encoding.Read256(&params, hash); err != nil {
+		r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
+		return
+	}
+
+	// Enforce fetching from peers if local cache does not have this Candidate
+	// Optional param
+	var fetchFromPeers bool
+	_ = encoding.ReadBool(&params, &fetchFromPeers)
+
+	cm, err := c.reg.GetCandidateByHash(hash)
+	r.RespChan <- rpcbus.Response{Resp: cm, Err: err}
 }
 
 func (c *mockSafeRegistryBroker) provideLastCertificate(r rpcbus.Request) {
