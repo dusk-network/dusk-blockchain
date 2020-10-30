@@ -4,40 +4,11 @@ import (
 	stdtesting "testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/score"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
-
-type mockNode struct {
-	hlp *score.Helper
-
-	chain *mockChain
-
-	// P2P Layer
-	streamer eventbus.GossipStreamer
-}
-
-func (n *mockNode) boostrap(pubKey *keys.PublicKey, assert *assert.Assertions) {
-
-	hlp := score.NewHelper(50, time.Second)
-	// Subscribe for topics.Certificate
-
-	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
-	streamListener := eventbus.NewStreamListener(streamer)
-	// wiring the Gossip streamer to capture the gossiped messages
-	_ = hlp.EventBus.Subscribe(topics.Gossip, streamListener)
-
-	chain, err := newMockChain(*hlp.Emitter, 10*time.Second, pubKey, assert)
-	assert.NoError(err)
-	n.chain = chain
-
-	n.chain.Loop(assert)
-}
 
 // TestConsensus performs a integration testing upon complete consensus logic
 // TestConsensus passing means the consensus phases are properly assembled
@@ -45,16 +16,36 @@ func TestConsensus(t *stdtesting.T) {
 
 	assert := assert.New(t)
 
-	// boostrap node 1
-	n := new(mockNode)
+	// Create Gossip Router
+	streamer := eventbus.NewRouterStreamer()
+	streamListener := eventbus.NewStreamListener(streamer)
 
-	_, pk := transactions.MockKeys()
-	n.boostrap(pk, assert)
+	network := make([]mockNode, 0)
+	networkSize := 1
 
-	time.Sleep(10 * time.Second)
+	// Initialize consensus participants
+	for i := 0; i < networkSize; i++ {
+		_, pk := transactions.MockKeys()
+		node := newMockNode(pk, streamListener, assert)
 
-	// TODO: assert chainTip is higher than prevChainTip
-	// for each 5*second, fetch chainTip
+		network = append(network, *node)
+		streamer.Add(node.hlp.EventBus)
+	}
+
+	// Run all consensus participants
+	for n := 0; n < len(network); n++ {
+		network[n].run(assert)
+	}
+
 	// assert chainTip is higher than prevChainTip
+	for i := 0; i < len(network); i++ {
+		time.Sleep(15 * time.Second)
+		// Trace chain tip of all nodes
+		blk, err := network[i].getLastBlock()
+		assert.NoError(err)
 
+		logrus.WithField("node", i).
+			WithField("height", blk.Header.Height).
+			Info("local chain head")
+	}
 }
