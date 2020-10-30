@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/score"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -43,12 +44,12 @@ type Consensus struct {
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing
-func CreateStateMachine(e *consensus.Emitter, consensusTimeOut time.Duration, pubKey *keys.PublicKey) (scoreStep consensus.Phase, agreementStep consensus.Controller, err error) {
+func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey) (scoreStep consensus.Phase, agreementStep consensus.Controller, err error) {
 	redu2 := secondstep.New(e, consensusTimeOut)
 	redu1 := firststep.New(redu2, e, consensusTimeOut)
 	sel := selection.New(redu1, e, consensusTimeOut)
 	blockGen := candidate.New(e, pubKey)
-	scoreStep, err = score.New(sel, e, blockGen)
+	scoreStep, err = score.New(sel, e, blockGen, db)
 	agreementStep = agreement.New(e)
 	if err != nil {
 		return
