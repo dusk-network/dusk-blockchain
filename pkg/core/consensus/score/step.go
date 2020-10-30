@@ -11,7 +11,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-crypto/bls"
 	log "github.com/sirupsen/logrus"
@@ -37,10 +36,9 @@ type Phase struct {
 }
 
 // New creates a new score generation step
-func New(next consensus.Phase, e *consensus.Emitter, bg candidate.Generator) (*Phase, error) {
+func New(next consensus.Phase, e *consensus.Emitter, bg candidate.Generator, db database.DB) (*Phase, error) {
 	var d, k []byte
 	var indexStoredBid uint64
-	_, db := heavy.CreateDBConnection()
 
 	if err := db.View(func(t database.Transaction) error {
 		var err error
@@ -105,7 +103,7 @@ func (p *Phase) generate(ctx context.Context, r consensus.RoundUpdate, step uint
 	sr := blindbid.GenerateScoreRequest{
 		Commitment:     p.d,
 		K:              p.k,
-		Seed:           &common.BlsScalar{ Data: seed },
+		Seed:           &common.BlsScalar{Data: seed},
 		Round:          uint32(r.Round),
 		Step:           uint32(step),
 		IndexStoredBid: p.indexStoredBid,
