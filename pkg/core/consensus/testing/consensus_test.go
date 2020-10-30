@@ -21,7 +21,7 @@ func TestConsensus(t *stdtesting.T) {
 	streamListener := eventbus.NewStreamListener(streamer)
 
 	network := make([]mockNode, 0)
-	networkSize := 1
+	networkSize := 3
 
 	// Initialize consensus participants
 	for i := 0; i < networkSize; i++ {
@@ -39,7 +39,7 @@ func TestConsensus(t *stdtesting.T) {
 
 	// assert chainTip is higher than prevChainTip
 	for i := 0; i < len(network); i++ {
-		time.Sleep(15 * time.Second)
+		time.Sleep(30 * time.Second)
 		// Trace chain tip of all nodes
 		blk, err := network[i].getLastBlock()
 		assert.NoError(err)
@@ -48,4 +48,5 @@ func TestConsensus(t *stdtesting.T) {
 			WithField("height", blk.Header.Height).
 			Info("local chain head")
 	}
+
 }

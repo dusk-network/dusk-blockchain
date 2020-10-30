@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
@@ -27,31 +28,34 @@ type mockSafeRegistry struct {
 
 func newMockSafeRegistry() *mockSafeRegistry {
 
-	randomGenesis := block.NewBlock()
+	randomGenesis := helper.RandomBlock(0, 3)
+	lastCertificate := helper.RandomCertificate()
 
 	return &mockSafeRegistry{
-		chainTip: *randomGenesis,
+		chainTip:        *randomGenesis,
+		lastCertificate: lastCertificate,
 	}
 }
 
 // RetrieveCandidate returns a copy of candidate block if found by hash
-func (r *mockSafeRegistry) GetCandidateByHash(hash []byte) (block.Block, error) {
+func (r *mockSafeRegistry) GetCandidateByHash(hash []byte) (message.Candidate, error) {
 
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
 	if len(hash) != 32 {
-		return block.Block{}, errors.New("invalid hash")
+		return message.Candidate{}, errors.New("invalid hash")
 	}
 
 	for n := 0; n < len(r.candidates); n++ {
-		b := r.candidates[n].Block
+		cm := r.candidates[n]
+		b := cm.Block
 		if bytes.Equal(b.Header.Hash, hash) {
-			return b.Copy().(block.Block), nil
+			return cm.Copy().(message.Candidate), nil
 		}
 	}
 
-	return block.Block{}, errors.New("candidate not found")
+	return message.Candidate{}, errors.New("candidate not found")
 }
 
 func (r *mockSafeRegistry) GetProvisioners() user.Provisioners {

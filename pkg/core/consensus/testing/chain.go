@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -91,15 +92,13 @@ func newMockChain(e consensus.Emitter, consensusTimeOut time.Duration, pubKey *k
 	}, nil
 }
 
-func (c *mockChain) MainLoop(assert *assert.Assertions) {
+func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 
 	// accepting blocks in the blockchain, alters SafeRegistry
 	go c.acceptor.loop(c.prntCtx, assert)
 
 	// Provides async access (read/write) to SafeRegistry
 	go c.broker.loop(c.prntCtx, assert)
-
-	p, _ := consensus.MockProvisioners(10)
 
 	// Chain main loop
 	for {
