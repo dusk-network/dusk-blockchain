@@ -1,6 +1,8 @@
 package testing
 
 import (
+	"context"
+	"encoding/binary"
 	"errors"
 	"time"
 
@@ -12,6 +14,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,6 +62,18 @@ func newMockAcceptor(e consensus.Emitter, db database.DB, reg *mockSafeRegistry)
 	chainTip := reg.GetChainTip()
 	err := db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&chainTip)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Should this stay here?
+	err = db.Update(func(t database.Transaction) error {
+		k, _ := crypto.RandEntropy(32)
+		d, _ := crypto.RandEntropy(32)
+		indexStoredBidBytes, _ := crypto.RandEntropy(8)
+		return t.StoreBidValues(d, k, binary.LittleEndian.Uint64(indexStoredBidBytes), 250000)
 	})
 
 	return &acc, err
@@ -143,27 +159,26 @@ func (c mockAcceptor) processCandidateVerificationRequest(r rpcbus.Request) {
 	r.RespChan <- res
 }
 
-func (a *mockAcceptor) loop(assert *assert.Assertions) {
+func (a *mockAcceptor) loop(pctx context.Context, assert *assert.Assertions) {
 
 	for {
 		select {
 		// Handles Idle
-		case <-time.After(20 * time.Second):
-			assert.Fail("consensus couldn't produce topics.Certificate")
-
+		case <-time.After(30 * time.Second):
+			logrus.Warn("consensus couldn't produce topics.Certificate")
 		// Handles topics.Certificate
 		case m := <-a.certficateChan:
 			cert := m.Payload().(message.Certificate)
 			winningHash := cert.Ag.State().BlockHash
 
 			// Fetch block by hash from local registry
-			b, err := a.reg.GetCandidateByHash(winningHash)
+			cm, err := a.reg.GetCandidateByHash(winningHash)
 			assert.NoError(err)
 
 			// TODO: if err, FetchCandidate from Network (Peers in Gossip)
 
 			// Ensure block is accepted by Chain
-			err = a.acceptBlock(b)
+			err = a.acceptBlock(*cm.Block)
 			assert.NoError(err)
 
 		// Handles topics.Block from the wire.
@@ -171,6 +186,8 @@ func (a *mockAcceptor) loop(assert *assert.Assertions) {
 			// Not needed in testing for now
 		case req := <-a.verifyCandidateBlockChan:
 			a.processCandidateVerificationRequest(req)
+		case <-pctx.Done():
+			return
 		}
 	}
 }
