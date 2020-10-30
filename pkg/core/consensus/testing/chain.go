@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,6 +41,10 @@ type mockChain struct {
 	// chan to trigger consensus if already stopped
 	StartLoopChan, StopLoopChan chan bool
 	QuitChan                    chan bool
+
+	// context to control child goroutines
+	prntCtx    context.Context
+	prntCancel context.CancelFunc
 }
 
 func newMockChain(e consensus.Emitter, consensusTimeOut time.Duration, pubKey *keys.PublicKey, assert *assert.Assertions) (*mockChain, error) {
@@ -67,64 +72,95 @@ func newMockChain(e consensus.Emitter, consensusTimeOut time.Duration, pubKey *k
 
 	loop := loop.New(&e)
 
+	// Parent context
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return &mockChain{
-		db:       db,
-		reg:      reg,
-		loop:     loop,
-		pubKey:   pubKey,
-		timeOut:  consensusTimeOut,
-		broker:   broker,
-		acceptor: acceptor,
+		db:            db,
+		reg:           reg,
+		loop:          loop,
+		pubKey:        pubKey,
+		timeOut:       consensusTimeOut,
+		broker:        broker,
+		acceptor:      acceptor,
+		prntCtx:       ctx,
+		prntCancel:    cancel,
+		StartLoopChan: make(chan bool),
+		StopLoopChan:  make(chan bool),
+		QuitChan:      make(chan bool),
 	}, nil
 }
 
-func (n *mockChain) Loop(assert *assert.Assertions) {
+func (c *mockChain) MainLoop(assert *assert.Assertions) {
 
 	// accepting blocks in the blockchain, alters SafeRegistry
-	go n.acceptor.loop(assert)
+	go c.acceptor.loop(c.prntCtx, assert)
 
 	// Provides async access (read/write) to SafeRegistry
-	go n.broker.loop(assert)
+	go c.broker.loop(c.prntCtx, assert)
+
+	p, _ := consensus.MockProvisioners(10)
 
 	// Chain main loop
 	for {
-
 		ctx, cancel := context.WithCancel(context.Background())
 
-		b := n.reg.GetChainTip()
+		b := c.reg.GetChainTip()
 		lastRound := b.Header.Height
 
 		// Initialize roundUpdate
 		round := lastRound + 1
-		ru := consensus.RoundUpdate{Round: uint64(round)}
+		hash, _ := crypto.RandEntropy(32)
+		seed, _ := crypto.RandEntropy(32)
+		ru := consensus.RoundUpdate{
+			Round: round,
+			P:     *p,
+			Hash:  hash,
+			Seed:  seed,
+		}
 
+		// Trigger consensus
 		go func() {
-			scr, agr, err := loop.CreateStateMachine(n.loop.Emitter, n.timeOut, n.pubKey.Copy())
+			// Consensus spin is started in a separate goroutine
+			// For stopping it, use StopLoopChan
+			scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, c.timeOut, c.pubKey.Copy())
 			assert.NoError(err)
 
-			err = n.loop.Spin(ctx, scr, agr, ru)
+			err = c.loop.Spin(ctx, scr, agr, ru)
 			assert.NoError(err)
 		}()
 
 		// Support start/stop consensus spin
-		if s := n.WaitForSignal(cancel); s == quit {
+		if s := c.WaitForSignal(cancel); s == quit {
 			break
+		}
+	}
+
+	c.teardown()
+}
+
+func (c *mockChain) WaitForSignal(cancel context.CancelFunc) signalType {
+	for {
+		select {
+		case <-c.StopLoopChan:
+			// cancel consensus spin and continue waiting for Start or Quit signals
+			cancel()
+		case <-c.StartLoopChan:
+			// cancel consensus spin, return start signal
+			cancel()
+			return start
+		case <-c.QuitChan:
+			cancel()
+			return quit
 		}
 	}
 }
 
-func (n *mockChain) WaitForSignal(cancel context.CancelFunc) signalType {
-	for {
-		select {
-		case <-n.QuitChan:
-			cancel()
-			return quit
-		case <-n.StopLoopChan:
-			// cancel consensus spin and continue waiting for Start or Quit signals
-			cancel()
-		case <-n.StartLoopChan:
-			cancel()
-			return start
-		}
-	}
+// teardown should terminate/close safely Chain-related goroutines and data storages
+func (c *mockChain) teardown() {
+
+	// Terminate child goroutines
+	c.prntCancel()
+
+	// TODO: Close DB
 }
