@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ import (
 )
 
 func TestSelection(t *testing.T) {
+	hlp := selection.NewHelper(10)
 	consensusTimeOut := 300 * time.Millisecond
 
 	ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) {
@@ -23,9 +25,8 @@ func TestSelection(t *testing.T) {
 		require.NotEmpty(messageScore.Score)
 	}
 
-	hlp := selection.NewHelper(10)
 	testPhase := consensus.NewTestPhase(t, ttestCB, nil)
-	sel := selection.New(testPhase, hlp.Emitter, consensusTimeOut)
+	sel := selection.New(testPhase, blockgenerator.Mock(hlp.Emitter), hlp.Emitter, consensusTimeOut)
 	selFn := sel.Fn(nil)
 
 	msgChan := make(chan message.Message, 1)

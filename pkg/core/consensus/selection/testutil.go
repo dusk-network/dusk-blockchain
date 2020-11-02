@@ -1,11 +1,13 @@
 package selection
 
 import (
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -45,6 +47,17 @@ func NewHelper(scoreToSpawn int) *Helper {
 		scoreToSpawn: scoreToSpawn,
 		P:            p,
 	}
+
+	var wg sync.WaitGroup
+	genHlp := &candidate.Helper{
+		ThisSender:       emitter.Keys.BLSPubKeyBytes,
+		ProvisionersKeys: provisionersKeys,
+		P:                p,
+		Nr:               ProvisionerNr,
+		Emitter:          emitter,
+	}
+	genHlp.MockRPCCalls(&wg, provisionersKeys)
+	wg.Wait()
 	return hlp
 }
 
