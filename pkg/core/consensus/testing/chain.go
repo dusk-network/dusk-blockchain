@@ -12,7 +12,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -130,14 +129,11 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 		go func() {
 			// Consensus spin is started in a separate goroutine
 			// For stopping it, use StopLoopChan
-			scr, agr, sel, err := loop.CreateStateMachine(c.loop.Emitter, c.db, c.timeOut, c.pubKey.Copy())
+			scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, c.timeOut, c.pubKey.Copy())
 			assert.NoError(err)
 
 			err = c.loop.Spin(ctx, scr, agr, ru)
 			assert.NoError(err)
-
-			// Spin teardown
-			c.loop.Emitter.EventBus.Unsubscribe(topics.ScoreEvent, sel.ID)
 
 			// if loop.spin is done with this round, start another loop.spin
 			wg.Done()

@@ -87,14 +87,6 @@ func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
 // In this case the selection listens to new Score/Candidate messages
 func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 
-	// at the end of this selection, we unsubscribe from the eventbus and let
-	// eventual internal score be discarded
-	defer func() {
-		//TODO: Run Unsubscribe on phase teardown
-		// Or Subscribe before again Selection
-		// p.EventBus.Unsubscribe(topics.ScoreEvent, p.id)
-	}()
-
 	p.handler = NewScoreHandler(p.provisioner)
 	timeoutChan := time.After(p.timeout)
 	for _, ev := range queue.GetEvents(r.Round, step) {
@@ -115,6 +107,9 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 		case <-timeoutChan:
 			return p.endSelection(r.Round, step)
 		case <-ctx.Done():
+			// Or Subscribe before again Selection
+			p.EventBus.Unsubscribe(topics.ScoreEvent, p.id)
+
 			// preventing timeout leakage
 			go func() {
 				<-timeoutChan
