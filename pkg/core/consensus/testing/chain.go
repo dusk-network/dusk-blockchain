@@ -2,6 +2,7 @@ package testing
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -39,8 +40,8 @@ type mockChain struct {
 	broker   *mockSafeRegistryBroker
 
 	// chan to trigger consensus if already stopped
-	StartLoopChan, StopLoopChan chan bool
-	QuitChan                    chan bool
+	RestartLoopChan, StopLoopChan chan bool
+	QuitChan                      chan bool
 
 	// context to control child goroutines
 	prntCtx    context.Context
@@ -77,25 +78,25 @@ func newMockChain(e consensus.Emitter, consensusTimeOut time.Duration, pubKey *k
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &mockChain{
-		db:            db,
-		reg:           reg,
-		loop:          loop,
-		pubKey:        pubKey,
-		timeOut:       consensusTimeOut,
-		broker:        broker,
-		acceptor:      acceptor,
-		prntCtx:       ctx,
-		prntCancel:    cancel,
-		StartLoopChan: make(chan bool),
-		StopLoopChan:  make(chan bool),
-		QuitChan:      make(chan bool),
+		db:              db,
+		reg:             reg,
+		loop:            loop,
+		pubKey:          pubKey,
+		timeOut:         consensusTimeOut,
+		broker:          broker,
+		acceptor:        acceptor,
+		prntCtx:         ctx,
+		prntCancel:      cancel,
+		RestartLoopChan: make(chan bool),
+		StopLoopChan:    make(chan bool),
+		QuitChan:        make(chan bool),
 	}, nil
 }
 
 func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 
 	// accepting blocks in the blockchain, alters SafeRegistry
-	go c.acceptor.loop(c.prntCtx, assert)
+	go c.acceptor.loop(c.prntCtx, c.RestartLoopChan, assert)
 
 	// Provides async access (read/write) to SafeRegistry
 	go c.broker.loop(c.prntCtx)
@@ -111,7 +112,7 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 
 		// Initialize roundUpdate
 		round := lastRound + 1
-		hash, _ := crypto.RandEntropy(32)
+		hash := b.Header.Hash
 		seed, _ := crypto.RandEntropy(32)
 		ru := consensus.RoundUpdate{
 			Round: round,
@@ -122,6 +123,8 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 
 		c.reg.ResetCandidates(b.Header.Height)
 
+		var wg sync.WaitGroup
+		wg.Add(1)
 		// Trigger consensus
 		go func() {
 			// Consensus spin is started in a separate goroutine
@@ -133,11 +136,11 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 			assert.NoError(err)
 
 			// if loop.spin is done with this round, start another loop.spin
-			c.StartLoopChan <- true
+			wg.Done()
 		}()
 
 		// Support start/stop consensus spin
-		if s := c.WaitForSignal(cancel); s == quit {
+		if s := c.WaitForSignal(cancel, &wg); s == quit {
 			break
 		}
 	}
@@ -145,18 +148,23 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 	c.teardown()
 }
 
-func (c *mockChain) WaitForSignal(cancel context.CancelFunc) signalType {
+func (c *mockChain) WaitForSignal(cancel context.CancelFunc, wg *sync.WaitGroup) signalType {
 	for {
 		select {
+
+		// stat consensus spin
 		case <-c.StopLoopChan:
 			// cancel consensus spin and continue waiting for Start or Quit signals
 			cancel()
-		case <-c.StartLoopChan:
+			wg.Wait()
+		case <-c.RestartLoopChan:
 			// cancel consensus spin, return start signal
 			cancel()
+			wg.Wait()
 			return start
 		case <-c.QuitChan:
 			cancel()
+			wg.Wait()
 			return quit
 		}
 	}

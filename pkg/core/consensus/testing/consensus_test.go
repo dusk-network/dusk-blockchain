@@ -40,15 +40,23 @@ func TestConsensus(t *stdtesting.T) {
 		network[n].run(assert)
 	}
 
-	// assert chainTip is higher than prevChainTip
-	for i := 0; i < len(network); i++ {
-		time.Sleep(30 * time.Second)
-		// Trace chain tip of all nodes
-		blk, err := network[i].getLastBlock()
-		assert.NoError(err)
+	// Monitor consensus participants
+	for {
+		time.Sleep(7 * time.Second)
+		for i := 0; i < len(network); i++ {
 
-		logrus.WithField("node", i).
-			WithField("height", blk.Header.Height).
-			Info("local chain head")
+			// Trace chain tip of all nodes
+			blk, err := network[i].getLastBlock()
+			assert.NoError(err)
+
+			logrus.WithField("node", i).
+				WithField("height", blk.Header.Height).
+				Info("local chainTip")
+
+			// Main check point to ensure test passes
+			if blk.Header.Height > 10 {
+				return
+			}
+		}
 	}
 }

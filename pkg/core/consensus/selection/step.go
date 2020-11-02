@@ -19,6 +19,7 @@ import (
 )
 
 var lg = log.WithField("process", "selector")
+
 func getLog(r uint64, s uint8) *log.Entry {
 	return lg.WithFields(log.Fields{
 		"round": r,
@@ -126,6 +127,9 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 		case <-timeoutChan:
 			return p.endSelection(r.Round, step)
 		case <-ctx.Done():
+			// Or Subscribe before again Selection
+			p.EventBus.Unsubscribe(topics.ScoreEvent, p.id)
+
 			// preventing timeout leakage
 			go func() {
 				<-timeoutChan

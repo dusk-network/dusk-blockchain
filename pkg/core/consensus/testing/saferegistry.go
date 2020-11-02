@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -32,6 +33,8 @@ func newMockSafeRegistry() *mockSafeRegistry {
 
 	randomGenesis := helper.RandomBlock(0, 3)
 	lastCertificate := helper.RandomCertificate()
+
+	randomGenesis.Header.Timestamp = time.Now().Unix() - 100000
 
 	return &mockSafeRegistry{
 		chainTip:        *randomGenesis,
