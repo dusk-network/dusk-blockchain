@@ -15,6 +15,7 @@ import (
 func TestConsensus(t *stdtesting.T) {
 
 	t.SkipNow()
+	// logrus.SetLevel(logrus.TraceLevel)
 
 	assert := assert.New(t)
 

@@ -19,6 +19,12 @@ import (
 )
 
 var lg = log.WithField("process", "selector")
+func getLog(r uint64, s uint8) *log.Entry {
+	return lg.WithFields(log.Fields{
+		"round": r,
+		"step":  s,
+	})
+}
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
@@ -87,12 +93,17 @@ func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
 // In this case the selection listens to new Score/Candidate messages
 func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 
+	tlog := getLog(r.Round, step)
+	tlog.Traceln("starting selection")
+
 	// at the end of this selection, we unsubscribe from the eventbus and let
 	// eventual internal score be discarded
 	defer func() {
 		//TODO: Run Unsubscribe on phase teardown
 		// Or Subscribe before again Selection
 		// p.EventBus.Unsubscribe(topics.ScoreEvent, p.id)
+
+		tlog.Traceln("ending selection")
 	}()
 
 	p.handler = NewScoreHandler(p.provisioner)
@@ -208,22 +219,22 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 	if cmp == header.Before {
 		lg.
 			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
+				"topic":          m.Category(),
+				"round":          hdr.Round,
+				"expected round": round,
 			}).
-			Debugln("discarding obsolete agreement")
+			Debugln("discarding obsolete event")
 		return false
 	}
 
 	if cmp == header.After {
 		lg.
 			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
+				"topic":          m.Category(),
+				"round":          hdr.Round,
+				"expected round": round,
 			}).
-			Debugln("storing future round for later")
+			Debugln("storing future event for later")
 		queue.PutEvent(hdr.Round, hdr.Step, m)
 		return false
 	}
@@ -231,11 +242,10 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 	if m.Category() != topics.Score {
 		lg.
 			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
+				"topic": m.Category(),
+				"round": hdr.Round,
 			}).
-			Debugln("message not topics.Score")
+			Warnln("message not topics.Score")
 		return false
 	}
 
