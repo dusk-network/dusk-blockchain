@@ -31,6 +31,8 @@ type mockAcceptor struct {
 	db  database.DB
 	reg *mockSafeRegistry
 	// executor
+
+	restartLoopChan chan bool
 }
 
 //nolint:unused
@@ -87,7 +89,7 @@ func newMockAcceptor(e consensus.Emitter, db database.DB, reg *mockSafeRegistry)
 // Valid block header
 func (a *mockAcceptor) acceptBlock(b block.Block) error {
 
-	if len(b.Header.Hash) == 32 {
+	if len(b.Header.Hash) != 32 {
 		return errors.New("invalid hash")
 	}
 
@@ -161,7 +163,7 @@ func (a *mockAcceptor) processCandidateVerificationRequest(r rpcbus.Request) {
 	r.RespChan <- res
 }
 
-func (a *mockAcceptor) loop(pctx context.Context, assert *assert.Assertions) {
+func (a *mockAcceptor) loop(pctx context.Context, restartLoopChan chan bool, assert *assert.Assertions) {
 
 	for {
 		select {
@@ -182,6 +184,8 @@ func (a *mockAcceptor) loop(pctx context.Context, assert *assert.Assertions) {
 			// Ensure block is accepted by Chain
 			err = a.acceptBlock(*cm.Block)
 			assert.NoError(err)
+
+			restartLoopChan <- true
 
 		// Handles topics.Block from the wire.
 		case <-a.blockChan:
