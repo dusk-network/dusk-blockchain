@@ -10,30 +10,6 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
-/*
-// MockBlock ...
-func MockBlock(round uint64, e *consensus.Emitter) *block.Block {
-	key := keys.NewPublicKey()
-
-	g := &generator{
-		Emitter:   e,
-		genPubKey: key,
-	}
-
-	// TODO: do we need to generate correct proof and score
-	seed, _ := crypto.RandEntropy(33)
-	proof, _ := crypto.RandEntropy(32)
-	score, _ := crypto.RandEntropy(32)
-
-	b, err := g.GenerateBlock(round, seed, proof, score, make([]byte, 32), [][]byte{{0}})
-	if err != nil {
-		panic(err)
-	}
-
-	return b
-}
-*/
-
 // MockCandidate ...
 func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) message.Candidate {
 	if previousBlock == nil {

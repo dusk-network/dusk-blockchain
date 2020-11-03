@@ -11,6 +11,7 @@ import (
 
 type mock struct {
 	*consensus.Emitter
+	inert bool
 }
 
 func (m *mock) Generate(ctx context.Context, r consensus.RoundUpdate, step uint8) message.ScoreProposal {
@@ -23,10 +24,14 @@ func (m *mock) Generate(ctx context.Context, r consensus.RoundUpdate, step uint8
 		PubKeyBLS: m.Keys.BLSPubKeyBytes,
 	}
 
+	if m.inert {
+		return message.EmptyScoreProposal(hdr)
+	}
+
 	return message.MockScoreProposal(hdr)
 }
 
 // Mock a score generator
-func Mock(e *consensus.Emitter) Generator {
-	return &mock{e}
+func Mock(e *consensus.Emitter, inert bool) Generator {
+	return &mock{e, inert}
 }

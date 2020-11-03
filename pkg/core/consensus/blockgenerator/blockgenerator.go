@@ -36,10 +36,11 @@ func New(e *consensus.Emitter, genPubKey *keys.PublicKey, db database.DB) (Block
 	}, nil
 }
 
-// Mock ...
-func Mock(e *consensus.Emitter) BlockGenerator {
+// Mock the block generator. If inert is true, no block will be generated (this
+// simulates the score not reaching the threshold)
+func Mock(e *consensus.Emitter, inert bool) BlockGenerator {
 	return &blockGenerator{
-		scoreGenerator:     score.Mock(e),
+		scoreGenerator:     score.Mock(e, inert),
 		candidateGenerator: candidate.Mock(e),
 	}
 }
