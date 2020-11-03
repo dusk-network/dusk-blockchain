@@ -1,0 +1,38 @@
+on: [pull_request]
+name: Continuous Integration
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15.x
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Lint
+      run: rm -rf $HOME/.cache/golangci-lint || true && make lint
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15.x
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Test
+      run: go get ./... && go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+    - name: Upload coverage report
+      run: bash <(curl -s https://codecov.io/bash)
+  test-harness:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15.x
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Test Harness
+      run: make test-harness-ci
