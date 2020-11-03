@@ -15,27 +15,49 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
+type tparm struct {
+	bg   blockgenerator.BlockGenerator
+	msgs []message.Score
+}
+
 func TestSelection(t *testing.T) {
+
 	hlp := selection.NewHelper(10)
 	consensusTimeOut := 300 * time.Millisecond
 
-	ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) {
-		require.NotNil(p)
-		messageScore := p.(message.Score)
-		require.NotEmpty(messageScore.Score)
+	table := map[string]tparm{
+		"ExternalWinningScore": {
+			bg:   blockgenerator.Mock(hlp.Emitter, true),
+			msgs: hlp.Spawn(),
+		},
+
+		"InternalWinningScore": {
+			bg:   blockgenerator.Mock(hlp.Emitter, false),
+			msgs: []message.Score{},
+		},
 	}
 
-	testPhase := consensus.NewTestPhase(t, ttestCB, nil)
-	sel := selection.New(testPhase, blockgenerator.Mock(hlp.Emitter), hlp.Emitter, consensusTimeOut)
-	selFn := sel.Fn(nil)
+	for name, ttest := range table {
+		t.Run(name, func(t *testing.T) {
+			ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) {
+				require.NotNil(p)
+				messageScore := p.(message.Score)
+				require.NotEmpty(messageScore.Score)
+			}
 
-	msgChan := make(chan message.Message, 1)
-	msgs := hlp.Spawn()
-	go func() {
-		for _, msg := range msgs {
-			msgChan <- message.New(topics.Score, msg)
-		}
-	}()
-	testCallback := selFn(context.Background(), consensus.NewQueue(), msgChan, hlp.RoundUpdate(), hlp.Step)
-	_ = testCallback(context.Background(), nil, nil, hlp.RoundUpdate(), hlp.Step+1)
+			testPhase := consensus.NewTestPhase(t, ttestCB, nil)
+			sel := selection.New(testPhase, ttest.bg, hlp.Emitter, consensusTimeOut)
+			selFn := sel.Fn(nil)
+
+			msgChan := make(chan message.Message, 1)
+			go func() {
+				for _, msg := range ttest.msgs {
+					msgChan <- message.New(topics.Score, msg)
+				}
+			}()
+			testCallback := selFn(context.Background(), consensus.NewQueue(), msgChan, hlp.RoundUpdate(), hlp.Step)
+			_ = testCallback(context.Background(), nil, nil, hlp.RoundUpdate(), hlp.Step+1)
+		})
+	}
+
 }
