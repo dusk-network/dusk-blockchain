@@ -8,12 +8,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/score"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -43,18 +43,25 @@ type Consensus struct {
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing
-func CreateStateMachine(e *consensus.Emitter, consensusTimeOut time.Duration, pubKey *keys.PublicKey) (scoreStep consensus.Phase, agreementStep consensus.Controller, err error) {
+func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey) (consensus.Phase, consensus.Controller, error) {
+	generator, err := blockgenerator.New(e, pubKey, db)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	selectionStep := CreateInitialStep(e, consensusTimeOut, generator)
+	agreementStep := agreement.New(e)
+	return selectionStep, agreementStep, nil
+}
+
+// CreateInitialStep creates the selection step by injecting a BlockGenerator
+// interface to it
+func CreateInitialStep(e *consensus.Emitter, consensusTimeOut time.Duration, bg blockgenerator.BlockGenerator) consensus.Phase {
 	redu2 := secondstep.New(e, consensusTimeOut)
 	redu1 := firststep.New(redu2, e, consensusTimeOut)
-	sel := selection.New(redu1, e, consensusTimeOut)
-	blockGen := candidate.New(e, pubKey)
-	scoreStep, err = score.New(sel, e, blockGen)
-	agreementStep = agreement.New(e)
-	if err != nil {
-		return
-	}
-	redu2.SetNext(scoreStep)
-	return
+	selectionStep := selection.New(redu1, bg, e, consensusTimeOut)
+	redu2.SetNext(selectionStep)
+	return selectionStep
 }
 
 // New creates a new Consensus struct. The legacy StopConsensus and RoundUpdate
