@@ -259,7 +259,7 @@ start_dusk_mock_rusk_func() {
   WALLET_FILE="${currentDir}/harness/data/wallet-$((9000+$i)).dat"
 
   CMD="${currentDir}/bin/utils mockrusk --rusknetwork tcp --ruskaddress 127.0.0.1:$((10000+$i)) --walletstore ${DDIR}/walletDB/ --walletfile ${WALLET_FILE}"
-  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/mock$i.log" 2>&1 &
+  ${CMD} >> "${currentDir}/devnet/dusk_data/logs/mock_rusk$i.log" 2>&1 &
 
   EXEC_PID=$!
   echo "started Dusk Rusk Mock node $i, pid=$EXEC_PID"
