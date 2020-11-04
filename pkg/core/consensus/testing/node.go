@@ -27,23 +27,24 @@ type mockNode struct {
 }
 
 //nolint:unused
-func newMockNode(pubKey *keys.PublicKey, gossipListener eventbus.Listener, assert *assert.Assertions) *mockNode {
-
-	provisioners := 10
-	p, provisionersKeys := consensus.MockProvisioners(provisioners)
+func newMockNode(pubKey *keys.PublicKey, provisionersKeys []key.Keys,
+	p *user.Provisioners, index int, gossipListener eventbus.Listener,
+	genesis block.Block, lastCert block.Certificate,
+	assert *assert.Assertions) *mockNode {
 
 	mockProxy := transactions.MockProxy{
 		P:  transactions.PermissiveProvisioner{},
 		BG: transactions.MockBlockGenerator{},
 	}
+
 	emitter := consensus.MockEmitter(10*time.Second, mockProxy)
-	emitter.Keys = provisionersKeys[0]
+	emitter.Keys = provisionersKeys[index]
 
 	// Initialize hlp component
 	_ = emitter.EventBus.Subscribe(topics.Gossip, gossipListener)
 
 	// Initialize Chain component
-	chain, err := newMockChain(*emitter, 10*time.Second, pubKey, assert)
+	chain, err := newMockChain(*emitter, 10*time.Second, pubKey, genesis, lastCert, assert)
 	assert.NoError(err)
 
 	return &mockNode{

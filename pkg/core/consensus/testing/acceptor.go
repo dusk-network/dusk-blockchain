@@ -129,6 +129,9 @@ func (a *mockAcceptor) acceptBlock(b block.Block) error {
 	// Update registry
 	a.reg.SetChainTip(b)
 
+	// Gossip/Kadcast here topics.Block
+	// Not needed for the purposes of consensus sandbox
+
 	return err
 }
 

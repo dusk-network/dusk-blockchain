@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -49,7 +50,9 @@ type mockChain struct {
 }
 
 //nolint:unused
-func newMockChain(e consensus.Emitter, consensusTimeOut time.Duration, pubKey *keys.PublicKey, assert *assert.Assertions) (*mockChain, error) {
+func newMockChain(e consensus.Emitter, consensusTimeOut time.Duration, pubKey *keys.PublicKey,
+	genesis block.Block, lastCert block.Certificate,
+	assert *assert.Assertions) (*mockChain, error) {
 
 	// Open database driver
 	drvr, err := database.From(lite.DriverName)
@@ -62,7 +65,7 @@ func newMockChain(e consensus.Emitter, consensusTimeOut time.Duration, pubKey *k
 		return nil, err
 	}
 
-	reg := newMockSafeRegistry()
+	reg := newMockSafeRegistry(genesis, &lastCert)
 
 	// Acceptor instance
 	acceptor, err := newMockAcceptor(e, db, reg)

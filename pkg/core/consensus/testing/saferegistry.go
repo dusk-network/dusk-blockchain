@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
@@ -29,16 +27,11 @@ type mockSafeRegistry struct {
 }
 
 //nolint:unused
-func newMockSafeRegistry() *mockSafeRegistry {
-
-	randomGenesis := helper.RandomBlock(0, 3)
-	lastCertificate := helper.RandomCertificate()
-
-	randomGenesis.Header.Timestamp = time.Now().Unix() - 100000
+func newMockSafeRegistry(genesis block.Block, cert *block.Certificate) *mockSafeRegistry {
 
 	return &mockSafeRegistry{
-		chainTip:        *randomGenesis,
-		lastCertificate: lastCertificate,
+		chainTip:        genesis,
+		lastCertificate: cert,
 	}
 }
 
