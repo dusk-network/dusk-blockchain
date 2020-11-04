@@ -35,7 +35,7 @@ func newMockSafeRegistryBroker(e consensus.Emitter, reg *mockSafeRegistry) (*moc
 
 	// Subscriptions
 
-	candidateChan := make(chan message.Message, 1)
+	candidateChan := make(chan message.Message, 10)
 	chanListener := eventbus.NewChanListener(candidateChan)
 	e.EventBus.Subscribe(topics.Candidate, chanListener)
 

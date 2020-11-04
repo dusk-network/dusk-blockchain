@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// nolint
 func mockGenesis() (block.Block, block.Certificate) {
 	randomGenesis := helper.RandomBlock(0, 3)
 	lastCertificate := helper.RandomCertificate()
