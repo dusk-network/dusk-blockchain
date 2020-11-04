@@ -72,7 +72,7 @@ func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emi
 // Fn returns the Phase state function for the next phase, and initializes it
 // with the result from this phase
 func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
-	return p.Run
+	return p
 }
 
 func (p *Phase) generateCandidate(ctx context.Context, round consensus.RoundUpdate, step uint8, internalScoreChan chan<- message.Message) {
@@ -102,6 +102,11 @@ func (p *Phase) generateCandidate(ctx context.Context, round consensus.RoundUpda
 
 	// communicate our own score to the selection
 	internalScoreChan <- message.New(topics.Score, *scr)
+}
+
+// String as required by the interface PhaseFn
+func (p *Phase) String() string {
+	return "selection"
 }
 
 // Run executes the logic for this phase

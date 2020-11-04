@@ -125,12 +125,24 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	phaseFunction := scr.Fn(nil)
 	// synchronous consensus loop keeps running until the agreement invokes
 	// context.Done or the context is canceled some other way
-	for step := uint8(1); phaseFunction != nil; step++ {
-		phaseFunction = phaseFunction(stepCtx, c.eventQueue, c.eventChan, round, step)
+	for step := uint8(1); ; step++ {
+		phaseFunction = phaseFunction.Run(stepCtx, c.eventQueue, c.eventChan, round, step)
+		// if result is nil, this round is over
+		if phaseFunction == nil {
+			lg.
+				WithFields(log.Fields{
+					"round": round.Round,
+					"step":  step,
+				}).
+				Trace("consensus achieved")
+			return nil
+		}
+
 		lg.
 			WithFields(log.Fields{
 				"round": round.Round,
 				"step":  step,
+				"name":  phaseFunction.String(),
 			}).
 			Trace("new phase")
 
@@ -152,7 +164,6 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	// - we reached the maximum amount of steps (~213) and the consensus should
 	// halt. In this case, cancel() will take care of stopping the Agreement
 	// loop
-	return nil
 }
 
 var steps = []string{"selection", "reduction1", "reduction2"} // nolint

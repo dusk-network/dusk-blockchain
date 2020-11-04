@@ -48,14 +48,20 @@ type step struct {
 	wg *sync.WaitGroup
 }
 
+func (h *step) String() string {
+	return "step"
+}
+
+func (h *step) Run(ctx context.Context, _ *consensus.Queue, _ chan message.Message, _ consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
+	h.wg.Done()
+	// if this does not get canceled, the test will timeout
+	<-ctx.Done()
+	return nil
+}
+
 // Fn returns a phase function that simply hangs until canceled
 func (h *step) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
-	return func(ctx context.Context, _ *consensus.Queue, _ chan message.Message, _ consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
-		h.wg.Done()
-		// if this does not get canceled, the test will timeout
-		<-ctx.Done()
-		return nil
-	}
+	return h
 }
 
 // succesfulAgreement is used by TestAgreementCompletion to simulate a
@@ -87,13 +93,19 @@ func TestAgreementCompletion(t *testing.T) {
 // properly get canceled
 type stallingStep struct{}
 
+func (h *stallingStep) String() string {
+	return "stalling"
+}
+
+// Run simply returns a phase function that sleeps and returns itself until canceled
+func (h *stallingStep) Run(ctx context.Context, _ *consensus.Queue, _ chan message.Message, _ consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
+	time.Sleep(time.Millisecond)
+	return h
+}
+
 // Fn returns a phase function that simply hangs until canceled
 func (h *stallingStep) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
-	return func(ctx context.Context, _ *consensus.Queue, _ chan message.Message, _ consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
-		// this recursion makes sure we get to the maximum amount of step
-		time.Sleep(time.Millisecond)
-		return h.Fn(nil)
-	}
+	return h
 }
 
 // unsuccesfulAgreement is used by TestStall to simulate an

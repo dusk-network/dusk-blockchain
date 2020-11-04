@@ -16,7 +16,13 @@ type (
 	}
 
 	// PhaseFn represents the recursive consensus state function
-	PhaseFn func(context.Context, *Queue, chan message.Message, RoundUpdate, uint8) PhaseFn
+	PhaseFn interface {
+		// Run the phase function
+		Run(context.Context, *Queue, chan message.Message, RoundUpdate, uint8) PhaseFn
+
+		// String returns the description of this phase function
+		String() string
+	}
 
 	// Controller is a factory for the ControlFn. It basically relates to the
 	// Agreement, which needs a different execution each round

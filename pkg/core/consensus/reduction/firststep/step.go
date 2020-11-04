@@ -41,10 +41,15 @@ func New(next consensus.Phase, e *consensus.Emitter, timeOut time.Duration) *Pha
 	}
 }
 
+// String returns the reduction
+func (p *Phase) String() string {
+	return "reduction-first-step"
+}
+
 // Fn passes to this reduction step the best score collected during selection
 func (p *Phase) Fn(re consensus.InternalPacket) consensus.PhaseFn {
 	p.selectionResult = re.(message.Score)
-	return p.Run
+	return p
 }
 
 // Run the first reduction step until either there is a timeout, we reach 64%

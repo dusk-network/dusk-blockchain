@@ -98,7 +98,11 @@ type mockPhase struct {
 
 func (m *mockPhase) Fn(packet InternalPacket) PhaseFn {
 	m.packet = packet
-	return m.Run
+	return m
+}
+
+func (m *mockPhase) String() string {
+	return "mock_step"
 }
 
 // nolint
@@ -107,7 +111,7 @@ func (m *mockPhase) Run(ctx context.Context, queue *Queue, evChan chan message.M
 	if stop := m.callback(ctx); stop {
 		return nil
 	}
-	return m.Run
+	return m
 }
 
 // MockPhase mocks up a consensus phase. It accepts a (recursive) function which returns a
@@ -144,15 +148,18 @@ func NewTestPhase(t *testing.T, callback TestCallback, streamer *eventbus.Gossip
 		streamer: streamer,
 	}
 }
+func (t *TestPhase) String() string {
+	return "test"
+}
 
 // Fn is used by the step under test to provide its result
 func (t *TestPhase) Fn(sv InternalPacket) PhaseFn {
 	t.packet = sv
-	return t.Run
+	return t
 }
 
 // Run does nothing else than delegating to the specified callback
-func (t *TestPhase) Run(_ context.Context, queue *Queue, _ chan message.Message, _ RoundUpdate, _ uint8) PhaseFn {
+func (t *TestPhase) Run(_ context.Context, queue *Queue, _ chan message.Message, _ RoundUpdate, step uint8) PhaseFn {
 	t.callback(t.req, t.packet, t.streamer)
 	return nil
 }

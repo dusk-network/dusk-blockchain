@@ -131,7 +131,7 @@ func TestFirstStepReduction(t *testing.T) {
 			// testing the status of the step
 			ttest.testStep(t, firstStepReduction)
 			// here the tests are performed on the result of the step
-			_ = runTestCallback(ctx, queue, evChan, r, step+1)
+			_ = runTestCallback.Run(ctx, queue, evChan, r, step+1)
 		})
 	}
 }
