@@ -27,7 +27,7 @@ const MaxTxSetSize = 150000
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator interface {
-	PropagateBlockAndScore(context.Context, message.ScoreProposal, consensus.RoundUpdate, uint8) error
+	GenerateCandidateMessage(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) (*message.Score, error)
 }
 
 type generator struct {
@@ -46,7 +46,7 @@ func New(e *consensus.Emitter, genPubKey *keys.PublicKey) Generator {
 // PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
-func (bg *generator) PropagateBlockAndScore(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) error {
+func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
 	log := lg.
 		WithField("round", sev.State().Round).
 		WithField("step", sev.State().Step)
@@ -59,7 +59,7 @@ func (bg *generator) PropagateBlockAndScore(ctx context.Context, sev message.Sco
 		log.
 			WithError(err).
 			Error("failed to topics.GetLastCommittee")
-		return err
+		return nil, err
 	}
 
 	keys := resp.([][]byte)
@@ -68,7 +68,7 @@ func (bg *generator) PropagateBlockAndScore(ctx context.Context, sev message.Sco
 		log.
 			WithError(err).
 			Error("failed to bg.Generate")
-		return err
+		return nil, err
 	}
 
 	// Create candidate message
@@ -78,7 +78,7 @@ func (bg *generator) PropagateBlockAndScore(ctx context.Context, sev message.Sco
 		log.
 			WithError(err).
 			Error("failed to topics.GetLastCertificate")
-		return err
+		return nil, err
 	}
 	certBuf := resp.(bytes.Buffer)
 
@@ -87,30 +87,14 @@ func (bg *generator) PropagateBlockAndScore(ctx context.Context, sev message.Sco
 		log.
 			WithError(err).
 			Error("failed to UnmarshalCertificate")
-		return err
+		return nil, err
 	}
 
 	// Since the Candidate message goes straight to the Chain, there is
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
 	candidate := message.MakeCandidate(blk, cert)
-	score := message.NewScore(sev, bg.Keys.BLSPubKeyBytes, r.Hash, candidate)
-
-	log.
-		WithField("step", step).
-		WithField("round", r.Round).
-		Debugln("sending score")
-
-	msg := message.New(topics.Score, *score)
-	// propagate internally
-	_ = bg.EventBus.Publish(topics.ScoreEvent, msg)
-
-	// gossip externally
-	if err := bg.Gossip(msg); err != nil {
-		return err
-	}
-
-	return nil
+	return message.NewScore(sev, bg.Keys.BLSPubKeyBytes, r.Hash, candidate), nil
 }
 
 // Generate a Block

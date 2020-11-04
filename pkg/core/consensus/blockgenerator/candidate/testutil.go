@@ -1,7 +1,8 @@
-package score
+package candidate
 
 import (
 	"bytes"
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -44,14 +45,22 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 		Emitter:          emitter,
 	}
 
-	go hlp.processLastCommittee(provisionersKeys)
-	go hlp.processLastCertificate()
-	go hlp.processMempoolTxsBySize()
-
+	// the wait group makes sure we force the registering of the methods to the RPCBus
+	var wg sync.WaitGroup
+	hlp.MockRPCCalls(&wg, provisionersKeys)
+	wg.Wait()
 	return hlp
 }
 
-func (hlp *Helper) processLastCommittee(keys []key.Keys) {
+// MockRPCCalls makes sure that the RPCBus methods are registered
+func (hlp *Helper) MockRPCCalls(wg *sync.WaitGroup, provisionersKeys []key.Keys) {
+	wg.Add(3)
+	go hlp.processLastCommittee(wg, provisionersKeys)
+	go hlp.processLastCertificate(wg)
+	go hlp.processMempoolTxsBySize(wg)
+}
+
+func (hlp *Helper) processLastCommittee(wg *sync.WaitGroup, keys []key.Keys) {
 	v := make(chan rpcbus.Request, 10)
 	if err := hlp.RPCBus.Register(topics.GetLastCommittee, v); err != nil {
 		panic(err)
@@ -62,6 +71,7 @@ func (hlp *Helper) processLastCommittee(keys []key.Keys) {
 		pks = append(pks, pk.BLSPubKeyBytes)
 	}
 
+	wg.Done()
 	for {
 		r := <-v
 		com := make([][]byte, 0)
@@ -71,11 +81,13 @@ func (hlp *Helper) processLastCommittee(keys []key.Keys) {
 	}
 }
 
-func (hlp *Helper) processLastCertificate() {
+func (hlp *Helper) processLastCertificate(wg *sync.WaitGroup) {
 	v := make(chan rpcbus.Request, 10)
 	if err := hlp.RPCBus.Register(topics.GetLastCertificate, v); err != nil {
 		panic(err)
 	}
+
+	wg.Done()
 	for {
 		r := <-v
 		buf := new(bytes.Buffer)
@@ -86,11 +98,13 @@ func (hlp *Helper) processLastCertificate() {
 	}
 }
 
-func (hlp *Helper) processMempoolTxsBySize() {
+func (hlp *Helper) processMempoolTxsBySize(wg *sync.WaitGroup) {
 	v := make(chan rpcbus.Request, 10)
 	if err := hlp.RPCBus.Register(topics.GetMempoolTxsBySize, v); err != nil {
 		panic(err)
 	}
+
+	wg.Done()
 	for {
 		r := <-v
 		log.Debug("sending mocked topics.GetMempoolTxsBySize back")

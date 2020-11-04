@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -39,14 +39,13 @@ type Phase struct {
 	next        consensus.Phase
 	keys        key.Keys
 
-	id                uint32
-	internalScoreChan chan message.Message
+	g blockgenerator.BlockGenerator
 }
 
 // New creates and launches the component which responsibility is to validate
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
-func New(next consensus.Phase, e *consensus.Emitter, timeout time.Duration) *Phase {
+func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emitter, timeout time.Duration) *Phase {
 
 	selector := &Phase{
 		Emitter:     e,
@@ -54,6 +53,7 @@ func New(next consensus.Phase, e *consensus.Emitter, timeout time.Duration) *Pha
 		bestEvent:   message.EmptyScore(),
 		provisioner: e.Proxy.Provisioner(),
 		keys:        e.Keys,
+		g:           g,
 
 		next: next,
 	}
@@ -73,14 +73,6 @@ func New(next consensus.Phase, e *consensus.Emitter, timeout time.Duration) *Pha
 		}
 	}
 
-	// the internalScoreChan is the channel where the BlockGenerator of this
-	// node publishes the score. This channel needs to be active solely during
-	// the selection
-	internalScoreChan := make(chan message.Message, 1)
-	lstnr := eventbus.NewSafeChanListener(internalScoreChan)
-	selector.id = e.EventBus.Subscribe(topics.ScoreEvent, lstnr)
-	selector.internalScoreChan = internalScoreChan
-
 	return selector
 }
 
@@ -90,22 +82,47 @@ func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
 	return p.Run
 }
 
+func (p *Phase) generateCandidate(ctx context.Context, round consensus.RoundUpdate, step uint8, internalScoreChan chan<- message.Message) {
+	score := p.g.Generate(ctx, round, step)
+	if score.IsEmpty() {
+		return
+	}
+
+	scr, err := p.g.GenerateCandidateMessage(ctx, score, round, step)
+	if err != nil {
+		lg.WithError(err).Errorln("candidate block generation failed")
+		return
+	}
+
+	log.
+		WithField("step", step).
+		WithField("round", round.Round).
+		Debugln("sending score")
+
+	// create the message
+	msg := message.New(topics.Score, *scr)
+
+	// gossip externally
+	if err := p.Gossip(msg); err != nil {
+		lg.WithError(err).Errorln("candidate block gossip failed")
+	}
+
+	// communicate our own score to the selection
+	internalScoreChan <- message.New(topics.Score, *scr)
+}
+
 // Run executes the logic for this phase
 // In this case the selection listens to new Score/Candidate messages
-func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
+func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 
-	tlog := getLog(r.Round, step)
-	tlog.Traceln("starting selection")
+	ctx, cancel := context.WithCancel(parentCtx)
+	// this makes sure that the internal score channel gets canceled
+	defer cancel()
 
-	// at the end of this selection, we unsubscribe from the eventbus and let
-	// eventual internal score be discarded
-	defer func() {
-		//TODO: Run Unsubscribe on phase teardown
-		// Or Subscribe before again Selection
-		// p.EventBus.Unsubscribe(topics.ScoreEvent, p.id)
-
-		tlog.Traceln("ending selection")
-	}()
+	// channel for the blockgenerator to communicate a score message as soon as
+	// it gets generated
+	internalScoreChan := make(chan message.Message, 1)
+	go p.generateCandidate(ctx, r, step, internalScoreChan)
 
 	p.handler = NewScoreHandler(p.provisioner)
 	timeoutChan := time.After(p.timeout)
@@ -117,7 +134,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	for {
 		select {
-		case internalScoreResult := <-p.internalScoreChan:
+		case internalScoreResult := <-internalScoreChan:
 			p.collectScore(ctx, internalScoreResult.Payload().(message.Score))
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
@@ -127,9 +144,6 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 		case <-timeoutChan:
 			return p.endSelection(r.Round, step)
 		case <-ctx.Done():
-			// Or Subscribe before again Selection
-			p.EventBus.Unsubscribe(topics.ScoreEvent, p.id)
-
 			// preventing timeout leakage
 			go func() {
 				<-timeoutChan

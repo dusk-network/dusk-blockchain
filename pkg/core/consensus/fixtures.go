@@ -34,6 +34,20 @@ func MockEmitter(consTimeout time.Duration, proxy transactions.Proxy) *Emitter {
 	}
 }
 
+// StupidEmitter ...
+func StupidEmitter() (*Emitter, *user.Provisioners) {
+	committeeSize := 50
+	p, provisionersKeys := MockProvisioners(committeeSize)
+
+	mockProxy := transactions.MockProxy{
+		P:  transactions.PermissiveProvisioner{},
+		BG: transactions.MockBlockGenerator{},
+	}
+	emitter := MockEmitter(time.Second, mockProxy)
+	emitter.Keys = provisionersKeys[0]
+	return emitter, p
+}
+
 // MockRoundUpdate mocks a round update
 func MockRoundUpdate(round uint64, p *user.Provisioners) RoundUpdate {
 	var provisioners = p
