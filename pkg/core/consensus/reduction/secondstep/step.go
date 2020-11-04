@@ -44,10 +44,15 @@ func (p *Phase) SetNext(next consensus.Phase) {
 	p.next = next
 }
 
+// String representation of this Phase
+func (p *Phase) String() string {
+	return "reduction-second-step"
+}
+
 // Fn passes to this reduction step the best score collected during selection
 func (p *Phase) Fn(re consensus.InternalPacket) consensus.PhaseFn {
 	p.firstStepVotesMsg = re.(message.StepVotesMsg)
-	return p.Run
+	return p
 }
 
 // Run the first reduction step until either there is a timeout, we reach 64%

@@ -186,7 +186,7 @@ func TestSecondStepReduction(t *testing.T) {
 			// testing the status of the step
 			ttest.testStep(t, secondStepReduction)
 			// here the tests are performed on the result of the step
-			_ = runTestCallback(ctx, queue, evChan, r, step+1)
+			_ = runTestCallback.Run(ctx, queue, evChan, r, step+1)
 		})
 
 		hlp.EventBus.Unsubscribe(topics.Gossip, id)
