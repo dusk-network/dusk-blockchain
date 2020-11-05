@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"encoding/hex"
 	stdtesting "testing"
 	"time"
 
@@ -25,7 +26,7 @@ func mockGenesis() (block.Block, block.Certificate) {
 // TestConsensus passing means the consensus phases are properly assembled
 func TestConsensus(t *stdtesting.T) {
 
-	logrus.SetLevel(logrus.TraceLevel)
+	// logrus.SetLevel(logrus.TraceLevel)
 
 	assert := assert.New(t)
 
@@ -72,17 +73,18 @@ func TestConsensus(t *stdtesting.T) {
 
 			logrus.WithField("node", i).
 				WithField("height", chainTip).
-				Info("local chainTip")
+				WithField("hash", hex.EncodeToString(blk.Header.Hash)).
+				Info("local chain tip")
 
 			if h <= 2 {
 				h = chainTip
 			} else {
 				// Ensure not more than 2 rounds difference
 				cond := (h-2 < chainTip && chainTip <= h+2)
-				assert.True(cond, "participant falling behind error")
+				assert.True(cond, "a node falling behind error")
 			}
 
-			// Main check point to ensure test passes
+			// Ensure consensus can reach N rounds
 			if chainTip > 10 {
 				return
 			}
