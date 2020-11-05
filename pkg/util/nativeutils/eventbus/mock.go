@@ -251,18 +251,16 @@ func (r *RouterStreamer) Write(p []byte) (n int, err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	b := bytes.NewBuffer(p)
-	msg, err := message.Unmarshal(b)
-	if err != nil {
-		return 0, err
-	}
-
-	category := msg.Category()
-
 	// Re-route message to all peers
 	for i := 0; i < len(r.peers); i++ {
-		node := r.peers[i]
-		node.Publish(category, msg)
+
+		b := bytes.NewBuffer(p)
+		msg, err := message.Unmarshal(b)
+		if err != nil {
+			return 0, err
+		}
+
+		r.peers[i].Publish(msg.Category(), msg)
 	}
 
 	return len(p), nil
