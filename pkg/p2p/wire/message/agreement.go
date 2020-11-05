@@ -505,15 +505,15 @@ func GenVotes(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Pr
 	}
 
 	// Create committee key sets
-	keySet1 := createCommitteeKeySet(p.CreateVotingCommittee(round, step-2, len(keys)), keys)
-	keySet2 := createCommitteeKeySet(p.CreateVotingCommittee(round, step-1, len(keys)), keys)
+	keySet1 := createCommitteeKeySet(p.CreateVotingCommittee(round, step-1, len(keys)), keys)
+	keySet2 := createCommitteeKeySet(p.CreateVotingCommittee(round, step, len(keys)), keys)
 
-	stepVotes1, set1 := createStepVotesAndSet(hash, round, step-2, keySet1)
-	stepVotes2, set2 := createStepVotesAndSet(hash, round, step-1, keySet2)
+	stepVotes1, set1 := createStepVotesAndSet(hash, round, step-1, keySet1)
+	stepVotes2, set2 := createStepVotesAndSet(hash, round, step, keySet2)
 
-	bitSet1 := createBitSet(set1, round, step-2, len(keySet1), p)
+	bitSet1 := createBitSet(set1, round, step-1, len(keySet1), p)
 	stepVotes1.BitSet = bitSet1
-	bitSet2 := createBitSet(set2, round, step-1, len(keySet2), p)
+	bitSet2 := createBitSet(set2, round, step, len(keySet2), p)
 	stepVotes2.BitSet = bitSet2
 
 	return []*StepVotes{stepVotes1, stepVotes2}

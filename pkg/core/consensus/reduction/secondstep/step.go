@@ -16,6 +16,13 @@ import (
 
 var lg = log.WithField("process", "secondstep reduction")
 
+func getLog(r uint64, s uint8) *log.Entry {
+	return lg.WithFields(log.Fields{
+		"round": r,
+		"step":  s,
+	})
+}
+
 // Phase is the implementation of the Selection step component
 type Phase struct {
 	*reduction.Reduction
@@ -58,10 +65,13 @@ func (p *Phase) Fn(re consensus.InternalPacket) consensus.PhaseFn {
 // Run the first reduction step until either there is a timeout, we reach 64%
 // of votes, or we experience an unrecoverable error
 func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
-	lg.
-		WithField("round", r.Round).
-		WithField("step", step).
-		Trace("starting secondstep reduction")
+	tlog := getLog(r.Round, step)
+	tlog.Traceln("starting second reduction step")
+
+	defer func() {
+		tlog.Traceln("ending second reduction step")
+	}()
+
 	p.handler = reduction.NewHandler(p.Keys, r.P)
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {

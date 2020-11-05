@@ -90,22 +90,22 @@ func ShouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 	if cmp == header.Before {
 		lg.
 			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
+				"topic":          m.Category(),
+				"round":          hdr.Round,
+				"expected round": round,
 			}).
-			Debugln("discarding obsolete agreement")
+			Debugln("discarding obsolete event")
 		return false
 	}
 
 	if cmp == header.After {
 		lg.
 			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
+				"topic":          m.Category(),
+				"round":          hdr.Round,
+				"expected round": round,
 			}).
-			Debugln("storing future round for later")
+			Debugln("storing future event for later")
 		queue.PutEvent(hdr.Round, hdr.Step, m)
 		return false
 	}
@@ -113,11 +113,10 @@ func ShouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 	if m.Category() != topics.Reduction {
 		lg.
 			WithFields(log.Fields{
-				"topic":             "Reduction",
-				"round":             hdr.Round,
-				"coordinator_round": round,
+				"topic": m.Category(),
+				"round": hdr.Round,
 			}).
-			Debugln("message is not topics.Reduction")
+			Warnln("unexpected topic for this step")
 		return false
 	}
 

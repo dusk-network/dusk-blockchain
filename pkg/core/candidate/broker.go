@@ -44,6 +44,8 @@ type Broker struct {
 // to be started by calling `Listen`.
 func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
+	// FIXME: the channel buffer might lead to candidate drop.
+	// See https://github.com/dusk-network/dusk-blockchain/issues/742
 	getCandidateChan := make(chan rpcbus.Request, 1)
 	err := rpcBus.Register(topics.GetCandidate, getCandidateChan)
 	if err != nil {

@@ -39,7 +39,6 @@ func NewAggregator(handler *Handler) *Aggregator {
 // StepVotes/Set kept under the corresponding block hash. If the Set reaches or exceeds
 // quorum, a result is created with the voted hash and the related StepVotes
 // added. The validation of the candidate block is left to the caller
-// FIXME: this function should not return error. If it does, it should panic
 func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 	hdr := ev.State()
 	hash := string(hdr.BlockHash)
