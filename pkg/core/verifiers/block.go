@@ -20,8 +20,8 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 
 	// First, lets get the actual reduction steps
 	// These would be the two steps preceding the one on the certificate
-	stepOne := blk.Header.Certificate.Step - 2
-	stepTwo := blk.Header.Certificate.Step - 1
+	stepOne := blk.Header.Certificate.Step - 1
+	stepTwo := blk.Header.Certificate.Step
 
 	// Reconstruct signatures
 	stepOneBatchedSig, err := bls.UnmarshalSignature(blk.Header.Certificate.StepOneBatchedSig)
