@@ -173,7 +173,7 @@ func (a *mockAcceptor) loop(pctx context.Context, restartLoopChan chan bool, ass
 			restartLoopChan <- true
 
 		// Handles topics.Block from the wire on synchronizing
-		case _ = <-a.blockChan:
+		case <-a.blockChan:
 			// Not needed in testing for now
 			//err = a.acceptBlock(*cm.Block)
 			//assert.NoError(err)
