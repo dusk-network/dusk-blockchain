@@ -19,7 +19,7 @@ type mockSafeRegistry struct {
 	// Option: a mutex instance per a member
 	lock sync.RWMutex
 
-	p               *user.Provisioners
+	p               user.Provisioners
 	lastCertificate *block.Certificate
 	lastCommittee   [][]byte
 	chainTip        block.Block
@@ -85,6 +85,12 @@ func (r *mockSafeRegistry) GetLastCommittee() [][]byte {
 	}
 
 	return dup
+}
+
+func (r *mockSafeRegistry) SetProvisioners(p user.Provisioners) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.p = p.Copy()
 }
 
 func (r *mockSafeRegistry) SetChainTip(b block.Block) {

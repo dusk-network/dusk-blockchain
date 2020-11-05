@@ -110,8 +110,11 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 
 		// TODO: Instead of relying on GetChainTip, to avoid race condition we
 		// need to wait here for topics.RoundUpdate from accepting latest block
+
 		b := c.reg.GetChainTip()
 		lastRound := b.Header.Height
+
+		c.reg.SetProvisioners(*p)
 
 		// Initialize roundUpdate
 		round := lastRound + 1

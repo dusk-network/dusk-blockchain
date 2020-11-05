@@ -30,7 +30,8 @@ type mockAcceptor struct {
 	// reference to chain state (not owner)
 	db  database.DB
 	reg *mockSafeRegistry
-	// executor
+
+	// TODO mock executor
 }
 
 //nolint:unused
@@ -87,25 +88,8 @@ func newMockAcceptor(e consensus.Emitter, db database.DB, reg *mockSafeRegistry)
 // Valid block header
 func (a *mockAcceptor) acceptBlock(b block.Block) error {
 
-	if len(b.Header.Hash) != 32 {
-		return errors.New("invalid hash")
-	}
-
-	// 1. Check if the block is a duplicate
-	err := a.db.View(func(t database.Transaction) error {
-		_, err := t.FetchBlockExists(b.Header.Hash)
-		return err
-	})
-
-	if err != database.ErrBlockNotFound {
-		if err == nil {
-			err = errors.New("block already exists")
-		}
-		return err
-	}
-
-	// SanityCheck block header to ensure consensus has worked a chainTip
-	if err = verifiers.CheckBlockHeader(a.reg.GetChainTip(), b); err != nil {
+	// 1. Check the certificate
+	if err := sanityCheckBlock(a.db, a.reg.GetChainTip(), b); err != nil {
 		return err
 	}
 
@@ -113,16 +97,18 @@ func (a *mockAcceptor) acceptBlock(b block.Block) error {
 	// This check should avoid a possible race condition between accepting two blocks
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
-	//if err := verifiers.CheckBlockCertificate(c.reg.GetProvisioners(), b); err != nil {
-	//	return err
-	//}
-
-	// TODO: Provide provisioners (Get/Set)
+	if err := verifiers.CheckBlockCertificate(a.reg.GetProvisioners(), b); err != nil {
+		return err
+	}
 
 	// Store block in the in-memory database
-	err = a.db.Update(func(t database.Transaction) error {
+	err := a.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&b)
 	})
+
+	if err != nil {
+		return err
+	}
 
 	// Update registry
 	a.reg.SetChainTip(b)
@@ -137,22 +123,17 @@ func (a *mockAcceptor) processCandidateVerificationRequest(r rpcbus.Request) {
 	var res rpcbus.Response
 
 	cm := r.Params.(message.Candidate)
-
 	candidateBlock := *cm.Block
 	chainTip := a.reg.GetChainTip()
 
-	if chainTip.Header.Height+1 > candidateBlock.Header.Height {
-		res.Err = errors.New("invalid height")
-	}
-
 	// We first perform a quick check on the Block Header and
-	/* TODO:
-	if err := c.verifier.SanityCheckBlock(chainTip, candidateBlock); err != nil {
+	if err := sanityCheckBlock(a.db, chainTip, candidateBlock); err != nil {
 		res.Err = err
 		r.RespChan <- res
 		return
 	}
 
+	/* VST
 	_, err := c.executor.VerifyStateTransition(c.ctx, candidateBlock.Txs, candidateBlock.Header.Height)
 	if err != nil {
 		res.Err = err
@@ -170,31 +151,63 @@ func (a *mockAcceptor) loop(pctx context.Context, restartLoopChan chan bool, ass
 		select {
 		// Handles Idle
 		case <-time.After(30 * time.Second):
-			logrus.Warn("consensus couldn't produce topics.Certificate")
-		// Handles topics.Certificate
+			logrus.Warn("acceptor on idle")
+		// Handles topics.Certificate from consensus
 		case m := <-a.certficateChan:
-			cert := m.Payload().(message.Certificate)
-			winningHash := cert.Ag.State().BlockHash
 
-			// Fetch block by hash from local registry
+			// Extract winning hash and block certificate
+			cMsg := m.Payload().(message.Certificate)
+			certificate := cMsg.Ag.GenerateCertificate()
+			winningHash := cMsg.Ag.State().BlockHash
+
+			// Try to fetch block by hash from local registry
 			cm, err := a.reg.GetCandidateByHash(winningHash)
 			assert.NoError(err)
-
 			// TODO: if err, FetchCandidate from Network (Peers in Gossip)
 
+			cm.Block.Header.Certificate = certificate
 			// Ensure block is accepted by Chain
 			err = a.acceptBlock(*cm.Block)
 			assert.NoError(err)
 
 			restartLoopChan <- true
 
-		// Handles topics.Block from the wire.
-		case <-a.blockChan:
+		// Handles topics.Block from the wire on synchronizing
+		case _ = <-a.blockChan:
 			// Not needed in testing for now
+			//err = a.acceptBlock(*cm.Block)
+			//assert.NoError(err)
 		case req := <-a.verifyCandidateBlockChan:
 			a.processCandidateVerificationRequest(req)
 		case <-pctx.Done():
 			return
 		}
 	}
+}
+
+func sanityCheckBlock(db database.DB, prevBlock block.Block, b block.Block) error {
+
+	// 1. Check if the block is a duplicate
+	err := db.View(func(t database.Transaction) error {
+		_, err := t.FetchBlockExists(b.Header.Hash)
+		return err
+	})
+
+	if err != database.ErrBlockNotFound {
+		if err == nil {
+			err = errors.New("block already exists")
+		}
+		return err
+	}
+
+	// SanityCheck block header to ensure consensus has worked a chainTip
+	if err = verifiers.CheckBlockHeader(prevBlock, b); err != nil {
+		return err
+	}
+
+	if err = verifiers.CheckMultiCoinbases(b.Txs); err != nil {
+		return err
+	}
+
+	return nil
 }

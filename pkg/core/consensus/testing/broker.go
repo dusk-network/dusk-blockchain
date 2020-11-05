@@ -5,11 +5,13 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
@@ -96,11 +98,11 @@ func (c *mockSafeRegistryBroker) loop(pctx context.Context) {
 			c.provideLastCommittee(r)
 		case m := <-c.candidateChan:
 			cm := m.Payload().(message.Candidate)
-			// TODO: ValidateCandidate
-			//if err := ValidateCandidate(cm); err != nil {
-			//	diagnostics.LogError("error in validating the candidate", err)
-			//	return
-			//}
+			// ValidateCandidate
+			if err := candidate.ValidateCandidate(cm); err != nil {
+				diagnostics.LogError("error in validating the candidate", err)
+				return
+			}
 			c.reg.AddCandidate(cm)
 		case <-pctx.Done():
 			return
