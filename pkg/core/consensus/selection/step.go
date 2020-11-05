@@ -20,13 +20,6 @@ import (
 
 var lg = log.WithField("process", "selector")
 
-func getLog(r uint64, s uint8) *log.Entry {
-	return lg.WithFields(log.Fields{
-		"round": r,
-		"step":  s,
-	})
-}
-
 // Phase is the implementation of the Selection step component
 type Phase struct {
 	*consensus.Emitter

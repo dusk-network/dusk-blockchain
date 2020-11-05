@@ -31,8 +31,6 @@ type mockAcceptor struct {
 	db  database.DB
 	reg *mockSafeRegistry
 	// executor
-
-	restartLoopChan chan bool
 }
 
 //nolint:unused

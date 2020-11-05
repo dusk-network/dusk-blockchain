@@ -18,13 +18,13 @@ import (
 )
 
 var lg = log.WithField("process", "first step reduction")
+
 func getLog(r uint64, s uint8) *log.Entry {
 	return lg.WithFields(log.Fields{
 		"round": r,
 		"step":  s,
 	})
 }
-
 
 // Phase is the implementation of the Selection step component
 type Phase struct {
