@@ -220,13 +220,10 @@ func launchDupeMap(eventBus eventbus.Broker) *dupemap.DupeMap {
 func (s *Server) OnAccept(conn net.Conn) {
 	writeQueueChan := make(chan *bytes.Buffer, 1000)
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
-	if err != nil {
-		panic(err)
-	}
+	peerReader := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 
 	if err := peerReader.Accept(); err != nil {
-		logServer.WithError(err).Warnln("problem performing handshake")
+		logServer.WithError(err).Warnln("OnAccept, problem performing handshake")
 		return
 	}
 	logServer.WithField("address", peerReader.Addr()).Debugln("connection established")
@@ -243,7 +240,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
 
 	if err := peerWriter.Connect(); err != nil {
-		logServer.WithError(err).Warnln("problem performing handshake")
+		logServer.WithError(err).Warnln("OnConnection, problem performing handshake")
 		return
 	}
 	address := peerWriter.Addr()
@@ -251,10 +248,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		Debugln("connection established")
 
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
-	if err != nil {
-		log.Panic(err)
-	}
+	peerReader := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 
 	go peerReader.ReadLoop()
 	go peerWriter.Serve(writeQueueChan, exitChan)

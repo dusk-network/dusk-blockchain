@@ -39,10 +39,7 @@ func TestReader(t *testing.T) {
 	rpcBus := rpcbus.New()
 	counter := chainsync.NewCounter()
 
-	peerReader, err := StartPeerReader(srv, eb, rpcBus, counter, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	peerReader := StartPeerReader(srv, eb, rpcBus, counter, nil)
 
 	// Our message should come in on the agreement topic
 	agreementChan := make(chan message.Message, 1)

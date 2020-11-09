@@ -34,10 +34,7 @@ func TestHandshake(t *testing.T) {
 	client, srv := net.Pipe()
 
 	go func() {
-		peerReader, err := StartPeerReader(srv, eb, rpcBus, counter, nil)
-		if err != nil {
-			panic(err)
-		}
+		peerReader := StartPeerReader(srv, eb, rpcBus, counter, nil)
 
 		if err := peerReader.Accept(); err != nil {
 			panic(err)

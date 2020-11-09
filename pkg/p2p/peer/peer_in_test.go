@@ -55,16 +55,10 @@ func TestPingLoop(t *testing.T) {
 	writer2 := NewWriter(srv, processing.NewGossip(protocol.TestNet), bus)
 	go writer2.Serve(responseChan2, make(chan struct{}, 1))
 
-	reader, err := NewReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), &chainsync.Counter{}, responseChan, make(chan struct{}, 1))
-	if err != nil {
-		t.Fatal(err)
-	}
+	reader := NewReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), &chainsync.Counter{}, responseChan, make(chan struct{}, 1))
 	go reader.ReadLoop()
 
-	reader2, err := NewReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), &chainsync.Counter{}, responseChan2, make(chan struct{}, 1))
-	if err != nil {
-		t.Fatal(err)
-	}
+	reader2 := NewReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), &chainsync.Counter{}, responseChan2, make(chan struct{}, 1))
 	go reader2.ReadLoop()
 
 	// We should eventually get a pong message out of responseChan2
@@ -208,7 +202,7 @@ func testReader(t *testing.T) (*Reader, net.Conn, net.Conn, chan<- *bytes.Buffer
 
 	respChan := make(chan *bytes.Buffer, 10)
 	g := processing.NewGossip(protocol.TestNet)
-	peer, _ := NewReader(r, g, d, bus, rpcbus, &chainsync.Counter{},
+	peer := NewReader(r, g, d, bus, rpcbus, &chainsync.Counter{},
 		respChan, make(chan struct{}, 1))
 
 	// Run the non-recover readLoop to watch for panics
