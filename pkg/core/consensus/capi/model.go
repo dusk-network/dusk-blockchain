@@ -36,6 +36,14 @@ type PeerJSON struct {
 	LastSeen time.Time `storm:"index" json:"last_seen"`
 }
 
+type Count struct {
+	Count int `json:"count"`
+}
+type PeerCount struct {
+	ID       string    `storm:"id" json:"id"`
+	LastSeen time.Time `storm:"index" json:"last_seen"`
+}
+
 // Member is the holder of bls and stakes
 type Member struct {
 	PublicKeyBLS []byte  `json:"bls_key"`

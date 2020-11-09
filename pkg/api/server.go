@@ -111,6 +111,7 @@ func (s *Server) InitRouting() *pat.Router {
 	r.HandleFunc("/consensus/roundinfo", capi.GetRoundInfoHandler).Methods("GET")
 	r.HandleFunc("/consensus/eventqueuestatus", capi.GetEventQueueStatusHandler).Methods("GET")
 	r.HandleFunc("/p2p/logs", capi.GetP2PLogsHandler).Methods("GET")
+	r.HandleFunc("/p2p/count", capi.GetP2PCountHandler).Methods("GET")
 
 	return r
 }

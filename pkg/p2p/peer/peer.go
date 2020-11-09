@@ -94,7 +94,7 @@ func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Sub
 
 // NewReader returns a Reader. It will still need to be initialized by
 // running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
+func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) *Reader {
 	pconn := &Connection{
 		Conn:   conn,
 		gossip: gossip,
@@ -128,7 +128,7 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 		}
 	}()
 
-	return reader, nil
+	return reader
 }
 
 // ReadMessage reads from the connection
@@ -167,7 +167,17 @@ func (w *Writer) Connect() error {
 			}
 			err := store.Save(&peerJSON)
 			if err != nil {
-				log.Error("failed to save peer into StormDB")
+				log.Error("failed to save peerJSON into StormDB")
+			}
+
+			// save count
+			peerCount := capi.PeerCount{
+				ID:       addr,
+				LastSeen: time.Now(),
+			}
+			err = store.Save(&peerCount)
+			if err != nil {
+				log.Error("failed to save peerCount into StormDB")
 			}
 		}()
 	}
@@ -196,6 +206,17 @@ func (p *Reader) Accept() error {
 			if err != nil {
 				log.Error("failed to save peer into StormDB")
 			}
+
+			// save count
+			peerCount := capi.PeerCount{
+				ID:       addr,
+				LastSeen: time.Now(),
+			}
+			err = store.Save(&peerCount)
+			if err != nil {
+				log.Error("failed to save peerCount into StormDB")
+			}
+
 		}()
 	}
 
@@ -235,6 +256,15 @@ func (w *Writer) onDisconnect() {
 			if err != nil {
 				log.Error("failed to save peer into StormDB")
 			}
+
+			// delete count
+			peerCount := capi.PeerCount{
+				ID: addr,
+			}
+			err = store.Delete(&peerCount)
+			if err != nil {
+				log.Error("failed to Delete peerCount into StormDB")
+			}
 		}()
 	}
 
@@ -254,6 +284,21 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 				exitChan <- struct{}{}
 			}
 		case <-exitChan:
+			log.Error("writeLoop, exitChan called")
+			if config.Get().API.Enabled {
+				go func() {
+					addr := w.Addr()
+					peerCount := capi.PeerCount{
+						ID: addr,
+					}
+					store := capi.GetStormDBInstance()
+					// delete count
+					err := store.Delete(&peerCount)
+					if err != nil {
+						log.Error("writeLoop, failed to Delete peerCount into StormDB")
+					}
+				}()
+			}
 			return
 		}
 	}
@@ -330,6 +375,23 @@ func (p *Reader) readLoop() {
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)
+
+		if config.Get().API.Enabled {
+			go func() {
+				store := capi.GetStormDBInstance()
+				addr := p.Addr()
+				// save count
+				peerCount := capi.PeerCount{
+					ID:       addr,
+					LastSeen: time.Now(),
+				}
+				err = store.Save(&peerCount)
+				if err != nil {
+					log.Error("failed to save peerCount into StormDB")
+				}
+			}()
+		}
+
 	}
 }
 
@@ -342,8 +404,29 @@ func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
 		for {
 			select {
 			case <-t.C:
-				// TODO: why not check err returned ?
-				_ = p.Connection.keepAlive()
+				// TODO: why was the error never checked ?
+				err := p.Connection.keepAlive()
+				if err != nil {
+					log.WithError(err).Error("keepAliveLoop, got error back from keepAlive")
+					if config.Get().API.Enabled {
+						go func() {
+							addr := p.Addr()
+							err := p.Connection.keepAlive()
+
+							peerCount := capi.PeerCount{
+								ID: addr,
+							}
+							store := capi.GetStormDBInstance()
+							// delete count
+							err = store.Delete(&peerCount)
+							if err != nil {
+								log.Error("keepAliveLoop, failed to Delete peerCount into StormDB")
+							}
+						}()
+					}
+
+				}
+
 			case <-quitChan:
 				t.Stop()
 				return
