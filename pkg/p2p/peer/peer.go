@@ -364,7 +364,7 @@ func (p *Reader) readLoop() {
 		// TODO: error here should be checked in order to decrease reputation
 		// or blacklist spammers
 		startTime := time.Now().UnixNano()
-		if err := p.router.Collect(message); err != nil {
+		if err = p.router.Collect(message); err != nil {
 			l.WithError(err).Error("message routing")
 		}
 
@@ -411,8 +411,6 @@ func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
 					if config.Get().API.Enabled {
 						go func() {
 							addr := p.Addr()
-							err := p.Connection.keepAlive()
-
 							peerCount := capi.PeerCount{
 								ID: addr,
 							}

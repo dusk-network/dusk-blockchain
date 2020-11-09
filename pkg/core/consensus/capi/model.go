@@ -36,9 +36,12 @@ type PeerJSON struct {
 	LastSeen time.Time `storm:"index" json:"last_seen"`
 }
 
+// Count is the struct used to return a count for a API service
 type Count struct {
 	Count int `json:"count"`
 }
+
+// PeerCount is the struct used to save a peer or remove from a PeerCount collection in the API monitoring database
 type PeerCount struct {
 	ID       string    `storm:"id" json:"id"`
 	LastSeen time.Time `storm:"index" json:"last_seen"`
