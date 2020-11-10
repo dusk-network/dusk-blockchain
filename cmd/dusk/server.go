@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 
 	"github.com/sirupsen/logrus"
@@ -20,7 +21,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/chain2"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -66,9 +67,9 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 	} else {
 		genesis = cfg.DecodeGenesis()
 	}
-	l := chain.NewDBLoader(db, genesis)
+	l := chain2.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(ctx, eventBus, rpcBus, counter, l, l, srv, proxy.Executor())
+	chainProcess, err := chain2.New(ctx, eventBus, rpcBus, proxy, l, proxy.Executor())
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +80,7 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 		return nil, err
 	}
 
-	go chainProcess.Listen()
+	go chainProcess.ConsensusLoop()
 	return l, nil
 }
 
