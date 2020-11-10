@@ -8,7 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -352,11 +352,19 @@ func loadResponseFromPub(pubKey keys.PublicKey) *node.LoadResponse {
 //nolint:unused
 func (t *Transactor) launchConsensus() {
 	log.Tracef("Launch consensus")
-	go initiator.LaunchConsensus(context.Background(), t.eb, t.rb, t.w, t.proxy)
+
+	wk := key.WalletKeys{
+		ConsensusKeys: t.w.Keys(),
+		PublicKey:     &t.w.PublicKey,
+	}
+
+	msg := message.New(topics.Initialization, wk)
+	t.eb.Publish(topics.Initialization, msg)
 }
 
 //nolint:unused
 func (t *Transactor) writeBidValues(tx *node.TransactionResponse) error {
+
 	// return t.db.Update(func(tr database.Transaction) error {
 	// 	k, err := t.w.ReconstructK()
 	// 	if err != nil {
