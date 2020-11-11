@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 
 	"github.com/sirupsen/logrus"
@@ -17,11 +19,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -30,8 +31,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
@@ -44,16 +46,16 @@ type Server struct {
 	rpcBus            *rpcbus.RPCBus
 	loader            chain.Loader
 	dupeMap           *dupemap.DupeMap
-	counter           *chainsync.Counter
 	gossip            *processing.Gossip
 	grpcServer        *grpc.Server
 	ruskConn          *grpc.ClientConn
+	readerFactory     *peer.ReaderFactory
 	activeConnections map[string]time.Time
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, srv *grpc.Server, db database.DB) (chain.Loader, error) {
+func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (chain.Loader, peer.ProcessorFunc, error) {
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
@@ -61,26 +63,26 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 		var err error
 		genesis, err = legacy.OldBlockToNewBlock(g)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	} else {
 		genesis = cfg.DecodeGenesis()
 	}
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(ctx, eventBus, rpcBus, counter, l, l, srv, proxy.Executor())
+	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Perform database sanity check to ensure that it is rational before
 	// bootstrapping all node subsystems
 	if err := l.PerformSanityCheck(0, 10, 0); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	go chainProcess.Listen()
-	return l, nil
+	return l, chainProcess.ProcessBlock, nil
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
@@ -100,7 +102,28 @@ func Setup() *Server {
 	// creating the rpcbus
 	rpcBus := rpcbus.New()
 
-	counter := chainsync.NewCounter()
+	_, db := heavy.CreateDBConnection()
+	processor := peer.NewMessageProcessor(eventBus)
+	// Register peer services
+	processor.Register(topics.Ping, responding.ProcessPing)
+	dataBroker := responding.NewDataBroker(db, rpcBus)
+	processor.Register(topics.GetData, dataBroker.SendItems)
+	dataRequestor := responding.NewDataRequestor(db, rpcBus, eventBus)
+	processor.Register(topics.Inv, dataRequestor.RequestMissingItems)
+	bhb := responding.NewBlockHashBroker(db)
+	processor.Register(topics.GetBlocks, bhb.AdvertiseMissingBlocks)
+	cb := responding.NewCandidateBroker(db)
+	processor.Register(topics.GetCandidate, cb.ProvideCandidate)
+	cBroker := candidate.NewBroker(db)
+	processor.Register(topics.Candidate, cBroker.StoreCandidateMessage)
+	cp := consensus.NewPublisher(eventBus)
+	processor.Register(topics.Score, cp.Process)
+	processor.Register(topics.Reduction, cp.Process)
+	processor.Register(topics.Agreement, cp.Process)
+
+	_ = republisher.New(eventBus, topics.Score)
+	_ = republisher.New(eventBus, topics.Reduction)
+	_ = republisher.New(eventBus, topics.Agreement)
 
 	// Instantiate gRPC client
 	// TODO: get address from config
@@ -117,8 +140,8 @@ func Setup() *Server {
 
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()
+	processor.Register(topics.Tx, m.ProcessTx)
 
-	_, db := heavy.CreateDBConnection()
 	// Instantiate API server
 	if cfg.Get().API.Enabled {
 		if apiServer, e := api.NewHTTPServer(eventBus, rpcBus); e != nil {
@@ -132,17 +155,15 @@ func Setup() *Server {
 		}
 	}
 
-	chainDBLoader, err := LaunchChain(ctx, proxy, eventBus, rpcBus, counter, grpcServer, db)
+	chainDBLoader, blkFn, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	// Setting up the candidate broker
-	candidateBroker := candidate.NewBroker(eventBus, rpcBus)
-	go candidateBroker.Listen()
+	processor.Register(topics.Block, blkFn)
 
 	// Setting up a dupemap
-	dupeBlacklist := launchDupeMap(eventBus)
+	dupeBlacklist := dupemap.Launch(eventBus)
 
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
@@ -155,16 +176,19 @@ func Setup() *Server {
 		}
 	}
 
+	// Creating the peer factory
+	readerFactory := peer.NewReaderFactory(processor)
+
 	// creating the Server
 	srv := &Server{
 		eventBus:          eventBus,
 		rpcBus:            rpcBus,
 		loader:            chainDBLoader,
 		dupeMap:           dupeBlacklist,
-		counter:           counter,
 		gossip:            processing.NewGossip(protocol.TestNet),
 		grpcServer:        grpcServer,
 		ruskConn:          ruskConn,
+		readerFactory:     readerFactory,
 		activeConnections: make(map[string]time.Time),
 	}
 
@@ -195,24 +219,11 @@ func Setup() *Server {
 	return srv
 }
 
-func launchDupeMap(eventBus eventbus.Broker) *dupemap.DupeMap {
-	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
-	dupeBlacklist := dupemap.NewDupeMap(1)
-	go func() {
-		for {
-			blk := <-acceptedBlockChan
-			// NOTE: do we need locking?
-			dupeBlacklist.UpdateHeight(blk.Header.Height)
-		}
-	}()
-	return dupeBlacklist
-}
-
 // OnAccept read incoming packet from the peers
 func (s *Server) OnAccept(conn net.Conn) {
 	writeQueueChan := make(chan *bytes.Buffer, 1000)
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
+	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, writeQueueChan, exitChan)
 	if err != nil {
 		panic(err)
 	}
@@ -243,7 +254,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		Debugln("connection established")
 
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
+	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, writeQueueChan, exitChan)
 	if err != nil {
 		log.Panic(err)
 	}
