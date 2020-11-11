@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"log"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
@@ -29,6 +30,9 @@ const (
 
 	// Maximum number of blocks to be requested/delivered on a single syncing session with a peer
 	MaxInvBlocks = 500
+
+	// Protocol-based consensus step time
+	ConsensusTimeOut = 5 * time.Second
 )
 
 // DecodeGenesis marshals a genesis block into a buffer

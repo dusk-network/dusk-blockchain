@@ -22,9 +22,6 @@ type DBLoader struct {
 
 	// Unsure if the genesis block needs to be here
 	genesis *block.Block
-
-	// Output prefetched data
-	chainTip *block.Block
 }
 
 // SanityCheckBlock will verify whether we have not seed the block before
@@ -185,33 +182,33 @@ func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmou
 func (l *DBLoader) LoadTip() (*block.Block, error) {
 	var tip *block.Block
 	err := l.db.Update(func(t database.Transaction) error {
-
 		s, err := t.FetchState()
 		if err != nil {
 			// TODO: maybe log the error here and diversify between empty
 			// results and actual errors
 
 			// Store Genesis Block, if a modern node runs
-			err := t.StoreBlock(l.genesis)
+			err = t.StoreBlock(l.genesis)
 			if err != nil {
 				return err
 			}
 			tip = l.genesis
 
-		} else {
-			// Reconstruct chain tip
-			h, err := t.FetchBlockHeader(s.TipHash)
-			if err != nil {
-				return err
-			}
-
-			txs, err := t.FetchBlockTxs(s.TipHash)
-			if err != nil {
-				return err
-			}
-
-			tip = &block.Block{Header: h, Txs: txs}
+			return nil
 		}
+
+		// Reconstruct chain tip
+		h, err := t.FetchBlockHeader(s.TipHash)
+		if err != nil {
+			return err
+		}
+
+		txs, err := t.FetchBlockTxs(s.TipHash)
+		if err != nil {
+			return err
+		}
+
+		tip = &block.Block{Header: h, Txs: txs}
 		return nil
 	})
 
@@ -239,6 +236,5 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 		return nil, err
 	}
 
-	l.chainTip = tip
 	return tip, nil
 }
