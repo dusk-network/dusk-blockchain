@@ -1,5 +1,6 @@
 package testing
 
+/*
 import (
 	"bytes"
 	"errors"
@@ -125,3 +126,4 @@ func (r *mockSafeRegistry) ResetCandidates(round uint64) {
 
 	r.candidates = candidates
 }
+*/

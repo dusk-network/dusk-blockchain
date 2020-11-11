@@ -1,5 +1,6 @@
 package testing
 
+/*
 import (
 	"bytes"
 	"context"
@@ -156,3 +157,4 @@ func (c *mockSafeRegistryBroker) provideLastBlock(r rpcbus.Request) {
 	b := c.reg.GetChainTip()
 	r.RespChan <- rpcbus.NewResponse(b, nil)
 }
+*/

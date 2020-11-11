@@ -1,5 +1,6 @@
 package testing
 
+/*
 import (
 	"context"
 	"encoding/binary"
@@ -133,14 +134,12 @@ func (a *mockAcceptor) processCandidateVerificationRequest(r rpcbus.Request) {
 		return
 	}
 
-	/* VST
 	_, err := c.executor.VerifyStateTransition(c.ctx, candidateBlock.Txs, candidateBlock.Header.Height)
 	if err != nil {
 		res.Err = err
 		r.RespChan <- res
 		return
 	}
-	*/
 
 	r.RespChan <- res
 }
@@ -211,3 +210,4 @@ func sanityCheckBlock(db database.DB, prevBlock block.Block, b block.Block) erro
 
 	return nil
 }
+*/

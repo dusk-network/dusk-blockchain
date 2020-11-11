@@ -1,5 +1,6 @@
 package testing
 
+/*
 import (
 	"time"
 
@@ -71,3 +72,4 @@ func (n *mockNode) getLastBlock() (block.Block, error) {
 	blk := resp.(block.Block)
 	return blk, nil
 }
+*/

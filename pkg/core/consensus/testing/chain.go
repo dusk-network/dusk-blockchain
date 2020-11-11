@@ -1,5 +1,6 @@
 package testing
 
+/*
 import (
 	"context"
 	"sync"
@@ -121,10 +122,12 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 		hash := b.Header.Hash
 		seed, _ := crypto.RandEntropy(32)
 		ru := consensus.RoundUpdate{
-			Round: round,
-			P:     *p,
-			Hash:  hash,
-			Seed:  seed,
+			Round:           round,
+			P:               *p,
+			Hash:            hash,
+			Seed:            seed,
+			LastCertificate: block.EmptyCertificate(),
+			LastCommittee:   make([][]byte, 0),
 		}
 
 		c.reg.ResetCandidates(b.Header.Height)
@@ -135,11 +138,13 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 		go func() {
 			// Consensus spin is started in a separate goroutine
 			// For stopping it, use StopLoopChan
-			scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, c.timeOut, c.pubKey.Copy())
+			scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, c.timeOut, c.pubKey.Copy(), func([]byte) error { return nil })
 			assert.NoError(err)
 
-			err = c.loop.Spin(ctx, scr, agr, ru)
-			assert.NoError(err)
+			cert, hash, comm := c.loop.Spin(ctx, scr, agr, ru)
+			assert.NotNil(cert)
+			assert.NotNil(hash)
+			assert.NotNil(comm)
 
 			// if loop.spin is done with this round, start another loop.spin
 			wg.Done()
@@ -185,3 +190,4 @@ func (c *mockChain) teardown() {
 	// Close DB
 	_ = c.db.Close()
 }
+*/
