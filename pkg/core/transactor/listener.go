@@ -5,15 +5,14 @@ import (
 	"crypto/rand"
 	"errors"
 	"os"
+	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 
@@ -312,11 +311,8 @@ func (t *Transactor) publishTx(tx transactions.ContractCall) ([]byte, error) {
 		return nil, err
 	}
 
-	msg := message.New(topics.Tx, tx)
-	errList := t.eb.Publish(topics.Tx, msg)
-	diagnostics.LogPublishErrors("transactor/listener.go, topics.Tx", errList)
-
-	return hash, nil
+	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 2*time.Second)
+	return hash, err
 }
 
 func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.TransactionResponse, error) {
@@ -352,7 +348,9 @@ func loadResponseFromPub(pubKey keys.PublicKey) *node.LoadResponse {
 //nolint:unused
 func (t *Transactor) launchConsensus() {
 	log.Tracef("Launch consensus")
-	go initiator.LaunchConsensus(context.Background(), t.eb, t.rb, t.w, t.proxy)
+	keys := t.w.Keys()
+	msg := message.NewInitialization(&t.w.PublicKey, &keys)
+	t.eb.Publish(topics.Initialization, message.New(topics.Initialization, msg))
 }
 
 //nolint:unused
