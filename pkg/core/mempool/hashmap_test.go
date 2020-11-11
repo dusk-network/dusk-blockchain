@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 func TestSortedKeys(t *testing.T) {
 	assert := assert.New(t)
 
-	pool := &HashMap{Capacity: 100}
+	pool := &HashMap{lock: &sync.RWMutex{}, Capacity: 100}
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
@@ -43,7 +44,7 @@ func TestSortedKeys(t *testing.T) {
 }
 
 func TestStableSortedKeys(t *testing.T) {
-	pool := HashMap{Capacity: 100}
+	pool := HashMap{lock: &sync.RWMutex{}, Capacity: 100}
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
@@ -77,7 +78,7 @@ func TestStableSortedKeys(t *testing.T) {
 func TestGet(t *testing.T) {
 	assert := assert.New(t)
 	txsCount := 10
-	pool := HashMap{Capacity: uint32(txsCount)}
+	pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(txsCount)}
 
 	// Generate 10 random txs
 	hashes := make([][]byte, txsCount)
@@ -107,7 +108,7 @@ func BenchmarkPut(b *testing.B) {
 
 	// Put all transactions
 	for tN := 0; tN < b.N; tN++ {
-		pool := HashMap{Capacity: uint32(len(txs))}
+		pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(len(txs))}
 		for i := 0; i < len(txs); i++ {
 
 			td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
@@ -125,7 +126,7 @@ func BenchmarkContains(b *testing.B) {
 	txs := transactions.RandContractCalls(50000, 0, false)
 
 	// Put all transactions
-	pool := HashMap{Capacity: uint32(len(txs))}
+	pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(len(txs))}
 	for i := 0; i < len(txs); i++ {
 
 		td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
@@ -153,7 +154,7 @@ func BenchmarkRangeSort(b *testing.B) {
 	txs := transactions.RandContractCalls(10000, 0, false)
 
 	// Put all transactions
-	pool := HashMap{Capacity: uint32(len(txs))}
+	pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(len(txs))}
 	for i := 0; i < len(txs); i++ {
 
 		td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}

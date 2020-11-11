@@ -155,7 +155,7 @@ func TestProcessPendingTxs(t *testing.T) {
 		// Publish valid tx
 		txMsg := prepTx(cc[i])
 		c.addTx(cc[i])
-		errList := c.bus.Publish(topics.Tx, txMsg)
+		_, errList := c.m.ProcessTx(txMsg)
 		assert.Empty(t, errList)
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
@@ -163,13 +163,13 @@ func TestProcessPendingTxs(t *testing.T) {
 		transactions.Invalidate(invalid)
 		txMsg = prepTx(invalid)
 		c.addTx(invalid)
-		errList = c.bus.Publish(topics.Tx, txMsg)
-		assert.Empty(t, errList)
+		_, errList = c.m.ProcessTx(txMsg)
+		assert.NotEmpty(t, errList)
 
 		// Publish a duplicated tx
 		c.addTx(invalid)
-		errList = c.bus.Publish(topics.Tx, txMsg)
-		assert.Empty(t, errList)
+		_, errList = c.m.ProcessTx(txMsg)
+		assert.NotEmpty(t, errList)
 	}
 
 	c.assert(t, true)
@@ -206,7 +206,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		go func(txs []transactions.ContractCall) {
 			for _, tx := range txs {
 				txMsg := prepTx(tx)
-				errList := c.bus.Publish(topics.Tx, txMsg)
+				_, errList := c.m.ProcessTx(txMsg)
 				assert.Empty(t, errList)
 			}
 			wg.Done()
@@ -220,8 +220,8 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 			for y := 0; y <= 5; y++ {
 				tx := transactions.MockInvalidTx()
 				txMsg := prepTx(tx)
-				errList := c.bus.Publish(topics.Tx, txMsg)
-				assert.Empty(t, errList)
+				_, errList := c.m.ProcessTx(txMsg)
+				assert.NotEmpty(t, errList)
 			}
 			wg.Done()
 		}()
@@ -259,7 +259,7 @@ func TestRemoveAccepted(t *testing.T) {
 		txMsg := prepTx(txCopy)
 
 		// Publish valid tx
-		errList := c.bus.Publish(topics.Tx, txMsg)
+		_, errList := c.m.ProcessTx(txMsg)
 		assert.Empty(errList)
 
 		// Simulate a situation where the block has accepted each 2nd tx
@@ -294,8 +294,10 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 	for _, tx := range txs {
 		txMsg := prepTx(tx)
 		c.addTx(tx)
-		errList := c.bus.Publish(topics.Tx, txMsg)
-		assert.Empty(t, errList)
+		_, errList := c.m.ProcessTx(txMsg)
+		if tx.Type() == transactions.Distribute {
+			assert.NotEmpty(t, errList)
+		}
 	}
 
 	c.wait()

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
@@ -15,7 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -30,8 +30,7 @@ import (
 var log = logger.WithFields(logger.Fields{"prefix": "mempool"})
 
 const (
-	//consensusSeconds = 20
-	maxPendingLen = 1000
+//consensusSeconds = 20
 )
 
 var (
@@ -50,10 +49,6 @@ type Mempool struct {
 	getMempoolTxsBySizeChan <-chan rpcbus.Request
 	sendTxChan              <-chan rpcbus.Request
 
-	// transactions emitted by RPC and Peer subsystems
-	// pending to be verified before adding them to verified pool
-	pending chan TxDesc
-
 	// verified txs to be included in next block
 	verified Pool
 
@@ -68,9 +63,6 @@ type Mempool struct {
 	// the magic function that knows best what is valid chain Tx
 	verifier transactions.UnconfirmedTxProber
 	quitChan chan struct{}
-
-	// ID of subscription to the TX topic on the EventBus
-	txSubscriberID uint32
 
 	ctx context.Context
 }
@@ -87,7 +79,6 @@ func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 
 // NewMempool instantiates and initializes node mempool
 func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
-
 	log.Infof("Create instance")
 
 	getMempoolTxsChan := make(chan rpcbus.Request, 1)
@@ -125,14 +116,6 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 
 	log.Infof("Running with pool type %s", config.Get().Mempool.PoolType)
 
-	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
-	m.pending = make(chan TxDesc, maxPendingLen)
-	collectPendingListener := eventbus.NewCallbackListener(m.CollectPending)
-	if config.Get().General.SafeCallbackListener {
-		collectPendingListener = eventbus.NewSafeCallbackListener(m.CollectPending)
-	}
-	m.txSubscriberID = m.eventBus.Subscribe(topics.Tx, collectPendingListener)
-
 	if srv != nil {
 		node.RegisterMempoolServer(srv, m)
 	}
@@ -158,11 +141,6 @@ func (m *Mempool) Run() {
 				handleRequest(r, m.processGetMempoolTxsBySizeRequest, "GetMempoolTxsBySize")
 			case b := <-m.acceptedBlockChan:
 				m.onBlock(b)
-			case tx := <-m.pending:
-				// TODO: the m.pending channel looks a bit wasteful. Consider
-				// removing it and call onPendingTx directly within
-				// CollectPending
-				_, _ = m.onPendingTx(tx)
 			case <-time.After(20 * time.Second):
 				m.onIdle()
 			// Mempool terminating
@@ -174,9 +152,10 @@ func (m *Mempool) Run() {
 	}()
 }
 
-// onPendingTx handles a submitted tx from any source (rpcBus or eventBus)
-func (m *Mempool) onPendingTx(t TxDesc) ([]byte, error) {
-	log.WithField("len_pending", len(m.pending)).Info("handle submitted tx")
+// ProcessTx handles a submitted tx from any source (rpcBus or eventBus)
+func (m *Mempool) ProcessTx(msg message.Message) ([]*bytes.Buffer, error) {
+	t := TxDesc{tx: msg.Payload().(transactions.ContractCall), received: time.Now(), size: uint(len(msg.Id()))}
+	log.Info("handle submitted tx")
 
 	start := time.Now()
 	txid, err := m.processTx(t)
@@ -194,7 +173,7 @@ func (m *Mempool) onPendingTx(t TxDesc) ([]byte, error) {
 			Infof("Verified handle submitted tx")
 	}
 
-	return txid, err
+	return nil, err
 }
 
 // processTx ensures all transaction rules are satisfied before adding the tx
@@ -274,9 +253,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 	}
 
 	tree, err := merkletree.NewTree(payloads)
-
 	if err == nil && tree != nil {
-
 		s := m.newPool()
 		// Check if mempool verified tx is part of merkle tree of this block
 		// if not, then keep it in the mempool for the next block
@@ -346,28 +323,19 @@ func (m *Mempool) onIdle() {
 }
 
 func (m *Mempool) newPool() Pool {
-
 	preallocTxs := config.Get().Mempool.PreallocTxs
 
 	var p Pool
 	switch config.Get().Mempool.PoolType {
 	case "hashmap":
-		p = &HashMap{Capacity: preallocTxs}
+		p = &HashMap{lock: &sync.RWMutex{}, Capacity: preallocTxs}
 	case "syncpool":
 		log.Panic("syncpool not supported")
 	default:
-		p = &HashMap{Capacity: preallocTxs}
+		p = &HashMap{lock: &sync.RWMutex{}, Capacity: preallocTxs}
 	}
 
 	return p
-}
-
-// CollectPending process the emitted transactions.
-// Fast-processing and simple impl to avoid locking here.
-// NB This is always run in a different than main mempool routine
-func (m *Mempool) CollectPending(msg message.Message) {
-	tx := msg.Payload().(transactions.ContractCall)
-	m.pending <- TxDesc{tx: tx, received: time.Now(), size: uint(len(msg.Id()))}
 }
 
 // processGetMempoolTxsRequest retrieves current state of the mempool of the verified but
@@ -533,10 +501,8 @@ func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, err
 		return nil, err
 	}
 
-	txDesc := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len())}
-
-	// Process request
-	return m.onPendingTx(txDesc)
+	t := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len())}
+	return m.processTx(t)
 }
 
 // Quit makes mempool main loop to terminate
@@ -547,9 +513,8 @@ func (m *Mempool) Quit() {
 // Send Inventory message to all peers
 //nolint:unparam
 func (m *Mempool) advertiseTx(txID []byte) error {
-
-	msg := &peermsg.Inv{}
-	msg.AddItem(peermsg.InvTypeMempoolTx, txID)
+	msg := &message.Inv{}
+	msg.AddItem(message.InvTypeMempoolTx, txID)
 
 	// TODO: can we simply encode the message directly on a topic carrying buffer?
 	buf := new(bytes.Buffer)
@@ -577,7 +542,6 @@ func toHex(id []byte) string {
 // TODO: handlers should just return []transactions.ContractCall, and the
 // caller should be left to format the data however they wish
 func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}, error), name string) {
-
 	result, err := handler(r)
 	if err != nil {
 		log.
