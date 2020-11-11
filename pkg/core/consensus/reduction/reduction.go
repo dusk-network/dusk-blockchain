@@ -60,6 +60,11 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 
 // SendReduction to the other peers
 func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
+
+	if len(hash) != 32 {
+		return
+	}
+
 	hdr := header.Header{
 		Round:     round,
 		Step:      step,

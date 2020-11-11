@@ -226,7 +226,7 @@ func GetCandidate(r *rpcbus.RPCBus, hash []byte) (message.Candidate, error) {
 			WithError(err).
 			WithField("hash", hex.EncodeToString(hash)).
 			Error("could not find candidate block")
-		return message.Candidate{}, nil
+		return message.Candidate{}, err
 	}
 
 	return resp.(message.Candidate), nil
