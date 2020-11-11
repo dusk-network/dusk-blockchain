@@ -11,7 +11,7 @@ lint: ## Lint the files
 test: ## Run unittests
 	@go test $(TFLAGS) -short ${PKG_LIST}
 test-harness: ## Run harness tests
-	@go test -v --count=1 --test.timeout=0 ./harness/tests/ -args
+	@go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable
 test-harness-ci: build
 	MOCK_ADDRESS=127.0.0.1:8080 NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" make test-harness
 test-harness-alive: stop build
