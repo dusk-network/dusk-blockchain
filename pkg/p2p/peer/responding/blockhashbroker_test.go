@@ -1,15 +1,14 @@
 package responding_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	assert "github.com/stretchr/testify/require"
 )
@@ -28,23 +27,20 @@ func TestAdvertiseBlocks(t *testing.T) {
 	assert.NoError(storeBlocks(db, blocks))
 
 	// Set up the BlockHashBroker
-	responseChan := make(chan *bytes.Buffer, 100)
-	blockHashBroker := responding.NewBlockHashBroker(db, responseChan)
+	blockHashBroker := responding.NewBlockHashBroker(db)
 
 	// Make a GetBlocks, with the genesis block as the locator.
-	msg := createGetBlocksBuffer(hashes[0])
-	assert.NoError(blockHashBroker.AdvertiseMissingBlocks(msg))
-
-	// The BlockHashBroker's response should be put on the responseChan.
-	response := <-responseChan
+	msg := createGetBlocks(hashes[0])
+	blksBuf, err := blockHashBroker.AdvertiseMissingBlocks(msg)
+	assert.NoError(err)
 
 	// Check for correctness of topic
-	topic, _ := topics.Extract(response)
+	topic, _ := topics.Extract(blksBuf[0])
 	assert.Equal(topics.Inv, topic)
 
 	// Decode inv
-	inv := &peermsg.Inv{}
-	assert.NoError(inv.Decode(response))
+	inv := &message.Inv{}
+	assert.NoError(inv.Decode(blksBuf[0]))
 
 	// Check that block hashes match up with those we generated
 	for i, item := range inv.InvList {
@@ -65,16 +61,10 @@ func generateBlocks(amount int) ([][]byte, []*block.Block) {
 	return hashes, blocks
 }
 
-func createGetBlocksBuffer(locator []byte) *bytes.Buffer {
-	getBlocks := &peermsg.GetBlocks{}
+func createGetBlocks(locator []byte) message.Message {
+	getBlocks := &message.GetBlocks{}
 	getBlocks.Locators = append(getBlocks.Locators, locator)
-
-	buf := new(bytes.Buffer)
-	if err := getBlocks.Encode(buf); err != nil {
-		panic(err)
-	}
-
-	return buf
+	return message.New(topics.GetBlocks, *getBlocks)
 }
 
 func storeBlocks(db database.DB, blocks []*block.Block) error {

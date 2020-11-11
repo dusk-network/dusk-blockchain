@@ -1,12 +1,12 @@
-package peermsg
+package message
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 )
 
 // InvType is a byte describing the Inventory type
@@ -35,9 +35,32 @@ type Inv struct {
 	InvList []InvVect
 }
 
+// Copy an InvVect.
+// Implements the payload.Safe interface.
+func (i InvVect) Copy() payload.Safe {
+	hash := make([]byte, len(i.Hash))
+	copy(hash, i.Hash)
+	return &InvVect{
+		Type: i.Type,
+		Hash: hash,
+	}
+}
+
+// Copy an Inv.
+// Implements the payload.Safe interface.
+func (inv Inv) Copy() payload.Safe {
+	list := make([]InvVect, len(inv.InvList))
+	for i, item := range inv.InvList {
+		list[i] = item.Copy().(InvVect)
+	}
+
+	return &Inv{list}
+}
+
 // Encode an Inventory request into a buffer
 func (inv *Inv) Encode(w *bytes.Buffer) error {
-	if uint32(len(inv.InvList)) > config.Get().Mempool.MaxInvItems {
+	// NOTE: this is hardcoded due to recursive imports. this needs to be fixed
+	if uint32(len(inv.InvList)) > 10000 {
 		return errors.New("inv message is too large")
 	}
 
@@ -66,6 +89,17 @@ func (inv *Inv) Encode(w *bytes.Buffer) error {
 	return nil
 }
 
+// UnmarshalInvMessage into a SerializableMessage.
+func UnmarshalInvMessage(r *bytes.Buffer, m SerializableMessage) error {
+	inv := &Inv{}
+	if err := inv.Decode(r); err != nil {
+		return err
+	}
+
+	m.SetPayload(*inv)
+	return nil
+}
+
 // Decode an Inventory from a buffer
 func (inv *Inv) Decode(r *bytes.Buffer) error {
 	lenVect, e := encoding.ReadVarInt(r)
@@ -73,7 +107,7 @@ func (inv *Inv) Decode(r *bytes.Buffer) error {
 		return e
 	}
 
-	if lenVect > uint64(config.Get().Mempool.MaxInvItems) {
+	if lenVect > uint64(10000) {
 		return errors.New("inv message is too large")
 	}
 

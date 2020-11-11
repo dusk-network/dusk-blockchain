@@ -14,15 +14,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 var l = log.WithField("process", "peer")
@@ -67,8 +62,9 @@ type Writer struct {
 // other network nodes.
 type Reader struct {
 	*Connection
-	router   *messageRouter
-	exitChan chan<- struct{} // Way to kill the WriteLoop
+	processor    *MessageProcessor
+	responseChan chan<- *bytes.Buffer
+	exitChan     chan<- struct{} // Way to kill the WriteLoop
 	// TODO: add service flag
 }
 
@@ -90,45 +86,6 @@ func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Sub
 	}
 
 	return pw
-}
-
-// NewReader returns a Reader. It will still need to be initialized by
-// running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
-	pconn := &Connection{
-		Conn:   conn,
-		gossip: gossip,
-	}
-
-	_, db := heavy.CreateDBConnection()
-
-	dataRequestor := responding.NewDataRequestor(db, rpcBus, responseChan)
-
-	reader := &Reader{
-		Connection: pconn,
-		exitChan:   exitChan,
-		router: &messageRouter{
-			publisher:       publisher,
-			dupeMap:         dupeMap,
-			blockHashBroker: responding.NewBlockHashBroker(db, responseChan),
-			synchronizer:    chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
-			dataRequestor:   dataRequestor,
-			dataBroker:      responding.NewDataBroker(db, rpcBus, responseChan),
-			candidateBroker: responding.NewCandidateBroker(rpcBus, responseChan),
-			ponger:          processing.NewPonger(responseChan),
-			peerInfo:        conn.RemoteAddr().String(),
-		},
-	}
-
-	// On each new connection the node sends topics.Mempool to retrieve mempool
-	// txs from the new peer
-	go func() {
-		if err := dataRequestor.RequestMempoolItems(); err != nil {
-			l.WithError(err).Warnln("error sending topics.Mempool message")
-		}
-	}()
-
-	return reader, nil
 }
 
 // ReadMessage reads from the connection
@@ -316,17 +273,19 @@ func (p *Reader) readLoop() {
 			return
 		}
 
-		// TODO: error here should be checked in order to decrease reputation
-		// or blacklist spammers
-		startTime := time.Now().UnixNano()
-		if err := p.router.Collect(message); err != nil {
-			l.WithError(err).Error("message routing")
-		}
+		go func() {
+			// TODO: error here should be checked in order to decrease reputation
+			// or blacklist spammers
+			startTime := time.Now().UnixNano()
+			if err = p.processor.Collect(message, p.responseChan); err != nil {
+				l.WithError(err).Error("message routing")
+			}
 
-		duration := float64(time.Now().UnixNano()-startTime) / 1000000
-		l.WithField("cs", hex.EncodeToString(cs)).
-			WithField("len", len(message)).
-			WithField("ms", duration).Debug("trace message routing")
+			duration := float64(time.Now().UnixNano()-startTime) / 1000000
+			l.WithField("cs", hex.EncodeToString(cs)).
+				WithField("len", len(message)).
+				WithField("ms", duration).Debug("trace message routing")
+		}()
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)

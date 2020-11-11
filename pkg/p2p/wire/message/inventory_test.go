@@ -1,4 +1,4 @@
-package peermsg_test
+package message_test
 
 import (
 	"bytes"
@@ -6,22 +6,22 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEncodeDecodeInventory(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
-	inv := &peermsg.Inv{}
-	inv.AddItem(peermsg.InvTypeBlock, hash)
+	inv := &message.Inv{}
+	inv.AddItem(message.InvTypeBlock, hash)
 	buf := new(bytes.Buffer)
 	if err := inv.Encode(buf); err != nil {
 		t.Fatal(err)
 	}
 
-	inv2 := &peermsg.Inv{}
+	inv2 := &message.Inv{}
 	if err := inv2.Decode(buf); err != nil {
 		t.Fatal(err)
 	}
@@ -32,9 +32,9 @@ func TestEncodeDecodeInventory(t *testing.T) {
 func TestSizeLimit(t *testing.T) {
 	// Encoding
 	hash, _ := crypto.RandEntropy(32)
-	inv := &peermsg.Inv{}
+	inv := &message.Inv{}
 	for i := 0; uint32(i) < config.Get().Mempool.MaxInvItems+1; i++ {
-		inv.AddItem(peermsg.InvTypeBlock, hash)
+		inv.AddItem(message.InvTypeBlock, hash)
 	}
 
 	buf := new(bytes.Buffer)
@@ -46,6 +46,6 @@ func TestSizeLimit(t *testing.T) {
 	buf = new(bytes.Buffer)
 	assert.NoError(t, encoding.WriteVarInt(buf, math.MaxUint64))
 
-	inv = &peermsg.Inv{}
+	inv = &message.Inv{}
 	assert.Error(t, inv.Decode(buf))
 }

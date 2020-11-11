@@ -208,6 +208,12 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 	msg.category = topic
 
 	switch topic {
+	case topics.Block:
+		err = UnmarshalBlockMessage(b, msg)
+	case topics.GetBlocks:
+		err = UnmarshalGetBlocksMessage(b, msg)
+	case topics.Inv, topics.GetData:
+		err = UnmarshalInvMessage(b, msg)
 	case topics.Tx:
 		err = UnmarshalTxMessage(b, msg)
 	case topics.Candidate, topics.RoundResults:

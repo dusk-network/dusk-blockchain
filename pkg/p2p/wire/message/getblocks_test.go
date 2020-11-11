@@ -1,10 +1,10 @@
-package peermsg_test
+package message_test
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,13 +16,13 @@ func TestEncodeDecodeGetBlocks(t *testing.T) {
 		hashes = append(hashes, hash)
 	}
 
-	getBlocks := &peermsg.GetBlocks{hashes}
+	getBlocks := &message.GetBlocks{hashes}
 	buf := new(bytes.Buffer)
 	if err := getBlocks.Encode(buf); err != nil {
 		t.Fatal(err)
 	}
 
-	getBlocks2 := &peermsg.GetBlocks{}
+	getBlocks2 := &message.GetBlocks{}
 	if err := getBlocks2.Decode(buf); err != nil {
 		t.Fatal(err)
 	}

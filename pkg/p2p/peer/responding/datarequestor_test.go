@@ -6,42 +6,40 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 func TestRequestData(t *testing.T) {
+	bus := eventbus.New()
+
 	_, db := lite.CreateDBConnection()
 	defer func() {
 		_ = db.Close()
 	}()
 
-	responseChan := make(chan *bytes.Buffer, 100)
-	dataRequestor := responding.NewDataRequestor(db, nil, responseChan)
+	dataRequestor := responding.NewDataRequestor(db, nil, bus)
 
 	// Send topics.Inv
-	hash, buf, err := createInvBuffer()
+	hash, msg := createInv()
+
+	bufs, err := dataRequestor.RequestMissingItems(msg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := dataRequestor.RequestMissingItems(buf); err != nil {
-		t.Fatal(err)
-	}
-
-	response := <-responseChan
-
 	// Check topic
-	topic, _ := topics.Extract(response)
+	topic, _ := topics.Extract(bufs[0])
 	if topic != topics.GetData {
 		t.Fatalf("unexpected topic %s, expected GetData", topic)
 	}
 
 	// Assert the output
-	inv := &peermsg.Inv{}
-	if err := inv.Decode(response); err != nil {
+	inv := &message.Inv{}
+	if err := inv.Decode(bufs[0]); err != nil {
 		t.Fatal(err)
 	}
 
@@ -54,15 +52,9 @@ func TestRequestData(t *testing.T) {
 	}
 }
 
-func createInvBuffer() ([]byte, *bytes.Buffer, error) {
-	msg := &peermsg.Inv{}
+func createInv() ([]byte, message.Message) {
+	msg := &message.Inv{}
 	hash, _ := crypto.RandEntropy(32)
-	msg.AddItem(peermsg.InvTypeBlock, hash)
-
-	buf := new(bytes.Buffer)
-	if err := msg.Encode(buf); err != nil {
-		return nil, nil, err
-	}
-
-	return hash, buf, nil
+	msg.AddItem(message.InvTypeBlock, hash)
+	return hash, message.New(topics.Inv, *msg)
 }

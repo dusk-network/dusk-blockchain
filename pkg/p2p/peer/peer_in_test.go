@@ -12,7 +12,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -55,13 +55,18 @@ func TestPingLoop(t *testing.T) {
 	writer2 := NewWriter(srv, processing.NewGossip(protocol.TestNet), bus)
 	go writer2.Serve(responseChan2, make(chan struct{}, 1))
 
-	reader, err := NewReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), &chainsync.Counter{}, responseChan, make(chan struct{}, 1))
+	// Set up reader factory
+	processor := NewMessageProcessor(bus)
+	processor.Register(topics.Ping, responding.ProcessPing)
+	factory := NewReaderFactory(processor)
+
+	reader, err := factory.SpawnReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), responseChan, make(chan struct{}, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
 	go reader.ReadLoop()
 
-	reader2, err := NewReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), &chainsync.Counter{}, responseChan2, make(chan struct{}, 1))
+	reader2, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), responseChan2, make(chan struct{}, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,8 +89,13 @@ func TestPingLoop(t *testing.T) {
 // TestIncompleteChecksum ensures peer reader does not panic on
 // incomplete checksum buffer
 func TestIncompleteChecksum(t *testing.T) {
+	bus := eventbus.New()
 
-	peer, _, w, _ := testReader(t)
+	// Set up reader factory
+	processor := NewMessageProcessor(bus)
+	factory := NewReaderFactory(processor)
+
+	peer, _, w, _ := testReader(t, factory)
 	defer func() {
 		_ = peer.Close()
 	}()
@@ -118,8 +128,13 @@ func TestIncompleteChecksum(t *testing.T) {
 
 // TestZeroLength ensures peer reader does not panic on 0 length field
 func TestZeroLength(t *testing.T) {
+	bus := eventbus.New()
 
-	peer, _, w, _ := testReader(t)
+	// Set up reader factory
+	processor := NewMessageProcessor(bus)
+	factory := NewReaderFactory(processor)
+
+	peer, _, w, _ := testReader(t, factory)
 	defer func() {
 		_ = peer.Close()
 	}()
@@ -148,8 +163,13 @@ func TestZeroLength(t *testing.T) {
 // TestOverflowLength
 // Ensure peer reader does not panic overflow length value
 func TestOverflowLength(t *testing.T) {
+	bus := eventbus.New()
 
-	peer, _, w, _ := testReader(t)
+	// Set up reader factory
+	processor := NewMessageProcessor(bus)
+	factory := NewReaderFactory(processor)
+
+	peer, _, w, _ := testReader(t, factory)
 	defer func() {
 		_ = peer.Close()
 	}()
@@ -171,8 +191,13 @@ func TestOverflowLength(t *testing.T) {
 // TestInvalidPayload
 // Ensure peer reader does not panic on sending invalid payload to any topic
 func TestInvalidPayload(t *testing.T) {
+	bus := eventbus.New()
 
-	peer, _, w, _ := testReader(t)
+	// Set up reader factory
+	processor := NewMessageProcessor(bus)
+	factory := NewReaderFactory(processor)
+
+	peer, _, w, _ := testReader(t, factory)
 	defer func() {
 		_ = peer.Close()
 	}()
@@ -181,7 +206,6 @@ func TestInvalidPayload(t *testing.T) {
 	// payload
 	var topic byte
 	for topic = 0; topic <= 50; topic++ {
-
 		buf := &bytes.Buffer{}
 		buf.WriteByte(topic)
 		buf.Write([]byte{0, 1, 2})
@@ -199,8 +223,7 @@ func TestInvalidPayload(t *testing.T) {
 }
 
 //nolint:unparam
-func testReader(t *testing.T) (*Reader, net.Conn, net.Conn, chan<- *bytes.Buffer) {
-
+func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, chan<- *bytes.Buffer) {
 	bus := eventbus.New()
 	rpcbus := rpcbus.New()
 	d := dupemap.NewDupeMap(0)
@@ -208,8 +231,7 @@ func testReader(t *testing.T) (*Reader, net.Conn, net.Conn, chan<- *bytes.Buffer
 
 	respChan := make(chan *bytes.Buffer, 10)
 	g := processing.NewGossip(protocol.TestNet)
-	peer, _ := NewReader(r, g, d, bus, rpcbus, &chainsync.Counter{},
-		respChan, make(chan struct{}, 1))
+	peer, _ := f.SpawnReader(r, g, d, bus, rpcbus, respChan, make(chan struct{}, 1))
 
 	// Run the non-recover readLoop to watch for panics
 	go assert.NotPanics(t, peer.readLoop)

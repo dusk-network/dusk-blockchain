@@ -135,7 +135,7 @@ func (e Score) Copy() payload.Safe {
 // since empty scores should not be propagated externally
 func EmptyScore() Score {
 	return Score{
-		ScoreProposal: EmptyScoreProposal(header.Header{}),
+		ScoreProposal: EmptyScoreProposal(header.Header{BlockHash: make([]byte, 32)}),
 		Candidate:     *NewCandidate(),
 	}
 }

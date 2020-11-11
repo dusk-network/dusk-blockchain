@@ -6,7 +6,7 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
@@ -14,36 +14,31 @@ import (
 // It has a database connection, and a channel pointing to the outgoing message queue
 // of the requesting peer.
 type BlockHashBroker struct {
-	db           database.DB
-	responseChan chan<- *bytes.Buffer
+	db database.DB
 }
 
 // NewBlockHashBroker will return an initialized BlockHashBroker.
-func NewBlockHashBroker(db database.DB, responseChan chan<- *bytes.Buffer) *BlockHashBroker {
+func NewBlockHashBroker(db database.DB) *BlockHashBroker {
 	return &BlockHashBroker{
-		db:           db,
-		responseChan: responseChan,
+		db: db,
 	}
 }
 
 // AdvertiseMissingBlocks takes a GetBlocks wire message, finds the requesting peer's
 // height, and returns an inventory message of up to config.MaxInvBlocks blocks which follow the
 // provided locator.
-func (b *BlockHashBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
-	msg := &peermsg.GetBlocks{}
-	if err := msg.Decode(m); err != nil {
-		return err
-	}
+func (b *BlockHashBroker) AdvertiseMissingBlocks(m message.Message) ([]*bytes.Buffer, error) {
+	msg := m.Payload().(message.GetBlocks)
 
 	// Determine from where we need to start fetching blocks, going off his Locator
 	height, err := b.fetchLocatorHeight(msg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Fill an inv message with all block hashes between the locator
 	// and the chain tip.
-	inv := &peermsg.Inv{}
+	inv := &message.Inv{}
 	for {
 		height++
 
@@ -59,7 +54,7 @@ func (b *BlockHashBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 			break
 		}
 
-		inv.AddItem(peermsg.InvTypeBlock, hash)
+		inv.AddItem(message.InvTypeBlock, hash)
 		if len(inv.InvList) >= cfg.MaxInvBlocks {
 			break
 		}
@@ -68,20 +63,14 @@ func (b *BlockHashBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 	// If we retrieved any items, we should marshal the inventory message, and send it
 	// to the requesting peer.
 	if inv.InvList != nil {
-		buf, err := marshalInv(inv)
-		if err != nil {
-			return err
-		}
-
-		b.responseChan <- buf
+		return marshalInv(inv)
 	}
 
-	return nil
+	return nil, nil
 }
 
 // Determine a peer's height from his locator hash.
-func (b *BlockHashBroker) fetchLocatorHeight(msg *peermsg.GetBlocks) (uint64, error) {
-
+func (b *BlockHashBroker) fetchLocatorHeight(msg message.GetBlocks) (uint64, error) {
 	if len(msg.Locators) == 0 {
 		return 0, errors.New("empty locators array")
 	}
@@ -100,12 +89,12 @@ func (b *BlockHashBroker) fetchLocatorHeight(msg *peermsg.GetBlocks) (uint64, er
 	return height, err
 }
 
-func marshalInv(inv *peermsg.Inv) (*bytes.Buffer, error) {
+func marshalInv(inv *message.Inv) ([]*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	if err := inv.Encode(buf); err != nil {
 		return nil, err
 	}
 
 	_ = topics.Prepend(buf, topics.Inv)
-	return buf, nil
+	return []*bytes.Buffer{buf}, nil
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -37,17 +37,25 @@ func TestReader(t *testing.T) {
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
-	counter := chainsync.NewCounter()
 
-	peerReader, err := StartPeerReader(srv, eb, rpcBus, counter, nil)
+	// Set up reader factory
+	processor := NewMessageProcessor(eb)
+	agreementChan := make(chan struct{}, 1)
+	respFn := func(_ message.Message) ([]*bytes.Buffer, error) {
+		agreementChan <- struct{}{}
+		return nil, nil
+	}
+
+	processor.Register(topics.Agreement, respFn)
+	factory := NewReaderFactory(processor)
+
+	dupeMap := dupemap.NewDupeMap(5)
+	responseChan := make(chan *bytes.Buffer, 100)
+	exitChan := make(chan struct{}, 1)
+	peerReader, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupeMap, eb, rpcBus, responseChan, exitChan)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Our message should come in on the agreement topic
-	agreementChan := make(chan message.Message, 1)
-	l := eventbus.NewChanListener(agreementChan)
-	eb.Subscribe(topics.Agreement, l)
 
 	go peerReader.ReadLoop()
 
@@ -68,7 +76,6 @@ func TestReader(t *testing.T) {
 	select {
 	case err := <-errChan:
 		t.Fatal(err)
-
 	case <-agreementChan:
 	}
 }

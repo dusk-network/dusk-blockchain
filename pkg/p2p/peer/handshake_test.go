@@ -1,6 +1,7 @@
 package peer
 
 import (
+	"bytes"
 	"net"
 	"os"
 	"testing"
@@ -10,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -29,12 +30,16 @@ func TestHandshake(t *testing.T) {
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
-	counter := chainsync.NewCounter()
+
+	processor := NewMessageProcessor(eb)
+	factory := NewReaderFactory(processor)
 
 	client, srv := net.Pipe()
 
 	go func() {
-		peerReader, err := StartPeerReader(srv, eb, rpcBus, counter, nil)
+		responseChan := make(chan *bytes.Buffer, 100)
+		exitChan := make(chan struct{}, 1)
+		peerReader, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), eb, rpcBus, responseChan, exitChan)
 		if err != nil {
 			panic(err)
 		}

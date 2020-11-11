@@ -1,17 +1,25 @@
-package peermsg
+package message
 
 import (
 	"bytes"
 	"errors"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 )
 
 // GetBlocks defines a getblocks message on the Dusk wire protocol. It is used to
 // request blocks from another peer.
 type GetBlocks struct {
 	Locators [][]byte
+}
+
+// Copy a GetBlocks message.
+// Implements the payload.Safe interface.
+func (g GetBlocks) Copy() payload.Safe {
+	l := make([][]byte, len(g.Locators))
+	copy(l, g.Locators)
+	return &GetBlocks{l}
 }
 
 // Encode a GetBlocks struct and write it to w.
@@ -29,6 +37,18 @@ func (g *GetBlocks) Encode(w *bytes.Buffer) error {
 	return nil
 }
 
+// UnmarshalGetBlocksMessage unmarshals a GetBlocks message into a
+// SerializableMessage.
+func UnmarshalGetBlocksMessage(r *bytes.Buffer, m SerializableMessage) error {
+	g := &GetBlocks{}
+	if err := g.Decode(r); err != nil {
+		return err
+	}
+
+	m.SetPayload(*g)
+	return nil
+}
+
 // Decode a GetBlocks struct from r into g.
 func (g *GetBlocks) Decode(r *bytes.Buffer) error {
 	lenLocators, err := encoding.ReadVarInt(r)
@@ -38,7 +58,8 @@ func (g *GetBlocks) Decode(r *bytes.Buffer) error {
 
 	// lenLocators should never exceed 500, as that is the maximum amount
 	// of blocks a peer can request
-	if lenLocators > cfg.MaxInvBlocks {
+	// TODO: remove hardcoding
+	if lenLocators > 500 {
 		return errors.New("too many locators in GetBlocks message")
 	}
 

@@ -2,6 +2,9 @@ package dupemap
 
 import (
 	"bytes"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 var defaultTolerance uint64 = 3
@@ -12,6 +15,21 @@ type DupeMap struct {
 	round     uint64
 	tmpMap    *TmpMap
 	tolerance uint64
+}
+
+// Launch returns a dupemap which is self-cleaning, by launching a goroutine
+// which listens for accepted blocks, and updates the height upon receipt.
+func Launch(eventBus eventbus.Broker) *DupeMap {
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
+	dupeBlacklist := NewDupeMap(1)
+	go func() {
+		for {
+			blk := <-acceptedBlockChan
+			// NOTE: do we need locking?
+			dupeBlacklist.UpdateHeight(blk.Header.Height)
+		}
+	}()
+	return dupeBlacklist
 }
 
 // NewDupeMap returns a DupeMap

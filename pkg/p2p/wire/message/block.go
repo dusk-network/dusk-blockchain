@@ -31,6 +31,18 @@ func MarshalBlock(r *bytes.Buffer, b *block.Block) error {
 	return nil
 }
 
+// UnmarshalBlockMessage unmarshals a block from a binary buffer into
+// a SerializableMessage.
+func UnmarshalBlockMessage(r *bytes.Buffer, m SerializableMessage) error {
+	blk := block.NewBlock()
+	if err := UnmarshalBlock(r, blk); err != nil {
+		return err
+	}
+
+	m.SetPayload(*blk)
+	return nil
+}
+
 // UnmarshalBlock unmarshals a block from a binary buffer
 func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
 	if err := UnmarshalHeader(r, b.Header); err != nil {

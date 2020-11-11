@@ -60,7 +60,7 @@ Protocol version, expressed in a semver format.
 
 A block certificate, proving that this block was fairly decided upon during consensus. Equivalent to a proof-of-work in Bitcoin.
 
-### peermsg.InvVect
+### message.InvVect
 
 | Field Size | Title | Data Type | Description |
 | --- | --- | --- | --- |
@@ -107,7 +107,7 @@ This message is sent as a reply to the version message, to acknowledge a peer ha
 | Field Size | Title | Data Type | Description |
 | --- | --- | --- | --- |
 | 1-9 | Count | VarInt | Amount of items contains in the inventory message |
-| 33 * Count | Inv List | []peermsg.InvVect | Inventory items | 
+| 33 * Count | Inv List | []message.InvVect | Inventory items | 
 
 Inventory messages are used to advertise transactions and blocks to the network. It can be received unsolicited, or as a reply to GetBlocks.
 

@@ -2,51 +2,42 @@ package responding
 
 import (
 	"bytes"
-	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/sirupsen/logrus"
 )
-
-var lg = logrus.WithField("process", "candidate_broker")
 
 // CandidateBroker holds instances to RPCBus and responseChan
 type CandidateBroker struct {
-	rpcBus       *rpcbus.RPCBus
-	responseChan chan<- *bytes.Buffer
+	db database.DB
 }
 
 // NewCandidateBroker will create new CandidateBroker
-func NewCandidateBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer) *CandidateBroker {
-	return &CandidateBroker{rpcBus, responseChan}
+func NewCandidateBroker(db database.DB) *CandidateBroker {
+	return &CandidateBroker{db}
 }
 
 // ProvideCandidate for a given (m *bytes.Buffer)
-func (c *CandidateBroker) ProvideCandidate(m *bytes.Buffer) error {
-	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
-
-	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*m), timeoutGetCandidate)
-	if err != nil {
-		lg.
-			WithError(err).
-			WithField("timeout", timeoutGetCandidate).
-			Error("timeout ProvideCandidate topics.GetCandidate")
+func (c *CandidateBroker) ProvideCandidate(m message.Message) ([]*bytes.Buffer, error) {
+	msg := m.Payload().(message.SafeBuffer)
+	var cm *message.Candidate
+	if err := c.db.View(func(t database.Transaction) error {
+		var err error
+		cm, err = t.FetchCandidateMessage(msg.Bytes())
 		return err
+	}); err != nil {
+		return nil, err
 	}
-	cm := resp.(message.Candidate)
 
 	candidateBytes := new(bytes.Buffer)
-	if err := message.MarshalCandidate(candidateBytes, cm); err != nil {
-		return err
+	if err := message.MarshalCandidate(candidateBytes, *cm); err != nil {
+		return nil, err
 	}
 
 	if err := topics.Prepend(candidateBytes, topics.Candidate); err != nil {
-		return err
+		return nil, err
 	}
 
-	c.responseChan <- candidateBytes
-	return nil
+	return []*bytes.Buffer{candidateBytes}, nil
 }
