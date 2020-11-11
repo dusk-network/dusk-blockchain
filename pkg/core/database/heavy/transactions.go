@@ -52,6 +52,8 @@ var (
 	OutputKeyPrefix = []byte{0x07}
 	// BidValuesPrefix is the prefix to identify Bid Values
 	BidValuesPrefix = []byte{0x08}
+	// CandidatePrefix is the prefix to identify Candidate messages
+	CandidatePrefix = []byte{0x09}
 )
 
 type transaction struct {
@@ -589,6 +591,45 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	return tip - n + pos, nil
 
+}
+
+func (t transaction) StoreCandidateMessage(cm message.Candidate) error {
+	buf := new(bytes.Buffer)
+
+	if err := message.MarshalCandidate(buf, cm); err != nil {
+		return err
+	}
+
+	key := append(CandidatePrefix, cm.Block.Header.Hash...)
+	t.put(key, buf.Bytes())
+	return nil
+}
+
+func (t transaction) FetchCandidateMessage(hash []byte) (*message.Candidate, error) {
+	key := append(CandidatePrefix, hash...)
+	value, err := t.snapshot.Get(key, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	cm := new(message.Candidate)
+	cm.Block = block.NewBlock()
+	cm.Certificate = block.EmptyCertificate()
+	if err := message.UnmarshalCandidate(bytes.NewBuffer(value), cm); err != nil {
+		return nil, err
+	}
+
+	return cm, nil
+}
+
+func (t transaction) ClearCandidateMessages() error {
+	iter := t.snapshot.NewIterator(util.BytesPrefix(CandidatePrefix), nil)
+	defer iter.Release()
+	for iter.Next() {
+		t.batch.Delete(iter.Key())
+	}
+
+	return iter.Error()
 }
 
 // ClearDatabase will wipe all of the data currently in the database.

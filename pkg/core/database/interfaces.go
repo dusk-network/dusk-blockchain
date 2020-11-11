@@ -6,6 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
@@ -105,6 +106,13 @@ type Transaction interface {
 	// FetchBlockHeightSince try to find height of a block generated around
 	// sinceUnixTime starting the search from height (tip - offset)
 	FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error)
+
+	// StoreCandidateMessage will...
+	StoreCandidateMessage(cm message.Candidate) error
+
+	FetchCandidateMessage(hash []byte) (*message.Candidate, error)
+
+	ClearCandidateMessages() error
 
 	// ClearDatabase will remove all information from the database.
 	ClearDatabase() error

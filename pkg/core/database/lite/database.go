@@ -12,7 +12,6 @@ type table map[key][]byte
 type memdb [maxInd]table
 
 const (
-
 	// block table index
 	blocksInd = iota
 	txsInd
@@ -22,6 +21,7 @@ const (
 	stateInd
 	bidValuesInd
 	outputKeyInd
+	candidateInd
 	maxInd
 )
 
