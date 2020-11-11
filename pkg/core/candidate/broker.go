@@ -2,21 +2,10 @@ package candidate
 
 import (
 	"bytes"
-	"encoding/hex"
-	"errors"
-	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	lg "github.com/sirupsen/logrus"
 )
 
@@ -31,91 +20,40 @@ var log = lg.WithField("process", "candidate-broker")
 // of the network, and will attempt to provide the requesting component
 // with it's needed `Candidate`.
 type Broker struct {
-	publisher eventbus.Publisher
-
-	*store
-
-	acceptedBlockChan <-chan block.Block
-	candidateChan     <-chan message.Candidate
-	getCandidateChan  <-chan rpcbus.Request
+	db database.DB
 }
 
 // NewBroker returns an initialized Broker struct. It will still need
 // to be started by calling `Listen`.
-func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
-	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
-	// FIXME: the channel buffer might lead to candidate drop.
-	// See https://github.com/dusk-network/dusk-blockchain/issues/742
-	getCandidateChan := make(chan rpcbus.Request, 1)
-	err := rpcBus.Register(topics.GetCandidate, getCandidateChan)
-	if err != nil {
-		log.WithError(err).Error("could not Register GetCandidate")
-	}
-
-	b := &Broker{
-		publisher:         broker,
-		store:             newStore(),
-		acceptedBlockChan: acceptedBlockChan,
-		candidateChan:     initCandidateCollector(broker),
-		getCandidateChan:  getCandidateChan,
-	}
-	return b
-}
-
-// Listen for incoming `Candidate` messages, and internal requests.
-// Should be run in a goroutine.
-func (b *Broker) Listen() {
-	for {
-		select {
-		case cm := <-b.candidateChan:
-			b.storeCandidateMessage(cm)
-		case r := <-b.getCandidateChan:
-			// candidate requests from the RPCBus
-			b.provideCandidate(r)
-		case blk := <-b.acceptedBlockChan:
-			// Remove all candidates with lower or equal round
-			b.Clear(blk.Header.Height)
-		}
+func NewBroker(db database.DB) *Broker {
+	return &Broker{
+		db: db,
 	}
 }
 
-// TODO: interface - rpcBus encoding will be removed
-func (b *Broker) provideCandidate(r rpcbus.Request) {
-	// Read params from request
-	params := r.Params.(bytes.Buffer)
-
-	// Mandatory param
-	hash := make([]byte, 32)
-	if err := encoding.Read256(&params, hash); err != nil {
-		r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
-		return
+// StoreCandidateMessage validates an incoming Candidate message, and then
+// stores it in the database if the candidate is valid.
+// Satisfies the peer.ProcessorFunc interface.
+func (b *Broker) StoreCandidateMessage(msg message.Message) ([]*bytes.Buffer, error) {
+	cm := msg.Payload().(message.Candidate)
+	if err := ValidateCandidate(cm); err != nil {
+		diagnostics.LogError("error in validating the candidate", err)
+		return nil, err
 	}
 
-	// Enforce fetching from peers if local cache does not have this Candidate
-	// Optional param
-	var fetchFromPeers bool
-	_ = encoding.ReadBool(&params, &fetchFromPeers)
-
-	cm, err := b.store.fetchCandidateMessage(hash)
-	if fetchFromPeers && err != nil {
-		// If we don't have the candidate message, we should ask the network for it.
-		cm, err = b.requestCandidate(hash)
-	}
-
-	r.RespChan <- rpcbus.Response{Resp: cm, Err: err}
+	log.Trace("storing candidate message")
+	return nil, b.db.Update(func(t database.Transaction) error {
+		return t.StoreCandidateMessage(cm)
+	})
 }
 
-// ErrGetCandidateTimeout is an error specific to timeout happening on
-// GetCandidate calls
-var ErrGetCandidateTimeout = errors.New("request GetCandidate timeout")
-
+/*
 // requestCandidate from peers around this node. The candidate can only be
 // requested for 2 rounds (which provides some protection from keeping to
 // request bulky stuff)
 // TODO: encoding the category within the packet and specifying it as category
 // is ugly af
 func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
-
 	lg.WithField("hash", hex.EncodeToString(hash)).Trace("Request Candidate from peers")
 	// Send a request for this specific candidate
 	buf := new(bytes.Buffer)
@@ -160,3 +98,4 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 		}
 	}
 }
+*/

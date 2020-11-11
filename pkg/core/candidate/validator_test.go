@@ -3,6 +3,8 @@ package candidate
 import (
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/sirupsen/logrus"
@@ -29,4 +31,13 @@ func TestValidatorInvalidBlock(t *testing.T) {
 	cm.Block.Txs = cm.Block.Txs[1:]
 	msg := message.New(topics.Candidate, cm)
 	assert.Error(t, Validate(msg))
+}
+
+// Mocks a candidate message. It is not in the message package since it uses
+// the genesis block as mockup block
+//nolint:unused
+func mockCandidate() message.Candidate {
+	genesis := config.DecodeGenesis()
+	cert := block.EmptyCertificate()
+	return message.MakeCandidate(genesis, cert)
 }
