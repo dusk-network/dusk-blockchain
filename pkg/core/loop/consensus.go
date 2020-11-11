@@ -17,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -89,7 +90,17 @@ func New(e *consensus.Emitter) *Consensus {
 		eventChan:     eventChan,
 	}
 
+	// Initialize republishers
+	c.addRepublishers(topics.Score, topics.Reduction, topics.Agreement)
+
 	return c
+}
+
+func (c *Consensus) addRepublishers(tpcs ...topics.Topic) {
+	for _, tpc := range tpcs {
+		r := republisher.New(c.EventBus, tpc)
+		r.Activate()
+	}
 }
 
 // Spin the consensus state machine. The consensus runs for the whole round
