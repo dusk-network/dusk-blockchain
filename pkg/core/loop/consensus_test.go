@@ -8,6 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/stretchr/testify/require"
@@ -38,8 +39,11 @@ func TestContextCancellation(t *testing.T) {
 	}()
 
 	// the cancelation after 100ms should make the agreement end its loop with
-	// no error
-	require.NoError(t, l.Spin(ctx, consensus.MockPhase(cb), agreement.New(e), consensus.RoundUpdate{Round: uint64(1)}))
+	// a nil return value
+	cert, hash, comm := l.Spin(ctx, consensus.MockPhase(cb), agreement.New(e), consensus.RoundUpdate{Round: uint64(1)})
+	require.Nil(t, cert)
+	require.Nil(t, hash)
+	require.Nil(t, comm)
 }
 
 // step is used by TestAgreementCompletion to test that any step would
@@ -73,8 +77,9 @@ type succesfulAgreement struct {
 // GetControlFn creates a function that returns after a small sleep. This
 // simulates the agreement reaching consensus
 func (c *succesfulAgreement) GetControlFn() consensus.ControlFn {
-	return func(_ context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) {
+	return func(_ context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) (*block.Certificate, []byte, [][]byte) {
 		c.wg.Wait()
+		return block.EmptyCertificate(), make([]byte, 32), make([][]byte, 0)
 	}
 }
 
@@ -86,7 +91,10 @@ func TestAgreementCompletion(t *testing.T) {
 	l := loop.New(e)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	require.NoError(t, l.Spin(ctx, &step{&wg}, &succesfulAgreement{&wg}, consensus.RoundUpdate{Round: uint64(1)}))
+	cert, hash, comm := l.Spin(ctx, &step{&wg}, &succesfulAgreement{&wg}, consensus.RoundUpdate{Round: uint64(1)})
+	require.NotNil(t, cert)
+	require.NotNil(t, hash)
+	require.NotNil(t, comm)
 }
 
 // stallingStep is used by TestStall to test that any step would
@@ -115,8 +123,9 @@ type unsuccesfulAgreement struct{}
 // GetControlFn creates a function that returns after a small sleep. This
 // simulates the agreement reaching consensus
 func (c *unsuccesfulAgreement) GetControlFn() consensus.ControlFn {
-	return func(ctx context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) {
+	return func(ctx context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) (*block.Certificate, []byte, [][]byte) {
 		<-ctx.Done()
+		return nil, nil, nil
 	}
 }
 
@@ -126,6 +135,6 @@ func TestStall(t *testing.T) {
 	e := consensus.MockEmitter(time.Second, nil)
 	ctx := context.Background()
 	l := loop.New(e)
-	err := l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
-	require.Equal(t, loop.ErrMaxStepsReached, err)
+	_, _, _ = l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
+	// require.Equal(t, loop.ErrMaxStepsReached, err)
 }
