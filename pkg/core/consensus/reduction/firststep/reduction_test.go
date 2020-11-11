@@ -21,7 +21,7 @@ import (
 // It uses the reduction common test preparation
 func TestSendReduction(t *testing.T) {
 	hlp := reduction.NewHelper(50, time.Second)
-	step := New(nil, hlp.Emitter, 10*time.Second)
+	step := New(nil, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, 10*time.Second)
 	scoreMsg := consensus.MockScoreMsg(t, nil)
 	// injecting the result of the Selection step
 	stepFn := step.Fn(scoreMsg.Payload().(message.Score))
@@ -112,7 +112,7 @@ func TestFirstStepReduction(t *testing.T) {
 
 			// injecting the test phase in the reduction step
 			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, nil)
-			firstStepReduction := New(testPhase, hlp.Emitter, timeout)
+			firstStepReduction := New(testPhase, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, timeout)
 
 			// injecting the result of the Selection step
 			msg := consensus.MockScoreMsg(t, &header.Header{BlockHash: hash})

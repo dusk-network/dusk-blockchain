@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
@@ -33,5 +34,5 @@ type (
 
 	// ControlFn represents the asynchronous loop controlling the commencement
 	// ofthe Phase transition
-	ControlFn func(context.Context, *Queue, <-chan message.Message, RoundUpdate)
+	ControlFn func(context.Context, *Queue, <-chan message.Message, RoundUpdate) (*block.Certificate, []byte, [][]byte)
 )

@@ -1,7 +1,6 @@
 package reduction
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"sync"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -50,7 +48,6 @@ func PrepareSendReductionTest(hlp *Helper, stepFn consensus.PhaseFn) func(t *tes
 type Helper struct {
 	*consensus.Emitter
 	lock               sync.RWMutex
-	failOnFetching     bool
 	failOnVerification bool
 
 	ThisSender       []byte
@@ -72,7 +69,6 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	emitter.Keys = provisionersKeys[0]
 
 	hlp := &Helper{
-		failOnFetching:     false,
 		failOnVerification: false,
 
 		ThisSender:       emitter.Keys.BLSPubKeyBytes,
@@ -82,9 +78,6 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 		Handler:          NewHandler(emitter.Keys, *p),
 		Emitter:          emitter,
 	}
-
-	go hlp.provideCandidateBlock()
-	go hlp.processCandidateVerificationRequest()
 
 	return hlp
 }
@@ -121,20 +114,6 @@ func (hlp *Helper) FailOnVerification(flag bool) {
 	hlp.failOnVerification = flag
 }
 
-// FailOnFetching sets the failOnFetching flag
-func (hlp *Helper) FailOnFetching(flag bool) {
-	hlp.lock.Lock()
-	defer hlp.lock.Unlock()
-	hlp.failOnFetching = flag
-}
-
-func (hlp *Helper) shouldFailFetching() bool {
-	hlp.lock.RLock()
-	defer hlp.lock.RUnlock()
-	f := hlp.failOnFetching
-	return f
-}
-
 func (hlp *Helper) shouldFailVerification() bool {
 	hlp.lock.RLock()
 	defer hlp.lock.RUnlock()
@@ -142,32 +121,12 @@ func (hlp *Helper) shouldFailVerification() bool {
 	return f
 }
 
-func (hlp *Helper) provideCandidateBlock() {
-	c := make(chan rpcbus.Request, 1)
-	_ = hlp.RPCBus.Register(topics.GetCandidate, c)
-	for {
-		r := <-c
-		if hlp.shouldFailFetching() {
-			r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("could not get candidate block"))
-			continue
-		}
-
-		r.RespChan <- rpcbus.NewResponse(message.Candidate{}, nil)
+// ProcessCandidateVerificationRequest is a callback used by the firststep
+// reduction to verify potential winning candidates.
+func (hlp *Helper) ProcessCandidateVerificationRequest(hash []byte) error {
+	if hlp.shouldFailVerification() {
+		return errors.New("verification failed")
 	}
-}
 
-func (hlp *Helper) processCandidateVerificationRequest() {
-	v := make(chan rpcbus.Request, 1)
-	if err := hlp.RPCBus.Register(topics.VerifyCandidateBlock, v); err != nil {
-		panic(err)
-	}
-	for {
-		r := <-v
-		if hlp.shouldFailVerification() {
-			r.RespChan <- rpcbus.NewResponse(nil, errors.New("verification failed"))
-			continue
-		}
-
-		r.RespChan <- rpcbus.NewResponse(nil, nil)
-	}
+	return nil
 }

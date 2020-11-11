@@ -5,15 +5,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,15 +32,18 @@ type Phase struct {
 
 	selectionResult message.Score
 
+	verifyFn consensus.CandidateVerificationFunc
+
 	next consensus.Phase
 }
 
 // New creates and launches the component which responsibility is to reduce the
 // candidates gathered as winner of the selection of all nodes in the committee
 // and reduce them to just one candidate obtaining 64% of the committee vote
-func New(next consensus.Phase, e *consensus.Emitter, timeOut time.Duration) *Phase {
+func New(next consensus.Phase, e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration) *Phase {
 	return &Phase{
 		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
+		verifyFn:  verifyFn,
 		next:      next,
 	}
 }
@@ -160,7 +160,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
 	}
 
-	if err := p.verifyCandidateBlock(hdr.BlockHash); err != nil {
+	if err := p.verifyFn(hdr.BlockHash); err != nil {
 		log.
 			WithError(err).
 			WithField("round", hdr.Round).
@@ -190,42 +190,4 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 		},
 		StepVotes: r.SV,
 	}
-}
-
-func (p *Phase) verifyCandidateBlock(blockHash []byte) error {
-	// Fetch the candidate block first.
-
-	params := new(bytes.Buffer)
-	_ = encoding.Write256(params, blockHash)
-	_ = encoding.WriteBool(params, true)
-
-	req := rpcbus.NewRequest(*params)
-	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
-	resp, err := p.RPCBus.Call(topics.GetCandidate, req, timeoutGetCandidate)
-	if err != nil {
-		log.
-			WithError(err).
-			WithFields(log.Fields{
-				"process": "reduction",
-			}).Error("firststep, fetching the candidate block failed")
-		return err
-	}
-	cm := resp.(message.Candidate)
-
-	// If our result was not a zero value hash, we should first verify it
-	// before voting on it again
-	if !bytes.Equal(blockHash, reduction.EmptyHash[:]) {
-		req := rpcbus.NewRequest(cm)
-		timeoutVerifyCandidateBlock := time.Duration(config.Get().Timeout.TimeoutVerifyCandidateBlock) * time.Second
-		if _, err := p.RPCBus.Call(topics.VerifyCandidateBlock, req, timeoutVerifyCandidateBlock); err != nil {
-			log.
-				WithError(err).
-				WithFields(log.Fields{
-					"process": "reduction",
-				}).Error("firststep, verifying the candidate block failed")
-			return err
-		}
-	}
-
-	return nil
 }

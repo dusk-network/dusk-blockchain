@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,7 +35,7 @@ func (s *Loop) GetControlFn() consensus.ControlFn {
 }
 
 // Run the agreement step loop
-func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) {
+func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) (*block.Certificate, []byte, [][]byte) {
 	// creating accumulator and handler
 	h := NewHandler(s.Keys, r.P)
 	acc := newAccumulator(h, WorkerAmount)
@@ -64,15 +64,17 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 				WithField("step", evs[0].State().Step).
 				Debugln("quorum reached")
 
-			// Send the Agreement to the Certificate Collector within the Chain
-			if err := s.sendCertificate(h, evs[0]); err != nil {
+			committee, err := h.getVoterKeys(evs[0])
+			if err != nil {
 				panic(err)
 			}
-			return
+
+			cert := evs[0].GenerateCertificate()
+			return cert, evs[0].State().BlockHash, committee
 
 		case <-ctx.Done():
 			// finalize the worker pool
-			return
+			return nil, nil, nil
 		}
 	}
 }
@@ -115,15 +117,4 @@ func collectEvent(h *handler, accumulator *Accumulator, a message.Agreement) {
 	}
 
 	accumulator.Process(a)
-}
-
-func (s *Loop) sendCertificate(h *handler, ag message.Agreement) error {
-	keys, err := h.getVoterKeys(ag)
-	if err != nil {
-		return err
-	}
-	cert := message.NewCertificate(ag, keys)
-	msg := message.New(topics.Certificate, cert)
-	_ = s.EventBus.Publish(topics.Certificate, msg)
-	return nil
 }

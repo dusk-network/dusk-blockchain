@@ -51,19 +51,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.S
 		WithField("round", sev.State().Round).
 		WithField("step", sev.State().Step)
 
-	timeoutGetLastCommittee := time.Duration(config.Get().Timeout.TimeoutGetLastCommittee) * time.Second
-
-	// XXX: PRCBus must be able to operate on context cancellation
-	resp, err := bg.RPCBus.Call(topics.GetLastCommittee, rpcbus.EmptyRequest(), timeoutGetLastCommittee)
-	if err != nil {
-		log.
-			WithError(err).
-			Error("failed to topics.GetLastCommittee")
-		return nil, err
-	}
-
-	keys := resp.([][]byte)
-	blk, err := bg.Generate(sev, keys, r)
+	blk, err := bg.Generate(sev, r.LastCommittee, r)
 	if err != nil {
 		log.
 			WithError(err).
@@ -71,29 +59,10 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.S
 		return nil, err
 	}
 
-	// Create candidate message
-	timeoutGetLastCertificate := time.Duration(config.Get().Timeout.TimeoutGetLastCertificate) * time.Second
-	resp, err = bg.RPCBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), timeoutGetLastCertificate)
-	if err != nil {
-		log.
-			WithError(err).
-			Error("failed to topics.GetLastCertificate")
-		return nil, err
-	}
-	certBuf := resp.(bytes.Buffer)
-
-	cert := block.EmptyCertificate()
-	if err := message.UnmarshalCertificate(&certBuf, cert); err != nil {
-		log.
-			WithError(err).
-			Error("failed to UnmarshalCertificate")
-		return nil, err
-	}
-
 	// Since the Candidate message goes straight to the Chain, there is
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
-	candidate := message.MakeCandidate(blk, cert)
+	candidate := message.MakeCandidate(blk, r.LastCertificate)
 	return message.NewScore(sev, bg.Keys.BLSPubKeyBytes, r.Hash, candidate), nil
 }
 

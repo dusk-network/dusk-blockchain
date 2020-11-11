@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -33,13 +34,14 @@ type Phase struct {
 	keys        key.Keys
 
 	g blockgenerator.BlockGenerator
+
+	db database.DB
 }
 
 // New creates and launches the component which responsibility is to validate
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
-func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emitter, timeout time.Duration) *Phase {
-
+func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emitter, timeout time.Duration, db database.DB) *Phase {
 	selector := &Phase{
 		Emitter:     e,
 		timeout:     timeout,
@@ -47,6 +49,7 @@ func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emi
 		provisioner: e.Proxy.Provisioner(),
 		keys:        e.Keys,
 		g:           g,
+		db:          db,
 
 		next: next,
 	}
@@ -112,7 +115,6 @@ func (p *Phase) String() string {
 // Run executes the logic for this phase
 // In this case the selection listens to new Score/Candidate messages
 func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
-
 	ctx, cancel := context.WithCancel(parentCtx)
 	// this makes sure that the internal score channel gets canceled
 	defer cancel()
@@ -152,7 +154,6 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 }
 
 func (p *Phase) endSelection(_ uint64, _ uint8) consensus.PhaseFn {
-
 	defer func() {
 		p.handler.LowerThreshold()
 		p.increaseTimeOut()
@@ -182,8 +183,11 @@ func (p *Phase) collectScore(ctx context.Context, sc message.Score) {
 	}
 
 	// Publish internally topics.Candidate with bestEvent(highest score candidate block)
-	msg := message.New(topics.Candidate, sc.Candidate)
-	p.EventBus.Publish(topics.Candidate, msg)
+	if err := p.db.Update(func(t database.Transaction) error {
+		return t.StoreCandidateMessage(sc.Candidate)
+	}); err != nil {
+		lg.WithError(err).Errorln("could not store candidate")
+	}
 
 	// Only check for priority if we already have a best event
 	if !p.bestEvent.IsEmpty() {

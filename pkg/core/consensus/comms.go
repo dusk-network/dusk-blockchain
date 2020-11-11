@@ -19,6 +19,9 @@ import (
 )
 
 type (
+	// CandidateVerificationFunc is a callback used to verify candidate blocks
+	// after the conclusion of the first reduction step.
+	CandidateVerificationFunc func([]byte) error
 
 	// Emitter is a simple struct to pass the communication channels that the steps should be
 	// able to emit onto
@@ -33,10 +36,12 @@ type (
 	// RoundUpdate carries the data about the new Round, such as the active
 	// Provisioners, the BidList, the Seed and the Hash
 	RoundUpdate struct {
-		Round uint64
-		P     user.Provisioners
-		Seed  []byte
-		Hash  []byte
+		Round           uint64
+		P               user.Provisioners
+		Seed            []byte
+		Hash            []byte
+		LastCertificate *block.Certificate
+		LastCommittee   [][]byte
 	}
 
 	// InternalPacket is a specialization of the Payload of message.Message. It is used to
@@ -52,24 +57,23 @@ type (
 // the message safe to publish to multiple subscribers
 func (r RoundUpdate) Copy() payload.Safe {
 	ru := RoundUpdate{
-		Round: r.Round,
-		P:     r.P.Copy(),
-		Seed:  make([]byte, len(r.Seed)),
-		Hash:  make([]byte, len(r.Hash)),
+		Round:           r.Round,
+		P:               r.P.Copy(),
+		Seed:            make([]byte, len(r.Seed)),
+		Hash:            make([]byte, len(r.Hash)),
+		LastCertificate: r.LastCertificate.Copy(),
+		LastCommittee:   make([][]byte, len(r.LastCommittee)),
 	}
 
 	copy(ru.Seed, r.Seed)
 	copy(ru.Hash, r.Hash)
+	copy(ru.LastCommittee, r.LastCommittee)
 	return ru
 }
 
 type (
 	acceptedBlockCollector struct {
 		blockChan chan<- block.Block
-	}
-
-	roundCollector struct {
-		roundChan chan<- RoundUpdate
 	}
 )
 
@@ -85,23 +89,6 @@ func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, 
 // Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
 func (c *acceptedBlockCollector) Collect(m message.Message) {
 	c.blockChan <- m.Payload().(block.Block)
-}
-
-// InitRoundUpdate initializes a Round update channel and fires up the TopicListener
-// as well. Its purpose is to lighten up a bit the amount of arguments in creating
-// the handler for the collectors. Also it removes the need to store subscribers on
-// the consensus process
-func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
-	roundChan := make(chan RoundUpdate, 1)
-	roundCollector := &roundCollector{roundChan}
-	collectListener := eventbus.NewSafeCallbackListener(roundCollector.Collect)
-	subscriber.Subscribe(topics.RoundUpdate, collectListener)
-	return roundChan
-}
-
-// Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
-func (c *roundCollector) Collect(m message.Message) {
-	c.roundChan <- m.Payload().(RoundUpdate)
 }
 
 // Sign a header
