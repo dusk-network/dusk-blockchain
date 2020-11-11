@@ -8,8 +8,8 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -40,18 +40,18 @@ func TestMaintainStakes(t *testing.T) {
 	catchStakeRequest(rb, c)
 
 	// Send round update, to start the maintainer.
-	ru := consensus.MockRoundUpdate(1, nil)
-	ruMsg := message.New(topics.RoundUpdate, ru)
-	errList := bus.Publish(topics.RoundUpdate, ruMsg)
+	blk := helper.RandomBlock(0, 1)
+	ruMsg := message.New(topics.AcceptedBlock, blk)
+	errList := bus.Publish(topics.AcceptedBlock, ruMsg)
 	require.Empty(t, errList)
 
 	// Ensure stake request is sent
 	<-c
 
 	// Then, send a round update close after. No stake request should be sent
-	ru = consensus.MockRoundUpdate(2, nil)
-	ruMsg = message.New(topics.RoundUpdate, ru)
-	errList = bus.Publish(topics.RoundUpdate, ruMsg)
+	blk = helper.RandomBlock(1, 1)
+	ruMsg = message.New(topics.AcceptedBlock, blk)
+	errList = bus.Publish(topics.AcceptedBlock, ruMsg)
 	require.Empty(t, errList)
 
 	catchStakeRequest(rb, c)
@@ -64,9 +64,9 @@ func TestMaintainStakes(t *testing.T) {
 	}
 
 	// Send another round update that is within the 'offset', to trigger sending a new tx
-	ru = consensus.MockRoundUpdate(950, nil)
-	ruMsg = message.New(topics.RoundUpdate, ru)
-	errList = bus.Publish(topics.RoundUpdate, ruMsg)
+	blk = helper.RandomBlock(950, 1)
+	ruMsg = message.New(topics.AcceptedBlock, blk)
+	errList = bus.Publish(topics.AcceptedBlock, ruMsg)
 	require.Empty(t, errList)
 
 	// Ensure stake request is sent

@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -22,7 +23,7 @@ var l = log.WithField("process", "BidAutomaton")
 type BidAutomaton struct {
 	eventBroker eventbus.Broker
 	rpcBus      *rpcbus.RPCBus
-	roundChan   <-chan consensus.RoundUpdate
+	blockChan   <-chan block.Block
 
 	height       uint64
 	bidEndHeight uint64
@@ -52,7 +53,7 @@ func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, srv *grpc.Server) *
 // AutomateBids will automate the sending of bids.
 func (m *BidAutomaton) AutomateBids(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	if !m.running {
-		m.roundChan = consensus.InitRoundUpdate(m.eventBroker)
+		m.blockChan, _ = consensus.InitAcceptedBlockUpdate(m.eventBroker)
 		m.running = true
 		go m.Listen()
 	}
@@ -62,9 +63,9 @@ func (m *BidAutomaton) AutomateBids(ctx context.Context, e *node.EmptyRequest) (
 
 // Listen to round updates and send bids when necessary.
 func (m *BidAutomaton) Listen() {
-	for roundUpdate := range m.roundChan {
+	for blk := range m.blockChan {
 		// Rehydrate consensus state
-		m.height = roundUpdate.Round
+		m.height = blk.Header.Height + 1
 
 		if m.height+renewalOffset >= m.bidEndHeight {
 			if err := m.sendBid(); err != nil {

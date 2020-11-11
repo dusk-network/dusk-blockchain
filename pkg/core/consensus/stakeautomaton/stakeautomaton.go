@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -24,7 +25,7 @@ var l = log.WithField("process", "StakeAutomaton")
 type StakeAutomaton struct {
 	eventBroker eventbus.Broker
 	rpcBus      *rpcbus.RPCBus
-	roundChan   <-chan consensus.RoundUpdate
+	blockChan   <-chan block.Block
 
 	height         uint64
 	stakeEndHeight uint64
@@ -57,7 +58,7 @@ func (m *StakeAutomaton) AutomateStakes(ctx context.Context, e *node.EmptyReques
 	if !m.running {
 		// We only initialize the `roundChan` here so that we don't clog the channel with
 		// blocks while the maintainer is not actually running yet.
-		m.roundChan = consensus.InitRoundUpdate(m.eventBroker)
+		m.blockChan, _ = consensus.InitAcceptedBlockUpdate(m.eventBroker)
 		m.running = true
 		go m.Listen()
 	}
@@ -67,8 +68,8 @@ func (m *StakeAutomaton) AutomateStakes(ctx context.Context, e *node.EmptyReques
 
 // Listen to round updates and takes the proper decision Stake-wise
 func (m *StakeAutomaton) Listen() {
-	for roundUpdate := range m.roundChan {
-		m.height = roundUpdate.Round
+	for blk := range m.blockChan {
+		m.height = blk.Header.Height + 1
 
 		if m.height+renewalOffset >= m.stakeEndHeight {
 			if err := m.sendStake(); err != nil {
