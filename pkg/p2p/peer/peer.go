@@ -63,7 +63,7 @@ type Writer struct {
 type Reader struct {
 	*Connection
 	processor    *MessageProcessor
-	responseChan chan<- *bytes.Buffer
+	responseChan chan<- bytes.Buffer
 	exitChan     chan<- struct{} // Way to kill the WriteLoop
 	// TODO: add service flag
 }
@@ -160,7 +160,7 @@ func (p *Reader) Accept() error {
 }
 
 // Serve utilizes two different methods for writing to the open connection
-func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
+func (w *Writer) Serve(writeQueueChan <-chan bytes.Buffer, exitChan chan struct{}) {
 	defer w.onDisconnect()
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
@@ -197,11 +197,11 @@ func (w *Writer) onDisconnect() {
 
 }
 
-func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
+func (w *Writer) writeLoop(writeQueueChan <-chan bytes.Buffer, exitChan chan struct{}) {
 	for {
 		select {
 		case buf := <-writeQueueChan:
-			if err := w.gossip.Process(buf); err != nil {
+			if err := w.gossip.Process(&buf); err != nil {
 				l.WithError(err).Warnln("error processing outgoing message")
 				continue
 			}

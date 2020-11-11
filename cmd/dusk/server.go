@@ -221,7 +221,7 @@ func Setup() *Server {
 
 // OnAccept read incoming packet from the peers
 func (s *Server) OnAccept(conn net.Conn) {
-	writeQueueChan := make(chan *bytes.Buffer, 1000)
+	writeQueueChan := make(chan bytes.Buffer, 1000)
 	exitChan := make(chan struct{}, 1)
 	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan, exitChan)
 	if err != nil {
@@ -242,7 +242,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 
 // OnConnection is the callback for writing to the peers
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	writeQueueChan := make(chan *bytes.Buffer, 1000)
+	writeQueueChan := make(chan bytes.Buffer, 1000)
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
 
 	if err := peerWriter.Connect(); err != nil {

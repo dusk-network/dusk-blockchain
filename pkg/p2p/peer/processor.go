@@ -38,7 +38,7 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
-func (m *MessageProcessor) Collect(packet []byte, respChan chan<- *bytes.Buffer) error {
+func (m *MessageProcessor) Collect(packet []byte, respChan chan<- bytes.Buffer) error {
 	b := bytes.NewBuffer(packet)
 	msg, err := message.Unmarshal(b)
 	if err != nil {
@@ -65,7 +65,7 @@ func (m *MessageProcessor) CanRoute(topic topics.Topic) bool {
 	return false
 }
 
-func (m *MessageProcessor) process(msg message.Message, respChan chan<- *bytes.Buffer) error {
+func (m *MessageProcessor) process(msg message.Message, respChan chan<- bytes.Buffer) error {
 	category := msg.Category()
 	if m.CanRoute(category) {
 		if !m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
@@ -85,7 +85,7 @@ func (m *MessageProcessor) process(msg message.Message, respChan chan<- *bytes.B
 	}
 
 	for _, buf := range bufs {
-		respChan <- buf
+		respChan <- *buf
 	}
 
 	return nil

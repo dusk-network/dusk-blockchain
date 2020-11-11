@@ -45,12 +45,12 @@ func TestPingLoop(t *testing.T) {
 
 	cfg.Mock(&r)
 
-	responseChan := make(chan *bytes.Buffer, 10)
+	responseChan := make(chan bytes.Buffer, 10)
 	writer := NewWriter(client, processing.NewGossip(protocol.TestNet), bus)
 	go writer.Serve(responseChan, make(chan struct{}, 1))
 
 	// Set up the other end of the exchange
-	responseChan2 := make(chan *bytes.Buffer, 10)
+	responseChan2 := make(chan bytes.Buffer, 10)
 	writer2 := NewWriter(srv, processing.NewGossip(protocol.TestNet), bus)
 	go writer2.Serve(responseChan2, make(chan struct{}, 1))
 
@@ -74,7 +74,7 @@ func TestPingLoop(t *testing.T) {
 	// We should eventually get a pong message out of responseChan2
 	for {
 		buf := <-responseChan2
-		topic, err := topics.Extract(buf)
+		topic, err := topics.Extract(&buf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -222,11 +222,11 @@ func TestInvalidPayload(t *testing.T) {
 }
 
 //nolint:unparam
-func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, chan<- *bytes.Buffer) {
+func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, chan<- bytes.Buffer) {
 	d := dupemap.NewDupeMap(0)
 	r, w := net.Pipe()
 
-	respChan := make(chan *bytes.Buffer, 10)
+	respChan := make(chan bytes.Buffer, 10)
 	g := processing.NewGossip(protocol.TestNet)
 	peer, _ := f.SpawnReader(r, g, d, respChan, make(chan struct{}, 1))
 

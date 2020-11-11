@@ -34,7 +34,7 @@ func TestHandshake(t *testing.T) {
 	client, srv := net.Pipe()
 
 	go func() {
-		responseChan := make(chan *bytes.Buffer, 100)
+		responseChan := make(chan bytes.Buffer, 100)
 		exitChan := make(chan struct{}, 1)
 		peerReader, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan, exitChan)
 		if err != nil {

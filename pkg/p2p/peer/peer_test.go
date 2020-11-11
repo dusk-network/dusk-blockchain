@@ -48,7 +48,7 @@ func TestReader(t *testing.T) {
 	factory := NewReaderFactory(processor)
 
 	dupeMap := dupemap.NewDupeMap(5)
-	responseChan := make(chan *bytes.Buffer, 100)
+	responseChan := make(chan bytes.Buffer, 100)
 	exitChan := make(chan struct{}, 1)
 	peerReader, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupeMap, responseChan, exitChan)
 	if err != nil {
@@ -109,12 +109,12 @@ func TestWriteLoop(t *testing.T) {
 	}
 
 	go func(g *processing.Gossip) {
-		responseChan := make(chan *bytes.Buffer)
+		responseChan := make(chan bytes.Buffer)
 		writer := NewWriter(client, g, bus, 30*time.Millisecond)
 		go writer.Serve(responseChan, make(chan struct{}, 1))
 
 		bufCopy := buf
-		responseChan <- &bufCopy
+		responseChan <- bufCopy
 	}(g)
 
 	// Decode and remove magic
