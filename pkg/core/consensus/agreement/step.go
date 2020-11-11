@@ -35,7 +35,7 @@ func (s *Loop) GetControlFn() consensus.ControlFn {
 }
 
 // Run the agreement step loop
-func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) (*block.Certificate, []byte, [][]byte) {
+func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) (*block.Certificate, []byte) {
 	// creating accumulator and handler
 	h := NewHandler(s.Keys, r.P)
 	acc := newAccumulator(h, WorkerAmount)
@@ -64,17 +64,12 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 				WithField("step", evs[0].State().Step).
 				Debugln("quorum reached")
 
-			committee, err := h.getVoterKeys(evs[0])
-			if err != nil {
-				panic(err)
-			}
-
 			cert := evs[0].GenerateCertificate()
-			return cert, evs[0].State().BlockHash, committee
+			return cert, evs[0].State().BlockHash
 
 		case <-ctx.Done():
 			// finalize the worker pool
-			return nil, nil, nil
+			return nil, nil
 		}
 	}
 }

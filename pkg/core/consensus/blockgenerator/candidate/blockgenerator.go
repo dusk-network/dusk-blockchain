@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
@@ -43,6 +44,15 @@ func New(e *consensus.Emitter, genPubKey *keys.PublicKey) Generator {
 	}
 }
 
+func (bg *generator) regenerateCommittee(r consensus.RoundUpdate) [][]byte {
+	size := r.P.SubsetSizeAt(r.Round - 1)
+	if size > agreement.MaxCommitteeSize {
+		size = agreement.MaxCommitteeSize
+	}
+
+	return r.P.CreateVotingCommittee(r.Round-1, r.LastCertificate.Step, size).MemberKeys()
+}
+
 // PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
@@ -51,7 +61,8 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.S
 		WithField("round", sev.State().Round).
 		WithField("step", sev.State().Step)
 
-	blk, err := bg.Generate(sev, r.LastCommittee, r)
+	committee := bg.regenerateCommittee(r)
+	blk, err := bg.Generate(sev, committee, r)
 	if err != nil {
 		log.
 			WithError(err).

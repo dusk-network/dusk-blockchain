@@ -41,7 +41,6 @@ type (
 		Seed            []byte
 		Hash            []byte
 		LastCertificate *block.Certificate
-		LastCommittee   [][]byte
 	}
 
 	// InternalPacket is a specialization of the Payload of message.Message. It is used to
@@ -62,12 +61,10 @@ func (r RoundUpdate) Copy() payload.Safe {
 		Seed:            make([]byte, len(r.Seed)),
 		Hash:            make([]byte, len(r.Hash)),
 		LastCertificate: r.LastCertificate.Copy(),
-		LastCommittee:   make([][]byte, len(r.LastCommittee)),
 	}
 
 	copy(ru.Seed, r.Seed)
 	copy(ru.Hash, r.Hash)
-	copy(ru.LastCommittee, r.LastCommittee)
 	return ru
 }
 

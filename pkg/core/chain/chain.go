@@ -84,7 +84,6 @@ type Chain struct {
 	p *user.Provisioners
 
 	lastCertificate *block.Certificate
-	lastCommittee   [][]byte
 	pubKey          *keys.PublicKey
 
 	// Consensus context, used to cancel the loop.
@@ -390,7 +389,7 @@ func (c *Chain) startConsensus() error {
 		}
 
 		c.lock.Unlock()
-		cert, blockHash, committee, err := c.loop.Spin(c.consensusCtx, scr, agr, ru)
+		cert, blockHash, err := c.loop.Spin(c.consensusCtx, scr, agr, ru)
 		if err != nil {
 			// This is likely because of the consensus reaching max steps.
 			// If this is the case, we simply propagate the error upwards.
@@ -398,11 +397,11 @@ func (c *Chain) startConsensus() error {
 			return err
 		}
 
-		if cert == nil || blockHash == nil || committee == nil {
+		if cert == nil || blockHash == nil {
 			break
 		}
 
-		if err := c.handleCertificateMessage(cert, blockHash, committee); err != nil {
+		if err := c.handleCertificateMessage(cert, blockHash); err != nil {
 			return err
 		}
 	}
@@ -454,11 +453,10 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	return nil
 }
 
-func (c *Chain) handleCertificateMessage(cert *block.Certificate, blockHash []byte, committee [][]byte) error {
+func (c *Chain) handleCertificateMessage(cert *block.Certificate, blockHash []byte) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.lastCertificate = cert
-	c.lastCommittee = committee
 
 	var cm *message.Candidate
 	if err := c.db.View(func(t database.Transaction) error {
@@ -497,7 +495,6 @@ func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 		Seed:            c.tip.Header.Seed,
 		Hash:            c.tip.Header.Hash,
 		LastCertificate: c.lastCertificate,
-		LastCommittee:   c.lastCommittee,
 	}
 }
 

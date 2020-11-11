@@ -183,7 +183,7 @@ func TestAcceptBlock(t *testing.T) {
 	cert = block.EmptyCertificate()
 	cert.Step = 5
 
-	assert.NoError(c.handleCertificateMessage(cert, blk.Header.Hash, make([][]byte, 0)))
+	assert.NoError(c.handleCertificateMessage(cert, blk.Header.Hash))
 
 	// Should have `blk` as blockchain head now
 	assert.True(bytes.Equal(blk.Header.Hash, c.tip.Header.Hash))
@@ -221,7 +221,7 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	currPrevBlock := c.tip.Copy().(block.Block)
 
 	// Now pretend we finalized on it
-	c.handleCertificateMessage(cert, blk.Header.Hash, make([][]byte, 0))
+	c.handleCertificateMessage(cert, blk.Header.Hash)
 
 	// Ensure everything is still the same
 	assert.True(currPrevBlock.Equals(c.tip))

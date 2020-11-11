@@ -60,9 +60,9 @@ func TestConcurrentBlock(t *testing.T) {
 }
 
 //nolint:unused
-func mockCertificate() (*block.Certificate, []byte, [][]byte) {
+func mockCertificate() (*block.Certificate, []byte) {
 	p, keys := consensus.MockProvisioners(50)
 	hash, _ := crypto.RandEntropy(32)
 	ag := message.MockAgreement(hash, 2, 7, keys, p, 10)
-	return ag.GenerateCertificate(), hash, make([][]byte, 0)
+	return ag.GenerateCertificate(), hash
 }

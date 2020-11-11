@@ -45,7 +45,7 @@ func TestAgreement(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, retHash, _ := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(hash))
+	_, retHash := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(hash))
 
 	assert.Equal(t, hash, retHash)
 }

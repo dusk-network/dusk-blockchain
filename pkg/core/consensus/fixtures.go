@@ -58,10 +58,11 @@ func MockRoundUpdate(round uint64, p *user.Provisioners) RoundUpdate {
 	seed, _ := crypto.RandEntropy(33)
 	hash, _ := crypto.RandEntropy(32)
 	return RoundUpdate{
-		Round: round,
-		P:     *provisioners,
-		Seed:  seed,
-		Hash:  hash,
+		Round:           round,
+		P:               *provisioners,
+		Seed:            seed,
+		Hash:            hash,
+		LastCertificate: block.EmptyCertificate(),
 	}
 }
 

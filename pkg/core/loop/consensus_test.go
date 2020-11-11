@@ -40,10 +40,9 @@ func TestContextCancellation(t *testing.T) {
 
 	// the cancelation after 100ms should make the agreement end its loop with
 	// a nil return value
-	cert, hash, comm, err := l.Spin(ctx, consensus.MockPhase(cb), agreement.New(e), consensus.RoundUpdate{Round: uint64(1)})
+	cert, hash, err := l.Spin(ctx, consensus.MockPhase(cb), agreement.New(e), consensus.RoundUpdate{Round: uint64(1)})
 	require.Nil(t, cert)
 	require.Nil(t, hash)
-	require.Nil(t, comm)
 	require.Nil(t, err)
 }
 
@@ -78,9 +77,9 @@ type succesfulAgreement struct {
 // GetControlFn creates a function that returns after a small sleep. This
 // simulates the agreement reaching consensus
 func (c *succesfulAgreement) GetControlFn() consensus.ControlFn {
-	return func(_ context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) (*block.Certificate, []byte, [][]byte) {
+	return func(_ context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) (*block.Certificate, []byte) {
 		c.wg.Wait()
-		return block.EmptyCertificate(), make([]byte, 32), make([][]byte, 0)
+		return block.EmptyCertificate(), make([]byte, 32)
 	}
 }
 
@@ -92,10 +91,9 @@ func TestAgreementCompletion(t *testing.T) {
 	l := loop.New(e)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	cert, hash, comm, err := l.Spin(ctx, &step{&wg}, &succesfulAgreement{&wg}, consensus.RoundUpdate{Round: uint64(1)})
+	cert, hash, err := l.Spin(ctx, &step{&wg}, &succesfulAgreement{&wg}, consensus.RoundUpdate{Round: uint64(1)})
 	require.NotNil(t, cert)
 	require.NotNil(t, hash)
-	require.NotNil(t, comm)
 	require.Nil(t, err)
 }
 
@@ -125,9 +123,9 @@ type unsuccesfulAgreement struct{}
 // GetControlFn creates a function that returns after a small sleep. This
 // simulates the agreement reaching consensus
 func (c *unsuccesfulAgreement) GetControlFn() consensus.ControlFn {
-	return func(ctx context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) (*block.Certificate, []byte, [][]byte) {
+	return func(ctx context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) (*block.Certificate, []byte) {
 		<-ctx.Done()
-		return nil, nil, nil
+		return nil, nil
 	}
 }
 
@@ -137,6 +135,6 @@ func TestStall(t *testing.T) {
 	e := consensus.MockEmitter(time.Second, nil)
 	ctx := context.Background()
 	l := loop.New(e)
-	_, _, _, _ = l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
+	_, _, _ = l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
 	// require.Equal(t, loop.ErrMaxStepsReached, err)
 }

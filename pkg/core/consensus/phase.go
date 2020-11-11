@@ -34,5 +34,5 @@ type (
 
 	// ControlFn represents the asynchronous loop controlling the commencement
 	// ofthe Phase transition
-	ControlFn func(context.Context, *Queue, <-chan message.Message, RoundUpdate) (*block.Certificate, []byte, [][]byte)
+	ControlFn func(context.Context, *Queue, <-chan message.Message, RoundUpdate) (*block.Certificate, []byte)
 )

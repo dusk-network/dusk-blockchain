@@ -29,9 +29,8 @@ var lg = log.WithField("process", "consensus loop")
 var ErrMaxStepsReached = errors.New("consensus reached max number of steps without moving forward")
 
 type roundResults struct {
-	cert      *block.Certificate
-	hash      []byte
-	committee [][]byte
+	cert *block.Certificate
+	hash []byte
 }
 
 // Consensus is the state machine that runs the steps of consensus. Rather than
@@ -104,7 +103,7 @@ func New(e *consensus.Emitter) *Consensus {
 // Agreement loop (acting roundwise) runs concurrently with the generation-selection-reduction
 // loop (acting step-wise)
 // TODO: consider stopping the phase loop with a Done phase, instead of nil
-func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.Controller, round consensus.RoundUpdate) (*block.Certificate, []byte, [][]byte, error) {
+func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.Controller, round consensus.RoundUpdate) (*block.Certificate, []byte, error) {
 	// we create two context cancelation from the same parent context. This way
 	// we can let the agreement interrupt the stateMachine's loop cycle.
 	// Similarly, the loop can invoke the Agreement cancelation if it throws
@@ -126,8 +125,8 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	// (in which case we should probably re-sync)
 	go func() {
 		agreementLoop := ag.GetControlFn()
-		cert, blockHash, committee := agreementLoop(agrCtx, c.roundQueue, c.agreementChan, round)
-		roundResultsChan <- roundResults{cert, blockHash, committee}
+		cert, blockHash := agreementLoop(agrCtx, c.roundQueue, c.agreementChan, round)
+		roundResultsChan <- roundResults{cert, blockHash}
 		// canceling the consensus phase loop when Agreement is done (either
 		// because the parent canceled or because a consensus has been reached)
 		finalizeStep()
@@ -151,9 +150,9 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 			// Take round results from the agreement goroutine
 			select {
 			case results := <-roundResultsChan:
-				return results.cert, results.hash, results.committee, nil
+				return results.cert, results.hash, nil
 			default:
-				return nil, nil, nil, nil
+				return nil, nil, nil
 			}
 		}
 
@@ -176,7 +175,7 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 					"step":  step,
 				}).
 				Error("max steps reached")
-			return nil, nil, nil, ErrMaxStepsReached
+			return nil, nil, ErrMaxStepsReached
 		}
 	}
 
