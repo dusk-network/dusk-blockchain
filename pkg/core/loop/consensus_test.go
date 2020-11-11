@@ -40,10 +40,11 @@ func TestContextCancellation(t *testing.T) {
 
 	// the cancelation after 100ms should make the agreement end its loop with
 	// a nil return value
-	cert, hash, comm := l.Spin(ctx, consensus.MockPhase(cb), agreement.New(e), consensus.RoundUpdate{Round: uint64(1)})
+	cert, hash, comm, err := l.Spin(ctx, consensus.MockPhase(cb), agreement.New(e), consensus.RoundUpdate{Round: uint64(1)})
 	require.Nil(t, cert)
 	require.Nil(t, hash)
 	require.Nil(t, comm)
+	require.Nil(t, err)
 }
 
 // step is used by TestAgreementCompletion to test that any step would
@@ -91,10 +92,11 @@ func TestAgreementCompletion(t *testing.T) {
 	l := loop.New(e)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	cert, hash, comm := l.Spin(ctx, &step{&wg}, &succesfulAgreement{&wg}, consensus.RoundUpdate{Round: uint64(1)})
+	cert, hash, comm, err := l.Spin(ctx, &step{&wg}, &succesfulAgreement{&wg}, consensus.RoundUpdate{Round: uint64(1)})
 	require.NotNil(t, cert)
 	require.NotNil(t, hash)
 	require.NotNil(t, comm)
+	require.Nil(t, err)
 }
 
 // stallingStep is used by TestStall to test that any step would
@@ -135,6 +137,6 @@ func TestStall(t *testing.T) {
 	e := consensus.MockEmitter(time.Second, nil)
 	ctx := context.Background()
 	l := loop.New(e)
-	_, _, _ = l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
+	_, _, _, _ = l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
 	// require.Equal(t, loop.ErrMaxStepsReached, err)
 }

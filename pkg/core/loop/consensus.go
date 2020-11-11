@@ -28,6 +28,12 @@ var lg = log.WithField("process", "consensus loop")
 // is highly asynchronous or we are under attack
 var ErrMaxStepsReached = errors.New("consensus reached max number of steps without moving forward")
 
+type roundResults struct {
+	cert      *block.Certificate
+	hash      []byte
+	committee [][]byte
+}
+
 // Consensus is the state machine that runs the steps of consensus. Rather than
 // trying to coordinate the various steps, it lets them execute and indicate
 // which should be the following status, until completion.
@@ -98,7 +104,7 @@ func New(e *consensus.Emitter) *Consensus {
 // Agreement loop (acting roundwise) runs concurrently with the generation-selection-reduction
 // loop (acting step-wise)
 // TODO: consider stopping the phase loop with a Done phase, instead of nil
-func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.Controller, round consensus.RoundUpdate) (*block.Certificate, []byte, [][]byte) {
+func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.Controller, round consensus.RoundUpdate) (*block.Certificate, []byte, [][]byte, error) {
 	// we create two context cancelation from the same parent context. This way
 	// we can let the agreement interrupt the stateMachine's loop cycle.
 	// Similarly, the loop can invoke the Agreement cancelation if it throws
@@ -108,59 +114,71 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	// overhead
 	stepCtx, finalizeStep := context.WithCancel(ctx)
 	agrCtx, cancelAgreement := context.WithCancel(stepCtx)
+	defer cancelAgreement()
 
-	go func() {
-		defer cancelAgreement()
-		// score generation phase is the first step in the consensus
-		phaseFunction := scr.Fn(nil)
-		// synchronous consensus loop keeps running until the agreement invokes
-		// context.Done or the context is canceled some other way
-		for step := uint8(1); ; step++ {
-			phaseFunction = phaseFunction.Run(stepCtx, c.eventQueue, c.eventChan, round, step)
-			// if result is nil, this round is over
-			if phaseFunction == nil {
-				lg.
-					WithFields(log.Fields{
-						"round": round.Round,
-						"step":  step,
-					}).
-					Trace("consensus achieved")
-				return
-			}
-
-			lg.
-				WithFields(log.Fields{
-					"round": round.Round,
-					"step":  step,
-					"name":  phaseFunction.String(),
-				}).
-				Trace("new phase")
-
-			if config.Get().API.Enabled {
-				go report(round.Round, step)
-			}
-
-			if step >= 213 {
-				lg.
-					WithFields(log.Fields{
-						"round": round.Round,
-						"step":  step,
-					}).
-					Error("max steps reached")
-				return
-			}
-		}
-	}()
+	// We create a channel on which to communicate round results, so that they
+	// can be returned to the caller on a successful completion.
+	roundResultsChan := make(chan roundResults, 1)
 
 	// the agreement loop needs to be running until either the consensus
 	// reaches a maximum amount of iterations (approx. 213 steps), or we get
 	// agreements from future rounds and stopped receiving them for the current round
 	// (in which case we should probably re-sync)
-	agreementLoop := ag.GetControlFn()
-	cert, blockHash, committee := agreementLoop(agrCtx, c.roundQueue, c.agreementChan, round)
-	// canceling the consensus phase loop when Agreement is done (either
-	// because the parent canceled or because a consensus has been reached)
-	finalizeStep()
+	go func() {
+		agreementLoop := ag.GetControlFn()
+		cert, blockHash, committee := agreementLoop(agrCtx, c.roundQueue, c.agreementChan, round)
+		roundResultsChan <- roundResults{cert, blockHash, committee}
+		// canceling the consensus phase loop when Agreement is done (either
+		// because the parent canceled or because a consensus has been reached)
+		finalizeStep()
+	}()
+
+	// score generation phase is the first step in the consensus
+	phaseFunction := scr.Fn(nil)
+	// synchronous consensus loop keeps running until the agreement invokes
+	// context.Done or the context is canceled some other way
+	for step := uint8(1); ; step++ {
+		phaseFunction = phaseFunction.Run(stepCtx, c.eventQueue, c.eventChan, round, step)
+		// if result is nil, this round is over
+		if phaseFunction == nil {
+			lg.
+				WithFields(log.Fields{
+					"round": round.Round,
+					"step":  step,
+				}).
+				Trace("consensus achieved")
+
+			// Take round results from the agreement goroutine
+			select {
+			case results := <-roundResultsChan:
+				return results.cert, results.hash, results.committee, nil
+			default:
+				return nil, nil, nil, nil
+			}
+		}
+
+		lg.
+			WithFields(log.Fields{
+				"round": round.Round,
+				"step":  step,
+				"name":  phaseFunction.String(),
+			}).
+			Trace("new phase")
+
+		if config.Get().API.Enabled {
+			go report(round.Round, step)
+		}
+
+		if step >= 213 {
+			lg.
+				WithFields(log.Fields{
+					"round": round.Round,
+					"step":  step,
+				}).
+				Error("max steps reached")
+			return nil, nil, nil, ErrMaxStepsReached
+		}
+	}
 
 	// if we are here, either:
 	// - agreement completed normally and we can move on to the next block
@@ -171,7 +189,6 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	// - we reached the maximum amount of steps (~213) and the consensus should
 	// halt. In this case, cancel() will take care of stopping the Agreement
 	// loop
-	return cert, blockHash, committee
 }
 
 var steps = []string{"selection", "reduction1", "reduction2"} // nolint

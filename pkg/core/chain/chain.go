@@ -390,7 +390,14 @@ func (c *Chain) startConsensus() error {
 		}
 
 		c.lock.Unlock()
-		cert, blockHash, committee := c.loop.Spin(c.consensusCtx, scr, agr, ru)
+		cert, blockHash, committee, err := c.loop.Spin(c.consensusCtx, scr, agr, ru)
+		if err != nil {
+			// This is likely because of the consensus reaching max steps.
+			// If this is the case, we simply propagate the error upwards.
+			// TODO: maybe figure out a way to respond to this kind of error.
+			return err
+		}
+
 		if cert == nil || blockHash == nil || committee == nil {
 			break
 		}
