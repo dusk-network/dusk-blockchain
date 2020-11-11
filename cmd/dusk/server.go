@@ -223,7 +223,7 @@ func Setup() *Server {
 func (s *Server) OnAccept(conn net.Conn) {
 	writeQueueChan := make(chan *bytes.Buffer, 1000)
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, writeQueueChan, exitChan)
+	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan, exitChan)
 	if err != nil {
 		panic(err)
 	}
@@ -254,7 +254,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		Debugln("connection established")
 
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, writeQueueChan, exitChan)
+	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan, exitChan)
 	if err != nil {
 		log.Panic(err)
 	}

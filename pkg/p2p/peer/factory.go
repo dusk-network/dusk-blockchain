@@ -7,8 +7,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 // ReaderFactory is responsible for spawning peers. It provides them with the
@@ -24,7 +22,7 @@ func NewReaderFactory(processor *MessageProcessor) *ReaderFactory {
 
 // SpawnReader returns a Reader. It will still need to be launched by
 // running ReadLoop in a goroutine.
-func (f *ReaderFactory) SpawnReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
+func (f *ReaderFactory) SpawnReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
 	pconn := &Connection{
 		Conn:   conn,
 		gossip: gossip,

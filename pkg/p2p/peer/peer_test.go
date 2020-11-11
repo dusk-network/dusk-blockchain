@@ -16,7 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +35,6 @@ func TestReader(t *testing.T) {
 	client, srv := net.Pipe()
 
 	eb := eventbus.New()
-	rpcBus := rpcbus.New()
 
 	// Set up reader factory
 	processor := NewMessageProcessor(eb)
@@ -52,7 +50,7 @@ func TestReader(t *testing.T) {
 	dupeMap := dupemap.NewDupeMap(5)
 	responseChan := make(chan *bytes.Buffer, 100)
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupeMap, eb, rpcBus, responseChan, exitChan)
+	peerReader, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupeMap, responseChan, exitChan)
 	if err != nil {
 		t.Fatal(err)
 	}

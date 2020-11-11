@@ -18,7 +18,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,13 +59,13 @@ func TestPingLoop(t *testing.T) {
 	processor.Register(topics.Ping, responding.ProcessPing)
 	factory := NewReaderFactory(processor)
 
-	reader, err := factory.SpawnReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), responseChan, make(chan struct{}, 1))
+	reader, err := factory.SpawnReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan, make(chan struct{}, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
 	go reader.ReadLoop()
 
-	reader2, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), responseChan2, make(chan struct{}, 1))
+	reader2, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan2, make(chan struct{}, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,14 +223,12 @@ func TestInvalidPayload(t *testing.T) {
 
 //nolint:unparam
 func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, chan<- *bytes.Buffer) {
-	bus := eventbus.New()
-	rpcbus := rpcbus.New()
 	d := dupemap.NewDupeMap(0)
 	r, w := net.Pipe()
 
 	respChan := make(chan *bytes.Buffer, 10)
 	g := processing.NewGossip(protocol.TestNet)
-	peer, _ := f.SpawnReader(r, g, d, bus, rpcbus, respChan, make(chan struct{}, 1))
+	peer, _ := f.SpawnReader(r, g, d, respChan, make(chan struct{}, 1))
 
 	// Run the non-recover readLoop to watch for panics
 	go assert.NotPanics(t, peer.readLoop)

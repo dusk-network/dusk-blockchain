@@ -15,11 +15,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 func TestHandshake(t *testing.T) {
-
 	//setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
@@ -29,7 +27,6 @@ func TestHandshake(t *testing.T) {
 	cfg.Mock(&r)
 
 	eb := eventbus.New()
-	rpcBus := rpcbus.New()
 
 	processor := NewMessageProcessor(eb)
 	factory := NewReaderFactory(processor)
@@ -39,7 +36,7 @@ func TestHandshake(t *testing.T) {
 	go func() {
 		responseChan := make(chan *bytes.Buffer, 100)
 		exitChan := make(chan struct{}, 1)
-		peerReader, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), eb, rpcBus, responseChan, exitChan)
+		peerReader, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan, exitChan)
 		if err != nil {
 			panic(err)
 		}
