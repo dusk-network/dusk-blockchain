@@ -345,7 +345,7 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 
 // NewStake creates a staking transaction and returns it to the caller.
 func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.Transaction, error) {
-	stake, err := transactions.NewStake(0, byte(2), int64(0), 250000, s.w.ConsensusKeys().EdPubKeyBytes, s.w.ConsensusKeys().BLSPubKeyBytes)
+	stake, err := transactions.NewStake(0, byte(2), int64(0), 250000, s.w.ConsensusKeys().EdPubKeyBytes, req.PublicKeyBls)
 	if err != nil {
 		return nil, err
 	}
