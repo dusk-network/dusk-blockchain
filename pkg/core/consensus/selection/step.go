@@ -172,7 +172,9 @@ func (p *Phase) endSelection(_ uint64, _ uint8) consensus.PhaseFn {
 	}
 
 	log.Debug("endSelection, p.next.Fn(p.bestEvent)")
-	return p.next.Fn(p.bestEvent)
+	e := p.bestEvent
+	p.bestEvent = message.EmptyScore()
+	return p.next.Fn(e)
 }
 
 func (p *Phase) collectScore(ctx context.Context, sc message.Score) {
