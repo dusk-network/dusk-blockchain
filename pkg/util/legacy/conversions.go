@@ -251,6 +251,7 @@ func RuskStakeToStake(tx *rusk.Transaction) (*transactions.Stake, error) {
 	if err != nil {
 		return nil, err
 	}
+	stx.TxType = transactions.StakeType
 
 	buf := bytes.NewBuffer(tx.TxPayload.CallData)
 	var expirationHeight uint64
@@ -301,6 +302,7 @@ func RuskBidToBid(tx *rusk.Transaction) (*transactions.Bid, error) {
 	if err != nil {
 		return nil, err
 	}
+	stx.TxType = transactions.BidType
 
 	buf := bytes.NewBuffer(tx.TxPayload.CallData)
 	var expirationHeight uint64
