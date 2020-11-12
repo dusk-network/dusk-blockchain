@@ -69,6 +69,7 @@ type Chain struct {
 
 	highestSeen uint64
 	syncing     bool
+	syncTarget  uint64
 	*sequencer
 
 	// loader abstracts away the persistence aspect of Block operations
@@ -217,6 +218,12 @@ func (c *Chain) ProcessBlock(m message.Message) ([]*bytes.Buffer, error) {
 				c.lock.Unlock()
 				return nil, err
 			}
+
+			c.syncTarget = blk.Header.Height
+			if c.syncTarget > c.tip.Header.Height+config.MaxInvBlocks {
+				c.syncTarget = c.tip.Header.Height + config.MaxInvBlocks
+			}
+
 			c.syncing = true
 			c.lock.Unlock()
 			return []*bytes.Buffer{buf}, nil
@@ -359,7 +366,7 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	errList := c.eventBus.Publish(topics.AcceptedBlock, msg)
 	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
 
-	if blk.Header.Height == c.highestSeen {
+	if blk.Header.Height == c.syncTarget {
 		l.Trace("ending sync")
 		c.syncing = false
 	}
