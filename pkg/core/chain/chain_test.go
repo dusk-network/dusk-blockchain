@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"testing"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -35,8 +34,7 @@ import (
 func TestConcurrentAcceptBlock(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(1)
-	eb, _, c := setupChainTest(t, startingHeight)
-	go c.Listen()
+	eb, _, _ := setupChainTest(t, startingHeight)
 
 	// Run two subscribers expecting acceptedBlock message
 	acceptedBlock1Chan := make(chan message.Message, 1)
@@ -97,8 +95,6 @@ func TestAcceptFromPeer(t *testing.T) {
 	startingHeight := uint64(1)
 	eb, _, c := setupChainTest(t, startingHeight)
 
-	go c.Listen()
-
 	d, _ := crypto.RandEntropy(32)
 	k, _ := crypto.RandEntropy(32)
 	if err := c.db.Update(func(t database.Transaction) error {
@@ -112,15 +108,12 @@ func TestAcceptFromPeer(t *testing.T) {
 
 	// Start consensus so that the chain has access to the needed keys
 	BLSKeys, _ := key.NewRandKeys()
-	pk := &keys.PublicKey{
+	pk := keys.PublicKey{
 		AG: &common.JubJubCompressed{Data: make([]byte, 32)},
 		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
 	}
 
-	msg := message.NewInitialization(pk, &BLSKeys)
-	eb.Publish(topics.Initialization, message.New(topics.Initialization, msg))
-
-	time.Sleep(2 * time.Second)
+	go c.SetupConsensus(pk, BLSKeys)
 
 	blk := mockAcceptableBlock(*c.tip)
 
@@ -162,7 +155,6 @@ func TestAcceptBlock(t *testing.T) {
 	startingHeight := uint64(1)
 
 	eb, _, c := setupChainTest(t, startingHeight)
-	go c.Listen()
 
 	acceptedBlockChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.AcceptedBlock, eventbus.NewChanListener(acceptedBlockChan))
@@ -271,7 +263,6 @@ func TestFetchTip(t *testing.T) {
 
 func TestRebuildChain(t *testing.T) {
 	eb, rb, c := setupChainTest(t, 0)
-	go c.Listen()
 	catchClearWalletDatabaseRequest(t, rb)
 
 	// Listen for `StopConsensus` messages

@@ -23,7 +23,6 @@ func TestConcurrentBlock(t *testing.T) {
 	// Set up a chain instance with mocking verifiers
 	startingHeight := uint64(1)
 	eb, _, chain := setupChainTest(t, startingHeight)
-	go chain.Listen()
 
 	BLSKeys, _ := key.NewRandKeys()
 	pk := &keys.PublicKey{

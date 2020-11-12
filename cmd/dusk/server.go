@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 
 	"github.com/sirupsen/logrus"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
@@ -55,7 +57,7 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (chain.Loader, peer.ProcessorFunc, error) {
+func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (chain.Loader, peer.ProcessorFunc, func(keys.PublicKey, key.Keys) error, error) {
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
@@ -63,7 +65,7 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 		var err error
 		genesis, err = legacy.OldBlockToNewBlock(g)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	} else {
 		genesis = cfg.DecodeGenesis()
@@ -72,17 +74,16 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 
 	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Perform database sanity check to ensure that it is rational before
 	// bootstrapping all node subsystems
 	if err := l.PerformSanityCheck(0, 10, 0); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	go chainProcess.Listen()
-	return l, chainProcess.ProcessBlock, nil
+	return l, chainProcess.ProcessBlock, chainProcess.SetupConsensus, nil
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
@@ -155,7 +156,7 @@ func Setup() *Server {
 		}
 	}
 
-	chainDBLoader, blkFn, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db)
+	chainDBLoader, blkFn, consFn, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -193,7 +194,7 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy)
+	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy, consFn)
 	if err != nil {
 		log.Panic(err)
 	}

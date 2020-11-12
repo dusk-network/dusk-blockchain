@@ -3,6 +3,7 @@ package transactor
 import (
 	"context"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
@@ -35,11 +36,13 @@ type Transactor struct { // TODO: rename
 	proxy     transactions.Proxy
 	keyMaster transactions.KeyMaster
 
+	setupConsensus func(keys.PublicKey, key.Keys) error
+
 	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy) (*Transactor, error) {
+func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy, setupConsensusFn func(keys.PublicKey, key.Keys) error) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -48,12 +51,13 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 	bidChan := make(chan rpcbus.Request, 1)
 
 	t := &Transactor{
-		db:        db,
-		eb:        eb,
-		rb:        rb,
-		stakeChan: stakeChan,
-		bidChan:   bidChan,
-		proxy:     proxy,
+		db:             db,
+		eb:             eb,
+		rb:             rb,
+		stakeChan:      stakeChan,
+		bidChan:        bidChan,
+		proxy:          proxy,
+		setupConsensus: setupConsensusFn,
 	}
 
 	if srv != nil {

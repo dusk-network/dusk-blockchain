@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 
@@ -159,31 +160,15 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 	return chain, nil
 }
 
-// Listen to the collectors
-func (c *Chain) Listen() {
-	for {
-		select {
-		case m := <-c.initializationChan:
-			// This runs in a goroutine in order to avoid locking the Listen loop.
-			go func() {
-				if err := c.initialize(m); err != nil {
-					log.WithError(err).WithField("topic", topics.Initialization.String()).Warn("Handling initialization failed")
-				}
-			}()
-		case <-c.ctx.Done():
-			// TODO: dispose the Chain
-		}
-	}
-}
-
-func (c *Chain) initialize(m message.Message) error {
+// SetupConsensus adds the missing fields on the Chain which need to be populated
+// by the user. Once the fields are populated, consensus is started.
+func (c *Chain) SetupConsensus(pk keys.PublicKey, blsKeys key.Keys) error {
 	c.lock.Lock()
-	msg := m.Payload().(message.Initialization)
-	c.pubKey = msg.PublicKey
+	c.pubKey = &pk
 	e := &consensus.Emitter{
 		EventBus:    c.eventBus,
 		RPCBus:      c.rpcBus,
-		Keys:        *msg.BLSKeys,
+		Keys:        blsKeys,
 		Proxy:       c.proxy,
 		TimerLength: config.ConsensusTimeOut,
 	}
@@ -387,7 +372,7 @@ func (c *Chain) startConsensus() error {
 	for {
 		c.lock.Lock()
 		ru := c.getRoundUpdate()
-		c.consensusCtx, c.cancel = context.WithCancel(context.Background())
+		c.consensusCtx, c.cancel = context.WithCancel(c.ctx)
 		scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock)
 		if err != nil {
 			log.WithError(err).Error("could not create consensus state machine")

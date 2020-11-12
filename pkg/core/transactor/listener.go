@@ -10,7 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
@@ -349,8 +348,11 @@ func loadResponseFromPub(pubKey keys.PublicKey) *node.LoadResponse {
 func (t *Transactor) launchConsensus() {
 	log.Tracef("Launch consensus")
 	keys := t.w.Keys()
-	msg := message.NewInitialization(&t.w.PublicKey, &keys)
-	t.eb.Publish(topics.Initialization, message.New(topics.Initialization, msg))
+	go func() {
+		if err := t.setupConsensus(t.w.PublicKey, keys); err != nil {
+			log.WithError(err).Errorln("error setting up consensus")
+		}
+	}()
 }
 
 //nolint:unused
