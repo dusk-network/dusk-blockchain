@@ -350,6 +350,13 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 		return err
 	}
 
+	if err := c.db.Update(func(t database.Transaction) error {
+		return t.ClearCandidateMessages()
+	}); err != nil {
+		l.WithError(err).Error("candidate deletion failed")
+		return err
+	}
+
 	// 5. Gossip advertise block Hash
 	l.Trace("gossiping block")
 	if err := c.advertiseBlock(blk); err != nil {
