@@ -1,6 +1,5 @@
 package testing
 
-/*
 import (
 	"context"
 	"encoding/binary"
@@ -24,7 +23,6 @@ import (
 // mockAcceptor owns mockConsensusRegistry and has direct read/write access to it
 //nolint:unused
 type mockAcceptor struct {
-	certficateChan           chan message.Message
 	blockChan                chan message.Message
 	verifyCandidateBlockChan chan rpcbus.Request
 
@@ -37,15 +35,9 @@ type mockAcceptor struct {
 
 //nolint:unused
 func newMockAcceptor(e consensus.Emitter, db database.DB, reg *mockSafeRegistry) (*mockAcceptor, error) {
-
 	// Subscriptions
-
-	certficateChan := make(chan message.Message, 1)
-	chanListener := eventbus.NewChanListener(certficateChan)
-	e.EventBus.Subscribe(topics.Certificate, chanListener)
-
 	blockChan := make(chan message.Message, 1)
-	chanListener = eventbus.NewChanListener(blockChan)
+	chanListener := eventbus.NewChanListener(blockChan)
 	e.EventBus.Subscribe(topics.Block, chanListener)
 
 	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
@@ -54,7 +46,6 @@ func newMockAcceptor(e consensus.Emitter, db database.DB, reg *mockSafeRegistry)
 	}
 
 	acc := mockAcceptor{
-		certficateChan:           certficateChan,
 		blockChan:                blockChan,
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
 		db:                       db,
@@ -134,43 +125,41 @@ func (a *mockAcceptor) processCandidateVerificationRequest(r rpcbus.Request) {
 		return
 	}
 
+	/* VST
 	_, err := c.executor.VerifyStateTransition(c.ctx, candidateBlock.Txs, candidateBlock.Header.Height)
 	if err != nil {
 		res.Err = err
 		r.RespChan <- res
 		return
 	}
+	*/
 
 	r.RespChan <- res
 }
 
-func (a *mockAcceptor) loop(pctx context.Context, restartLoopChan chan bool, assert *assert.Assertions) {
+func (a *mockAcceptor) acceptCertificate(cert *block.Certificate, hash []byte, restartLoopChan chan bool, assert *assert.Assertions) {
+	// Try to fetch block by hash from local registry
+	var cm message.Candidate
+	assert.NoError(a.db.View(func(t database.Transaction) error {
+		var err error
+		cm, err = t.FetchCandidateMessage(hash)
+		return err
+	}))
+	// TODO: if err, FetchCandidate from Network (Peers in Gossip)
 
+	cm.Block.Header.Certificate = cert
+	// Ensure block is accepted by Chain
+	assert.NoError(a.acceptBlock(*cm.Block))
+
+	restartLoopChan <- true
+}
+
+func (a *mockAcceptor) loop(pctx context.Context) {
 	for {
 		select {
 		// Handles Idle
 		case <-time.After(30 * time.Second):
 			logrus.Warn("acceptor on idle")
-		// Handles topics.Certificate from consensus
-		case m := <-a.certficateChan:
-
-			// Extract winning hash and block certificate
-			cMsg := m.Payload().(message.Certificate)
-			certificate := cMsg.Ag.GenerateCertificate()
-			winningHash := cMsg.Ag.State().BlockHash
-
-			// Try to fetch block by hash from local registry
-			cm, err := a.reg.GetCandidateByHash(winningHash)
-			assert.NoError(err)
-			// TODO: if err, FetchCandidate from Network (Peers in Gossip)
-
-			cm.Block.Header.Certificate = certificate
-			// Ensure block is accepted by Chain
-			err = a.acceptBlock(*cm.Block)
-			assert.NoError(err)
-
-			restartLoopChan <- true
-
 		// Handles topics.Block from the wire on synchronizing
 		case <-a.blockChan:
 			// Not needed in testing for now
@@ -185,7 +174,6 @@ func (a *mockAcceptor) loop(pctx context.Context, restartLoopChan chan bool, ass
 }
 
 func sanityCheckBlock(db database.DB, prevBlock block.Block, b block.Block) error {
-
 	// 1. Check if the block is a duplicate
 	err := db.View(func(t database.Transaction) error {
 		_, err := t.FetchBlockExists(b.Header.Hash)
@@ -210,4 +198,3 @@ func sanityCheckBlock(db database.DB, prevBlock block.Block, b block.Block) erro
 
 	return nil
 }
-*/

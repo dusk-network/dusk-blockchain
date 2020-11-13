@@ -1,6 +1,5 @@
 package testing
 
-/*
 import (
 	"encoding/hex"
 	stdtesting "testing"
@@ -92,4 +91,3 @@ func TestConsensus(t *stdtesting.T) {
 		}
 	}
 }
-*/

@@ -1,6 +1,5 @@
 package testing
 
-/*
 import (
 	"context"
 	"sync"
@@ -27,7 +26,6 @@ const (
 
 //nolint:unused
 type mockChain struct {
-
 	// Blockchain and consensus state
 	db  database.DB
 	reg *mockSafeRegistry
@@ -98,9 +96,8 @@ func newMockChain(e consensus.Emitter, consensusTimeOut time.Duration, pubKey *k
 }
 
 func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
-
 	// accepting blocks in the blockchain, alters SafeRegistry
-	go c.acceptor.loop(c.prntCtx, c.RestartLoopChan, assert)
+	go c.acceptor.loop(c.prntCtx)
 
 	// Provides async access (read/write) to SafeRegistry
 	go c.broker.loop(c.prntCtx)
@@ -127,10 +124,7 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 			Hash:            hash,
 			Seed:            seed,
 			LastCertificate: block.EmptyCertificate(),
-			LastCommittee:   make([][]byte, 0),
 		}
-
-		c.reg.ResetCandidates(b.Header.Height)
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -141,10 +135,12 @@ func (c *mockChain) MainLoop(p *user.Provisioners, assert *assert.Assertions) {
 			scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, c.timeOut, c.pubKey.Copy(), func([]byte) error { return nil })
 			assert.NoError(err)
 
-			cert, hash, comm := c.loop.Spin(ctx, scr, agr, ru)
+			cert, hash, err := c.loop.Spin(ctx, scr, agr, ru)
 			assert.NotNil(cert)
 			assert.NotNil(hash)
-			assert.NotNil(comm)
+			assert.NoError(err)
+
+			c.acceptor.acceptCertificate(cert, hash, c.RestartLoopChan, assert)
 
 			// if loop.spin is done with this round, start another loop.spin
 			wg.Done()
@@ -190,4 +186,3 @@ func (c *mockChain) teardown() {
 	// Close DB
 	_ = c.db.Close()
 }
-*/
