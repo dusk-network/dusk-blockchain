@@ -214,6 +214,8 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 		err = UnmarshalGetBlocksMessage(b, msg)
 	case topics.Inv, topics.GetData:
 		err = UnmarshalInvMessage(b, msg)
+	case topics.GetCandidate:
+		UnmarshalGetCandidateMessage(b, msg)
 	case topics.Tx:
 		err = UnmarshalTxMessage(b, msg)
 	case topics.Candidate, topics.RoundResults:

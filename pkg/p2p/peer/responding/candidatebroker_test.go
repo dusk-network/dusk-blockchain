@@ -1,7 +1,6 @@
 package responding_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -30,14 +29,14 @@ func TestCandidateBroker(t *testing.T) {
 
 	// First, ask for the wrong candidate.
 	wrongHash, _ := crypto.RandEntropy(32)
-	_, err := c.ProvideCandidate(message.New(topics.GetCandidate, message.SafeBuffer{
-		Buffer: *bytes.NewBuffer(wrongHash)},
+	_, err := c.ProvideCandidate(message.New(topics.GetCandidate, message.GetCandidate{
+		Hash: wrongHash},
 	))
 	assert.Error(t, err)
 
 	// Now, ask for the correct one.
-	buf, err := c.ProvideCandidate(message.New(topics.GetCandidate, message.SafeBuffer{
-		Buffer: *bytes.NewBuffer(hashes[0])},
+	buf, err := c.ProvideCandidate(message.New(topics.GetCandidate, message.GetCandidate{
+		Hash: hashes[0]},
 	))
 	assert.NoError(t, err)
 
