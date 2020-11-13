@@ -296,6 +296,48 @@ func TestRebuildChain(t *testing.T) {
 	<-stopConsensusChan
 }
 
+func TestGetCandidate(t *testing.T) {
+	eb, _, c := setupChainTest(t, 0)
+
+	// Attempt to verify a candidate that doesn't exist, prompting a network request.
+	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+
+	candidateBlock := mockAcceptableBlock(*c.tip)
+	cert := block.EmptyCertificate()
+
+	doneChan := make(chan error, 1)
+	go func(doneChan chan error) {
+		doneChan <- c.VerifyCandidateBlock(candidateBlock.Header.Hash)
+	}(doneChan)
+
+	// Check if we receive a `GetCandidate` message
+	m, err := streamer.Read()
+	assert.NoError(t, err)
+
+	assert.True(t, streamer.SeenTopics()[0] == topics.GetCandidate)
+	assert.True(t, bytes.Equal(candidateBlock.Header.Hash, m))
+
+	// Publish the requested candidate on topics.Candidate
+	eb.Publish(topics.Candidate, message.New(topics.Candidate, message.Candidate{
+		Block:       candidateBlock,
+		Certificate: cert,
+	}))
+
+	// Wait for the candidate to be processed
+	assert.NoError(t, <-doneChan)
+
+	// Candidate message should now exist in the db
+	var cm message.Candidate
+	assert.NoError(t, c.db.View(func(t database.Transaction) error {
+		var err error
+		cm, err = t.FetchCandidateMessage(candidateBlock.Header.Hash)
+		return err
+	}))
+
+	assert.NotEmpty(t, cm)
+}
+
 // mock a block which can be accepted by the chain.
 // note that this is only valid for height 1, as the certificate
 // is not checked on height 1 (for network bootstrapping)

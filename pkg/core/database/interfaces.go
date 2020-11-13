@@ -110,7 +110,7 @@ type Transaction interface {
 	// StoreCandidateMessage will...
 	StoreCandidateMessage(cm message.Candidate) error
 
-	FetchCandidateMessage(hash []byte) (*message.Candidate, error)
+	FetchCandidateMessage(hash []byte) (message.Candidate, error)
 
 	ClearCandidateMessages() error
 

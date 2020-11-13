@@ -2,34 +2,36 @@ package candidate_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	assert "github.com/stretchr/testify/require"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
-func TestBroker(t *testing.T) {
-	_, db := lite.CreateDBConnection()
-	b := candidate.NewBroker(db)
+func TestPublisher(t *testing.T) {
+	bus := eventbus.New()
+	b := candidate.NewBroker(bus)
+
+	// Catch incoming candidates
+	candidateChan := make(chan message.Message, 1)
+	cChan := eventbus.NewChanListener(candidateChan)
+	bus.Subscribe(topics.Candidate, cChan)
 
 	cm := mockCandidate()
-	b.StoreCandidateMessage(message.New(topics.Candidate, cm))
 
-	// DB should have the candidate now
-	assert.NoError(t, db.View(func(tr database.Transaction) error {
-		c, err := tr.FetchCandidateMessage(cm.Block.Header.Hash)
-		if err != nil {
-			return err
-		}
+	b.Process(message.New(topics.Candidate, cm))
 
-		assert.True(t, c.Block.Equals(cm.Block))
-		return nil
-	}))
+	// Should now have something on the candidateChan
+	select {
+	case <-candidateChan:
+		// Success
+	case <-time.After(1 * time.Second):
+		t.Fatal("did not receive a candidate message")
+	}
 }
 
 // Mocks a candidate message. It is not in the message package since it uses

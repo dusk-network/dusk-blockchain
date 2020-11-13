@@ -357,20 +357,20 @@ func (t *transaction) StoreCandidateMessage(cm message.Candidate) error {
 	return nil
 }
 
-func (t *transaction) FetchCandidateMessage(hash []byte) (*message.Candidate, error) {
+func (t *transaction) FetchCandidateMessage(hash []byte) (message.Candidate, error) {
 	cmBytes, ok := t.db.storage[candidateInd][toKey(hash)]
 	if !ok {
-		return nil, errors.New("candidate not found")
+		return message.Candidate{}, database.ErrBlockNotFound
 	}
 
 	cm := new(message.Candidate)
 	cm.Block = block.NewBlock()
 	cm.Certificate = block.EmptyCertificate()
 	if err := message.UnmarshalCandidate(bytes.NewBuffer(cmBytes), cm); err != nil {
-		return nil, err
+		return message.Candidate{}, err
 	}
 
-	return cm, nil
+	return *cm, nil
 }
 
 func (t *transaction) ClearCandidateMessages() error {

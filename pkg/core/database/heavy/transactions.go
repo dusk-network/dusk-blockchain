@@ -605,21 +605,21 @@ func (t transaction) StoreCandidateMessage(cm message.Candidate) error {
 	return nil
 }
 
-func (t transaction) FetchCandidateMessage(hash []byte) (*message.Candidate, error) {
+func (t transaction) FetchCandidateMessage(hash []byte) (message.Candidate, error) {
 	key := append(CandidatePrefix, hash...)
 	value, err := t.snapshot.Get(key, nil)
 	if err != nil {
-		return nil, err
+		return message.Candidate{}, database.ErrBlockNotFound
 	}
 
 	cm := new(message.Candidate)
 	cm.Block = block.NewBlock()
 	cm.Certificate = block.EmptyCertificate()
 	if err := message.UnmarshalCandidate(bytes.NewBuffer(value), cm); err != nil {
-		return nil, err
+		return message.Candidate{}, err
 	}
 
-	return cm, nil
+	return *cm, nil
 }
 
 func (t transaction) ClearCandidateMessages() error {
