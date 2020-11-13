@@ -193,3 +193,26 @@ func GetP2PLogsHandler(res http.ResponseWriter, req *http.Request) {
 
 	_, _ = res.Write(b)
 }
+
+// GetP2PCountHandler will return the current peer count
+func GetP2PCountHandler(res http.ResponseWriter, req *http.Request) {
+	peersCount, err := GetStormDBInstance().DB.Count(&PeerCount{})
+	if err != nil {
+		log.WithError(err).Debug("failed to count peers")
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	count := Count{
+		Count: peersCount,
+	}
+
+	var b []byte
+	b, err = json.Marshal(count)
+	if err != nil {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	_, _ = res.Write(b)
+}

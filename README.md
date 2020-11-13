@@ -1,4 +1,4 @@
-# Dusk Network Testnet [![Build Status](https://travis-ci.org/dusk-network/dusk-blockchain.svg?branch=testnet)](https://travis-ci.com/dusk-network/dusk-blockchain)
+# Dusk Network Testnet [![Actions Status](https://github.com/dusk-network/dusk-blockchain/workflows/Continuous%20Integration/badge.svg)](https://github.com/dusk-network/dusk-blockchain/actions) [![codecov](https://codecov.io/gh/dusk-network/dusk-blockchain/branch/master/graph/badge.svg)](https://codecov.io/gh/dusk-network/dusk-blockchain)
 
 ## Rei (レイ) Release
 

@@ -230,7 +230,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	}
 
 	if err := peerReader.Accept(); err != nil {
-		logServer.WithError(err).Warnln("problem performing handshake")
+		logServer.WithError(err).Warnln("OnAccept, problem performing handshake")
 		return
 	}
 	logServer.WithField("address", peerReader.Addr()).Debugln("connection established")
@@ -247,7 +247,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
 
 	if err := peerWriter.Connect(); err != nil {
-		logServer.WithError(err).Warnln("problem performing handshake")
+		logServer.WithError(err).Warnln("OnConnection, problem performing handshake")
 		return
 	}
 	address := peerWriter.Addr()
