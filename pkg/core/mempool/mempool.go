@@ -153,7 +153,7 @@ func (m *Mempool) Run() {
 }
 
 // ProcessTx handles a submitted tx from any source (rpcBus or eventBus)
-func (m *Mempool) ProcessTx(msg message.Message) ([]*bytes.Buffer, error) {
+func (m *Mempool) ProcessTx(msg message.Message) ([]bytes.Buffer, error) {
 	t := TxDesc{tx: msg.Payload().(transactions.ContractCall), received: time.Now(), size: uint(len(msg.Id()))}
 	log.Info("handle submitted tx")
 

@@ -35,12 +35,12 @@ func TestAdvertiseBlocks(t *testing.T) {
 	assert.NoError(err)
 
 	// Check for correctness of topic
-	topic, _ := topics.Extract(blksBuf[0])
+	topic, _ := topics.Extract(&blksBuf[0])
 	assert.Equal(topics.Inv, topic)
 
 	// Decode inv
 	inv := &message.Inv{}
-	assert.NoError(inv.Decode(blksBuf[0]))
+	assert.NoError(inv.Decode(&blksBuf[0]))
 
 	// Check that block hashes match up with those we generated
 	for i, item := range inv.InvList {

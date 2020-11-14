@@ -179,7 +179,7 @@ func (c *Chain) SetupConsensus(pk keys.PublicKey, blsKeys key.Keys) error {
 // the chain to enter sync mode if it detects that we are behind, which will
 // cancel the running consensus loop and attempt to reach the new chain tip.
 // Satisfied the peer.ProcessorFunc interface.
-func (c *Chain) ProcessBlock(m message.Message) ([]*bytes.Buffer, error) {
+func (c *Chain) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	blk := m.Payload().(block.Block)
 	log.WithField("height", blk.Header.Height).Trace("received block")
 
@@ -222,7 +222,7 @@ func (c *Chain) ProcessBlock(m message.Message) ([]*bytes.Buffer, error) {
 
 			c.syncing = true
 			c.lock.Unlock()
-			return []*bytes.Buffer{buf}, nil
+			return []bytes.Buffer{*buf}, nil
 		}
 
 		c.lock.Unlock()

@@ -48,7 +48,7 @@ func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus, broker eventbus.Bro
 // RequestMissingItems takes an inventory message, checks it for any items that the node
 // is missing, puts these items in a GetData wire message, and sends it off to the peer's
 // outgoing message queue, requesting the items in full.
-func (d *DataRequestor) RequestMissingItems(m message.Message) ([]*bytes.Buffer, error) {
+func (d *DataRequestor) RequestMissingItems(m message.Message) ([]bytes.Buffer, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	msg := m.Payload().(message.Inv)
@@ -97,7 +97,7 @@ func (d *DataRequestor) RequestMissingItems(m message.Message) ([]*bytes.Buffer,
 	if getData.InvList != nil {
 		// we've got objects that are missing, then packet and request them
 		buf, err := marshalGetData(getData)
-		return []*bytes.Buffer{buf}, err
+		return []bytes.Buffer{*buf}, err
 	}
 
 	return nil, nil

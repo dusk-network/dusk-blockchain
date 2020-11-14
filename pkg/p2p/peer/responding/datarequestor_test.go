@@ -32,14 +32,14 @@ func TestRequestData(t *testing.T) {
 	}
 
 	// Check topic
-	topic, _ := topics.Extract(bufs[0])
+	topic, _ := topics.Extract(&bufs[0])
 	if topic != topics.GetData {
 		t.Fatalf("unexpected topic %s, expected GetData", topic)
 	}
 
 	// Assert the output
 	inv := &message.Inv{}
-	if err := inv.Decode(bufs[0]); err != nil {
+	if err := inv.Decode(&bufs[0]); err != nil {
 		t.Fatal(err)
 	}
 

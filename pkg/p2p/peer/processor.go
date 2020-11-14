@@ -13,7 +13,7 @@ import (
 
 // ProcessorFunc defines an interface for callbacks which can be registered
 // to the MessageProcessor, in order to process messages from the network.
-type ProcessorFunc func(message.Message) ([]*bytes.Buffer, error)
+type ProcessorFunc func(message.Message) ([]bytes.Buffer, error)
 
 // MessageProcessor is connected to all of the processing units that are tied to the peer.
 // It sends an incoming message in the right direction, according to its topic.
@@ -85,7 +85,7 @@ func (m *MessageProcessor) process(msg message.Message, respChan chan<- bytes.Bu
 	}
 
 	for _, buf := range bufs {
-		respChan <- *buf
+		respChan <- buf
 	}
 
 	return nil

@@ -37,12 +37,12 @@ func TestSendData(t *testing.T) {
 	recvBlocks := make([]*block.Block, 0, 5)
 	for _, buf := range bufs {
 		// Check for correctness of topic
-		topic, _ := topics.Extract(buf)
+		topic, _ := topics.Extract(&buf)
 		assert.Equal(topics.Block, topic)
 
 		// Decode block
 		blk := block.NewBlock()
-		assert.NoError(message.UnmarshalBlock(buf, blk))
+		assert.NoError(message.UnmarshalBlock(&buf, blk))
 
 		recvBlocks = append(recvBlocks, blk)
 	}

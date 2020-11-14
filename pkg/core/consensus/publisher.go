@@ -20,7 +20,7 @@ func NewPublisher(publisher eventbus.Publisher) *Publisher {
 
 // Process incoming consensus messages.
 // Satisfies the peer.ProcessorFunc interface.
-func (p *Publisher) Process(msg message.Message) ([]*bytes.Buffer, error) {
+func (p *Publisher) Process(msg message.Message) ([]bytes.Buffer, error) {
 	p.publisher.Publish(msg.Category(), msg)
 	return nil, nil
 }

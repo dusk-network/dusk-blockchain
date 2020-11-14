@@ -27,7 +27,7 @@ func NewBlockHashBroker(db database.DB) *BlockHashBroker {
 // AdvertiseMissingBlocks takes a GetBlocks wire message, finds the requesting peer's
 // height, and returns an inventory message of up to config.MaxInvBlocks blocks which follow the
 // provided locator.
-func (b *BlockHashBroker) AdvertiseMissingBlocks(m message.Message) ([]*bytes.Buffer, error) {
+func (b *BlockHashBroker) AdvertiseMissingBlocks(m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.GetBlocks)
 
 	// Determine from where we need to start fetching blocks, going off his Locator
@@ -63,7 +63,8 @@ func (b *BlockHashBroker) AdvertiseMissingBlocks(m message.Message) ([]*bytes.Bu
 	// If we retrieved any items, we should marshal the inventory message, and send it
 	// to the requesting peer.
 	if inv.InvList != nil {
-		return marshalInv(inv)
+		buf, err := marshalInv(inv)
+		return []bytes.Buffer{buf}, err
 	}
 
 	return nil, nil
@@ -89,12 +90,12 @@ func (b *BlockHashBroker) fetchLocatorHeight(msg message.GetBlocks) (uint64, err
 	return height, err
 }
 
-func marshalInv(inv *message.Inv) ([]*bytes.Buffer, error) {
+func marshalInv(inv *message.Inv) (bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	if err := inv.Encode(buf); err != nil {
-		return nil, err
+		return bytes.Buffer{}, err
 	}
 
 	_ = topics.Prepend(buf, topics.Inv)
-	return []*bytes.Buffer{buf}, nil
+	return *buf, nil
 }

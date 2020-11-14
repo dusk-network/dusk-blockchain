@@ -29,10 +29,10 @@ func NewDataBroker(db database.DB, rpcBus *rpcbus.RPCBus) *DataBroker {
 
 // SendItems takes a GetData message from the wire, and iterates through the list,
 // sending back each item's complete data to the requesting peer.
-func (d *DataBroker) SendItems(m message.Message) ([]*bytes.Buffer, error) {
+func (d *DataBroker) SendItems(m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.Inv)
 
-	bufs := make([]*bytes.Buffer, 0, len(msg.InvList))
+	bufs := make([]bytes.Buffer, 0, len(msg.InvList))
 	for _, obj := range msg.InvList {
 		switch obj.Type {
 		case message.InvTypeBlock:
@@ -54,7 +54,7 @@ func (d *DataBroker) SendItems(m message.Message) ([]*bytes.Buffer, error) {
 				return nil, err
 			}
 
-			bufs = append(bufs, buf)
+			bufs = append(bufs, *buf)
 		case message.InvTypeMempoolTx:
 			// Try to retrieve tx from local mempool state. It might not be
 			// available
@@ -70,7 +70,7 @@ func (d *DataBroker) SendItems(m message.Message) ([]*bytes.Buffer, error) {
 					return nil, err
 				}
 
-				bufs = append(bufs, buf)
+				bufs = append(bufs, *buf)
 			}
 
 			// A txID will not be found in a few situations:

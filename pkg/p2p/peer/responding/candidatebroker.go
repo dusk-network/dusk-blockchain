@@ -19,7 +19,7 @@ func NewCandidateBroker(db database.DB) *CandidateBroker {
 }
 
 // ProvideCandidate for a given (m *bytes.Buffer)
-func (c *CandidateBroker) ProvideCandidate(m message.Message) ([]*bytes.Buffer, error) {
+func (c *CandidateBroker) ProvideCandidate(m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.GetCandidate)
 	var cm message.Candidate
 	if err := c.db.View(func(t database.Transaction) error {
@@ -39,5 +39,5 @@ func (c *CandidateBroker) ProvideCandidate(m message.Message) ([]*bytes.Buffer, 
 		return nil, err
 	}
 
-	return []*bytes.Buffer{candidateBytes}, nil
+	return []bytes.Buffer{*candidateBytes}, nil
 }

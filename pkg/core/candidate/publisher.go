@@ -27,7 +27,7 @@ func NewBroker(publisher eventbus.Publisher) *Publisher {
 }
 
 // Process a received Candidate message. Invalid Candidate messages are discarded.
-func (b *Publisher) Process(msg message.Message) ([]*bytes.Buffer, error) {
+func (b *Publisher) Process(msg message.Message) ([]bytes.Buffer, error) {
 	// We only publish valid candidate messages
 	if err := Validate(msg); err != nil {
 		return nil, err
