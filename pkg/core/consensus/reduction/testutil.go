@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/require"
@@ -123,7 +124,7 @@ func (hlp *Helper) shouldFailVerification() bool {
 
 // ProcessCandidateVerificationRequest is a callback used by the firststep
 // reduction to verify potential winning candidates.
-func (hlp *Helper) ProcessCandidateVerificationRequest(hash []byte) error {
+func (hlp *Helper) ProcessCandidateVerificationRequest(blk block.Block) error {
 	if hlp.shouldFailVerification() {
 		return errors.New("verification failed")
 	}

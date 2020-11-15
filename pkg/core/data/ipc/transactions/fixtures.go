@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"math/big"
 
@@ -17,8 +16,6 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
-
-var intermediatePublicKey = "61c36e407ac91f20174572eec95f692f5cff1c40bacd1b9f86c7fa7202e93bb6753c2f424caf3c9220876e8cfe0afdff7ffd7c984d5c7d95fa0b46cf3781d883"
 
 // PermissiveExecutor implements the transactions.Executor interface. It
 // simulates successful Validation and Execution of State transitions
@@ -228,44 +225,6 @@ func MockTx(obfuscated bool, blindingFactor []byte, randomized bool) *Transactio
 /****************/
 /** DISTRIBUTE **/
 /****************/
-
-// IntermediateCoinbase is the coinbase of the first intermediate block. It
-// needs to be deterministic because all consensus nodes will need to use the
-// same intermediate block with the same Hash to prevent forking immediately
-// after the genesis. The determinism comes from using the same PubliKey and an
-// empty set of provisioners
-func IntermediateCoinbase(reward uint64) *Transaction {
-	startingPk, err := hex.DecodeString(intermediatePublicKey)
-	if err != nil {
-		panic(err)
-	}
-
-	pk := new(keys.PublicKey)
-
-	pk.AG = new(common.JubJubCompressed)
-	pk.BG = new(common.JubJubCompressed)
-
-	pk.AG.Data = startingPk[:len(startingPk)/2]
-	pk.BG.Data = startingPk[len(startingPk)/2:]
-
-	// XXX: as a hotfix, the PK is not encoded here, only an amount.
-	// This is to prevent annoying errors during test-harness execution.
-	// Since the actual workaround requires much more work, I will defer
-	// it until we can start integrating with actual Rusk.
-	tx := MockTx(false, make([]byte, 32), false)
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, 5000000000); err != nil {
-		panic(err)
-	}
-	// if err := keys.MarshalPublicKey(buf, pk); err != nil {
-	// 	panic(err)
-	// }
-
-	tx.TxPayload.CallData = buf.Bytes()
-	tx.TxPayload.Nullifiers = make([]*common.BlsScalar, 0)
-	tx.TxType = Distribute
-	return tx
-}
 
 // RandDistributeTx creates a random distribute transaction
 func RandDistributeTx(reward uint64, provisionerNr int) *Transaction {

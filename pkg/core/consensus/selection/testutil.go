@@ -1,7 +1,6 @@
 package selection
 
 import (
-	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -48,7 +47,6 @@ func NewHelper(scoreToSpawn int) *Helper {
 		P:            p,
 	}
 
-	var wg sync.WaitGroup
 	genHlp := &candidate.Helper{
 		ThisSender:       emitter.Keys.BLSPubKeyBytes,
 		ProvisionersKeys: provisionersKeys,
@@ -56,8 +54,7 @@ func NewHelper(scoreToSpawn int) *Helper {
 		Nr:               ProvisionerNr,
 		Emitter:          emitter,
 	}
-	genHlp.MockRPCCalls(&wg, provisionersKeys)
-	wg.Wait()
+	genHlp.MockRPCCalls(provisionersKeys)
 	return hlp
 }
 

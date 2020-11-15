@@ -12,6 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
@@ -21,7 +22,8 @@ import (
 // It uses the reduction common test preparation
 func TestSendReduction(t *testing.T) {
 	hlp := reduction.NewHelper(50, time.Second)
-	step := New(nil, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, 10*time.Second)
+	_, db := lite.CreateDBConnection()
+	step := New(nil, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, 10*time.Second, db)
 	scoreMsg := consensus.MockScoreMsg(t, nil)
 	// injecting the result of the Selection step
 	stepFn := step.Fn(scoreMsg.Payload().(message.Score))
@@ -36,7 +38,6 @@ type reductionTest struct {
 }
 
 func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte, round uint64, step uint8) map[string]reductionTest {
-
 	return map[string]reductionTest{
 		"HappyPath": {
 			batchEvents: func() chan message.Message {
@@ -112,7 +113,8 @@ func TestFirstStepReduction(t *testing.T) {
 
 			// injecting the test phase in the reduction step
 			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, nil)
-			firstStepReduction := New(testPhase, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, timeout)
+			_, db := lite.CreateDBConnection()
+			firstStepReduction := New(testPhase, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, timeout, db)
 
 			// injecting the result of the Selection step
 			msg := consensus.MockScoreMsg(t, &header.Header{BlockHash: hash})

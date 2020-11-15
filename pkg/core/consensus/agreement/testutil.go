@@ -8,15 +8,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 // Helper is a struct that facilitates sending semi-real Events with minimum effort
 type Helper struct {
 	*consensus.Emitter
 	P                *user.Provisioners
-	CertificateChan  chan message.Message
 	Nr               int
 	ProvisionersKeys []key.Keys
 	Round            uint64
@@ -31,18 +28,13 @@ func NewHelper(provisioners int) *Helper {
 	emitter := consensus.MockEmitter(time.Second, mockProxy)
 	emitter.Keys = provisionersKeys[0]
 
-	hlp := &Helper{
+	return &Helper{
 		Emitter:          emitter,
 		Nr:               provisioners,
 		P:                p,
 		ProvisionersKeys: provisionersKeys,
 		Round:            uint64(1),
-		CertificateChan:  make(chan message.Message, 1),
 	}
-
-	chanListener := eventbus.NewChanListener(hlp.CertificateChan)
-	emitter.EventBus.Subscribe(topics.Certificate, chanListener)
-	return hlp
 }
 
 // RoundUpdate creates a valid RoundUpdate for the current round, based on the information

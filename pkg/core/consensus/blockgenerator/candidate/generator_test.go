@@ -15,7 +15,6 @@ import (
 )
 
 func TestGenerate(t *testing.T) {
-
 	hlp := candidate.NewHelper(50, time.Second)
 
 	_, pubKey := transactions.MockKeys()

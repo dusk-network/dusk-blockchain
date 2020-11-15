@@ -21,7 +21,7 @@ import (
 type (
 	// CandidateVerificationFunc is a callback used to verify candidate blocks
 	// after the conclusion of the first reduction step.
-	CandidateVerificationFunc func([]byte) error
+	CandidateVerificationFunc func(block.Block) error
 
 	// Emitter is a simple struct to pass the communication channels that the steps should be
 	// able to emit onto

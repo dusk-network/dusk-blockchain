@@ -9,7 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-const m = topics.GetLastBlock
+const m = topics.GetMempoolTxs
 
 var errInvalidParams = errors.New("invalid params")
 

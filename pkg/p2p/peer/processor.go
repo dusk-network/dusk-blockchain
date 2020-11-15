@@ -57,8 +57,7 @@ func (m *MessageProcessor) CanRoute(topic topics.Topic) bool {
 		topics.Score,
 		topics.Reduction,
 		topics.Agreement,
-		topics.GetCandidate,
-		topics.RoundResults:
+		topics.GetCandidate:
 		return true
 	}
 

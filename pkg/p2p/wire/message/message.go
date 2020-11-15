@@ -218,7 +218,7 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 		UnmarshalGetCandidateMessage(b, msg)
 	case topics.Tx:
 		err = UnmarshalTxMessage(b, msg)
-	case topics.Candidate, topics.RoundResults:
+	case topics.Candidate:
 		err = UnmarshalCandidateMessage(b, msg)
 	case topics.Score:
 		err = UnmarshalScoreMessage(b, msg)
@@ -294,11 +294,10 @@ func marshal(s Message, b *bytes.Buffer) error {
 func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) error {
 	var err error
 	switch topic {
-
 	case topics.Tx:
 		tx := payload.(transactions.ContractCall)
 		err = transactions.Marshal(buf, tx)
-	case topics.Candidate, topics.RoundResults:
+	case topics.Candidate:
 		candidate := payload.(Candidate)
 		err = MarshalCandidate(buf, candidate)
 	case topics.Score:
