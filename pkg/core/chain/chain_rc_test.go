@@ -22,18 +22,16 @@ import (
 func TestConcurrentBlock(t *testing.T) {
 	// Set up a chain instance with mocking verifiers
 	startingHeight := uint64(1)
-	eb, _, chain := setupChainTest(t, startingHeight)
+	_, _, chain := setupChainTest(t, startingHeight)
 
 	BLSKeys, _ := key.NewRandKeys()
-	pk := &keys.PublicKey{
+	pk := keys.PublicKey{
 		AG: &common.JubJubCompressed{Data: make([]byte, 32)},
 		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
 	}
 
-	msg := message.NewInitialization(pk, &BLSKeys)
-	eb.Publish(topics.Initialization, message.New(topics.Initialization, msg))
+	go chain.SetupConsensus(pk, BLSKeys)
 
-	time.Sleep(1 * time.Second)
 	var wg sync.WaitGroup
 	for n := 0; n < 50; n++ {
 		wg.Add(2)

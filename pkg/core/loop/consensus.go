@@ -64,7 +64,7 @@ func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut t
 // interface to it
 func CreateInitialStep(e *consensus.Emitter, consensusTimeOut time.Duration, bg blockgenerator.BlockGenerator, verifyFn consensus.CandidateVerificationFunc, db database.DB) consensus.Phase {
 	redu2 := secondstep.New(e, consensusTimeOut)
-	redu1 := firststep.New(redu2, e, verifyFn, consensusTimeOut)
+	redu1 := firststep.New(redu2, e, verifyFn, consensusTimeOut, db)
 	selectionStep := selection.New(redu1, bg, e, consensusTimeOut, db)
 	redu2.SetNext(selectionStep)
 	return selectionStep

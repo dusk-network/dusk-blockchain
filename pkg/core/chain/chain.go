@@ -3,7 +3,6 @@ package chain
 import (
 	"bytes"
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -406,82 +405,14 @@ func (c *Chain) startConsensus() error {
 
 // VerifyCandidateBlock can be used as a callback for the consensus in order to
 // verify potential winning candidates.
-func (c *Chain) VerifyCandidateBlock(hash []byte) error {
-	cm, err := c.fetchCandidateMessage(hash)
-	if err != nil {
-		return err
-	}
-
+func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 	// We first perform a quick check on the Block Header and
-	if err = c.verifier.SanityCheckBlock(*c.tip, *cm.Block); err != nil {
+	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
 		return err
 	}
 
-	_, err = c.proxy.Executor().VerifyStateTransition(c.ctx, cm.Block.Txs, cm.Block.Header.Height)
+	_, err := c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, blk.Header.Height)
 	return err
-}
-
-func (c *Chain) fetchCandidateMessage(hash []byte) (message.Candidate, error) {
-	var cm message.Candidate
-	err := c.db.View(func(t database.Transaction) error {
-		var err error
-		cm, err = t.FetchCandidateMessage(hash)
-		return err
-	})
-
-	if err != nil && err != database.ErrBlockNotFound {
-		return message.Candidate{}, err
-	}
-
-	// If the candidate message isn't found, we will ask our direct peers for it.
-	if err == database.ErrBlockNotFound {
-		cm, err = c.requestCandidate(hash)
-		if err != nil {
-			return message.Candidate{}, err
-		}
-
-		// Store the candidate for future use
-		err = c.db.Update(func(t database.Transaction) error {
-			return t.StoreCandidateMessage(cm)
-		})
-	}
-
-	return cm, err
-}
-
-func (c *Chain) requestCandidate(hash []byte) (message.Candidate, error) {
-	// Make sure we get temporarily notified of incoming messages
-	candidateChan := make(chan message.Message, 10)
-	cChan := eventbus.NewChanListener(candidateChan)
-	id := c.eventBus.Subscribe(topics.Candidate, cChan)
-	defer c.eventBus.Unsubscribe(topics.Candidate, id)
-
-	// Send a request for this specific candidate
-	buf := bytes.NewBuffer(hash)
-	// Ugh! Move encoding after the Gossip ffs
-	if err := topics.Prepend(buf, topics.GetCandidate); err != nil {
-		return message.Candidate{}, err
-	}
-	msg := message.New(topics.GetCandidate, *buf)
-	c.eventBus.Publish(topics.Gossip, msg)
-
-	getCandidateTimeOut := config.Get().Timeout.TimeoutBrokerGetCandidate
-	timer := time.NewTimer(time.Duration(getCandidateTimeOut) * time.Second)
-
-	for {
-		select {
-		case <-timer.C:
-			log.WithField("hash", hex.EncodeToString(hash)).Debug("failed to receive candidate from the network")
-			return message.Candidate{}, errors.New("failed to receive candidate from the network")
-		case cm := <-candidateChan:
-			m := cm.Payload().(message.Candidate)
-
-			if bytes.Equal(m.Block.Header.Hash, hash) {
-				// Since the candidate is already validated, we can just directly return it
-				return m, nil
-			}
-		}
-	}
 }
 
 // Send Inventory message to all peers
@@ -577,9 +508,9 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 // to allow for a full re-sync.
 func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	// Halt consensus
-	msg := message.New(topics.StopConsensus, nil)
-	errList := c.eventBus.Publish(topics.StopConsensus, msg)
-	diagnostics.LogPublishErrors("chain/chain.go, topics.StopConsensus", errList)
+	if c.cancel != nil {
+		c.cancel()
+	}
 
 	// Remove EVERYTHING from the database. This includes the genesis
 	// block, so we need to add it afterwards.

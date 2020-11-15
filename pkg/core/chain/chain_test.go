@@ -159,9 +159,6 @@ func TestAcceptBlock(t *testing.T) {
 	acceptedBlockChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.AcceptedBlock, eventbus.NewChanListener(acceptedBlockChan))
 
-	roundUpdateChan := make(chan message.Message, 1)
-	eb.Subscribe(topics.RoundUpdate, eventbus.NewChanListener(roundUpdateChan))
-
 	// Make a 'winning' candidate message
 	blk := helper.RandomBlock(startingHeight, 1)
 	cert := block.EmptyCertificate()
@@ -190,24 +187,17 @@ func TestAcceptBlock(t *testing.T) {
 	assert.True(decodedBlk.Equals(c.tip))
 }
 
-func TestReturnOnNilIntermediateBlock(t *testing.T) {
+func TestReturnOnMissingCandidate(t *testing.T) {
 	// suppressing expected warning related to not finding a winning block
 	// candidate
 	logrus.SetLevel(logrus.ErrorLevel)
 	assert := assert.New(t)
 	startingHeight := uint64(2)
 
-	eb, _, c := setupChainTest(t, startingHeight)
+	_, _, c := setupChainTest(t, startingHeight)
 
-	// Make a 'winning' candidate message
-	blk := helper.RandomBlock(startingHeight, 1)
+	blk := mockAcceptableBlock(*c.tip)
 	cert := block.EmptyCertificate()
-
-	cm := message.MakeCandidate(blk, cert)
-
-	// Store it
-	errList := eb.Publish(topics.Candidate, message.New(topics.Candidate, cm))
-	assert.Empty(errList)
 
 	// Save current prevBlock
 	currPrevBlock := c.tip.Copy().(block.Block)
@@ -262,12 +252,8 @@ func TestFetchTip(t *testing.T) {
 }
 
 func TestRebuildChain(t *testing.T) {
-	eb, rb, c := setupChainTest(t, 0)
+	_, rb, c := setupChainTest(t, 0)
 	catchClearWalletDatabaseRequest(t, rb)
-
-	// Listen for `StopConsensus` messages
-	stopConsensusChan := make(chan message.Message, 1)
-	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
 
 	// Add a block so that we have a bit of chain state
 	// to check against.
@@ -291,51 +277,6 @@ func TestRebuildChain(t *testing.T) {
 	assert.True(t, genesis.Equals(c.tip))
 
 	assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
-
-	// Ensure we got a `StopConsensus` message
-	<-stopConsensusChan
-}
-
-func TestGetCandidate(t *testing.T) {
-	eb, _, c := setupChainTest(t, 0)
-
-	// Attempt to verify a candidate that doesn't exist, prompting a network request.
-	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
-	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
-
-	candidateBlock := mockAcceptableBlock(*c.tip)
-	cert := block.EmptyCertificate()
-
-	doneChan := make(chan error, 1)
-	go func(doneChan chan error) {
-		doneChan <- c.VerifyCandidateBlock(candidateBlock.Header.Hash)
-	}(doneChan)
-
-	// Check if we receive a `GetCandidate` message
-	m, err := streamer.Read()
-	assert.NoError(t, err)
-
-	assert.True(t, streamer.SeenTopics()[0] == topics.GetCandidate)
-	assert.True(t, bytes.Equal(candidateBlock.Header.Hash, m))
-
-	// Publish the requested candidate on topics.Candidate
-	eb.Publish(topics.Candidate, message.New(topics.Candidate, message.Candidate{
-		Block:       candidateBlock,
-		Certificate: cert,
-	}))
-
-	// Wait for the candidate to be processed
-	assert.NoError(t, <-doneChan)
-
-	// Candidate message should now exist in the db
-	var cm message.Candidate
-	assert.NoError(t, c.db.View(func(t database.Transaction) error {
-		var err error
-		cm, err = t.FetchCandidateMessage(candidateBlock.Header.Hash)
-		return err
-	}))
-
-	assert.NotEmpty(t, cm)
 }
 
 // mock a block which can be accepted by the chain.

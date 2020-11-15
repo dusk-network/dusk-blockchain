@@ -5,12 +5,15 @@ import (
 	"context"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,6 +30,8 @@ func getLog(r uint64, s uint8) *log.Entry {
 type Phase struct {
 	*reduction.Reduction
 
+	db database.DB
+
 	handler    *reduction.Handler
 	aggregator *reduction.Aggregator
 
@@ -40,11 +45,12 @@ type Phase struct {
 // New creates and launches the component which responsibility is to reduce the
 // candidates gathered as winner of the selection of all nodes in the committee
 // and reduce them to just one candidate obtaining 64% of the committee vote
-func New(next consensus.Phase, e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration) *Phase {
+func New(next consensus.Phase, e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration, db database.DB) *Phase {
 	return &Phase{
 		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
 		verifyFn:  verifyFn,
 		next:      next,
+		db:        db,
 	}
 }
 
@@ -153,6 +159,9 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 	}).Debugln("received_event")
 
 	result := p.aggregator.CollectVote(r)
+	if result == nil {
+		return nil
+	}
 
 	// if the votes converged for an empty hash we invoke halt with no
 	// StepVotes
@@ -160,12 +169,34 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
 	}
 
-	if err := p.verifyFn(hdr.BlockHash); err != nil {
+	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Block.Header.Hash) {
+		var err error
+		p.selectionResult.Candidate, err = p.fetchCandidateBlock(hdr.BlockHash)
+		if err != nil {
+			log.
+				WithError(err).
+				WithField("round", hdr.Round).
+				WithField("step", hdr.Step).
+				Error("firststep_fetchCandidateBlock failed")
+			return p.createStepVoteMessage(reduction.EmptyResult, round, step)
+		}
+
+		// Store candidate for later use
+		if err := p.storeCandidate(p.selectionResult.Candidate); err != nil {
+			log.WithError(err).
+				WithField("round", hdr.Round).
+				WithField("step", hdr.Step).
+				Error("firststep_storeCandidate failed")
+			// TODO: what should our response be?
+		}
+	}
+
+	if err := p.verifyFn(*p.selectionResult.Candidate.Block); err != nil {
 		log.
 			WithError(err).
 			WithField("round", hdr.Round).
 			WithField("step", hdr.Step).
-			Error("firststep_verifyCandidateBlock the candidate block failed")
+			Error("firststep_verifyCandidateBlock failed")
 		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
 	}
 
@@ -173,10 +204,6 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 }
 
 func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8) *message.StepVotesMsg {
-	if r == nil {
-		return nil
-	}
-
 	if r.IsEmpty() {
 		p.IncreaseTimeout(round)
 	}
@@ -190,4 +217,26 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 		},
 		StepVotes: r.SV,
 	}
+}
+
+func (p *Phase) fetchCandidateBlock(hash []byte) (message.Candidate, error) {
+	req := rpcbus.NewRequest(hash)
+	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
+	resp, err := p.RPCBus.Call(topics.GetCandidate, req, timeoutGetCandidate)
+	if err != nil {
+		log.
+			WithError(err).
+			WithFields(log.Fields{
+				"process": "reduction",
+			}).Error("firststep, fetching the candidate block failed")
+		return message.Candidate{}, err
+	}
+
+	return resp.(message.Candidate), nil
+}
+
+func (p *Phase) storeCandidate(cm message.Candidate) error {
+	return p.db.Update(func(t database.Transaction) error {
+		return t.StoreCandidateMessage(cm)
+	})
 }
