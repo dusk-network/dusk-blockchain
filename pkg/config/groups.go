@@ -45,6 +45,22 @@ type networkConfiguration struct {
 	Port    string
 }
 
+type kadcastConfiguration struct {
+	Enabled bool
+	Network string
+
+	// IP nature
+	Address string
+
+	// a set of network addresses of bootstrapping nodes
+	Bootstrappers []string
+
+	// Kadcast protocol configs
+	MaxDelegatesNum byte
+
+	Raptor bool
+}
+
 type monitorConfiguration struct {
 	Address string
 	Enabled bool

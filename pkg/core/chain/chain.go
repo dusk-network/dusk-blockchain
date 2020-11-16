@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
@@ -415,6 +416,11 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 
 // Send Inventory message to all peers
 func (c *Chain) advertiseBlock(b block.Block) error {
+	// Disable gossiping messages if kadcast mode
+	if config.Get().Kadcast.Enabled {
+		return nil
+	}
+
 	msg := &message.Inv{}
 	msg.AddItem(message.InvTypeBlock, b.Header.Hash)
 
@@ -432,6 +438,33 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	m := message.New(topics.Inv, *buf)
 	errList := c.eventBus.Publish(topics.Gossip, m)
 	diagnostics.LogPublishErrors("chain/chain.go, topics.Gossip, topics.Inv", errList)
+
+	return nil
+}
+
+//nolint:unused
+func (c *Chain) kadcastBlock(m message.Message) error {
+	var kadHeight byte = 255
+	if len(m.Header()) > 0 {
+		kadHeight = m.Header()[0]
+	}
+
+	b, ok := m.Payload().(block.Block)
+	if !ok {
+		return errors.New("message payload not a block")
+	}
+
+	buf := new(bytes.Buffer)
+	if err := message.MarshalBlock(buf, &b); err != nil {
+		return err
+	}
+
+	if err := topics.Prepend(buf, topics.Block); err != nil {
+		return err
+	}
+
+	m = message.NewWithHeader(topics.Block, *buf, []byte{kadHeight})
+	c.eventBus.Publish(topics.Kadcast, m)
 
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -44,6 +45,8 @@ type Message interface {
 	// the unmarshaling of incoming messages. In case the message has been
 	// created internally and never serialized, this should return an empty buffer
 	CachedBinary() bytes.Buffer
+
+	Header() []byte
 }
 
 // Serializable allows to set a payload
@@ -71,6 +74,8 @@ type simple struct {
 	payload payload.Safe
 	// cached marshaled form with Category
 	marshaled *bytes.Buffer
+	// header used as metadata (e.g kadcast.height)
+	header []byte
 }
 
 // Clone creates a new Message which carries a copy of the payload
@@ -118,6 +123,10 @@ func (m simple) String() string {
 
 }
 
+func (m simple) Header() []byte {
+	return m.header
+}
+
 // Id is the Id the Message
 // nolint:golint
 func (m simple) Id() []byte {
@@ -148,8 +157,7 @@ func (m simple) Equal(other Message) bool {
 	return ok && bytes.Equal(msg.marshaled.Bytes(), msg.marshaled.Bytes())
 }
 
-// New creates a new Message
-func New(top topics.Topic, p interface{}) Message {
+func convertToSafePayload(p interface{}) payload.Safe {
 	var safePayload payload.Safe
 	switch t := p.(type) {
 	case uint:
@@ -184,7 +192,19 @@ func New(top topics.Topic, p interface{}) Message {
 		safePayload = t
 	}
 
+	return safePayload
+}
+
+// New creates a new Message
+func New(top topics.Topic, p interface{}) Message {
+	safePayload := convertToSafePayload(p)
 	return &simple{category: top, payload: safePayload}
+}
+
+// NewWithHeader creates a new Message with non-nil header
+func NewWithHeader(t topics.Topic, payload interface{}, header []byte) Message {
+	safePayload := convertToSafePayload(payload)
+	return &simple{category: t, payload: safePayload, header: header}
 }
 
 func (m *simple) initPayloadBuffer(b bytes.Buffer) {
@@ -294,6 +314,9 @@ func marshal(s Message, b *bytes.Buffer) error {
 func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) error {
 	var err error
 	switch topic {
+	case topics.Block:
+		blk := payload.(block.Block)
+		err = MarshalBlock(buf, &blk)
 	case topics.Tx:
 		tx := payload.(transactions.ContractCall)
 		err = transactions.Marshal(buf, tx)

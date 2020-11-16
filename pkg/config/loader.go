@@ -51,6 +51,7 @@ type Registry struct {
 	Database  databaseConfiguration
 	Wallet    walletConfiguration
 	Network   networkConfiguration
+	Kadcast   kadcastConfiguration
 	Mempool   mempoolConfiguration
 	Consensus consensusConfiguration
 

@@ -30,9 +30,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -48,11 +48,12 @@ type Server struct {
 	rpcBus            *rpcbus.RPCBus
 	loader            chain.Loader
 	dupeMap           *dupemap.DupeMap
-	gossip            *processing.Gossip
+	gossip            *protocol.Gossip
 	grpcServer        *grpc.Server
 	ruskConn          *grpc.ClientConn
 	readerFactory     *peer.ReaderFactory
 	activeConnections map[string]time.Time
+	kadPeer           *kadcast.Peer
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
@@ -84,6 +85,21 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 	}
 
 	return l, chainProcess.ProcessBlock, chainProcess.SetupConsensus, nil
+}
+
+func (s *Server) launchKadcastPeer() {
+
+	kcfg := cfg.Get().Kadcast
+
+	if !kcfg.Enabled {
+		log.Warn("Kadcast service is disabled")
+		return
+	}
+
+	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, s.dupeMap, kcfg.Raptor)
+	// Launch kadcast peer services and join network defined by bootstrappers
+	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
+	s.kadPeer = kadPeer
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
@@ -186,7 +202,7 @@ func Setup() *Server {
 		rpcBus:            rpcBus,
 		loader:            chainDBLoader,
 		dupeMap:           dupeBlacklist,
-		gossip:            processing.NewGossip(protocol.TestNet),
+		gossip:            protocol.NewGossip(protocol.TestNet),
 		grpcServer:        grpcServer,
 		ruskConn:          ruskConn,
 		readerFactory:     readerFactory,
@@ -200,6 +216,9 @@ func Setup() *Server {
 	}
 
 	// TODO: maintainer should be started here
+
+	// Setting up and launch kadcast peer
+	srv.launchKadcastPeer()
 
 	// Start serving from the gRPC server
 	go func() {
@@ -271,4 +290,8 @@ func (s *Server) Close() {
 	s.rpcBus.Close()
 	s.grpcServer.GracefulStop()
 	_ = s.ruskConn.Close()
+
+	if s.kadPeer != nil {
+		s.kadPeer.Close()
+	}
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -46,12 +45,12 @@ func TestPingLoop(t *testing.T) {
 	cfg.Mock(&r)
 
 	responseChan := make(chan bytes.Buffer, 10)
-	writer := NewWriter(client, processing.NewGossip(protocol.TestNet), bus)
+	writer := NewWriter(client, protocol.NewGossip(protocol.TestNet), bus)
 	go writer.Serve(responseChan, make(chan struct{}, 1))
 
 	// Set up the other end of the exchange
 	responseChan2 := make(chan bytes.Buffer, 10)
-	writer2 := NewWriter(srv, processing.NewGossip(protocol.TestNet), bus)
+	writer2 := NewWriter(srv, protocol.NewGossip(protocol.TestNet), bus)
 	go writer2.Serve(responseChan2, make(chan struct{}, 1))
 
 	// Set up reader factory
@@ -59,13 +58,13 @@ func TestPingLoop(t *testing.T) {
 	processor.Register(topics.Ping, responding.ProcessPing)
 	factory := NewReaderFactory(processor)
 
-	reader, err := factory.SpawnReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan, make(chan struct{}, 1))
+	reader, err := factory.SpawnReader(client, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan, make(chan struct{}, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
 	go reader.ReadLoop()
 
-	reader2, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan2, make(chan struct{}, 1))
+	reader2, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan2, make(chan struct{}, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +209,7 @@ func TestInvalidPayload(t *testing.T) {
 		buf.Write([]byte{0, 1, 2})
 
 		cs := checksum.Generate(buf.Bytes())
-		_ = processing.WriteFrame(buf, protocol.TestNet, cs)
+		_ = protocol.WriteFrame(buf, protocol.TestNet, cs)
 
 		_, err := w.Write(buf.Bytes())
 		if err != nil {
@@ -227,7 +226,7 @@ func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, ch
 	r, w := net.Pipe()
 
 	respChan := make(chan bytes.Buffer, 10)
-	g := processing.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip(protocol.TestNet)
 	peer, _ := f.SpawnReader(r, g, d, respChan, make(chan struct{}, 1))
 
 	// Run the non-recover readLoop to watch for panics

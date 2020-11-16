@@ -14,8 +14,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
@@ -28,14 +28,14 @@ var l = log.WithField("process", "peer")
 type Connection struct {
 	lock sync.Mutex
 	net.Conn
-	gossip *processing.Gossip
+	gossip *protocol.Gossip
 }
 
 // GossipConnector calls Gossip.Process on the message stream incoming from the
 // ringbuffer
 // It absolves the function previously carried over by the Gossip preprocessor.
 type GossipConnector struct {
-	gossip *processing.Gossip
+	gossip *protocol.Gossip
 	*Connection
 }
 
@@ -71,7 +71,7 @@ type Reader struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
+func NewWriter(conn net.Conn, gossip *protocol.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
 	kas := 30 * time.Second
 	if len(keepAlive) > 0 {
 		kas = keepAlive[0]
@@ -301,7 +301,7 @@ func (p *Reader) readLoop() {
 			l.WithError(err).Warnf("error setting read timeout")
 		}
 
-		b, err := p.ReadMessage()
+		b, err := p.gossip.ReadMessage(p.Conn)
 		if err != nil {
 			l.WithError(err).Warnln("error reading message")
 			return

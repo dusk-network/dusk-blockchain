@@ -16,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -211,13 +212,26 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 		return txid, fmt.Errorf("store: %v", err)
 	}
 
-	// advertise the hash of the verified tx to the P2P network
-	if err := m.advertiseTx(txid); err != nil {
-		// TODO: Perform re-advertise procedure
-		return txid, fmt.Errorf("advertise: %v", err)
-	}
+	// try to (re)propagate transaction in both gossip and kadcast networks
+	m.propagateTx(t, txid)
 
 	return txid, nil
+}
+
+// propagateTx (re)-propagate tx in gossip or kadcast network but not in both
+func (m *Mempool) propagateTx(t TxDesc, txid []byte) {
+
+	if config.Get().Kadcast.Enabled {
+		// Kadcast complete transaction data
+		if err := m.kadcastTx(t); err != nil {
+			log.WithError(err).Warn("Transaction kadcast sending failed")
+		}
+	} else {
+		// Advertise the transaction hash to gossip network via "Inventory Vectors"
+		if err := m.advertiseTx(txid); err != nil {
+			log.WithError(err).Error("transaction advertising failed")
+		}
+	}
 }
 
 func (m *Mempool) onBlock(b block.Block) {
@@ -501,7 +515,7 @@ func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, err
 		return nil, err
 	}
 
-	t := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len())}
+	t := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len()), kadHeight: kadcast.InitHeight}
 	return m.processTx(t)
 }
 
@@ -530,6 +544,28 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 	packet := message.New(topics.Inv, *buf)
 	errList := m.eventBus.Publish(topics.Gossip, packet)
 	diagnostics.LogPublishErrors("mempool.go, topics.Gossip, topics.Inv", errList)
+
+	return nil
+}
+
+// kadcastTx (re)propagates transaction in kadcast network
+func (m *Mempool) kadcastTx(t TxDesc) error {
+	if t.kadHeight > kadcast.InitHeight {
+		return errors.New("invalid kadcast height")
+	}
+
+	/// repropagate
+	buf := new(bytes.Buffer)
+	if err := transactions.Marshal(buf, t.tx); err != nil {
+		return err
+	}
+
+	if err := topics.Prepend(buf, topics.Tx); err != nil {
+		return err
+	}
+
+	msg := message.NewWithHeader(topics.Tx, *buf, []byte{t.kadHeight})
+	m.eventBus.Publish(topics.Kadcast, msg)
 
 	return nil
 }

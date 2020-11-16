@@ -17,3 +17,13 @@ var DefaultAlphaClosestNodes int = 1
 
 // DefaultKNumber is the K number of peers that a node will send on a `FIND_NODES` message
 var DefaultKNumber int = 20
+
+const (
+
+	// MaxTCPacketSize is the max size allowed of TCP packet
+	MaxTCPacketSize = 500000
+
+	// MaxUDPacketSize max size of a UDP packet. As per default MTU 1500, UDP
+	// packet should be up to 1472 bytes
+	MaxUDPacketSize = 1472
+)

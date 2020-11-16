@@ -21,9 +21,11 @@ require (
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
 	github.com/go-chi/render v1.0.1
 	github.com/golangci/golangci-lint v1.31.0 // indirect
+	github.com/google/gofountain v0.0.0-20160820054803-4928733085e9
 	github.com/gorilla/context v1.1.1 // indirect
-	github.com/gorilla/mux v1.7.4 // indirect
+	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/pat v1.0.1
+	github.com/gorilla/rpc v1.2.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/graphql-go/graphql v0.7.8
 	github.com/machinebox/graphql v0.2.2
@@ -40,6 +42,7 @@ require (
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/goleveldb v1.0.0
+	github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8 // indirect
 	github.com/urfave/cli v1.22.3
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	google.golang.org/grpc v1.29.0

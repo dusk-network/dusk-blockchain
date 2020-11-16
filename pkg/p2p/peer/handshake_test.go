@@ -12,7 +12,6 @@ import (
 
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
@@ -36,7 +35,7 @@ func TestHandshake(t *testing.T) {
 	go func() {
 		responseChan := make(chan bytes.Buffer, 100)
 		exitChan := make(chan struct{}, 1)
-		peerReader, err := factory.SpawnReader(srv, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan, exitChan)
+		peerReader, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan, exitChan)
 		if err != nil {
 			panic(err)
 		}
@@ -47,7 +46,7 @@ func TestHandshake(t *testing.T) {
 	}()
 
 	time.Sleep(500 * time.Millisecond)
-	g := processing.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip(protocol.TestNet)
 	pw := NewWriter(client, g, eb)
 	defer func() {
 		_ = pw.Conn.Close()

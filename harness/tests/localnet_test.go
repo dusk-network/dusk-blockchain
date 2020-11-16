@@ -16,14 +16,16 @@ import (
 )
 
 var (
-	localNetSizeStr = os.Getenv("NETWORK_SIZE")
+	localNetSizeStr = os.Getenv("DUSK_NETWORK_SIZE")
 	localNetSize    = 10
 )
 
 var localNet engine.Network
 var workspace string
 
-// TestMain sets up a temporarily local network of N nodes running from genesis block
+// TestMain sets up a temporarily local network of N nodes running from genesis
+// block
+//
 // The network should be fully functioning and ready to accept messaging
 func TestMain(m *testing.M) {
 	var err error
@@ -116,8 +118,8 @@ func monitorNetwork() {
 }
 
 // TestSendBidTransaction ensures that a valid bid transaction has been accepted
-// by all nodes in the network within a particular time frame and within
-// the same block
+// by all nodes in the network within a particular time frame and within the
+// same block
 func TestSendBidTransaction(t *testing.T) {
 	localNet.LoadNetworkWallets(t, localNet.Size())
 
@@ -158,8 +160,8 @@ func TestSendBidTransaction(t *testing.T) {
 	}
 }
 
-// TestCatchup tests that a node which falls behind during consensus
-// will properly catch up and re-join the consensus execution trace.
+// TestCatchup tests that a node which falls behind during consensus will
+// properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
 	localNet.LoadNetworkWallets(t, localNet.Size())
 
@@ -260,4 +262,52 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 	// Deploy new node an hour after bootstrapping the network
 	// This allows us to monitor re-sync process with more than 500 blocks difference
 	time.AfterFunc(1*time.Hour, deployNewNode)
+}
+
+// TestMeasureNetworkTPS is a placeholder for a simple test definition on top of
+// which network TPS metric should be collected
+func TestMeasureNetworkTPS(t *testing.T) {
+
+	// Disabled by default not to messup the CI
+	_, presented := os.LookupEnv("DUSK_ENABLE_TPS_TEST")
+	if !presented {
+		t.SkipNow()
+	}
+
+	log.Info("60sec Wait for network nodes to complete bootstrapping procedure")
+	time.Sleep(60 * time.Second)
+
+	walletsPass := os.Getenv("DUSK_WALLET_PASS")
+	consensusNodes := os.Getenv("DUSK_CONSENSUS_NODES")
+	if len(consensusNodes) == 0 {
+		consensusNodes = "10"
+	}
+
+	nodesNum, err := strconv.Atoi(consensusNodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//Send to all consensus-running nodes a request for wallet loading. This
+	//will trigger consensus as well
+	for i := 0; i < nodesNum; i++ {
+		_, _ = localNet.LoadWalletCmd(uint(i), walletsPass)
+	}
+
+	log.Info("10sec Wait for consensus-nodes to kick off consensus")
+	time.Sleep(10 * time.Second)
+
+	// Send to all consensus-running nodes a bid tx
+	for i := 0; i < nodesNum; i++ {
+		txidBytes, err := localNet.SendBidCmd(uint(i), 10, 10)
+		if err != nil {
+			continue
+		}
+		txID := hex.EncodeToString(txidBytes)
+		t.Logf("Bid transaction id: %s", txID)
+
+		time.Sleep(3 * time.Second)
+	}
+
+	time.Sleep(20 * time.Second)
 }

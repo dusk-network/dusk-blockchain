@@ -19,6 +19,9 @@ type TxDesc struct {
 	// the point in time, tx was accepted by this node
 	// accepted time.Time
 	size uint
+
+	// Kadcast transport-specific field
+	kadHeight byte
 }
 
 // Pool represents a transaction pool of the verified txs only.

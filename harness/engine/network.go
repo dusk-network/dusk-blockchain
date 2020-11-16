@@ -288,6 +288,7 @@ func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, erro
 func (n *Network) start(nodeDir string, name string, arg ...string) error {
 	//nolint:gosec
 	cmd := exec.Command(name, arg...)
+	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
 
 	// Redirect both STDOUT and STDERR to separate files
