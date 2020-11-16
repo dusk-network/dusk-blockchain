@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/machinebox/graphql"
@@ -46,8 +48,24 @@ func executeQueryHTTP(endpoint string, query string, target interface{}) error {
 		_ = resp.Body.Close()
 	}()
 
+	//body, err := ioutil.ReadAll(resp.Body)
+	//if err != nil {
+	//	return err
+	//}
+
+	//bodyString := string(body)
+	//
+	//if err := json.Unmarshal(body, &target); err != nil {
+	//	fmt.Println("ERROR executeQueryHTTP,  ", err, bodyString)
+	//	return err
+	//}
+
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
-		return err
+		body, _ := ioutil.ReadAll(resp.Body)
+		fmt.Println("ERROR executeQueryHTTP,  ", err, string(body))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -86,6 +104,31 @@ func getLatestBlocks(client *graphql.Client, values map[string]interface{}) (int
 	var target interface{}
 
 	return executeQuery(client, query, target, values)
+}
+
+//nolint
+func getLatestBlock(duskInfo *DuskInfo, height uint64) (*Block, error) {
+	query := fmt.Sprintf("{\"query\" : \"{  blocks(height: %d ) { header { hash height timestamp } transactions { txid txtype size } } }\"}", height)
+	var resp map[string]interface{}
+
+	err := executeQueryHTTP(duskInfo.GQLEndpoint, query, &resp)
+	if err != nil {
+		return nil, err
+	}
+	result := resp["data"]
+	fmt.Println("getLatestBlock, ", result, resp)
+
+	byt, err := json.Marshal(result)
+	blocks := new(Blocks)
+	if err := json.Unmarshal(byt, blocks); err != nil {
+		return nil, err
+	}
+
+	if len(blocks.Blocks) == 0 {
+		return nil, errors.New("block not found")
+	}
+
+	return &blocks.Blocks[0], nil
 }
 
 //nolint
@@ -174,8 +217,6 @@ func pendingTransactionCount(duskInfo *DuskInfo) (int, error) {
 	if ok {
 		count = len(result["mempool"])
 	}
-
-	//fmt.Println("Got PendingTransactionCount", resp, count)
 	return count, nil
 }
 

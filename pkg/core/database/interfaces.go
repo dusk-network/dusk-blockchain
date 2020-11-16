@@ -4,9 +4,9 @@ import (
 	"errors"
 	"math"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
@@ -56,10 +56,10 @@ type Transaction interface {
 
 	FetchBlockHeader(hash []byte) (*block.Header, error)
 	// Fetch all of the Txs that belong to a block with this header.hash
-	FetchBlockTxs(hash []byte) ([]transactions.Transaction, error)
+	FetchBlockTxs(hash []byte) ([]transactions.ContractCall, error)
 	// Fetch tx by txID. If succeeds, it returns tx data, tx index and
 	// hash of the block it belongs to.
-	FetchBlockTxByHash(txID []byte) (tx transactions.Transaction, txIndex uint32, blockHeaderHash []byte, err error)
+	FetchBlockTxByHash(txID []byte) (tx transactions.ContractCall, txIndex uint32, blockHeaderHash []byte, err error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
 	// Fetch chain state information (chain tip hash)
@@ -82,10 +82,6 @@ type Transaction interface {
 	// block in the database.
 	FetchCurrentHeight() (uint64, error)
 
-	// FetchDecoys will return a number of decoy public keys, to be used
-	// when constructing a ring signature for a transaction.
-	FetchDecoys(numDecoys int) []ristretto.Point
-
 	// FetchOutputExists returns whether or not an output exists for the
 	// given destination public key
 	FetchOutputExists(destkey []byte) (bool, error)
@@ -96,18 +92,27 @@ type Transaction interface {
 
 	// StoreBidValues stores the D and K values passed by the caller in
 	// the database, as well as the expiry height. It should be passed
-	// the transaction locktime as a third argument, as the database
+	// the transaction lock time as a third argument, as the database
 	// can infer the current height and consequently, the expiry height,
 	// on its own.
-	StoreBidValues([]byte, []byte, uint64) error
+	// XXX the Unused value was erroneously marked as Seed
+	StoreBidValues(D []byte, K []byte, BidIndex uint64, ExpiryHeight uint64) error
 
 	// FetchBidValues retrieves the D and K values with the lowest
 	// expiry height from the database.
-	FetchBidValues() ([]byte, []byte, error)
+	// XXX the Unused value was erroneously marked as Seed
+	FetchBidValues() (D []byte, K []byte, BidIndex uint64, err error)
 
 	// FetchBlockHeightSince try to find height of a block generated around
 	// sinceUnixTime starting the search from height (tip - offset)
 	FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error)
+
+	// StoreCandidateMessage will...
+	StoreCandidateMessage(cm message.Candidate) error
+
+	FetchCandidateMessage(hash []byte) (message.Candidate, error)
+
+	ClearCandidateMessages() error
 
 	// ClearDatabase will remove all information from the database.
 	ClearDatabase() error

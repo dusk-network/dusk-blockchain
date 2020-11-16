@@ -2,27 +2,23 @@ package peer
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
+	"io"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
+
 	log "github.com/sirupsen/logrus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
-
-var readWriteTimeout = 60 * time.Second // Max idle time for a peer
-var keepAliveTime = 30 * time.Second    // Send keepalive message after inactivity for this amount of time
 
 var l = log.WithField("process", "peer")
 
@@ -66,8 +62,9 @@ type Writer struct {
 // other network nodes.
 type Reader struct {
 	*Connection
-	router   *messageRouter
-	exitChan chan<- struct{} // Way to kill the WriteLoop
+	processor    *MessageProcessor
+	responseChan chan<- bytes.Buffer
+	exitChan     chan<- struct{} // Way to kill the WriteLoop
 	// TODO: add service flag
 }
 
@@ -91,44 +88,21 @@ func NewWriter(conn net.Conn, gossip *protocol.Gossip, subscriber eventbus.Subsc
 	return pw
 }
 
-// NewReader returns a Reader. It will still need to be initialized by
-// running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, gossip *protocol.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
-	pconn := &Connection{
-		Conn:   conn,
-		gossip: gossip,
+// ReadMessage reads from the connection
+func (c *Connection) ReadMessage() ([]byte, error) {
+	length, err := c.gossip.UnpackLength(c.Conn)
+	if err != nil {
+		return nil, err
 	}
 
-	_, db := heavy.CreateDBConnection()
-
-	dataRequestor := responding.NewDataRequestor(db, rpcBus, responseChan)
-
-	reader := &Reader{
-		Connection: pconn,
-		exitChan:   exitChan,
-		router: &messageRouter{
-			publisher:         publisher,
-			dupeMap:           dupeMap,
-			blockHashBroker:   responding.NewBlockHashBroker(db, responseChan),
-			synchronizer:      chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
-			dataRequestor:     dataRequestor,
-			dataBroker:        responding.NewDataBroker(db, rpcBus, responseChan),
-			roundResultBroker: responding.NewRoundResultBroker(rpcBus, responseChan),
-			candidateBroker:   responding.NewCandidateBroker(rpcBus, responseChan),
-			ponger:            processing.NewPonger(responseChan),
-			peerInfo:          conn.RemoteAddr().String(),
-		},
+	// read a [length]byte from connection
+	buf := make([]byte, int(length))
+	_, err = io.ReadFull(c.Conn, buf)
+	if err != nil {
+		return nil, err
 	}
 
-	// On each new connection the node sends topics.Mempool to retrieve mempool
-	// txs from the new peer
-	go func() {
-		if err := dataRequestor.RequestMempoolItems(); err != nil {
-			l.WithError(err).Warnln("error sending topics.Mempool message")
-		}
-	}()
-
-	return reader, nil
+	return buf, err
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
@@ -136,6 +110,33 @@ func (w *Writer) Connect() error {
 	if err := w.Handshake(); err != nil {
 		_ = w.Conn.Close()
 		return err
+	}
+
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := w.Addr()
+			peerJSON := capi.PeerJSON{
+				Address:  addr,
+				Type:     "Writer",
+				Method:   "Connect",
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peerJSON into StormDB")
+			}
+
+			// save count
+			peerCount := capi.PeerCount{
+				ID:       addr,
+				LastSeen: time.Now(),
+			}
+			err = store.Save(&peerCount)
+			if err != nil {
+				log.Error("failed to save peerCount into StormDB")
+			}
+		}()
 	}
 
 	return nil
@@ -148,12 +149,39 @@ func (p *Reader) Accept() error {
 		return err
 	}
 
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := p.Addr()
+			peerJSON := capi.PeerJSON{
+				Address:  addr,
+				Type:     "Reader",
+				Method:   "Accept",
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peer into StormDB")
+			}
+
+			// save count
+			peerCount := capi.PeerCount{
+				ID:       addr,
+				LastSeen: time.Now(),
+			}
+			err = store.Save(&peerCount)
+			if err != nil {
+				log.Error("failed to save peerCount into StormDB")
+			}
+
+		}()
+	}
+
 	return nil
 }
 
 // Serve utilizes two different methods for writing to the open connection
-func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
-
+func (w *Writer) Serve(writeQueueChan <-chan bytes.Buffer, exitChan chan struct{}) {
 	defer w.onDisconnect()
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
@@ -167,17 +195,43 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 }
 
 func (w *Writer) onDisconnect() {
-	log.Infof("Connection to %s terminated", w.Connection.RemoteAddr().String())
+	log.WithField("address", w.Connection.RemoteAddr().String()).Infof("Connection terminated")
 	_ = w.Conn.Close()
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
+
+	if config.Get().API.Enabled {
+		go func() {
+			store := capi.GetStormDBInstance()
+			addr := w.Addr()
+			peerJSON := capi.PeerJSON{
+				Address:  addr,
+				Type:     "Writer",
+				Method:   "onDisconnect",
+				LastSeen: time.Now(),
+			}
+			err := store.Save(&peerJSON)
+			if err != nil {
+				log.Error("failed to save peer into StormDB")
+			}
+
+			// delete count
+			peerCount := capi.PeerCount{
+				ID: addr,
+			}
+			err = store.Delete(&peerCount)
+			if err != nil {
+				log.Error("failed to Delete peerCount into StormDB")
+			}
+		}()
+	}
+
 }
 
-func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
-
+func (w *Writer) writeLoop(writeQueueChan <-chan bytes.Buffer, exitChan chan struct{}) {
 	for {
 		select {
 		case buf := <-writeQueueChan:
-			if err := w.gossip.Process(buf); err != nil {
+			if err := w.gossip.Process(&buf); err != nil {
 				l.WithError(err).Warnln("error processing outgoing message")
 				continue
 			}
@@ -187,6 +241,21 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 				exitChan <- struct{}{}
 			}
 		case <-exitChan:
+			log.Error("writeLoop, exitChan called")
+			if config.Get().API.Enabled {
+				go func() {
+					addr := w.Addr()
+					peerCount := capi.PeerCount{
+						ID: addr,
+					}
+					store := capi.GetStormDBInstance()
+					// delete count
+					err := store.Delete(&peerCount)
+					if err != nil {
+						log.Error("writeLoop, failed to Delete peerCount into StormDB")
+					}
+				}()
+			}
 			return
 		}
 	}
@@ -196,15 +265,14 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
 func (p *Reader) ReadLoop() {
-
 	// As the peer ReadLoop is at the front-line of P2P network, receiving a
 	// malformed frame by an adversary node could lead to a panic.
 	// In such situation, the node should survive but adversary conn gets dropped
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
+	// 	}
+	// }()
 
 	p.readLoop()
 }
@@ -213,6 +281,9 @@ func (p *Reader) readLoop() {
 	defer func() {
 		_ = p.Conn.Close()
 	}()
+
+	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second  // Max idle time for a peer
+	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
 
 	// Set up a timer, which triggers the sending of a `keepalive` message
 	// when fired.
@@ -238,7 +309,7 @@ func (p *Reader) readLoop() {
 
 		message, cs, err := checksum.Extract(b)
 		if err != nil {
-			l.WithError(err).Warnln("error reading message")
+			l.WithError(err).Warnln("error reading Extract message")
 			return
 		}
 
@@ -247,26 +318,72 @@ func (p *Reader) readLoop() {
 			return
 		}
 
-		// TODO: error here should be checked in order to decrease reputation
-		// or blacklist spammers
-		err = p.router.Collect(message)
-		if err != nil {
-			log.WithError(err).Errorln("error routing message")
-		}
+		go func() {
+			// TODO: error here should be checked in order to decrease reputation
+			// or blacklist spammers
+			startTime := time.Now().UnixNano()
+			if err = p.processor.Collect(message, p.responseChan); err != nil {
+				l.WithError(err).Error("message routing")
+			}
+
+			duration := float64(time.Now().UnixNano()-startTime) / 1000000
+			l.WithField("cs", hex.EncodeToString(cs)).
+				WithField("len", len(message)).
+				WithField("ms", duration).Debug("trace message routing")
+		}()
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)
+
+		if config.Get().API.Enabled {
+			go func() {
+				store := capi.GetStormDBInstance()
+				addr := p.Addr()
+				// save count
+				peerCount := capi.PeerCount{
+					ID:       addr,
+					LastSeen: time.Now(),
+				}
+				err = store.Save(&peerCount)
+				if err != nil {
+					log.Error("failed to save peerCount into StormDB")
+				}
+			}()
+		}
+
 	}
 }
 
 func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
+	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
+
 	timer := time.NewTimer(keepAliveTime)
 	quitChan := make(chan struct{}, 1)
 	go func(p *Reader, t *time.Timer, quitChan chan struct{}) {
 		for {
 			select {
 			case <-t.C:
-				_ = p.Connection.keepAlive()
+				// TODO: why was the error never checked ?
+				err := p.Connection.keepAlive()
+				if err != nil {
+					log.WithError(err).Error("keepAliveLoop, got error back from keepAlive")
+					if config.Get().API.Enabled {
+						go func() {
+							addr := p.Addr()
+							peerCount := capi.PeerCount{
+								ID: addr,
+							}
+							store := capi.GetStormDBInstance()
+							// delete count
+							err = store.Delete(&peerCount)
+							if err != nil {
+								log.Error("keepAliveLoop, failed to Delete peerCount into StormDB")
+							}
+						}()
+					}
+
+				}
+
 			case <-quitChan:
 				t.Stop()
 				return
@@ -295,6 +412,8 @@ func (c *Connection) keepAlive() error {
 // Conn needs to be locked, as this function can be called both by the WriteLoop,
 // and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
+	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second // Max idle time for a peer
+
 	c.lock.Lock()
 	_ = c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	n, err := c.Conn.Write(b)

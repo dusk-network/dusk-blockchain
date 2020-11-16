@@ -19,6 +19,40 @@ var profileList Profiles
 func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Reset()
 	viper.Set("general.network", "testnet")
+	viper.Set("general.walletonly", "false")
+	viper.Set("general.safecallbacklistener", "false")
+
+	//bidautomaton.go
+	viper.Set("timeout.timeoutsendbidtx", 5)
+	//blockgenerator.go
+	viper.Set("timeout.timeoutgetlastcommittee", 5)
+	//blockgenerator.go
+	viper.Set("timeout.timeoutgetlastcertificate", 5)
+	//blockgenerator.go
+	viper.Set("timeout.timeoutgetmempooltxsbysize", 4)
+	//initiator.go
+	//sync.go
+	viper.Set("timeout.timeoutgetlastblock", 5)
+	//aggregator.go
+	//candidatebroker.go
+	//chain.go
+	viper.Set("timeout.timeoutgetcandidate", 5)
+	//chain.go
+	viper.Set("timeout.timeoutclearwalletdatabase", 0)
+	//aggregator.go
+	viper.Set("timeout.timeoutverifycandidateblock", 5)
+	//stakeautomaton.go
+	viper.Set("timeout.timeoutsendstaketx", 5)
+	//mempool.go datarequestor.go
+	viper.Set("timeout.timeoutgetmempooltxs", 3)
+	//roundresultsbroker.go
+	viper.Set("timeout.timeoutgetroundresults", 5)
+	//broker.go
+	viper.Set("timeout.timeoutbrokergetcandidate", 2)
+	//peer.go
+	viper.Set("timeout.timeoutreadwrite", 60)
+	//peer.go
+	viper.Set("timeout.timeoutkeepalivetime", 30)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
 	viper.Set("logger.level", "warn")
@@ -33,8 +67,14 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	} else {
 		viper.Set("rpc.address", node.Cfg.RPC.Address)
 	}
+	viper.Set("rpc.sessionDurationMins", node.Cfg.RPC.SessionDurationMins)
+	viper.Set("rpc.requireSession", node.Cfg.RPC.RequireSession)
 
 	viper.Set("rpc.enabled", "true")
+	viper.Set("rpc.rusk.network", node.Cfg.RPC.Rusk.Network)
+	viper.Set("rpc.rusk.address", node.Cfg.RPC.Rusk.Address)
+	viper.Set("rpc.rusk.contractTimeout", 6000)
+	viper.Set("rpc.rusk.defaultTimeout", 1000)
 	viper.Set("database.driver", heavy.DriverName)
 	viper.Set("database.dir", node.Dir+"/chain/")
 	viper.Set("wallet.store", node.Dir+"/walletDB/")
@@ -45,14 +85,21 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("mempool.poolType", "hashmap")
 	viper.Set("mempool.preallocTxs", "100")
 	viper.Set("mempool.maxInvItems", "10000")
+	viper.Set("genesis.legacy", true)
+
 	viper.Set("consensus.defaultlocktime", 1000)
 	viper.Set("consensus.defaultoffset", 10)
 	viper.Set("consensus.defaultamount", 50)
+	viper.Set("consensus.consensustimeout", 5)
+
+	viper.Set("api.enabled", false)
+	viper.Set("api.enabletls", false)
+	viper.Set("api.address", "127.0.0.1:9199")
+	viper.Set("api.expirationtime", 300)
 }
 
 // Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing)
 func Profile2(index int, node *DuskNode, walletPath string) {
-
 	Profile1(index, node, walletPath)
 	viper.Set("database.driver", lite.DriverName)
 }

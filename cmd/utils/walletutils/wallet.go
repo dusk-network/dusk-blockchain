@@ -23,7 +23,7 @@ func RunWallet(grpcHost, walletCMD, walletPassword string) (*node.LoadResponse, 
 		_ = conn.Close()
 	}()
 
-	client := node.NewNodeClient(conn)
+	client := node.NewWalletClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 

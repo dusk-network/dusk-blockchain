@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -15,14 +16,15 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/status"
 )
 
 // PublishTopic publishes an event bus topic to the specified node via
 // rpc call
 func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
-
 	/*
 		if nodeIndex >= uint(len(n.Nodes)) {
 			return errors.New("invalid node index")
@@ -51,11 +53,11 @@ func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
 
 // SendQuery sends a graphql query to the specified network node
 func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) error {
-	if nodeIndex >= uint(len(n.Nodes)) {
+	if nodeIndex >= uint(len(n.nodes)) {
 		return errors.New("invalid node index")
 	}
 
-	targetNode := n.Nodes[nodeIndex]
+	targetNode := n.nodes[nodeIndex]
 	addr := "http://" + targetNode.Cfg.Gql.Address + "/graphql"
 
 	buf := bytes.Buffer{}
@@ -81,19 +83,14 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 
 // LoadWalletCmd sends gRPC command LoadWallet and returns pubkey (if loaded)
 func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
-
-	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
-
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+	// session has been setup already in the TestMain, so here the client
+	// should be returning the permanent connection
+	conn, err := n.GetGrpcConn(ind, grpc.WithInsecure())
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		_ = conn.Close()
-	}()
 
-	client := pb.NewNodeClient(conn)
+	client := pb.NewWalletClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
@@ -106,26 +103,37 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 	return string(resp.GetKey().PublicKey), nil
 }
 
+// LoadNetworkWallets sends a LoadWallet request to N nodes of the network
+func (n *Network) LoadNetworkWallets(t *testing.T, nodesNum int) {
+	walletsPass := os.Getenv("DUSK_WALLET_PASS")
+	t.Logf("Send request to %d nodes to loadWallet", nodesNum)
+	for i := 0; i < nodesNum; i++ {
+		_, err := n.LoadWalletCmd(uint(i), walletsPass)
+		if err != nil {
+			st := status.Convert(err)
+			if st.Message() != "wallet is already loaded" {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
 // SendBidCmd sends gRPC command SendBid and returns tx hash
 func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
-
-	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
-
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+	// session has been setup already in the TestMain, so here the client is
+	// returning the permanent connection
+	c := n.grpcClients[n.nodes[ind].Id]
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = conn.Close()
-	}()
 
-	client := pb.NewNodeClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	client := pb.NewTransactorClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req := pb.ConsensusTxRequest{Amount: amount, LockTime: locktime}
-	resp, err := client.SendBid(ctx, &req)
+	req := pb.BidRequest{Amount: amount}
+	resp, err := client.Bid(ctx, &req)
 	if err != nil {
 		return nil, err
 	}
@@ -136,12 +144,11 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 // SendWireMsg sends a P2P message to the specified network node
 // NB: Handshaking procedure must be performed prior to the message sending
 func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
-
-	if ind >= uint(len(n.Nodes)) {
+	if ind >= uint(len(n.nodes)) {
 		return errors.New("invalid node index")
 	}
 
-	targetNode := n.Nodes[ind]
+	targetNode := n.nodes[ind]
 	addr := "127.0.0.1:" + targetNode.Cfg.Network.Port
 
 	// connect to this socket
@@ -183,7 +190,6 @@ func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.B
 // WriteFrame writes a frame to a buffer
 // TODO: remove *bytes.Buffer from the returned parameters
 func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
-
 	msg := new(bytes.Buffer)
 	// Append prefix(header)
 	if err := encoding.WriteUint64LE(msg, uint64(0)); err != nil {
@@ -203,7 +209,6 @@ func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 
 // WaitUntil blocks until the node at index ind reaches the target height
 func (n *Network) WaitUntil(t *testing.T, ind uint, targetHeight uint64, waitFor time.Duration, tick time.Duration) {
-
 	condition := func() bool {
 		// Construct query to fetch block height
 		query := "{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}"
@@ -226,7 +231,6 @@ func (n *Network) WaitUntil(t *testing.T, ind uint, targetHeight uint64, waitFor
 // WaitUntilTx blocks until the node at index ind accepts the specified Tx
 // Returns hash of the block that includes this tx
 func (n *Network) WaitUntilTx(t *testing.T, ind uint, txID string) string {
-
 	var blockhash string
 	condition := func() bool {
 		// Construct query to fetch txid
@@ -257,4 +261,108 @@ func (n *Network) WaitUntilTx(t *testing.T, ind uint, txID string) string {
 	assert.Eventuallyf(t, condition, 1*time.Minute, time.Second, "failed node %s", ind)
 
 	return blockhash
+}
+
+// SendStakeCmd sends gRPC command SendStake and returns tx hash
+func (n *Network) SendStakeCmd(ind uint, amount, locktime uint64) ([]byte, error) {
+	// session has been setup already in the TestMain, so here the client is
+	// returning the permanent connection
+	c := n.grpcClients[n.nodes[ind].Id]
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return nil, err
+	}
+
+	client := pb.NewTransactorClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req := pb.StakeRequest{Amount: amount, Locktime: locktime}
+	resp, err := client.Stake(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Hash, nil
+}
+
+// GetLastBlockHeight makes an attempt to fetch last block height of a specified node
+func (n *Network) GetLastBlockHeight(ind uint) (uint64, error) {
+
+	// Construct query to fetch block height
+	query := "{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}"
+	var result map[string]map[string][]map[string]map[string]int
+	if err := n.SendQuery(ind, query, &result); err != nil {
+		return 0, err
+	}
+	return uint64(result["data"]["blocks"][0]["header"]["height"]), nil
+}
+
+//IsSynced checks if each node blockchain tip is close to the blockchain tip of node 0.
+// threshold param is the number of blocks the last block can differ
+func (n *Network) IsSynced(threshold uint64) (uint64, error) {
+
+	forks := make(map[uint64][]int)
+	primaryHeight := uint64(0)
+	for nodeID := 0; nodeID < n.Size(); nodeID++ {
+		h, err := n.GetLastBlockHeight(uint(nodeID))
+		if err != nil {
+			logrus.WithField("nodeID", nodeID).WithError(err).Warn("fetch last block height failed")
+			continue
+		}
+
+		if len(forks) == 0 {
+			primaryHeight = h
+			forks[h] = make([]int, 1)
+			forks[h][0] = nodeID
+			continue
+		}
+
+		// Check if this node tip is close to the network tip
+		var nofork bool
+		for tip := range forks {
+			lowerBound := tip - threshold
+			if lowerBound > tip {
+				lowerBound = 0
+			}
+			upperBound := tip + threshold
+
+			if h >= lowerBound && h < upperBound {
+				// Good. Within the range
+				forks[tip] = append(forks[tip], nodeID)
+				nofork = true
+				break
+			}
+		}
+
+		if nofork {
+			continue
+		}
+
+		// Bad. Not in the range
+		// If the difference is higher than the specified threshold, we assume a forking has happened
+		// NB Such situation could be observed also in case of a subset of the network getting stalled
+		forks[h] = make([]int, 1)
+		forks[h][0] = nodeID
+	}
+
+	// If more than 1 forks are found,
+	if len(forks) > 1 {
+		// Trace network status
+		for tip := range forks {
+			logMsg := fmt.Sprintf("Network at round [%d] driven by nodes [", tip)
+			for nodeID := range forks[tip] {
+				logMsg += fmt.Sprintf(" %d,", nodeID)
+			}
+			logMsg += "]"
+			logrus.WithField("process", "monitor").Info(logMsg)
+		}
+		return 0, errors.New("potential network inconsistency detected")
+	}
+
+	if len(forks) == 0 {
+		return 0, errors.New("network unreachable")
+	}
+
+	return primaryHeight, nil
 }

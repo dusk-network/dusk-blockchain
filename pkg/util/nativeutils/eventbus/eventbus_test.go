@@ -8,7 +8,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/stretchr/testify/assert"
+	"github.com/sirupsen/logrus"
+	assert "github.com/stretchr/testify/require"
 )
 
 //*****************
@@ -43,8 +44,9 @@ func TestSubscribe(t *testing.T) {
 func TestUnsubscribe(t *testing.T) {
 	eb, myChan, id := newEB(t)
 	eb.Unsubscribe(topics.Test, id)
-	msg := message.New(topics.Test, *(bytes.NewBufferString("whatever2")))
-	eb.Publish(topics.Test, msg)
+	msg := message.New(topics.Test, bytes.NewBufferString("whatever2"))
+	errList := eb.Publish(topics.Test, msg)
+	assert.Empty(t, errList)
 
 	select {
 	case <-myChan:
@@ -60,14 +62,12 @@ func TestUnsubscribe(t *testing.T) {
 func TestStreamer(t *testing.T) {
 	topic := topics.Gossip
 	bus, streamer := CreateFrameStreamer(topic)
-	msg := message.New(topics.Test, *(bytes.NewBufferString("pluto")))
-	bus.Publish(topic, msg)
+	msg := message.New(topics.Test, bytes.NewBufferString("pluto")) //nolint
+	errList := bus.Publish(topic, msg)
+	assert.Empty(t, errList)
 
 	packet, err := streamer.(*SimpleStreamer).Read()
-	if !assert.NoError(t, err) {
-		assert.FailNow(t, "error in reading from the subscribed stream")
-	}
-
+	assert.NoError(t, err)
 	// first 4 bytes of packet are the checksum
 	assert.Equal(t, "pluto", string(packet[4:]))
 }
@@ -77,29 +77,35 @@ func TestStreamer(t *testing.T) {
 //******************
 func TestDefaultListener(t *testing.T) {
 	eb := New()
-	msgChan := make(chan message.Message)
+	msgChan := make(chan message.Message, 100)
 
 	eb.AddDefaultTopic(topics.Reject)
 	eb.AddDefaultTopic(topics.Unknown)
 	eb.SubscribeDefault(NewChanListener(msgChan))
 
-	m := message.New(topics.Reject, *(bytes.NewBufferString("pluto")))
-	eb.Publish(topics.Reject, m)
+	m := message.New(topics.Reject, *bytes.NewBufferString("pluto")) //nolint
+	errList := eb.Publish(topics.Reject, m)
+	assert.Empty(t, errList)
+
 	msg := <-msgChan
 	assert.Equal(t, topics.Reject, msg.Category())
 
-	payload := msg.Payload().(bytes.Buffer)
+	payload := msg.Payload().(message.SafeBuffer)
 	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
 
-	m = message.New(topics.Unknown, *(bytes.NewBufferString("pluto")))
-	eb.Publish(topics.Unknown, m)
+	m = message.New(topics.Unknown, bytes.NewBufferString("pluto")) //nolint
+	errList = eb.Publish(topics.Unknown, m)
+	assert.Empty(t, errList)
+
 	msg = <-msgChan
 	assert.Equal(t, topics.Unknown, msg.Category())
-	payload = msg.Payload().(bytes.Buffer)
+	payload = msg.Payload().(message.SafeBuffer)
 	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
 
-	m = message.New(topics.Gossip, *(bytes.NewBufferString("pluto")))
-	eb.Publish(topics.Gossip, m)
+	m = message.New(topics.Gossip, bytes.NewBufferString("pluto")) //nolint
+	errList = eb.Publish(topics.Gossip, m)
+	assert.Empty(t, errList)
+
 	select {
 	case <-msgChan:
 		t.FailNow()
@@ -111,6 +117,7 @@ func TestDefaultListener(t *testing.T) {
 //****************
 // SETUP FUNCTIONS
 //****************
+//nolint
 func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 	eb := New()
 	myChan := make(chan message.Message, 10)
@@ -119,11 +126,12 @@ func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 	assert.NotNil(t, id)
 	b := bytes.NewBufferString("whatever")
 	m := message.New(topics.Test, *b)
-	eb.Publish(topics.Test, m)
+	errList := eb.Publish(topics.Test, m)
+	assert.Empty(t, errList)
 
 	select {
 	case received := <-myChan:
-		payload := received.Payload().(bytes.Buffer)
+		payload := received.Payload().(message.SafeBuffer)
 		assert.Equal(t, "whatever", (&payload).String())
 	case <-time.After(50 * time.Millisecond):
 		assert.FailNow(t, "We should have received a message by now")
@@ -133,7 +141,10 @@ func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 }
 
 // Test that a streaming goroutine is killed when the exit signal is sent
+// nolint
 func TestExitChan(t *testing.T) {
+	// suppressing annoying logging of expected errors
+	logrus.SetLevel(logrus.FatalLevel)
 	eb := New()
 	topic := topics.Test
 	sl := NewStreamListener(&mockWriteCloser{})
@@ -143,7 +154,9 @@ func TestExitChan(t *testing.T) {
 	val := new(bytes.Buffer)
 	val.Write([]byte{0})
 	m := message.New(topic, *val)
-	eb.Publish(topic, m)
+	errList := eb.Publish(topic, m)
+	assert.Empty(t, errList)
+
 	// Wait for event to be handled
 	// NB: 'Writer' must return error to force consumer termination
 	time.Sleep(100 * time.Millisecond)
@@ -151,12 +164,11 @@ func TestExitChan(t *testing.T) {
 	l := eb.listeners.Load(topic)
 	for _, listener := range l {
 		if streamer, ok := listener.Listener.(*StreamListener); ok {
-			if !assert.True(t, streamer.ringbuffer.Closed()) {
-				assert.FailNow(t, "ringbuffer not closed")
-			}
+			assert.True(t, streamer.ringbuffer.Closed())
 			return
 		}
 	}
+
 	assert.FailNow(t, "stream listener not found")
 }
 

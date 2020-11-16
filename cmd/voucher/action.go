@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,14 +35,18 @@ func action(ctx *cli.Context) error {
 		}
 	}
 
-	//TODO: should we be binding all interfaces here ?
-	//nolint:gosec
-	ln, err := net.Listen("tcp", ":8081")
+	port := ctx.Int(portFlag.Name)
+	hostname := ctx.String(hostnameFlag.Name)
+
+	ln, err := net.Listen("tcp", hostname+":"+strconv.Itoa(port))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Info("Voucher seeder up: accepting connections on port 8081")
+	log.
+		WithField("port", port).
+		WithField("hostname", hostname).
+		Info("Voucher seeder up & accepting connections")
 	nodes := New()
 
 	for {
@@ -93,7 +98,7 @@ func handleConnection(duskNode *DuskNodes, conn net.Conn, ip string) {
 		return
 	}
 
-	log.WithField("message", string(buf)).Info("Message Received:")
+	log.WithField("message", string(buf)).Info("Message Received")
 
 	rep := strings.Split(string(buf), ",")
 	port := getPort(rep)

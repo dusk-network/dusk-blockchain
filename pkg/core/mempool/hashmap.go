@@ -1,19 +1,13 @@
 package mempool
 
 import (
-	"fmt"
 	"sort"
+	"sync"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-)
-
-const (
-	keyImageSize = 32
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
 type (
-	keyImage [keyImageSize]byte
-
 	keyFee struct {
 		k txHash
 		f uint64
@@ -23,6 +17,7 @@ type (
 	// solution to bench against.
 	HashMap struct {
 		// transactions pool
+		lock *sync.RWMutex
 		data map[txHash]TxDesc
 
 		// sorted is data keys sorted by Fee in a descending order
@@ -31,23 +26,20 @@ type (
 		sorted []keyFee
 
 		// spent key images from the transactions in the pool
-		spentkeyImages map[keyImage]bool
-		Capacity       uint32
-		txsSize        uint32
+		//spentkeyImages map[keyImage]bool
+		Capacity uint32
+		txsSize  uint32
 	}
 )
 
 // Put sets the value for the given key. It overwrites any previous value
 // for that key;
 func (m *HashMap) Put(t TxDesc) error {
-
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	if m.data == nil {
 		m.data = make(map[txHash]TxDesc, m.Capacity)
 		m.sorted = make([]keyFee, 0, m.Capacity)
-	}
-
-	if m.spentkeyImages == nil {
-		m.spentkeyImages = make(map[keyImage]bool)
 	}
 
 	// store tx
@@ -65,7 +57,7 @@ func (m *HashMap) Put(t TxDesc) error {
 	// sort keys by Fee
 	// Bulk sort like (sort.Slice) performs a few times slower than
 	// a simple binarysearch&shift algorithm.
-	fee := t.tx.StandardTx().Fee.BigInt().Uint64()
+	_, fee := t.tx.Values()
 
 	index := sort.Search(len(m.sorted), func(i int) bool {
 		return m.sorted[i].f < fee
@@ -75,24 +67,14 @@ func (m *HashMap) Put(t TxDesc) error {
 	copy(m.sorted[index+1:], m.sorted[index:])
 	m.sorted[index] = keyFee{k: k, f: fee}
 
-	// store all tx key images, if provided
-	for i, input := range t.tx.StandardTx().Inputs {
-		if len(input.KeyImage.Bytes()) == keyImageSize {
-			var ki keyImage
-			copy(ki[:], input.KeyImage.Bytes())
-			m.spentkeyImages[ki] = true
-		} else {
-			return fmt.Errorf("invalid key image found at index %d", i)
-		}
-	}
-
 	return nil
 }
 
 // Clone the entire pool
-func (m HashMap) Clone() []transactions.Transaction {
-
-	r := make([]transactions.Transaction, len(m.data))
+func (m HashMap) Clone() []transactions.ContractCall {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	r := make([]transactions.ContractCall, len(m.data))
 	i := 0
 	for _, t := range m.data {
 		r[i] = t.tx
@@ -104,8 +86,10 @@ func (m HashMap) Clone() []transactions.Transaction {
 
 // FilterByType returns all transactions for a specific type that are
 // currently in the HashMap.
-func (m HashMap) FilterByType(filterType transactions.TxType) []transactions.Transaction {
-	txs := make([]transactions.Transaction, 0)
+func (m HashMap) FilterByType(filterType transactions.TxType) []transactions.ContractCall {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	txs := make([]transactions.ContractCall, 0)
 	for _, t := range m.data {
 		if t.tx.Type() == filterType {
 			txs = append(txs, t.tx)
@@ -117,6 +101,8 @@ func (m HashMap) FilterByType(filterType transactions.TxType) []transactions.Tra
 
 // Contains returns true if the given key is in the pool.
 func (m *HashMap) Contains(txID []byte) bool {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	var k txHash
 	copy(k[:], txID)
 	_, ok := m.data[k]
@@ -124,7 +110,9 @@ func (m *HashMap) Contains(txID []byte) bool {
 }
 
 // Get returns a tx for a given txID if it exists.
-func (m *HashMap) Get(txID []byte) transactions.Transaction {
+func (m *HashMap) Get(txID []byte) transactions.ContractCall {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	var k txHash
 	copy(k[:], txID)
 	txd, ok := m.data[k]
@@ -136,17 +124,22 @@ func (m *HashMap) Get(txID []byte) transactions.Transaction {
 
 // Size of the txs
 func (m *HashMap) Size() uint32 {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	return m.txsSize
 }
 
 // Len returns the number of tx entries
 func (m *HashMap) Len() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	return len(m.data)
 }
 
 // Range iterates through all tx entries
 func (m *HashMap) Range(fn func(k txHash, t TxDesc) error) error {
-
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	for k, v := range m.data {
 		err := fn(k, v)
 		if err != nil {
@@ -159,7 +152,8 @@ func (m *HashMap) Range(fn func(k txHash, t TxDesc) error) error {
 // RangeSort iterates through all tx entries sorted by Fee
 // in a descending order
 func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error {
-
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	for _, value := range m.sorted {
 		done, err := fn(value.k, m.data[value.k])
 		if err != nil {
@@ -171,13 +165,4 @@ func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error {
 		}
 	}
 	return nil
-}
-
-// ContainsKeyImage returns true if txpool includes a input that contains
-// this keyImage
-func (m *HashMap) ContainsKeyImage(txInputKeyImage []byte) bool {
-	var ki keyImage
-	copy(ki[:], txInputKeyImage)
-	_, ok := m.spentkeyImages[ki]
-	return ok
 }

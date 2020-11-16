@@ -2,25 +2,26 @@ package message
 
 import (
 	"bytes"
+	"math/big"
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
 type (
 
 	// ScoreProposal is an internal packet created by the node. the Score Message with the fields consistent with the Blind Bid data structure
 	ScoreProposal struct {
-		hdr           header.Header
-		Score         []byte
-		Proof         []byte
-		Z             []byte
-		BidListSubset []byte
-		Seed          []byte
+		hdr      header.Header
+		Score    []byte
+		Proof    []byte
+		Identity []byte
+		Seed     []byte
 	}
 
 	// Score extends the ScoreProposal with additional fields related to the
@@ -28,8 +29,8 @@ type (
 	// created and it gets forwarded to the other nodes
 	Score struct {
 		ScoreProposal
-		PrevHash []byte
-		VoteHash []byte
+		PrevHash  []byte
+		Candidate Candidate
 	}
 )
 
@@ -42,15 +43,40 @@ func EmptyScoreProposal(hdr header.Header) ScoreProposal {
 }
 
 // NewScoreProposal creates a new ScoreProposa
-func NewScoreProposal(hdr header.Header, seed []byte, proof zkproof.ZkProof) ScoreProposal {
+func NewScoreProposal(hdr header.Header, seed []byte, score blindbid.GenerateScoreResponse) ScoreProposal {
 	return ScoreProposal{
-		hdr:           hdr,
-		Score:         proof.Score,
-		Proof:         proof.Proof,
-		Z:             proof.Z,
-		BidListSubset: proof.BinaryBidList,
-		Seed:          seed,
+		hdr:      hdr,
+		Score:    score.Score.Data,
+		Proof:    score.BlindbidProof.Data,
+		Seed:     seed,
+		Identity: score.ProverIdentity.Data,
 	}
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (e ScoreProposal) Copy() payload.Safe {
+	cpy := ScoreProposal{
+		hdr: e.hdr.Copy().(header.Header),
+	}
+
+	if e.Score != nil {
+		cpy.Score = make([]byte, len(e.Score))
+		copy(cpy.Score, e.Score)
+	}
+	if e.Proof != nil {
+		cpy.Proof = make([]byte, len(e.Proof))
+		copy(cpy.Proof, e.Proof)
+	}
+	if e.Seed != nil {
+		cpy.Seed = make([]byte, len(e.Seed))
+		copy(cpy.Seed, e.Seed)
+	}
+	if e.Identity != nil {
+		cpy.Identity = make([]byte, len(e.Identity))
+		copy(cpy.Identity, e.Identity)
+	}
+	return cpy
 }
 
 // IsEmpty tests a ScoreProposal for emptyness
@@ -65,7 +91,7 @@ func (e ScoreProposal) State() header.Header {
 
 // Sender of a Score event is the anonymous Z
 func (e ScoreProposal) Sender() []byte {
-	return e.Z
+	return e.Identity
 }
 
 // String representation of the ScoreProposal
@@ -80,38 +106,59 @@ func (e ScoreProposal) String() string {
 }
 
 // NewScore creates a new Score from a proposal
-func NewScore(proposal ScoreProposal, pubkey, prevHash, voteHash []byte) *Score {
+func NewScore(proposal ScoreProposal, pubkey, prevHash []byte, candidate Candidate) *Score {
+
 	score := &Score{
 		ScoreProposal: proposal,
 		PrevHash:      prevHash,
-		VoteHash:      voteHash,
+		Candidate:     candidate,
 	}
 	score.ScoreProposal.hdr.PubKeyBLS = pubkey
-	score.ScoreProposal.hdr.BlockHash = voteHash
+	score.ScoreProposal.hdr.BlockHash = score.VoteHash()
 	return score
+}
+
+// Copy complies with message.Safe interface. It returns a deep copy of
+// the message safe to publish to multiple subscribers
+func (e Score) Copy() payload.Safe {
+	cpy := Score{
+		ScoreProposal: e.ScoreProposal.Copy().(ScoreProposal),
+		PrevHash:      make([]byte, len(e.PrevHash)),
+		Candidate:     e.Candidate.Copy().(Candidate),
+	}
+
+	copy(cpy.PrevHash, e.PrevHash)
+	return cpy
 }
 
 // EmptyScore is used primarily to initialize the Score,
 // since empty scores should not be propagated externally
 func EmptyScore() Score {
 	return Score{
-		ScoreProposal: EmptyScoreProposal(header.Header{}),
+		ScoreProposal: EmptyScoreProposal(header.Header{BlockHash: make([]byte, 32)}),
+		Candidate:     *NewCandidate(),
 	}
 }
 
 // Equal tests if two Scores are equal
 func (e Score) Equal(s Score) bool {
-	return e.hdr.Equal(s.hdr) && bytes.Equal(e.VoteHash, s.VoteHash)
+	return e.hdr.Equal(s.hdr) && bytes.Equal(e.VoteHash(), s.VoteHash()) && e.VoteHash() != nil
+}
+
+// VoteHash returns hash of the Candidate block
+func (e Score) VoteHash() []byte {
+	return e.Candidate.Block.Header.Hash
 }
 
 // String representation of a Score
 func (e Score) String() string {
+
 	var sb strings.Builder
 	_, _ = sb.WriteString(e.ScoreProposal.String())
 	_, _ = sb.WriteString(" prev_hash='")
 	_, _ = sb.WriteString(util.StringifyBytes(e.PrevHash))
 	_, _ = sb.WriteString(" vote_hash='")
-	_, _ = sb.WriteString(util.StringifyBytes(e.VoteHash))
+	_, _ = sb.WriteString(util.StringifyBytes(e.VoteHash()))
 	return sb.String()
 }
 
@@ -151,12 +198,8 @@ func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
 		return err
 	}
 
-	sev.Z = make([]byte, 32)
-	if err := encoding.Read256(r, sev.Z); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadVarBytes(r, &sev.BidListSubset); err != nil {
+	sev.Identity = make([]byte, 32)
+	if err := encoding.Read256(r, sev.Identity); err != nil {
 		return err
 	}
 
@@ -170,8 +213,8 @@ func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
 		return err
 	}
 
-	sev.VoteHash = make([]byte, 32)
-	if err := encoding.Read256(r, sev.VoteHash); err != nil {
+	sev.Candidate = *NewCandidate()
+	if err := UnmarshalCandidate(r, &sev.Candidate); err != nil {
 		return err
 	}
 
@@ -197,13 +240,8 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 		return err
 	}
 
-	// Z
-	if err := encoding.Write256(r, sev.Z); err != nil {
-		return err
-	}
-
-	// BidList
-	if err := encoding.WriteVarBytes(r, sev.BidListSubset); err != nil {
+	// Identity
+	if err := encoding.Write256(r, sev.Identity); err != nil {
 		return err
 	}
 
@@ -216,8 +254,8 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 		return err
 	}
 
-	// CandidateHash
-	if err := encoding.Write256(r, sev.VoteHash); err != nil {
+	// Candidate
+	if err := MarshalCandidate(r, sev.Candidate); err != nil {
 		return err
 	}
 	return nil
@@ -225,28 +263,35 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 
 // MockScoreProposal mocks a ScoreProposal up
 func MockScoreProposal(hdr header.Header) ScoreProposal {
-	score, _ := crypto.RandEntropy(32)
+	var score []byte
+	for {
+		score, _ = crypto.RandEntropy(32)
+		scoreInt := big.NewInt(0).SetBytes(score)
+		limit, _ := big.NewInt(0).SetString("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 16)
+
+		if scoreInt.Cmp(limit) > -1 {
+			break
+		}
+	}
 	proof, _ := crypto.RandEntropy(1477)
-	z, _ := crypto.RandEntropy(32)
-	subset, _ := crypto.RandEntropy(32)
+	identity, _ := crypto.RandEntropy(32)
 	seed, _ := crypto.RandEntropy(33)
 	return ScoreProposal{
-		hdr:           hdr,
-		Score:         score,
-		Proof:         proof,
-		Z:             z,
-		BidListSubset: subset,
-		Seed:          seed,
+		hdr:      hdr,
+		Score:    score,
+		Proof:    proof,
+		Identity: identity,
+		Seed:     seed,
 	}
 }
 
 // MockScore mocks a Score and returns it.
-func MockScore(hdr header.Header, hash []byte) Score {
+func MockScore(hdr header.Header, c Candidate) Score {
 	prevHash, _ := crypto.RandEntropy(32)
 
 	return Score{
 		ScoreProposal: MockScoreProposal(hdr),
 		PrevHash:      prevHash,
-		VoteHash:      hash,
+		Candidate:     c,
 	}
 }

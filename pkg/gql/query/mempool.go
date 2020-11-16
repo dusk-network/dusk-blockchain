@@ -6,7 +6,9 @@ import (
 	"errors"
 	"time"
 
-	txs "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+
+	txs "github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/graphql-go/graphql"
@@ -42,11 +44,12 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			_, _ = payload.Write(txidBytes)
 		}
 
-		resp, err := t.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(payload), 5*time.Second)
+		timeoutGetMempoolTXs := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXs) * time.Second
+		resp, err := t.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(payload), timeoutGetMempoolTXs)
 		if err != nil {
 			return "", err
 		}
-		r := resp.([]txs.Transaction)
+		r := resp.([]txs.ContractCall)
 
 		txs := make([]queryTx, 0)
 		for i := 0; i < len(r); i++ {

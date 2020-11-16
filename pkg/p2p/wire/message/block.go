@@ -6,7 +6,7 @@ import (
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
@@ -23,7 +23,7 @@ func MarshalBlock(r *bytes.Buffer, b *block.Block) error {
 
 	// TODO: parallelize transaction serialization
 	for _, tx := range b.Txs {
-		if err := MarshalTx(r, tx); err != nil {
+		if err := transactions.Marshal(r, tx); err != nil {
 			return err
 		}
 	}
@@ -31,52 +31,20 @@ func MarshalBlock(r *bytes.Buffer, b *block.Block) error {
 	return nil
 }
 
-// UnmarshalBlock unmarshals a block from a binary buffer
-func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
-	return unmarshalBlockTxs(r, b, UnmarshalTx)
-}
-
-// UnmarshalLegacyBlock unmarshals a block from a binary buffer carrying legacy
-// Stake transactions
-// TODO: this should be better handled with a Marshaller object that supports
-// different versions of the protocol
-func UnmarshalLegacyBlock(r *bytes.Buffer, b *block.Block) error {
-	legacy := func(buf *bytes.Buffer) (transactions.Transaction, error) {
-		var txType uint8
-		preamble := make([]byte, 1)
-		copy(preamble, buf.Bytes())
-
-		if err := encoding.ReadUint8(bytes.NewBuffer(preamble), &txType); err != nil {
-			return nil, err
-		}
-
-		// Intercept the legacy stake and use the legacy unmarshaller for
-		// those. The rest of transactions should be untouched
-		switch transactions.TxType(txType) {
-		case transactions.StakeType:
-			// we need to actually read the TX preamble first
-			if err := encoding.ReadUint8(r, &txType); err != nil {
-				return nil, err
-			}
-			tx, err := transactions.NewStake(0, 0, 0, 0, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			err = UnmarshalLegacyStake(buf, tx)
-			return tx, err
-		}
-
-		return UnmarshalTx(buf)
+// UnmarshalBlockMessage unmarshals a block from a binary buffer into
+// a SerializableMessage.
+func UnmarshalBlockMessage(r *bytes.Buffer, m SerializableMessage) error {
+	blk := block.NewBlock()
+	if err := UnmarshalBlock(r, blk); err != nil {
+		return err
 	}
 
-	return unmarshalBlockTxs(r, b, legacy)
+	m.SetPayload(*blk)
+	return nil
 }
 
-type unmarfunc func(*bytes.Buffer) (transactions.Transaction, error)
-
-func unmarshalBlockTxs(r *bytes.Buffer, b *block.Block, unmarshalTx unmarfunc) error {
-
+// UnmarshalBlock unmarshals a block from a binary buffer
+func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
 	if err := UnmarshalHeader(r, b.Header); err != nil {
 		return err
 	}
@@ -92,13 +60,13 @@ func unmarshalBlockTxs(r *bytes.Buffer, b *block.Block, unmarshalTx unmarfunc) e
 		return errors.New("block tx count too large")
 	}
 
-	b.Txs = make([]transactions.Transaction, lTxs)
+	b.Txs = make([]transactions.ContractCall, lTxs)
 	for i := range b.Txs {
-		tx, err := unmarshalTx(r)
-		if err != nil {
+		c := transactions.NewTransaction()
+		if err := transactions.Unmarshal(r, c); err != nil {
 			return err
 		}
-		b.Txs[i] = tx
+		b.Txs[i] = c
 	}
 
 	return nil

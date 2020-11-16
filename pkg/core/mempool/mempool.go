@@ -2,21 +2,21 @@ package mempool
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -25,13 +25,13 @@ import (
 	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	logger "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 var log = logger.WithFields(logger.Fields{"prefix": "mempool"})
 
 const (
-	consensusSeconds = 20
-	maxPendingLen    = 1000
+//consensusSeconds = 20
 )
 
 var (
@@ -48,103 +48,78 @@ var (
 type Mempool struct {
 	getMempoolTxsChan       <-chan rpcbus.Request
 	getMempoolTxsBySizeChan <-chan rpcbus.Request
-	getMempoolViewChan      <-chan rpcbus.Request
 	sendTxChan              <-chan rpcbus.Request
-
-	// transactions emitted by RPC and Peer subsystems
-	// pending to be verified before adding them to verified pool
-	pending chan TxDesc
 
 	// verified txs to be included in next block
 	verified Pool
 
-	// the collector to listen for new intermediate blocks
-	intermediateBlockChan <-chan block.Block
-	acceptedBlockChan     <-chan block.Block
+	// the collector to listen for new accepted blocks
+	acceptedBlockChan <-chan block.Block
 
 	// used by tx verification procedure
 	latestBlockTimestamp int64
 
 	eventBus *eventbus.EventBus
-	db       database.DB
 
 	// the magic function that knows best what is valid chain Tx
-	verifyTx func(tx transactions.Transaction) error
+	verifier transactions.UnconfirmedTxProber
 	quitChan chan struct{}
 
-	// ID of subscription to the TX topic on the EventBus
-	txSubscriberID uint32
+	ctx context.Context
 }
 
-// checkTx is responsible to determine if a tx is valid or not
-func (m *Mempool) checkTx(tx transactions.Transaction) error {
+// checkTx is responsible to determine if a tx is valid or not.
+// Among the other checks, the underlying verifier also checks double spending
+func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 	// check if external verifyTx is provided
-	if m.verifyTx != nil {
-		return m.verifyTx(tx)
+	if err := m.verifier.VerifyTransaction(m.ctx, tx); err != nil {
+		return fmt.Errorf("transaction verification failed: %v", err)
 	}
-
-	// retrieve read-only connection to the blockchain database
-	if m.db == nil {
-		_, m.db = heavy.CreateDBConnection()
-	}
-
-	// run the default blockchain verifier
-	approxBlockTime := uint64(consensusSeconds) + uint64(m.latestBlockTimestamp)
-	return verifiers.CheckTx(m.db, 0, approxBlockTime, tx)
+	return nil
 }
 
 // NewMempool instantiates and initializes node mempool
-func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx func(tx transactions.Transaction) error) *Mempool {
-
+func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
 	log.Infof("Create instance")
 
 	getMempoolTxsChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetMempoolTxs, getMempoolTxsChan); err != nil {
-		log.Errorf("rpcbus.GetMempoolTxs err=%v", err)
+		log.WithError(err).Error("failed to register topics.GetMempoolTxs")
 	}
 
 	getMempoolTxsBySizeChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetMempoolTxsBySize, getMempoolTxsBySizeChan); err != nil {
-		log.Errorf("rpcbus.getMempoolTxsBySize err=%v", err)
-	}
-
-	getMempoolViewChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(topics.GetMempoolView, getMempoolViewChan); err != nil {
-		log.WithError(err).Errorf("error registering getMempoolView")
+		log.WithError(err).Error("failed to register topics.GetMempoolTxsBySize")
 	}
 
 	sendTxChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.SendMempoolTx, sendTxChan); err != nil {
-		log.Errorf("rpcbus.SendMempoolTx err=%v", err)
+		log.WithError(err).Error("failed to register topics.SendMempoolTx")
 	}
 
-	intermediateBlockChan := initIntermediateBlockCollector(eventBus)
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
 	m := &Mempool{
+		ctx:                     ctx,
 		eventBus:                eventBus,
 		latestBlockTimestamp:    math.MinInt32,
 		quitChan:                make(chan struct{}),
-		intermediateBlockChan:   intermediateBlockChan,
 		acceptedBlockChan:       acceptedBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
-		getMempoolViewChan:      getMempoolViewChan,
 		sendTxChan:              sendTxChan,
+		verifier:                verifier,
 	}
 
-	if verifyTx != nil {
-		m.verifyTx = verifyTx
-	}
-
+	// Setting the pool where to cache verified transactions.
+	// The pool is normally a Hashmap
 	m.verified = m.newPool()
 
 	log.Infof("Running with pool type %s", config.Get().Mempool.PoolType)
 
-	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
-	m.pending = make(chan TxDesc, maxPendingLen)
-	l := eventbus.NewCallbackListener(m.CollectPending)
-	m.txSubscriberID = m.eventBus.Subscribe(topics.Tx, l)
+	if srv != nil {
+		node.RegisterMempoolServer(srv, m)
+	}
 	return m
 }
 
@@ -165,18 +140,8 @@ func (m *Mempool) Run() {
 				handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
 			case r := <-m.getMempoolTxsBySizeChan:
 				handleRequest(r, m.processGetMempoolTxsBySizeRequest, "GetMempoolTxsBySize")
-			case r := <-m.getMempoolViewChan:
-				handleRequest(r, m.processGetMempoolViewRequest, "GetMempoolView")
-			// Mempool input channels
-			case b := <-m.intermediateBlockChan:
-				m.onBlock(b)
 			case b := <-m.acceptedBlockChan:
 				m.onBlock(b)
-			case tx := <-m.pending:
-				// TODO: the m.pending channel looks a bit wasteful. Consider
-				// removing it and call onPendingTx directly within
-				// CollectPending
-				_, _ = m.onPendingTx(tx)
 			case <-time.After(20 * time.Second):
 				m.onIdle()
 			// Mempool terminating
@@ -188,36 +153,43 @@ func (m *Mempool) Run() {
 	}()
 }
 
-// onPendingTx handles a submitted tx from any source (rpcBus or eventBus)
-func (m *Mempool) onPendingTx(t TxDesc) ([]byte, error) {
-
-	log.Infof("Pending txs=%d", len(m.pending))
+// ProcessTx handles a submitted tx from any source (rpcBus or eventBus)
+func (m *Mempool) ProcessTx(msg message.Message) ([]bytes.Buffer, error) {
+	t := TxDesc{tx: msg.Payload().(transactions.ContractCall), received: time.Now(), size: uint(len(msg.Id()))}
+	log.Info("handle submitted tx")
 
 	start := time.Now()
 	txid, err := m.processTx(t)
 	elapsed := time.Since(start)
 
 	if err != nil {
-		log.Errorf("Failed txid=%s err='%v' duration=%d μs", toHex(txid), err, elapsed.Microseconds())
+		log.WithError(err).
+			WithField("txid", toHex(txid)).
+			WithField("duration", elapsed.Microseconds()).
+			Error("Failed handle submitted tx")
 	} else {
-		log.Infof("Verified txid=%s duration=%d μs", toHex(txid), elapsed.Microseconds())
+		log.WithError(err).
+			WithField("txid", toHex(txid)).
+			WithField("duration", elapsed.Microseconds()).
+			Infof("Verified handle submitted tx")
 	}
 
-	return txid, err
+	return nil, err
 }
 
 // processTx ensures all transaction rules are satisfied before adding the tx
 // into the verified pool
 func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
-
 	txid, err := t.tx.CalculateHash()
 	if err != nil {
 		return txid, fmt.Errorf("hash err: %s", err.Error())
 	}
 
-	log.Infof("Pending txid=%s size=%d bytes", toHex(txid), t.size)
+	log.WithField("txid", txid).
+		WithField("size_bytes", t.size).
+		Info("ensuring transaction rules satisfied")
 
-	if t.tx.Type() == transactions.CoinbaseType {
+	if t.tx.Type() == transactions.Distribute {
 		// coinbase tx should be built by block generator only
 		return txid, ErrCoinbaseTxNotAllowed
 	}
@@ -225,11 +197,6 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	// expect it is not already a verified tx
 	if m.verified.Contains(txid) {
 		return txid, ErrAlreadyExists
-	}
-
-	// expect it is not already spent from mempool verified txs
-	if err := m.checkTXDoubleSpent(t.tx); err != nil {
-		return txid, ErrDoubleSpending
 	}
 
 	// execute tx verification procedure
@@ -261,7 +228,9 @@ func (m *Mempool) propagateTx(t TxDesc, txid []byte) {
 		}
 	} else {
 		// Advertise the transaction hash to gossip network via "Inventory Vectors"
-		m.advertiseTxHash(txid)
+		if err := m.advertiseTx(txid); err != nil {
+			log.WithError(err).Error("transaction advertising failed")
+		}
 	}
 }
 
@@ -279,10 +248,13 @@ func (m *Mempool) onBlock(b block.Block) {
 // The passed block is supposed to be the last one accepted. That said, it must
 // contain a valid TxRoot.
 func (m *Mempool) removeAccepted(b block.Block) {
-
 	blockHash := toHex(b.Header.Hash)
 
-	log.Infof("Processing block %s with %d txs", blockHash, len(b.Txs))
+	log.
+		WithField("height", b.Header.Height).
+		WithField("hash", blockHash).
+		WithField("len_txs", len(b.Txs)).
+		Info("processing_block")
 
 	if m.verified.Len() == 0 {
 		// No txs accepted then no cleanup needed
@@ -295,9 +267,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 	}
 
 	tree, err := merkletree.NewTree(payloads)
-
 	if err == nil && tree != nil {
-
 		s := m.newPool()
 		// Check if mempool verified tx is part of merkle tree of this block
 		// if not, then keep it in the mempool for the next block
@@ -311,33 +281,44 @@ func (m *Mempool) removeAccepted(b block.Block) {
 		})
 
 		if err != nil {
-			log.Error(err.Error())
+			log.
+				WithError(err).
+				WithField("height", b.Header.Height).
+				WithField("hash", blockHash).
+				WithField("len_txs", len(b.Txs)).
+				Error("could not check mempool verified tx")
 		}
 
 		m.verified = s
 	}
 
-	log.Infof("Processing block %s completed", toHex(b.Header.Hash))
+	log.
+		WithField("height", b.Header.Height).
+		WithField("hash", blockHash).
+		WithField("len_txs", len(b.Txs)).
+		Info("processing_block_completed")
 }
 
 func (m *Mempool) onIdle() {
 
 	// stats to log
 	poolSize := float32(m.verified.Size()) / 1000
-	log.Infof("Txs count %d, total size %.3f kB", m.verified.Len(), poolSize)
+	log.WithField("txs_count", m.verified.Len()).WithField("pool_size", poolSize).Infof("stats to log")
 
 	// trigger alarms/notifications in case of abnormal state
 
 	// trigger alarms on too much txs memory allocated
 	maxSizeBytes := config.Get().Mempool.MaxSizeMB * 1000 * 1000
 	if m.verified.Size() > maxSizeBytes {
-		log.Warnf("Mempool is bigger than %d MB", config.Get().Mempool.MaxSizeMB)
+		log.WithField("max_size_mb", config.Get().Mempool.MaxSizeMB).
+			WithField("current_size", m.verified.Size()).
+			Warn("Mempool is too big")
 	}
 
 	if log.Logger.Level == logger.TraceLevel {
 		if m.verified.Len() > 0 {
 			_ = m.verified.Range(func(k txHash, t TxDesc) error {
-				log.Tracef("txid=%s", toHex(k[:]))
+				log.WithField("txid", toHex(k[:])).Trace("verified transaction")
 				return nil
 			})
 		}
@@ -356,44 +337,19 @@ func (m *Mempool) onIdle() {
 }
 
 func (m *Mempool) newPool() Pool {
-
 	preallocTxs := config.Get().Mempool.PreallocTxs
 
 	var p Pool
 	switch config.Get().Mempool.PoolType {
 	case "hashmap":
-		p = &HashMap{Capacity: preallocTxs}
+		p = &HashMap{lock: &sync.RWMutex{}, Capacity: preallocTxs}
 	case "syncpool":
 		log.Panic("syncpool not supported")
 	default:
-		p = &HashMap{Capacity: preallocTxs}
+		p = &HashMap{lock: &sync.RWMutex{}, Capacity: preallocTxs}
 	}
 
 	return p
-}
-
-// CollectPending process the emitted transactions.
-// Fast-processing and simple impl to avoid locking here.
-// NB This is always run in a different than main mempool routine
-func (m *Mempool) CollectPending(msg message.Message) error {
-	tx := msg.Payload().(transactions.Transaction)
-
-	// set initial kadcast height.
-	// If message does bring kadHeight, this is transaction propagation
-	// If not, transaction is propagated for the first time
-	h := kadcast.InitHeight
-
-	if len(msg.Header()) > 0 {
-		h = msg.Header()[0]
-	}
-
-	m.pending <- TxDesc{
-		tx:        tx,
-		received:  time.Now(),
-		size:      uint(len(msg.Id())),
-		kadHeight: h}
-
-	return nil
 }
 
 // processGetMempoolTxsRequest retrieves current state of the mempool of the verified but
@@ -404,7 +360,7 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 	params := r.Params.(bytes.Buffer)
 	filterTxID := params.Bytes()
 
-	outputTxs := make([]transactions.Transaction, 0)
+	outputTxs := make([]transactions.ContractCall, 0)
 
 	// If we are looking for a specific tx, just look it up by key.
 	if len(filterTxID) == 32 {
@@ -431,27 +387,56 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 	return outputTxs, err
 }
 
-func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, error) {
-	txs := make([]transactions.Transaction, 0)
-	req := r.Params.(*node.SelectRequest)
+// uType translates the node.TxType into transactions.TxType
+func uType(t node.TxType) (transactions.TxType, error) {
+	switch t {
+	case node.TxType_STANDARD:
+		return transactions.Tx, nil
+	case node.TxType_DISTRIBUTE:
+		return transactions.Distribute, nil
+	case node.TxType_BID:
+		return transactions.Bid, nil
+	case node.TxType_STAKE:
+		return transactions.Stake, nil
+	case node.TxType_WITHDRAWFEES:
+		return transactions.WithdrawFees, nil
+	case node.TxType_WITHDRAWSTAKE:
+		return transactions.WithdrawStake, nil
+	case node.TxType_WITHDRAWBID:
+		return transactions.WithdrawBid, nil
+	case node.TxType_SLASH:
+		return transactions.Slash, nil
+	default:
+		return transactions.Tx, errors.New("unknown transaction type")
+	}
+}
+
+// SelectTx will return a view of the mempool, with optional filters applied.
+func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {
+	txs := make([]transactions.ContractCall, 0)
 	switch {
 	case len(req.Id) == 64:
 		// If we want a tx with a certain ID, we can simply look it up
 		// directly
 		hash, err := hex.DecodeString(req.Id)
 		if err != nil {
-			return bytes.Buffer{}, err
+			return nil, err
 		}
 
 		tx := m.verified.Get(hash)
 		if tx == nil {
-			return bytes.Buffer{}, errors.New("tx not found")
+			return nil, errors.New("tx not found")
 		}
 
 		txs = append(txs, tx)
 	case len(req.Types) > 0:
 		for _, t := range req.Types {
-			txs = append(txs, m.verified.FilterByType(transactions.TxType(t))...)
+			trType, err := uType(t)
+			if err != nil {
+				// most likely an unsupported type. We just ignore it
+				continue
+			}
+			txs = append(txs, m.verified.FilterByType(trType)...)
 		}
 	default:
 		txs = m.verified.Clone()
@@ -459,14 +444,31 @@ func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, er
 
 	resp := &node.SelectResponse{Result: make([]*node.Tx, len(txs))}
 	for i, tx := range txs {
+		txid, err := tx.CalculateHash()
+		if err != nil {
+			return nil, err
+		}
+
 		resp.Result[i] = &node.Tx{
-			Type:     node.TxType(tx.Type()),
-			Id:       hex.EncodeToString(tx.StandardTx().TxID),
-			LockTime: tx.LockTime(),
+			Type: node.TxType(tx.Type()),
+			Id:   hex.EncodeToString(txid),
+			// LockTime: tx.LockTime(),
 		}
 	}
 
 	return resp, nil
+}
+
+// GetUnconfirmedBalance will return the amount of DUSK that is in the mempool
+// for a given key.
+func (m Mempool) GetUnconfirmedBalance(ctx context.Context, req *node.GetUnconfirmedBalanceRequest) (*node.BalanceResponse, error) {
+	txs := m.verified.Clone()
+	balance, err := m.verifier.CalculateBalance(ctx, req.Vk, txs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &node.BalanceResponse{LockedBalance: balance}, nil
 }
 
 // processGetMempoolTxsBySizeRequest returns a subset of verified mempool txs which
@@ -474,7 +476,6 @@ func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, er
 // 2. has total txs size not bigger than maxTxsSize (request param)
 // Called by BlockGenerator on generating a new candidate block
 func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{}, error) {
-
 	// Read maxTxsSize param
 	var maxTxsSize uint32
 	params := r.Params.(bytes.Buffer)
@@ -482,7 +483,7 @@ func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{
 		return bytes.Buffer{}, err
 	}
 
-	txs := make([]transactions.Transaction, 0)
+	txs := make([]transactions.ContractCall, 0)
 
 	var totalSize uint32
 	err := m.verified.RangeSort(func(k txHash, t TxDesc) (bool, error) {
@@ -508,33 +509,14 @@ func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{
 
 // processSendMempoolTxRequest utilizes rpcbus to allow submitting a tx to mempool with
 func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, error) {
-	tx := r.Params.(transactions.Transaction)
+	tx := r.Params.(transactions.ContractCall)
 	buf := new(bytes.Buffer)
-	if err := message.MarshalTx(buf, tx); err != nil {
+	if err := transactions.Marshal(buf, tx); err != nil {
 		return nil, err
 	}
 
-	txDesc := TxDesc{tx: tx,
-		received:  time.Now(),
-		size:      uint(buf.Len()),
-		kadHeight: kadcast.InitHeight}
-
-	// Process request
-	return m.onPendingTx(txDesc)
-}
-
-// checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executes on
-// all checks against mempool verified txs but not blockchain db.on
-func (m *Mempool) checkTXDoubleSpent(tx transactions.Transaction) error {
-	for _, input := range tx.StandardTx().Inputs {
-
-		exists := m.verified.ContainsKeyImage(input.KeyImage.Bytes())
-		if exists {
-			return errors.New("tx already spent")
-		}
-	}
-
-	return nil
+	t := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len()), kadHeight: kadcast.InitHeight}
+	return m.processTx(t)
 }
 
 // Quit makes mempool main loop to terminate
@@ -544,10 +526,9 @@ func (m *Mempool) Quit() {
 
 // Send Inventory message to all peers
 //nolint:unparam
-func (m *Mempool) advertiseTxHash(txID []byte) {
-
-	msg := &peermsg.Inv{}
-	msg.AddItem(peermsg.InvTypeMempoolTx, txID)
+func (m *Mempool) advertiseTx(txID []byte) error {
+	msg := &message.Inv{}
+	msg.AddItem(message.InvTypeMempoolTx, txID)
 
 	// TODO: can we simply encode the message directly on a topic carrying buffer?
 	buf := new(bytes.Buffer)
@@ -561,19 +542,21 @@ func (m *Mempool) advertiseTxHash(txID []byte) {
 
 	// TODO: interface - marshaling should done after the Gossip, not before
 	packet := message.New(topics.Inv, *buf)
-	m.eventBus.Publish(topics.Gossip, packet)
+	errList := m.eventBus.Publish(topics.Gossip, packet)
+	diagnostics.LogPublishErrors("mempool.go, topics.Gossip, topics.Inv", errList)
+
+	return nil
 }
 
 // kadcastTx (re)propagates transaction in kadcast network
 func (m *Mempool) kadcastTx(t TxDesc) error {
-
 	if t.kadHeight > kadcast.InitHeight {
 		return errors.New("invalid kadcast height")
 	}
 
 	/// repropagate
 	buf := new(bytes.Buffer)
-	if err := message.MarshalTx(buf, t.tx); err != nil {
+	if err := transactions.Marshal(buf, t.tx); err != nil {
 		return err
 	}
 
@@ -592,20 +575,17 @@ func toHex(id []byte) string {
 	return enc
 }
 
-// TODO: handlers should just return []transactions.Transaction, and the
+// TODO: handlers should just return []transactions.ContractCall, and the
 // caller should be left to format the data however they wish
 func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}, error), name string) {
-
-	log.Tracef("Handling %s request", name)
-
 	result, err := handler(r)
 	if err != nil {
-		log.Errorf("Failed %s request: %v", name, err)
+		log.
+			WithError(err).
+			WithField("name", name).Errorf("mempool failed to process request")
 		r.RespChan <- rpcbus.Response{Err: err}
 		return
 	}
 
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
-
-	log.Tracef("Handled %s request", name)
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/cmd/dusk/genesis"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -27,7 +28,14 @@ func init() {
 	app.Usage = "Official Dusk command-line interface"
 	app.Author = "DUSK 2020"
 	app.Version = "0.0.1"
-	app.Commands = []cli.Command{}
+	app.Commands = []cli.Command{
+		{
+			Name:    "genesis",
+			Aliases: []string{"g"},
+			Usage:   "serializes the genesis block and prints it",
+			Action:  genesis.Action,
+		},
+	}
 	app.Flags = append(app.Flags, CLIFlags...)
 	app.Flags = append(app.Flags, GlobalFlags...)
 }

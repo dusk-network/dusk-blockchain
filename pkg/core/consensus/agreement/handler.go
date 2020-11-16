@@ -73,23 +73,34 @@ func (a *handler) Quorum(round uint64) int {
 func (a *handler) Verify(ev message.Agreement) error {
 	hdr := ev.State()
 	if err := verifyWhole(ev); err != nil {
-		return err
+		return fmt.Errorf("failed to verify Agreement Sender: %w", err)
 	}
 
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
-		step := hdr.Step - 2 + uint8(i)
+		// the beginning step is the same of the second reduction. Since the
+		// consensus steps start at 1, this is always a multiple of 3
+		// The first reduction step is one less
+		step := hdr.Step - 1 + uint8(i)
+
+		// FIXME: what shall we do when step overflows uint8 ?
+		if step == math.MaxInt8 {
+			err := errors.New("verify, step reached max limit")
+			lg.WithError(err).Error("step overflow")
+			return err
+		}
+
 		committee := a.Committee(hdr.Round, step)
 		subcommittee := committee.IntersectCluster(votes.BitSet)
 
 		allVoters += subcommittee.TotalOccurrences()
 		apk, err := ReconstructApk(subcommittee.Set)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to reconstruct APK in the Agreement verification: %w", err)
 		}
 
 		if err := header.VerifySignatures(hdr.Round, step, hdr.BlockHash, apk, votes.Signature); err != nil {
-			return err
+			return fmt.Errorf("failed to verify BLS multisig: %w", err)
 		}
 	}
 
@@ -97,6 +108,28 @@ func (a *handler) Verify(ev message.Agreement) error {
 		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum(hdr.Round))
 	}
 	return nil
+}
+
+func (a *handler) getVoterKeys(ev message.Agreement) ([][]byte, error) {
+	hdr := ev.State()
+	keys := make([][]byte, 0)
+	for i, votes := range ev.VotesPerStep {
+		step := hdr.Step - 2 + uint8(i)
+
+		// FIXME: what shall we do when step overflows uint8 ?
+		if step >= math.MaxInt8 {
+			err := errors.New("getVoterKeys, step reached max limit")
+			lg.WithError(err).Error("step overflow")
+			return nil, err
+		}
+
+		committee := a.Committee(hdr.Round, step)
+		subcommittee := committee.IntersectCluster(votes.BitSet)
+
+		keys = append(keys, subcommittee.Unravel()...)
+	}
+
+	return keys, nil
 }
 
 func verifyWhole(a message.Agreement) error {

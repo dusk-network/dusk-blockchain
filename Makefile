@@ -9,14 +9,22 @@ all: build
 lint: ## Lint the files
 	GOBIN=$(PWD)/bin go run scripts/build.go lint
 test: ## Run unittests
-	@go test $(TFLAGS) -p 1 -short ${PKG_LIST}
+	@go test $(TFLAGS) -short ${PKG_LIST}
 test-harness: ## Run harness tests
-	@go test -v --count=1 --test.timeout=0 ./harness/tests/... -args -enable #-keepalive
-get-blindbid: ## download dusk-blindbidproof
-	@rm -rf ${PWD}/bin/blindbid-linux-amd64 || true
-	@wget -P ${PWD}/bin/ https://github.com/dusk-network/dusk-blindbidproof/releases/download/v0.1.0/blindbid-linux-amd64 && chmod +x ${PWD}/bin/blindbid-linux-amd64
-test-harness-ci: get-blindbid build
-	NETWORK_SIZE=7 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_BLINDBID=${PWD}/bin/blindbid-linux-amd64 DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" make test-harness
+	@go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable
+test-harness-ci: build
+	MOCK_ADDRESS=127.0.0.1:8080 DUSK_NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" make test-harness
+test-harness-alive: stop build
+	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestMultipleBiddersProvisioners -args -enable -keepalive
+test-harness-session:
+	REQUIRE_SESSION=true make test-harness-alive
+test-harness-race-alive: stop build-race
+	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestMultipleBiddersProvisioners  -args -enable -keepalive
+test-harness-race-debug-alive: stop build-race-debug
+	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestMultipleBiddersProvisioners  -args -enable -keepalive
 race: dep ## Run data race detector
 	@go test $(TFLAGS) -race -v ${PKG_LIST}
 coverage: ## Generate global code coverage report
@@ -29,6 +37,10 @@ dep: ## Get the dependencies
 	go mod download
 build: dep ## Build the binary file
 	GOBIN=$(PWD)/bin go run scripts/build.go install
+build-race: dep ## Build the binary file
+	GOBIN=$(PWD)/bin go run scripts/build.go install -race
+build-race-debug: dep ## Build the binary file
+	GOBIN=$(PWD)/bin go run scripts/build.go install -race -debug
 clean: ## Remove previous build
 	@rm -f ./bin
 	@go clean -testcache
@@ -40,6 +52,14 @@ voucher: build
 	./bin/voucher
 wallet: build
 	./bin/wallet
+mock: build
+	./bin/utils mock --grpcmockhost=127.0.0.1:9191
+mockrusk: build
+	./bin/utils mockrusk --rusknetwork=tcp --ruskaddress=127.0.0.1:10000 \
+	--walletstore=/tmp/localnet-137601832/node-9003/walletDB/ \
+	--walletfile=./harness/data/wallet-9000.dat
+devnet: stop
+	./devnet.sh
 netcollector: build
 	./bin/netcollector
 stop:
@@ -47,14 +67,14 @@ stop:
 	killall dusk || true
 	killall voucher || true
 	killall utils || true
-	killall /opt/gocode/src/github.com/dusk-network/dusk-blockchain/bin/blindbid-linux-amd64 || true
+	killall filebeat || true
 ###################################CROSS#################################################
 install-tools:
 	go get -u github.com/karalabe/xgo
 cross: \
 	dusk-linux dusk-linux-arm dusk-darwin dusk-windows \
 	voucher-linux voucher-linux-arm voucher-darwin voucher-windows \
-	wallet-linux wallet-linux-arm wallet-darwin wallet-windows \
+	wallet-linux wallet-linux-arm wallet-darwin wallet-windows
 ###################################DUSK#################################################
 dusk-linux: install-tools
 	xgo --go=latest --targets=linux/amd64 -out=./bin/dusk ./cmd/dusk

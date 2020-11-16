@@ -1,20 +1,21 @@
 package responding_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	assert "github.com/stretchr/testify/require"
 )
 
 // Test the behavior of the block hash broker, upon receiving a GetBlocks message.
 func TestAdvertiseBlocks(t *testing.T) {
+	assert := assert.New(t)
 	// Set up db
 	_, db := lite.CreateDBConnection()
 	defer func() {
@@ -22,50 +23,37 @@ func TestAdvertiseBlocks(t *testing.T) {
 	}()
 
 	// Generate 5 blocks and store them in the db. Save the hashes for later checking.
-	hashes, blocks := generateBlocks(t, 5)
-	if err := storeBlocks(db, blocks); err != nil {
-		t.Fatal(err)
-	}
+	hashes, blocks := generateBlocks(5)
+	assert.NoError(storeBlocks(db, blocks))
 
 	// Set up the BlockHashBroker
-	responseChan := make(chan *bytes.Buffer, 100)
-	blockHashBroker := responding.NewBlockHashBroker(db, responseChan)
+	blockHashBroker := responding.NewBlockHashBroker(db)
 
 	// Make a GetBlocks, with the genesis block as the locator.
-	msg := createGetBlocksBuffer(hashes[0])
-	if err := blockHashBroker.AdvertiseMissingBlocks(msg); err != nil {
-		t.Fatal(err)
-	}
-
-	// The BlockHashBroker's response should be put on the responseChan.
-	response := <-responseChan
+	msg := createGetBlocks(hashes[0])
+	blksBuf, err := blockHashBroker.AdvertiseMissingBlocks(msg)
+	assert.NoError(err)
 
 	// Check for correctness of topic
-	topic, _ := topics.Extract(response)
-	if topic != topics.Inv {
-		t.Fatalf("unexpected topic %s, expected Inv", topic)
-	}
+	topic, _ := topics.Extract(&blksBuf[0])
+	assert.Equal(topics.Inv, topic)
 
 	// Decode inv
-	inv := &peermsg.Inv{}
-	if err := inv.Decode(response); err != nil {
-		t.Fatal(err)
-	}
+	inv := &message.Inv{}
+	assert.NoError(inv.Decode(&blksBuf[0]))
 
 	// Check that block hashes match up with those we generated
 	for i, item := range inv.InvList {
-		if !bytes.Equal(hashes[i+1], item.Hash) {
-			t.Fatal("received inv vector has mismatched hash")
-		}
+		assert.Equal(item.Hash, hashes[i+1])
 	}
 }
 
 // Generate a set of random blocks, which follow each other up in the chain.
-func generateBlocks(t *testing.T, amount int) ([][]byte, []*block.Block) {
+func generateBlocks(amount int) ([][]byte, []*block.Block) {
 	var hashes [][]byte
 	var blocks []*block.Block
 	for i := 0; i < amount; i++ {
-		blk := helper.RandomBlock(t, uint64(i), 2)
+		blk := helper.RandomBlock(uint64(i), 2)
 		hashes = append(hashes, blk.Header.Hash)
 		blocks = append(blocks, blk)
 	}
@@ -73,16 +61,10 @@ func generateBlocks(t *testing.T, amount int) ([][]byte, []*block.Block) {
 	return hashes, blocks
 }
 
-func createGetBlocksBuffer(locator []byte) *bytes.Buffer {
-	getBlocks := &peermsg.GetBlocks{}
+func createGetBlocks(locator []byte) message.Message {
+	getBlocks := &message.GetBlocks{}
 	getBlocks.Locators = append(getBlocks.Locators, locator)
-
-	buf := new(bytes.Buffer)
-	if err := getBlocks.Encode(buf); err != nil {
-		panic(err)
-	}
-
-	return buf
+	return message.New(topics.GetBlocks, *getBlocks)
 }
 
 func storeBlocks(db database.DB, blocks []*block.Block) error {

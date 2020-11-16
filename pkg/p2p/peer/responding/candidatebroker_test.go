@@ -1,72 +1,63 @@
 package responding_test
 
 import (
-	"bytes"
-	"errors"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
 // Test the functionality of the CandidateBroker.
 func TestCandidateBroker(t *testing.T) {
-	rb := rpcbus.New()
-	respChan := make(chan *bytes.Buffer, 1)
-	c := responding.NewCandidateBroker(rb, respChan)
-	blockHash, _ := crypto.RandEntropy(32)
-	quitChan := provideCandidate(rb, blockHash)
+	// Set up db
+	_, db := lite.CreateDBConnection()
+	defer func() {
+		_ = db.Close()
+	}()
+
+	// Generate 5 candidates and store them in the db. Save the hashes for later checking.
+	hashes, blocks := generateBlocks(5)
+	assert.NoError(t, storeCandidates(db, blocks))
+
+	c := responding.NewCandidateBroker(db)
 
 	// First, ask for the wrong candidate.
 	wrongHash, _ := crypto.RandEntropy(32)
-	assert.Error(t, c.ProvideCandidate(bytes.NewBuffer(wrongHash)))
+	_, err := c.ProvideCandidate(message.New(topics.GetCandidate, message.GetCandidate{
+		Hash: wrongHash},
+	))
+	assert.Error(t, err)
 
 	// Now, ask for the correct one.
-	assert.NoError(t, c.ProvideCandidate(bytes.NewBuffer(blockHash)))
+	buf, err := c.ProvideCandidate(message.New(topics.GetCandidate, message.GetCandidate{
+		Hash: hashes[0]},
+	))
+	assert.NoError(t, err)
 
-	// Should receive something on `respChan`
-	<-respChan
+	// Remove topic from buffer
+	_, _ = topics.Extract(&buf[0])
 
-	// Clean up goroutine
-	quitChan <- struct{}{}
+	// Ensure it is the same block
+	cm := message.MakeCandidate(block.NewBlock(), block.EmptyCertificate())
+	assert.NoError(t, message.UnmarshalCandidate(&buf[0], &cm))
+	assert.True(t, cm.Block.Equals(blocks[0]))
 }
 
-func provideCandidate(rb *rpcbus.RPCBus, correctHash []byte) chan struct{} {
-	quitChan := make(chan struct{}, 1)
-	reqChan := make(chan rpcbus.Request, 1)
-
-	rb.Register(topics.GetCandidate, reqChan)
-
-	go func(reqChan chan rpcbus.Request, quitChan chan struct{}, correctHash []byte) {
-		for {
-			select {
-			case r := <-reqChan:
-				params := r.Params.(bytes.Buffer)
-				hash := make([]byte, 32)
-				if err := encoding.Read256(&params, hash); err != nil {
-					panic(err)
-				}
-
-				if bytes.Equal(hash, correctHash) {
-					blk := helper.RandomBlock(&testing.T{}, 2, 1)
-					cm := message.NewCandidate()
-					cm.Block = blk
-					r.RespChan <- rpcbus.NewResponse(*cm, nil)
-					continue
-				}
-
-				r.RespChan <- rpcbus.NewResponse(nil, errors.New("not found"))
-			case <-quitChan:
-				return
+func storeCandidates(db database.DB, blocks []*block.Block) error {
+	return db.Update(func(t database.Transaction) error {
+		for _, blk := range blocks {
+			cm := message.NewCandidate()
+			cm.Block = blk
+			if err := t.StoreCandidateMessage(*cm); err != nil {
+				return err
 			}
 		}
-	}(reqChan, quitChan, correctHash)
-
-	return quitChan
+		return nil
+	})
 }

@@ -60,14 +60,14 @@ func (w *Writer) Serve() {
 func (w *Writer) Write(m message.Message) error {
 
 	header := m.Header()
-	buf := m.Payload().(bytes.Buffer)
+	buf := m.Payload().(message.SafeBuffer)
 
 	if len(header) == 0 {
 		return errors.New("invalid message height")
 	}
 
 	// Constuct gossip frame
-	if err := w.gossip.Process(&buf); err != nil {
+	if err := w.gossip.Process(&buf.Buffer); err != nil {
 		log.WithError(err).Error("reading gossip frame failed")
 		return err
 	}

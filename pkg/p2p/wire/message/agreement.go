@@ -7,11 +7,14 @@ import (
 	"math/big"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
@@ -35,7 +38,7 @@ type (
 	// external communications and therefore it does not have a
 	// Marshal/Unmarshal methods associated
 	StepVotesMsg struct {
-		hdr header.Header
+		header.Header
 		StepVotes
 	}
 
@@ -49,6 +52,16 @@ type (
 	}
 )
 
+// Copy deeply the StepVotes
+func (s *StepVotes) Copy() *StepVotes {
+	return &StepVotes{
+		BitSet:    s.BitSet,
+		Step:      s.Step,
+		Apk:       s.Apk.Copy(),
+		Signature: s.Signature.Copy(),
+	}
+}
+
 // String representation of the Agreement
 func (a Agreement) String() string {
 	var sb strings.Builder
@@ -60,10 +73,37 @@ func (a Agreement) String() string {
 	return sb.String()
 }
 
+// Copy the Agreement is somewhat more expensive than the other structures
+// since it involves Marshaling and Unmarshaling. This is necessary since we do
+// not have access to the underlying BLS structs
+func (a Agreement) Copy() payload.Safe {
+	// NOTE: we ignore the error here. Since we deal with a well formed agreement we
+	// assume that the marshaling cannot fail
+	cpy := new(Agreement)
+	cpy.hdr = a.hdr.Copy().(header.Header)
+	if a.signedVotes != nil {
+		cpy.signedVotes = make([]byte, len(a.signedVotes))
+		copy(cpy.signedVotes, a.signedVotes)
+	}
+
+	cpy.Repr = new(big.Int)
+	cpy.Repr.Set(a.Repr)
+
+	if a.VotesPerStep != nil {
+		// Un-Marshaling the StepVotes for equality
+		cpy.VotesPerStep = make([]*StepVotes, len(a.VotesPerStep))
+		for i, vps := range a.VotesPerStep {
+			cpy.VotesPerStep[i] = vps.Copy()
+		}
+	}
+	return *cpy
+}
+
 // NewStepVotesMsg creates a StepVotesMsg
+// Deprecated
 func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) StepVotesMsg {
 	return StepVotesMsg{
-		hdr: header.Header{
+		Header: header.Header{
 			Step:      sv.Step,
 			Round:     round,
 			BlockHash: hash,
@@ -73,10 +113,45 @@ func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) Ste
 	}
 }
 
+// Copy deeply the StepVotesMsg
+func (s StepVotesMsg) Copy() payload.Safe {
+	b := new(bytes.Buffer)
+
+	// #612
+	err := MarshalStepVotes(b, &s.StepVotes)
+	if err != nil {
+		log.WithError(err).Error("StepVotesMsg.Copy, could not MarshalStepVotes")
+		//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
+		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes())
+	}
+	sv, err := UnmarshalStepVotes(b)
+	if err != nil {
+		//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
+		log.WithError(err).Error("StepVotesMsg.Copy, could not UnmarshalStepVotes")
+		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes())
+	}
+
+	hdrCopy := s.Header.Copy()
+	if hdrCopy == nil {
+		return StepVotesMsg{
+			//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
+			Header:    NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes()).Header,
+			StepVotes: *sv,
+		}
+	}
+
+	cpy := StepVotesMsg{
+		Header:    s.Header.Copy().(header.Header),
+		StepVotes: *sv,
+	}
+
+	return cpy
+}
+
 // State returns the Header without information about Sender (as this is only
 // for internal communications)
 func (s StepVotesMsg) State() header.Header {
-	return s.hdr
+	return s.Header
 }
 
 // IsEmpty returns whether the StepVotesMsg represents a failed convergence
@@ -350,6 +425,15 @@ func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 // MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature
 // for an ordered set of votes
 func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
+
+	// #611
+	if vote == nil || vote.Apk == nil || vote.Signature == nil {
+		log.
+			WithField("vote", vote).
+			Error("could not MarshalStepVotes")
+		return errors.New("invalid stepVotes")
+	}
+
 	// APK
 	if err := encoding.WriteVarBytes(r, vote.Apk.Marshal()); err != nil {
 		return err
@@ -380,6 +464,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *us
 	}
 
 	if idx > len(keys) {
+		// FIXME: shall this panic ?
 		panic("wrong iterative index: cannot iterate more than there are keys")
 	}
 
@@ -391,6 +476,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *us
 
 	whole := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(whole, a.State()); err != nil {
+		//FIXME: shall this panic ?
 		panic(err)
 	}
 
@@ -414,19 +500,20 @@ func MockCommitteeVoteSet(p *user.Provisioners, k []key.Keys, hash []byte, commi
 // Albeit random, the generation is consistent with the rules of Votes
 func GenVotes(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners) []*StepVotes {
 	if len(keys) < 2 {
+		//FIXME: shall this panic ?
 		panic("At least two votes are required to mock an Agreement")
 	}
 
 	// Create committee key sets
-	keySet1 := createCommitteeKeySet(p.CreateVotingCommittee(round, step-2, len(keys)), keys)
-	keySet2 := createCommitteeKeySet(p.CreateVotingCommittee(round, step-1, len(keys)), keys)
+	keySet1 := createCommitteeKeySet(p.CreateVotingCommittee(round, step-1, len(keys)), keys)
+	keySet2 := createCommitteeKeySet(p.CreateVotingCommittee(round, step, len(keys)), keys)
 
-	stepVotes1, set1 := createStepVotesAndSet(hash, round, step-2, keySet1)
-	stepVotes2, set2 := createStepVotesAndSet(hash, round, step-1, keySet2)
+	stepVotes1, set1 := createStepVotesAndSet(hash, round, step-1, keySet1)
+	stepVotes2, set2 := createStepVotesAndSet(hash, round, step, keySet2)
 
-	bitSet1 := createBitSet(set1, round, step-2, len(keySet1), p)
+	bitSet1 := createBitSet(set1, round, step-1, len(keySet1), p)
 	stepVotes1.BitSet = bitSet1
-	bitSet2 := createBitSet(set2, round, step-1, len(keySet2), p)
+	bitSet2 := createBitSet(set2, round, step, len(keySet2), p)
 	stepVotes2.BitSet = bitSet2
 
 	return []*StepVotes{stepVotes1, stepVotes2}
@@ -469,11 +556,13 @@ func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Key
 
 			r := new(bytes.Buffer)
 			if err := header.MarshalSignableVote(r, h); err != nil {
+				//FIXME: shall this panic ?
 				panic(err)
 			}
 
 			sigma, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, r.Bytes())
 			if err := stepVotes.Add(sigma.Compress(), k.BLSPubKeyBytes, step); err != nil {
+				//FIXME: shall this panic ?
 				panic(err)
 			}
 		}

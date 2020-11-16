@@ -13,27 +13,58 @@ type (
 	// Member contains the bytes of a provisioner's Ed25519 public key,
 	// the bytes of his BLS public key, and how much he has staked.
 	Member struct {
-		PublicKeyBLS []byte
-		Stakes       []Stake
+		PublicKeyBLS []byte  `json:"bls_key"`
+		Stakes       []Stake `json:"stakes"`
 	}
 
 	// Provisioners is a map of Members, and makes up the current set of provisioners.
 	Provisioners struct {
-		Set     sortedset.Set
-		Members map[string]*Member
+		Set     sortedset.Set      `json:"set"`
+		Members map[string]*Member `json:"members"`
 	}
 
-	// Stake of the Provisioner
+	// Stake represents the Provisioner's stake
 	Stake struct {
-		Amount      uint64
-		StartHeight uint64
-		EndHeight   uint64
+		Amount      uint64 `json:"amount"`
+		StartHeight uint64 `json:"start_height"`
+		EndHeight   uint64 `json:"end_height"`
 	}
 )
+
+// Copy deeply a set of Provisioners
+func (p Provisioners) Copy() Provisioners {
+	cpy := Provisioners{
+		Set:     p.Set.Copy(),
+		Members: make(map[string]*Member),
+	}
+	for k, v := range p.Members {
+		cpy.Members[k] = v
+	}
+	return cpy
+}
 
 // AddStake appends a stake to the stake set
 func (m *Member) AddStake(stake Stake) {
 	m.Stakes = append(m.Stakes, stake)
+}
+
+// Copy deep a Member
+func (m *Member) Copy() *Member {
+	cpy := &Member{
+		PublicKeyBLS: make([]byte, len(m.PublicKeyBLS)),
+		Stakes:       make([]Stake, len(m.Stakes)),
+	}
+
+	copy(cpy.PublicKeyBLS, m.PublicKeyBLS)
+	for i, s := range m.Stakes {
+		cpy.Stakes[i] = Stake{
+			Amount:      s.Amount,
+			StartHeight: s.StartHeight,
+			EndHeight:   s.EndHeight,
+		}
+	}
+
+	return cpy
 }
 
 // RemoveStake removes a Stake (most likely because it expired)
@@ -65,6 +96,34 @@ func NewProvisioners() *Provisioners {
 		Set:     sortedset.New(),
 		Members: make(map[string]*Member),
 	}
+}
+
+// Add a Member to the Provisioners by using the bytes of a BLS public key.
+func (p *Provisioners) Add(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
+	if len(pubKeyBLS) != 129 {
+		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
+	}
+
+	i := string(pubKeyBLS)
+	stake := Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
+
+	// Check for duplicates
+	_, inserted := p.Set.IndexOf(pubKeyBLS)
+	if inserted {
+		// If they already exist, just add their new stake
+		p.Members[i].AddStake(stake)
+		return nil
+	}
+
+	// This is a new provisioner, so let's initialize the Member struct and add them to the list
+	p.Set.Insert(pubKeyBLS)
+	m := &Member{}
+
+	m.PublicKeyBLS = pubKeyBLS
+	m.AddStake(stake)
+
+	p.Members[i] = m
+	return nil
 }
 
 // SubsetSizeAt returns how many provisioners are active on a given round.

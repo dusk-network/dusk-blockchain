@@ -4,15 +4,15 @@ package header
 
 import (
 	"bytes"
-	crand "crypto/rand"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-crypto/bls"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -53,6 +53,25 @@ func New() Header {
 		Step:      uint8(0),
 		BlockHash: make([]byte, 32),
 	}
+}
+
+// Copy complies with the Safe interface
+func (h Header) Copy() payload.Safe {
+	hdr := Header{
+		Round: h.Round,
+		Step:  h.Step,
+	}
+
+	if h.BlockHash != nil {
+		hdr.BlockHash = make([]byte, len(h.BlockHash))
+		copy(hdr.BlockHash, h.BlockHash)
+	}
+
+	if h.PubKeyBLS != nil {
+		hdr.PubKeyBLS = make([]byte, len(h.PubKeyBLS))
+		copy(hdr.PubKeyBLS, h.PubKeyBLS)
+	}
+	return hdr
 }
 
 // State returns the Header struct itself. It is mandate by the
@@ -104,7 +123,7 @@ func (h Header) String() string {
 	_, _ = sb.WriteString(fmt.Sprintf("round='%d' step='%d'", h.Round, h.Step))
 	_, _ = sb.WriteString(" sender='")
 	_, _ = sb.WriteString(util.StringifyBytes(h.PubKeyBLS))
-	_, _ = sb.WriteString("' block hash='")
+	_, _ = sb.WriteString("' block_hash='")
 	_, _ = sb.WriteString(util.StringifyBytes(h.BlockHash))
 	_, _ = sb.WriteString("'")
 	return sb.String()
@@ -208,14 +227,16 @@ func Mock() Header {
 	k, _ := key.NewRandKeys()
 	pubkey := k.BLSPubKeyBytes
 	buf := make([]byte, 8)
-	_, _ = crand.Read(buf)
+	_, _ = rand.Read(buf)
 	round := binary.LittleEndian.Uint64(buf)
-	step := rand.Intn(8)
+
+	step := []byte{0}
+	_, _ = rand.Reader.Read(step)
 
 	return Header{
 		BlockHash: hash,
 		Round:     round,
-		Step:      uint8(step),
+		Step:      step[0],
 		PubKeyBLS: pubkey,
 	}
 }

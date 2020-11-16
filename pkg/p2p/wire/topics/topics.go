@@ -18,19 +18,13 @@ const (
 	Pong
 
 	// Data exchange topics
-	Addr
-	GetAddr
 	GetData
 	GetBlocks
-	GetHeaders
 	Tx
 	Block
 	AcceptedBlock
-	Headers
 	MemPool
 	Inv
-	Certificate
-	RoundResults
 
 	// Gossiped topics
 	Candidate
@@ -42,35 +36,20 @@ const (
 	Gossip
 
 	// Error topics
-	NotFound
 	Unknown
 	Reject
 
 	//Internal
-	Initialization
-	RoundUpdate
-	BestScore
 	Quit
 	Log
 	Monitor
 	Test
-	StepVotes
-	ScoreEvent
-	Generation
-	Restart
-	StopConsensus
-	IntermediateBlock
-	HighestSeen
-	ValidCandidateHash
 
 	// RPCBus topics
-	GetLastBlock
 	GetMempoolTxs
 	GetMempoolTxsBySize
-	VerifyCandidateBlock
-	GetLastCertificate
 	SendMempoolTx
-	ValidateStateTransition
+	VerifyStateTransition
 	ExecuteStateTransition
 
 	// Cross-process RPCBus topics
@@ -95,7 +74,6 @@ const (
 	StopProfile
 
 	// Cross-network RPCBus topics
-	GetRoundResults
 	GetCandidate
 
 	// Monitoring topics
@@ -119,49 +97,28 @@ var Topics = [...]topicBuf{
 	{VerAck, *(bytes.NewBuffer([]byte{byte(VerAck)})), "verack"},
 	{Ping, *(bytes.NewBuffer([]byte{byte(Ping)})), "ping"},
 	{Pong, *(bytes.NewBuffer([]byte{byte(Pong)})), "pong"},
-	{Addr, *(bytes.NewBuffer([]byte{byte(Addr)})), "addr"},
-	{GetAddr, *(bytes.NewBuffer([]byte{byte(GetAddr)})), "getaddr"},
 	{GetData, *(bytes.NewBuffer([]byte{byte(GetData)})), "getdata"},
 	{GetBlocks, *(bytes.NewBuffer([]byte{byte(GetBlocks)})), "getblocks"},
-	{GetHeaders, *(bytes.NewBuffer([]byte{byte(GetHeaders)})), "getheaders"},
 	{Tx, *(bytes.NewBuffer([]byte{byte(Tx)})), "tx"},
 	{Block, *(bytes.NewBuffer([]byte{byte(Block)})), "block"},
 	{AcceptedBlock, *(bytes.NewBuffer([]byte{byte(AcceptedBlock)})), "acceptedblock"},
-	{Headers, *(bytes.NewBuffer([]byte{byte(Headers)})), "headers"},
 	{MemPool, *(bytes.NewBuffer([]byte{byte(MemPool)})), "mempool"},
 	{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
-	{Certificate, *(bytes.NewBuffer([]byte{byte(Certificate)})), "certificate"},
-	{RoundResults, *(bytes.NewBuffer([]byte{byte(RoundResults)})), "roundresults"},
 	{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
 	{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
 	{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
 	{Agreement, *(bytes.NewBuffer([]byte{byte(Agreement)})), "agreement"},
 	{Gossip, *(bytes.NewBuffer([]byte{byte(Gossip)})), "gossip"},
-	{NotFound, *(bytes.NewBuffer([]byte{byte(NotFound)})), "notfound"},
 	{Unknown, *(bytes.NewBuffer([]byte{byte(Unknown)})), "unknown"},
 	{Reject, *(bytes.NewBuffer([]byte{byte(Reject)})), "reject"},
-	{Initialization, *(bytes.NewBuffer([]byte{byte(Initialization)})), "initialization"},
-	{RoundUpdate, *(bytes.NewBuffer([]byte{byte(RoundUpdate)})), "roundupdate"},
-	{BestScore, *(bytes.NewBuffer([]byte{byte(BestScore)})), "bestscore"},
 	{Quit, *(bytes.NewBuffer([]byte{byte(Quit)})), "quit"},
 	{Log, *(bytes.NewBuffer([]byte{byte(Log)})), "log"},
 	{Monitor, *(bytes.NewBuffer([]byte{byte(Log)})), "monitor_topic"},
 	{Test, *(bytes.NewBuffer([]byte{byte(Test)})), "__test"},
-	{StepVotes, *(bytes.NewBuffer([]byte{byte(StepVotes)})), "stepvotes"},
-	{ScoreEvent, *(bytes.NewBuffer([]byte{byte(ScoreEvent)})), "scoreevent"},
-	{Generation, *(bytes.NewBuffer([]byte{byte(Generation)})), "generation"},
-	{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
-	{StopConsensus, *(bytes.NewBuffer([]byte{byte(StopConsensus)})), "stopconsensus"},
-	{IntermediateBlock, *(bytes.NewBuffer([]byte{byte(IntermediateBlock)})), "intermediateblock"},
-	{HighestSeen, *(bytes.NewBuffer([]byte{byte(HighestSeen)})), "highestseen"},
-	{ValidCandidateHash, *(bytes.NewBuffer([]byte{byte(ValidCandidateHash)})), "validcandidatehash"},
-	{GetLastBlock, *(bytes.NewBuffer([]byte{byte(GetLastBlock)})), "getlastblock"},
 	{GetMempoolTxs, *(bytes.NewBuffer([]byte{byte(GetMempoolTxs)})), "getmempooltxs"},
 	{GetMempoolTxsBySize, *(bytes.NewBuffer([]byte{byte(GetMempoolTxsBySize)})), "getmempooltxsbysize"},
-	{VerifyCandidateBlock, *(bytes.NewBuffer([]byte{byte(VerifyCandidateBlock)})), "verifycandidateblock"},
-	{GetLastCertificate, *(bytes.NewBuffer([]byte{byte(GetLastCertificate)})), "getlastcertificate"},
 	{SendMempoolTx, *(bytes.NewBuffer([]byte{byte(SendMempoolTx)})), "sendmempooltx"},
-	{ValidateStateTransition, *(bytes.NewBuffer([]byte{byte(ValidateStateTransition)})), "validatestatetransition"},
+	{VerifyStateTransition, *(bytes.NewBuffer([]byte{byte(VerifyStateTransition)})), "validatestatetransition"},
 	{ExecuteStateTransition, *(bytes.NewBuffer([]byte{byte(ExecuteStateTransition)})), "executestatetransition"},
 	{GetMempoolView, *(bytes.NewBuffer([]byte{byte(GetMempoolView)})), "getmempoolview"},
 	{CreateWallet, *(bytes.NewBuffer([]byte{byte(CreateWallet)})), "createwallet"},
@@ -181,7 +138,6 @@ var Topics = [...]topicBuf{
 	{ClearWalletDatabase, *(bytes.NewBuffer([]byte{byte(ClearWalletDatabase)})), "clearwalletdatabase"},
 	{StartProfile, *(bytes.NewBuffer([]byte{byte(StartProfile)})), "startprofile"},
 	{StopProfile, *(bytes.NewBuffer([]byte{byte(StopProfile)})), "stopprofile"},
-	{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
 	{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 	{SyncProgress, *(bytes.NewBuffer([]byte{byte(SyncProgress)})), "syncprogress"},
 	{Kadcast, *(bytes.NewBuffer([]byte{byte(Kadcast)})), "kadcast"},

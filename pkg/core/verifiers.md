@@ -4,6 +4,5 @@ This package is intended to provide a stateless and standalone execution of a co
 
 Exposed API
 
-* CheckBlock
-* CheckTx
-
+- CheckBlock
+- CheckTx

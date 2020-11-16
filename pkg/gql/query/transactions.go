@@ -3,14 +3,12 @@ package query
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
-	core "github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	core "github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,9 +40,6 @@ type (
 		// non-StandardTx data fields
 		BlockHash []byte
 		Size      int
-
-		// Coinbase Tx fields
-		Score []byte
 	}
 )
 
@@ -52,8 +47,8 @@ type transactions struct {
 }
 
 // newQueryTx constructs query tx data from core tx and block hash
-func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
-
+//nolint
+func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	txID, err := tx.CalculateHash()
 	if err != nil {
 		return queryTx{}, err
@@ -61,39 +56,40 @@ func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
 
 	qd := queryTx{}
 	qd.TxID = txID
-	qd.TxType = tx.StandardTx().TxType
+	qd.TxType = tx.Type()
 
 	qd.Outputs = make([]queryOutput, 0)
-	for _, output := range tx.StandardTx().Outputs {
-		pubkey := output.PubKey.P.Bytes()
-		qd.Outputs = append(qd.Outputs, queryOutput{pubkey})
+	for _, output := range tx.StandardTx().Notes {
+
+		if IsNil(output) {
+			continue
+		}
+
+		qd.Outputs = append(qd.Outputs, queryOutput{output.PkR.Data})
 	}
 
 	qd.Inputs = make([]queryInput, 0)
-	for _, input := range tx.StandardTx().Inputs {
-		keyimage := input.KeyImage.Bytes()
+	for _, input := range tx.StandardTx().Nullifiers {
+		keyimage := input.Data
 		qd.Inputs = append(qd.Inputs, queryInput{keyimage})
 	}
 
 	qd.BlockHash = blockHash
 
-	// Populate Score value if available
-	if tx.Type() == core.CoinbaseType {
-		x, ok := tx.(*core.Coinbase)
-		if ok {
-			qd.Score = x.Score
-		}
-	}
-
 	// Populate marshaling size
 	buf := new(bytes.Buffer)
-	if err := message.MarshalTx(buf, tx); err != nil {
+	if err := core.Marshal(buf, tx); err != nil {
 		return queryTx{}, err
 	}
 
 	qd.Size = buf.Len()
 
 	return qd, nil
+}
+
+// IsNil will check for nil in a output
+func IsNil(output *core.Note) bool {
+	return output.PkR.Data == nil
 }
 
 func (t transactions) getQuery() *graphql.Field {
@@ -189,9 +185,9 @@ func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error)
 	}
 
 	if count >= txsFetchLimit {
-		msg := fmt.Sprintf("requested txs count exceeds the limit of %d", txsFetchLimit)
-		log.Warn(msg)
-
+		msg := "requested txs count exceeds the limit"
+		log.WithField("txsFetchLimit", txsFetchLimit).
+			Warn(msg)
 		return txs, errors.New(msg)
 	}
 

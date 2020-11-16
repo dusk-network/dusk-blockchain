@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -48,24 +48,23 @@ var (
 //
 // Note TestMain must clean up all resources on completion
 func TestMain(m *testing.M) {
-
 	var code int
+
 	// Run on all registered drivers.
 	for _, driverName := range database.Drivers() {
-
 		code = _TestDriver(m, driverName)
 		// the exit code might be needed on proper CI execution
 		if code != 0 {
 			os.Exit(code)
 		}
 	}
+
 	os.Exit(code)
 }
 
 // _TestDriver executes all tests (declared in this file) in the context of a
 // driver specified by driverName
 func _TestDriver(m *testing.M, driverName string) int {
-
 	// Cleanup TestMain iteration context
 	defer func() {
 		blocks = make([]*block.Block, 0)
@@ -111,8 +110,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 
 	// Generate a few blocks to be used as sample objects
 	// Less blocks are used as we have CI out-of-memory error
-	t := &testing.T{}
-	blocks, err = generateChainBlocks(t, 10)
+	blocks, err = generateChainBlocks(10)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -143,9 +141,8 @@ func _TestDriver(m *testing.M, driverName string) int {
 }
 
 func TestStoreBlock(test *testing.T) {
-
 	// Generate additional blocks to store
-	genBlocks, err := generateChainBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -188,7 +185,6 @@ func TestStoreBlock(test *testing.T) {
 	}
 }
 func TestFetchBlockExists(test *testing.T) {
-
 	test.Parallel()
 
 	// Verify all blocks can be found by Header.Hash
@@ -269,7 +265,6 @@ func TestFetchBlockHeader(test *testing.T) {
 	})
 }
 func TestFetchBlockTxs(test *testing.T) {
-
 	test.Parallel()
 
 	// Verify all blocks transactions can be fetched by Header.Hash
@@ -278,7 +273,6 @@ func TestFetchBlockTxs(test *testing.T) {
 
 			// Fetch all transactions that belong to this block
 			fblockTxs, err := t.FetchBlockTxs(block.Header.Hash)
-
 			if err != nil {
 				test.Fatalf(err.Error())
 			}
@@ -298,7 +292,7 @@ func TestFetchBlockTxs(test *testing.T) {
 				// Get bytes of the fetched transactions.Transaction
 				fblockTx := fblockTxs[index]
 				fetchedBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(fetchedBuf, fblockTx)
+				_ = transactions.Marshal(fetchedBuf, fblockTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
@@ -306,7 +300,7 @@ func TestFetchBlockTxs(test *testing.T) {
 
 				// Get bytes of the origin transactions.Transaction to compare with
 				originBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(originBuf, oBlockTx)
+				_ = transactions.Marshal(originBuf, oBlockTx)
 
 				if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
 					return errors.New("transactions.Transaction not retrieved properly from storage")
@@ -356,68 +350,6 @@ func TestFetchBlockHashByHeight(test *testing.T) {
 	})
 }
 
-func TestFetchKeyImageExists(test *testing.T) {
-
-	test.Parallel()
-
-	// Ensure all KeyImages have been stored to the KeyImage "table"
-	err := db.View(func(t database.Transaction) error {
-		for _, block := range blocks {
-			for _, tx := range block.Txs {
-				for _, input := range tx.StandardTx().Inputs {
-
-					if len(input.KeyImage.Bytes()) == 0 {
-						test.Fatal("Testing with empty keyImage")
-					}
-
-					exists, txID, err := t.FetchKeyImageExists(input.KeyImage.Bytes())
-
-					if !exists {
-						test.Fatal("FetchKeyImageExists cannot find keyImage")
-					}
-
-					if txID == nil {
-						test.Fatal("FetchKeyImageExists found keyImage on invalid tx")
-					}
-
-					if err != nil {
-						test.Fatal(err.Error())
-					}
-				}
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err.Error())
-	}
-
-	// Ensure it fails properly when a non-existing KeyImage is checked
-	_ = db.View(func(t database.Transaction) error {
-		invalidKeyImage, _ := crypto.RandEntropy(32)
-
-		if len(invalidKeyImage) == 0 {
-			test.Fatal("Testing with empty KeyImage")
-		}
-
-		exists, txID, err := t.FetchKeyImageExists(invalidKeyImage)
-
-		if exists {
-			test.Fatal("KeyImage is not supposed to be found")
-		}
-
-		if txID != nil {
-			test.Fatal("Invalid TxID for non-existing KeyImage")
-		}
-
-		if err != database.ErrKeyImageNotFound {
-			test.Fatal("ErrKeyImageNotFound is expected when fetching non-existing KeyImage")
-		}
-		return nil
-	})
-}
-
 // TestAtomicUpdates ensures no change is applied into storage state when DB
 // writable tx does fail
 func TestAtomicUpdates(test *testing.T) {
@@ -426,7 +358,7 @@ func TestAtomicUpdates(test *testing.T) {
 	// That said, no parallelism should be applied.
 	// test.Parallel()
 
-	genBlocks := generateRandomBlocks(test, 2)
+	genBlocks := generateRandomBlocks(2)
 
 	// Save current storage state to compare later
 	// Supported only in heavy.DB for now
@@ -556,7 +488,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	}()
 
 	// Initialize db and a slice of 10 blocks with 2 transactions.Transaction each
-	genBlocks, err := generateChainBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -609,23 +541,19 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 }
 
 func TestFetchBlockTxByHash(test *testing.T) {
-
 	test.Parallel()
 
 	var maxTxToFetch uint16 = 30
-
 	done := false
 
 	// Ensure we can fetch one by one each transaction by its TxID without
 	// providing block.header.hash
 	err := db.View(func(t database.Transaction) error {
-		for _, block := range blocks {
-			for txIndex, originTx := range block.Txs {
-
+		for _, blk := range blocks {
+			for txIndex, originTx := range blk.Txs {
 				// FetchBlockTxByHash
 				txID, _ := originTx.CalculateHash()
 				fetchedTx, fetchedIndex, _, err := t.FetchBlockTxByHash(txID)
-
 				if err != nil {
 					test.Fatal(err.Error())
 				}
@@ -641,14 +569,14 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 
 				fetchedBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(fetchedBuf, fetchedTx)
+				_ = transactions.Marshal(fetchedBuf, fetchedTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
 				}
 
 				originBuf := new(bytes.Buffer)
-				_ = message.MarshalTx(originBuf, originTx)
+				_ = transactions.Marshal(originBuf, originTx)
 
 				if !bytes.Equal(fetchedBuf.Bytes(), originBuf.Bytes()) {
 					test.Fatal("Invalid tx fetched")
@@ -663,6 +591,7 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 			}
 		}
+
 		return nil
 	})
 
@@ -693,6 +622,7 @@ func TestFetchBlockTxByHash(test *testing.T) {
 		if tx != nil || fetchedBlockHash != nil {
 			test.Fatal("Found non-existing tx?")
 		}
+
 		return nil
 	})
 }
@@ -726,165 +656,57 @@ func TestClearDatabase(test *testing.T) {
 	}
 }
 
-func TestFetchOutputExists(test *testing.T) {
-	test.Parallel()
-
-	err := db.View(func(t database.Transaction) error {
-		for _, block := range blocks {
-			for _, tx := range block.Txs {
-				for _, output := range tx.StandardTx().Outputs {
-					exists, err := t.FetchOutputExists(output.PubKey.P.Bytes())
-					if err != nil {
-						return err
-					}
-
-					if !exists {
-						test.Fatal("output key missing")
-					}
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err)
-	}
-}
-
-func TestFetchOutputUnlockHeight(test *testing.T) {
-	test.Parallel()
-
-	err := db.View(func(t database.Transaction) error {
-		for _, block := range blocks {
-			for _, tx := range block.Txs {
-				for i, output := range tx.StandardTx().Outputs {
-					unlockHeight, err := t.FetchOutputUnlockHeight(output.PubKey.P.Bytes())
-					if err != nil {
-						return err
-					}
-
-					// If it's a bid or a stake, the unlockheight should
-					// be non-zero for the first output
-					if i == 0 && (tx.Type() == transactions.BidType || tx.Type() == transactions.StakeType) {
-						if unlockHeight == 0 {
-							test.Fatal("found bid or stake with 0 unlockheight")
-						}
-					}
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err)
-	}
-}
-
-func TestFetchDecoys(test *testing.T) {
-	test.Parallel()
-
-	// 7 is the standard number of decoys
-	numDecoys := 7
-	hits := 0
-	err := db.View(func(t database.Transaction) error {
-		decoys := t.FetchDecoys(numDecoys)
-		// We should have at least 90 txs in our database, so plenty of
-		// decoys to choose from, and under no circumstance should we
-		// come up short.
-		if len(decoys) != numDecoys {
-			return errors.New("did not receive requested amount of decoys")
-		}
-
-		currentHeight, err := t.FetchCurrentHeight()
-		if err != nil {
-			return err
-		}
-
-		// Make sure these decoy points belong to transactions in
-		// our db, which are unlocked.
-		for _, decoy := range decoys {
-			// Make sure it's a real output
-			exists, err := t.FetchOutputExists(decoy.Bytes())
-			if err != nil {
-				return err
-			}
-
-			if !exists {
-				return errors.New("fetched a decoy for which there is no output entry")
-			}
-
-			unlockHeight, err := t.FetchOutputUnlockHeight(decoy.Bytes())
-			if err != nil {
-				return err
-			}
-
-			// Unlock height should be equal to or lower than the current
-			// height for it to be considered unlocked.
-			if unlockHeight <= currentHeight {
-				hits++
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err)
-	}
-
-	if hits != numDecoys {
-		test.Fatalf("incorrect amount of hits - %v/%v", hits, numDecoys)
-	}
-}
-
 func TestStoreFetchBidValues(test *testing.T) {
 	test.Parallel()
 
 	d1, _ := crypto.RandEntropy(32)
 	k1, _ := crypto.RandEntropy(32)
+	idx1Bytes, _ := crypto.RandEntropy(8)
+	idx1 := binary.LittleEndian.Uint64(idx1Bytes)
+
 	d2, _ := crypto.RandEntropy(32)
 	k2, _ := crypto.RandEntropy(32)
+	idx2Bytes, _ := crypto.RandEntropy(8)
+	idx2 := binary.LittleEndian.Uint64(idx2Bytes)
 
 	// Store bid values at different heights
 	assert.NoError(test, db.Update(func(t database.Transaction) error {
-		if err := t.StoreBidValues(d1, k1, 1000); err != nil {
+		if err := t.StoreBidValues(d1, k1, idx1, 1000); err != nil {
 			return err
 		}
 
-		return t.StoreBidValues(d2, k2, 2000)
+		return t.StoreBidValues(d2, k2, idx2, 2000)
 	}))
 
 	// Fetching bid values should give us d1 and k1 right now
 	assert.NoError(test, db.View(func(t database.Transaction) error {
-		d, k, err := t.FetchBidValues()
+		d, k, index, err := t.FetchBidValues()
 		if err != nil {
 			return err
 		}
 
 		assert.Equal(test, d1, d)
 		assert.Equal(test, k1, k)
+		assert.Equal(test, idx1, index)
 		return nil
 	}))
 
 	// Update state to after 1000
-	blk := helper.RandomBlock(test, 1200, 1)
+	blk := helper.RandomBlock(1200, 1)
 	assert.NoError(test, db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(blk)
 	}))
 
 	// Fetching bid values now should give us d2 and k2
 	assert.NoError(test, db.View(func(t database.Transaction) error {
-		d, k, err := t.FetchBidValues()
+		d, k, EdPk, err := t.FetchBidValues()
 		if err != nil {
 			return err
 		}
 
 		assert.Equal(test, d2, d)
 		assert.Equal(test, k2, k)
+		assert.Equal(test, idx2, EdPk)
 		return nil
 	}))
 }

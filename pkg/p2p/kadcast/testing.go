@@ -64,8 +64,7 @@ type Node struct {
 	Duplicated bool
 }
 
-func (n *Node) onAcceptBlock(m message.Message) error {
-
+func (n *Node) onAcceptBlock(m message.Message) {
 	n.Lock.Lock()
 	defer n.Lock.Unlock()
 
@@ -89,8 +88,6 @@ func (n *Node) onAcceptBlock(m message.Message) error {
 
 	repropagateMsg := message.NewWithHeader(topics.Block, *buf, m.Header())
 	n.EventBus.Publish(topics.Kadcast, repropagateMsg)
-
-	return nil
 }
 
 func newKadcastNode(r *RoutingTable, eb *eventbus.EventBus) *Node {

@@ -5,11 +5,15 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
 	log "github.com/sirupsen/logrus"
 )
+
+// DUSK is one whole unit of DUSK. This is duplicated from wallet since
+// otherwise we get into an import cycle including the transactions and users
+// packages
+const DUSK = uint64(100000000)
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain
 // point in the consensus. The set is sorted by the int value of the public key in
@@ -62,7 +66,7 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 
 // CreateVotingCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step and round.
-// FIXME: running this with weird setup causes infinite looping (to reproduce, hardcode `3` on MockProvisioners when calling agreement.NewHelper in the agreement tests)
+// TODO: running this with weird setup causes infinite looping (to reproduce, hardcode `3` on MockProvisioners when calling agreement.NewHelper in the agreement tests)
 func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) VotingCommittee {
 	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(p.TotalWeight())
@@ -94,18 +98,18 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 			break
 		}
 
-		hash, err := createSortitionHash(round, step, i)
+		hashSort, err := createSortitionHash(round, step, i)
 		if err != nil {
 			log.Panic(err)
 		}
 
-		score := generateSortitionScore(hash, W)
+		score := generateSortitionScore(hashSort, W)
 		blsPk := p.extractCommitteeMember(score)
 		votingCommittee.Insert(blsPk)
 
 		// Subtract up to one DUSK from the extracted committee member.
 		m := p.GetMember(blsPk)
-		subtracted := m.SubtractFromStake(1 * wallet.DUSK)
+		subtracted := m.SubtractFromStake(1 * DUSK)
 
 		// Also subtract the subtracted amount from the total weight, to ensure
 		// consistency.
@@ -125,7 +129,9 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 		if m, e = p.MemberAt(i); e != nil {
 			// handling the eventuality of an out of bound error
 			m, e = p.MemberAt(0)
+			i = 0
 			if e != nil {
+				//FIXME: shall this panic ?
 				log.Panic(e)
 			}
 		}

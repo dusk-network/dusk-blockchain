@@ -1,392 +1,369 @@
 package transactor
 
 import (
-	"bytes"
+	"context"
+	"crypto/rand"
 	"errors"
-	"fmt"
 	"os"
 	"time"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	logger "github.com/sirupsen/logrus"
 )
 
 var (
-	log = logger.WithFields(logger.Fields{"prefix": "transactor"})
+	log = logger.WithField("prefix", "transactor") //nolint
 
-	errWalletNotLoaded     = errors.New("wallet is not loaded yet")
-	errWalletAlreadyLoaded = errors.New("wallet is already loaded")
+	errWalletNotLoaded     = errors.New("wallet is not loaded yet") //nolint
+	errWalletAlreadyLoaded = errors.New("wallet is already loaded") //nolint
 )
 
-func loadResponse(pubKey []byte) *node.LoadResponse {
-	pk := &node.PubKey{PublicKey: pubKey}
-	return &node.LoadResponse{Key: pk}
-}
-
-// Listen to Wallet requests
-func (t *Transactor) Listen() {
-	for {
-		select {
-
-		// Wallet requests to respond to
-		case r := <-t.createWalletChan:
-			handleRequest(r, t.handleCreateWallet, "CreateWallet")
-		case r := <-t.createFromSeedChan:
-			handleRequest(r, t.handleCreateFromSeed, "CreateWalletFromSeed")
-		case r := <-t.loadWalletChan:
-			handleRequest(r, t.handleLoadWallet, "LoadWallet")
-		case r := <-t.automateConsensusTxsChan:
-			handleRequest(r, t.handleAutomateConsensusTxs, "AutomateConsensusTxs")
-		case r := <-t.clearWalletDatabaseChan:
-			handleRequest(r, t.handleClearWalletDatabase, "ClearWalletDatabase")
-
-		// Transaction requests to respond to
-		case r := <-t.sendBidTxChan:
-			handleRequest(r, t.handleSendBidTx, "BidTx")
-		case r := <-t.sendStakeTxChan:
-			handleRequest(r, t.handleSendStakeTx, "StakeTx")
-		case r := <-t.sendStandardTxChan:
-			handleRequest(r, t.handleSendStandardTx, "StandardTx")
-
-		// Information requests to respond to
-		case r := <-t.getBalanceChan:
-			handleRequest(r, t.handleBalance, "Balance")
-		case r := <-t.getUnconfirmedBalanceChan:
-			handleRequest(r, t.handleUnconfirmedBalance, "UnconfirmedBalance")
-		case r := <-t.getAddressChan:
-			handleRequest(r, t.handleAddress, "Address")
-		case r := <-t.getTxHistoryChan:
-			handleRequest(r, t.handleGetTxHistory, "GetTxHistory")
-		case r := <-t.isWalletLoadedChan:
-			handleRequest(r, t.handleIsWalletLoaded, "IsWalletLoaded")
-
-		// Event list to handle
-		case b := <-t.acceptedBlockChan:
-			t.onAcceptedBlockEvent(b)
-		}
-	}
-}
-
-func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) error, name string) {
-
-	log.Infof("Handling %s request", name)
-
-	if err := handler(r); err != nil {
-		log.Errorf("Failed %s request: %v", name, err)
-		r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: err}
-		return
+func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResponse, error) {
+	//return err if user sends no seed
+	if len(req.Seed) < 64 {
+		return nil, errors.New("seed must be at least 64 bytes in size")
 	}
 
-	log.Infof("Handled %s request", name)
-	r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}}
-}
-
-func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
-	if t.w != nil {
-		return errWalletAlreadyLoaded
-	}
-
-	req := r.Params.(*node.CreateRequest)
-
-	pubKey, err := t.createWallet(req.Password)
-	if err != nil {
-		return err
-	}
-
-	t.launchConsensus()
-
-	r.RespChan <- rpcbus.Response{Resp: loadResponse([]byte(pubKey)), Err: nil}
-
-	return nil
-}
-
-func (t *Transactor) handleAddress(r rpcbus.Request) error {
-	if t.w == nil {
-		return errWalletNotLoaded
-	}
-
-	addr, err := t.w.PublicAddress()
-	if err != nil {
-		return err
-	}
-
-	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(addr)}}
-	r.RespChan <- rpcbus.Response{Resp: resp, Err: nil}
-	return nil
-}
-
-func (t *Transactor) handleGetTxHistory(r rpcbus.Request) error {
-	if t.w == nil {
-		return errWalletNotLoaded
-	}
-
-	records, err := t.w.FetchTxHistory()
-	if err != nil {
-		return err
-	}
-
-	resp := &node.TxHistoryResponse{Records: make([]*node.TxRecord, len(records))}
-	for i, record := range records {
-		resp.Records[i] = &node.TxRecord{
-			Direction:    node.Direction(record.Direction),
-			Timestamp:    record.Timestamp,
-			Height:       record.Height,
-			Type:         node.TxType(record.TxType),
-			Amount:       record.Amount,
-			UnlockHeight: record.UnlockHeight,
-		}
-	}
-
-	r.RespChan <- rpcbus.Response{Resp: resp, Err: nil}
-	return nil
-}
-
-func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
-	if t.w != nil {
-		return errWalletAlreadyLoaded
-	}
-
-	req := r.Params.(*node.LoadRequest)
-	pubKey, err := t.loadWallet(req.Password)
-	if err != nil {
-		return err
-	}
-
-	// Sync with genesis if this is a new wallet
-	if _, err := t.w.GetSavedHeight(); err != nil {
-		_ = t.w.UpdateWalletHeight(0)
-		b := cfg.DecodeGenesis()
-		// call wallet.CheckBlock
-		if _, _, err := t.w.CheckWireBlock(*b); err != nil {
-			return fmt.Errorf("error checking block: %v", err)
-		}
-	}
-
-	t.launchConsensus()
-	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}
-	r.RespChan <- rpcbus.Response{Resp: resp, Err: nil}
-
-	return nil
-}
-
-func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
-	if t.w != nil {
-		return errWalletAlreadyLoaded
-	}
-
-	req := r.Params.(*node.CreateRequest)
-	pubKey, err := t.createFromSeed(string(req.Seed), req.Password)
-	if err != nil {
-		return err
-	}
-
-	t.launchConsensus()
-
-	r.RespChan <- rpcbus.Response{Resp: &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}, Err: nil}
-
-	return nil
-}
-
-func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
-	if t.w == nil {
-		return errWalletNotLoaded
-	}
-
-	req := r.Params.(*node.ConsensusTxRequest)
-	// create and sign transaction
-	log.Tracef("Create a bid tx (%d,%d)", req.Amount, req.LockTime)
-
-	tx, err := t.CreateBidTx(req.Amount, req.LockTime)
-	if err != nil {
-		return err
-	}
-
-	//  Publish transaction to the mempool processing
-	txid, err := t.publishTx(tx)
-	if err != nil {
-		return err
-	}
-
-	// Save relevant values in the database for the generation component to use
-	if err := t.writeBidValues(tx); err != nil {
-		return err
-	}
-
-	r.RespChan <- rpcbus.Response{Resp: &node.TransferResponse{Hash: txid}, Err: nil}
-	return nil
-}
-
-func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
-
-	if t.w == nil {
-		return errWalletNotLoaded
-	}
-
-	req := r.Params.(*node.ConsensusTxRequest)
-	// create and sign transaction
-	log.Tracef("Create a stake tx (%d,%d)", req.Amount, req.LockTime)
-
-	tx, err := t.CreateStakeTx(req.Amount, req.LockTime)
-	if err != nil {
-		return err
-	}
-
-	//  Publish transaction to the mempool processing
-	txid, err := t.publishTx(tx)
-	if err != nil {
-		return err
-	}
-
-	r.RespChan <- rpcbus.Response{Resp: &node.TransferResponse{Hash: txid}, Err: nil}
-
-	return nil
-}
-
-func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
-
-	if t.w == nil {
-		return errWalletNotLoaded
-	}
-
-	req := r.Params.(*node.TransferRequest)
-	// create and sign transaction
-	log.Tracef("Create a standard tx (%d,%s)", req.Amount, string(req.Address))
-
-	tx, err := t.CreateStandardTx(req.Amount, string(req.Address))
-	if err != nil {
-		return err
-	}
-
-	//  Publish transaction to the mempool processing
-	txid, err := t.publishTx(tx)
-	if err != nil {
-		return err
-	}
-
-	r.RespChan <- rpcbus.Response{Resp: &node.TransferResponse{Hash: txid}, Err: nil}
-
-	return nil
-}
-
-func (t *Transactor) handleBalance(r rpcbus.Request) error {
-
-	if t.w == nil {
-		return errWalletNotLoaded
-	}
-
-	unlockedBalance, lockedBalance, err := t.Balance()
-	if err != nil {
-		return err
-	}
-
-	log.Tracef("wallet balance: %d, mempool balance: %d", unlockedBalance, lockedBalance)
-
-	r.RespChan <- rpcbus.Response{Resp: &node.BalanceResponse{UnlockedBalance: unlockedBalance, LockedBalance: lockedBalance}, Err: nil}
-	return nil
-}
-
-func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
-	if t.w == nil {
-		return errWalletNotLoaded
-	}
-
-	// Retrieve mempool txs
-	resp, err := t.rb.Call(topics.GetMempoolTxs, rpcbus.Request{Params: bytes.Buffer{}, RespChan: make(chan rpcbus.Response, 1)}, 2*time.Second)
-	if err != nil {
-		return err
-	}
-	txs := resp.([]transactions.Transaction)
-
-	unconfirmedBalance, err := t.w.CheckUnconfirmedBalance(txs)
-	if err != nil {
-		return err
-	}
-
-	log.Tracef("unconfirmed wallet balance: %d", unconfirmedBalance)
-
-	r.RespChan <- rpcbus.Response{Resp: &node.BalanceResponse{UnlockedBalance: unconfirmedBalance}, Err: nil}
-	return nil
-}
-
-func (t *Transactor) handleAutomateConsensusTxs(r rpcbus.Request) error {
-	if err := t.launchMaintainer(); err != nil {
-		return err
-	}
-
-	r.RespChan <- rpcbus.Response{Resp: &node.GenericResponse{Response: "Consensus transactions are now being automated."}, Err: nil}
-	return nil
-}
-
-func (t *Transactor) handleClearWalletDatabase(r rpcbus.Request) error {
-	if t.w == nil {
-		if err := os.RemoveAll(cfg.Get().Wallet.Store); err != nil {
-			return err
-		}
-
-		r.RespChan <- rpcbus.Response{Resp: &node.GenericResponse{Response: "Wallet database deleted."}, Err: nil}
-		return nil
-	}
-
-	if err := t.w.ClearDatabase(); err != nil {
-		return err
-	}
-
-	r.RespChan <- rpcbus.Response{Resp: &node.GenericResponse{Response: "Wallet database deleted."}, Err: nil}
-	return nil
-}
-
-func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
-	r.RespChan <- rpcbus.Response{Resp: &node.WalletStatusResponse{Loaded: t.w != nil}, Err: nil}
-	return nil
-}
-
-func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
-	hash, err := tx.CalculateHash()
-	if err != nil {
-		// If we found a valid bid tx, we should under no circumstance have issues marshaling it
-		return nil, fmt.Errorf("error encoding transaction: %v", err)
-	}
-
-	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.Request{Params: tx, RespChan: make(chan rpcbus.Response, 1)}, 0)
+	//create wallet with seed and pass
+	err := t.createWallet(nil, req.Password)
 	if err != nil {
 		return nil, err
 	}
 
-	return hash, nil
+	t.launchConsensus()
+
+	return loadResponseFromPub(t.w.PublicKey), nil
 }
 
-//nolint:unparam
-func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
+func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
+	// sk := t.w.SecretKey
+	/*
+		if sk.IsEmpty() {
+			return nil, errors.New("SecretKey is not set")
+		}
+	*/
+
+	return loadResponseFromPub(t.w.PublicKey), nil
+}
+
+func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
 	if t.w == nil {
-		return
+		return nil, errWalletNotLoaded
 	}
 
-	if err := t.syncWallet(); err != nil {
-		log.Tracef("syncing failed with err: %v", err)
+	records, err := t.w.FetchTxHistory()
+	if err != nil {
+		return nil, err
 	}
+
+	resp := &node.TxHistoryResponse{Records: []*node.TxRecord{}}
+
+	for i, record := range records {
+		view := record.View()
+		resp.Records[i] = &node.TxRecord{
+			Height:       view.Height,
+			Timestamp:    view.Timestamp,
+			Direction:    node.Direction(view.Direction),
+			Type:         node.TxType(int32(view.Type)),
+			Amount:       view.Amount,
+			Fee:          view.Fee,
+			UnlockHeight: view.Timelock,
+			Hash:         view.Hash,
+			Data:         view.Data,
+			Obfuscated:   view.Obfuscated,
+		}
+	}
+
+	return resp, nil
 }
 
-func (t *Transactor) launchConsensus() {
-	if !t.walletOnly {
-		log.Tracef("Launch consensus")
-		go initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
+func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse, error) {
+	if t.w != nil {
+		return nil, errWalletAlreadyLoaded
 	}
+
+	pubKey, err := t.loadWallet(req.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	t.launchConsensus()
+
+	return loadResponseFromPub(pubKey), nil
 }
 
-func (t *Transactor) writeBidValues(tx transactions.Transaction) error {
-	return t.db.Update(func(tr database.Transaction) error {
-		k, err := t.w.ReconstructK()
+func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadResponse, error) {
+	if t.w != nil {
+		return nil, errWalletAlreadyLoaded
+	}
+
+	err := t.createWallet(req.Seed, req.Password)
+
+	t.launchConsensus()
+
+	return loadResponseFromPub(t.w.PublicKey), err
+}
+
+func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionResponse, error) {
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
+
+	// create and sign transaction
+	log.
+		WithField("amount", req.Amount).
+		WithField("locktime", req.Locktime).
+		Tracef("Creating a bid tx")
+
+	// TODO context should be created from the parent one
+	ctx := context.Background()
+
+	// FIXME: 476 - here we need to create K, EdPk; retrieve seed somehow and decide
+	// an ExpirationHeight (most likely the last 2 should be retrieved from he DB)
+	// Create the Ed25519 Keypair
+	// XXX: We need to get the proper values, and not just make some up out of thin air.
+	k := &common.BlsScalar{Data: make([]byte, 32)}
+	if _, err := rand.Read(k.Data); err != nil {
+		return nil, err
+	}
+
+	secret := &common.JubJubCompressed{Data: make([]byte, 32)}
+	if _, err := rand.Read(secret.Data); err != nil {
+		return nil, err
+	}
+
+	pkR := &keys.StealthAddress{
+		RG: &common.JubJubCompressed{
+			Data: make([]byte, 32),
+		},
+		PkR: &common.JubJubCompressed{
+			Data: make([]byte, 32),
+		},
+	}
+	if _, err := rand.Read(pkR.RG.Data); err != nil {
+		return nil, err
+	}
+	if _, err := rand.Read(pkR.PkR.Data); err != nil {
+		return nil, err
+	}
+
+	seed := &common.BlsScalar{Data: make([]byte, 32)}
+	if _, err := rand.Read(seed.Data); err != nil {
+		return nil, err
+	}
+
+	tx, err := t.proxy.Provider().NewBid(ctx, k, req.Amount, secret, pkR, seed, 0, 0)
+	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendBidTx, failed to create NewBidTx")
+		return nil, err
+	}
+
+	// TODO: store the K and D in storage for the block generator
+
+	hash, err := t.publishTx(tx.Tx)
+	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendBidTx, failed to create publishTx")
+		return nil, err
+	}
+
+	return &node.TransactionResponse{Hash: hash}, nil
+}
+
+func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.TransactionResponse, error) {
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
+
+	// create and sign transaction
+	log.
+		WithField("amount", req.Amount).
+		WithField("locktime", req.Locktime).
+		Tracef("Creating a stake tx")
+
+	blsKey := t.w.Keys().BLSPubKey
+	if blsKey == nil {
+		return nil, errWalletNotLoaded
+	}
+
+	// TODO: use a parent context
+	ctx := context.Background()
+	// FIXME: 476 - we should calculate the expirationHeight somehow (by asking
+	// the chain for the last block through the RPC bus and calculating the
+	// height)
+	tx, err := t.proxy.Provider().NewStake(ctx, blsKey.Marshal(), req.Amount)
+	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendStakeTx, failed to create NewStakeTx")
+		return nil, err
+	}
+
+	hash, err := t.publishTx(tx)
+	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Error("handleSendStakeTx, failed to create publishTx")
+		return nil, err
+	}
+
+	return &node.TransactionResponse{Hash: hash}, nil
+}
+
+func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.TransactionResponse, error) {
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
+
+	// create and sign transaction
+	log.
+		WithField("amount", req.Amount).
+		WithField("address", string(req.Address)).
+		Tracef("Create a standard tx")
+
+	ctx := context.Background()
+
+	pb, err := DecodeAddressToPublicKey(req.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := t.proxy.Provider().NewTransfer(ctx, req.Amount, pb)
+	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("address", string(req.Address)).
+			Error("handleSendStandardTx, failed to create NewTransactionTx")
+		return nil, err
+	}
+
+	// Publish transaction to the mempool processing
+	hash, err := t.publishTx(tx)
+	if err != nil {
+		log.
+			WithField("amount", req.Amount).
+			WithField("address", string(req.Address)).
+			Error("handleSendStandardTx, failed to create publishTx")
+		return nil, err
+	}
+
+	return &node.TransactionResponse{Hash: hash}, nil
+}
+
+func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
+
+	// NOTE: maybe we will separate the locked and unlocked balances
+	// This call should be updated in that case
+	ctx := context.Background()
+	balance, err := t.proxy.Provider().GetBalance(ctx, t.w.ViewKey)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Tracef("wallet balance: %d, mempool balance: %d", balance, 0)
+
+	return &node.BalanceResponse{UnlockedBalance: balance, LockedBalance: 0}, nil
+}
+
+func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) {
+	if t.w == nil {
+		if err := os.RemoveAll(cfg.Get().Wallet.Store); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := t.w.ClearDatabase(); err != nil {
+		return nil, err
+	}
+	return &node.GenericResponse{Response: "Wallet database deleted."}, nil
+}
+
+func (t *Transactor) handleIsWalletLoaded() (*node.WalletStatusResponse, error) {
+	isLoaded := false
+	if t.w != nil /*&& !t.w.SecretKey.IsEmpty() */ {
+		isLoaded = true
+	}
+	return &node.WalletStatusResponse{Loaded: isLoaded}, nil
+}
+
+func (t *Transactor) publishTx(tx transactions.ContractCall) ([]byte, error) {
+	hash, err := tx.CalculateHash()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 2*time.Second)
+	return hash, err
+}
+
+func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.TransactionResponse, error) {
+	/*
+		ctx := context.Background()
+
+		pb, err := DecodeAddressToPublicKey(c.Address)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		return tr.StoreBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes(), tx.LockTime())
-	})
+		txReq := transactions.MakeTxRequest(t.w.SecretKey, pb, uint64(0), c.Fee, true)
+		tx, err := t.proxy.Provider().NewContractCall(ctx, c.Data, txReq)
+		if err != nil {
+			return nil, err
+		}
+
+		// Publish transaction to the mempool processing
+		hash, err := t.publishTx(tx)
+		if err != nil {
+			return nil, err
+		}
+	*/
+
+	return nil, nil
+}
+
+func loadResponseFromPub(pubKey keys.PublicKey) *node.LoadResponse {
+	pk := &node.PubKey{PublicKey: pubKey.ToAddr()}
+	return &node.LoadResponse{Key: pk}
+}
+
+//nolint:unused
+func (t *Transactor) launchConsensus() {
+	log.Tracef("Launch consensus")
+	keys := t.w.Keys()
+	go func() {
+		if err := t.setupConsensus(t.w.PublicKey, keys); err != nil {
+			log.WithError(err).Errorln("error setting up consensus")
+		}
+	}()
+}
+
+//nolint:unused
+func (t *Transactor) writeBidValues(tx *node.TransactionResponse) error {
+	// return t.db.Update(func(tr database.Transaction) error {
+	// 	k, err := t.w.ReconstructK()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	return tr.StoreBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes(), tx.LockTime())
+	// })
+	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 )
@@ -23,14 +22,13 @@ type DBLoader struct {
 
 	// Unsure if the genesis block needs to be here
 	genesis *block.Block
-
-	// Output prefetched data
-	chainTip *block.Block
 }
 
-// CheckBlock will verify whether a block is valid according to the rules of the consensus
-// returns nil if a block is valid
-func (l *DBLoader) CheckBlock(prevBlock block.Block, blk block.Block) error {
+// SanityCheckBlock will verify whether we have not seed the block before
+// (duplicate), perform a check on the block header and verifies the coinbase
+// transactions. It leaves the bulk of transaction verification to the executor
+// Return nil if the sanity check passes
+func (l *DBLoader) SanityCheckBlock(prevBlock block.Block, blk block.Block) error {
 	// 1. Check that we have not seen this block before
 	err := l.db.View(func(t database.Transaction) error {
 		_, err := t.FetchBlockExists(blk.Header.Hash)
@@ -52,15 +50,6 @@ func (l *DBLoader) CheckBlock(prevBlock block.Block, blk block.Block) error {
 		return err
 	}
 
-	for i, merklePayload := range blk.Txs {
-		tx, ok := merklePayload.(transactions.Transaction)
-		if !ok {
-			return errors.New("tx does not implement the transaction interface")
-		}
-		if err := verifiers.CheckTx(l.db, uint64(i), uint64(blk.Header.Timestamp), tx); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -193,33 +182,33 @@ func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmou
 func (l *DBLoader) LoadTip() (*block.Block, error) {
 	var tip *block.Block
 	err := l.db.Update(func(t database.Transaction) error {
-
 		s, err := t.FetchState()
 		if err != nil {
 			// TODO: maybe log the error here and diversify between empty
 			// results and actual errors
 
 			// Store Genesis Block, if a modern node runs
-			err := t.StoreBlock(l.genesis)
+			err = t.StoreBlock(l.genesis)
 			if err != nil {
 				return err
 			}
 			tip = l.genesis
 
-		} else {
-			// Reconstruct chain tip
-			h, err := t.FetchBlockHeader(s.TipHash)
-			if err != nil {
-				return err
-			}
-
-			txs, err := t.FetchBlockTxs(s.TipHash)
-			if err != nil {
-				return err
-			}
-
-			tip = &block.Block{Header: h, Txs: txs}
+			return nil
 		}
+
+		// Reconstruct chain tip
+		h, err := t.FetchBlockHeader(s.TipHash)
+		if err != nil {
+			return err
+		}
+
+		txs, err := t.FetchBlockTxs(s.TipHash)
+		if err != nil {
+			return err
+		}
+
+		tip = &block.Block{Header: h, Txs: txs}
 		return nil
 	})
 
@@ -247,6 +236,5 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 		return nil, err
 	}
 
-	l.chainTip = tip
 	return tip, nil
 }

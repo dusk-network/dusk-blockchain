@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -53,6 +52,8 @@ var (
 	OutputKeyPrefix = []byte{0x07}
 	// BidValuesPrefix is the prefix to identify Bid Values
 	BidValuesPrefix = []byte{0x08}
+	// CandidatePrefix is the prefix to identify Candidate messages
+	CandidatePrefix = []byte{0x09}
 )
 
 type transaction struct {
@@ -79,7 +80,6 @@ type transaction struct {
 // It is assumed that StoreBlock would be called much less times than Fetch*
 // APIs. Based on that, extra indexing data is put to provide fast-read lookups
 func (t transaction) StoreBlock(b *block.Block) error {
-
 	if t.batch == nil {
 		// t.batch is initialized only on a open, read-write transaction
 		// (built with transaction.Update())
@@ -111,9 +111,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Put block transaction data. A KV pair per a single transaction is added
 	// into the store
 	for i, tx := range b.Txs {
-
 		txID, err := tx.CalculateHash()
-
 		if err != nil {
 			return err
 		}
@@ -128,11 +126,9 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// Value = index + block.transaction[index]
 		//
 		// For the retrival of transactions data by block.header.hash
-
 		keys := append(TxPrefix, b.Header.Hash...)
 		keys = append(keys, txID...)
 		entry, err := utils.EncodeBlockTx(tx, uint32(i))
-
 		if err != nil {
 			return err
 		}
@@ -145,42 +141,13 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// Value = block.header.hash
 		//
 		// For the retrival of a single transaction by TxId
-
 		t.put(append(TxIDPrefix, txID...), b.Header.Hash)
-
-		// Schema
-		//
-		// Key = KeyImagePrefix + tx.input.KeyImage
-		// Value = txID
-		//
-		// To make FetchKeyImageExists functioning
-		for _, input := range tx.StandardTx().Inputs {
-			t.put(append(KeyImagePrefix, input.KeyImage.Bytes()...), txID)
-		}
-
-		// Schema
-		//
-		// Key = OutputKeyPrefix + tx.output.PublicKey
-		// Value = unlockheight
-		//
-		// To make FetchOutputKey functioning
-		for i, output := range tx.StandardTx().Outputs {
-			v := make([]byte, 8)
-			// Only lock the first output, so that change outputs are
-			// not affected.
-			if i == 0 {
-				binary.LittleEndian.PutUint64(v, tx.LockTime()+b.Header.Height)
-			}
-			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), v)
-		}
-
 	}
 
 	// Key = HeightPrefix + block.header.height
 	// Value = block.header.hash
 	//
 	// To support fast header lookup by height
-
 	heightBuf := new(bytes.Buffer)
 
 	// Append height value
@@ -303,48 +270,7 @@ func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
 	return unlockHeight, err
 }
 
-// FetchDecoys iterates over the outputs and fetches `numDecoys` amount
-// of output public keys
-func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
-	scanFilter := OutputKeyPrefix
-
-	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
-	defer iterator.Release()
-
-	decoysPubKeys := make([]ristretto.Point, 0, numDecoys)
-
-	currentHeight, err := t.FetchCurrentHeight()
-	if err != nil {
-		log.Panic(err)
-	}
-
-	for iterator.Next() {
-		// We only take unlocked decoys
-		unlockHeight := binary.LittleEndian.Uint64(iterator.Value())
-		if unlockHeight > currentHeight {
-			continue
-		}
-
-		// Output public key is the iterator key minus the `OutputKeyPrefix`
-		// (1 byte)
-		value := iterator.Key()[1:]
-
-		var p ristretto.Point
-		var pBytes [32]byte
-		copy(pBytes[:], value)
-		p.SetBytes(&pBytes)
-
-		decoysPubKeys = append(decoysPubKeys, p)
-		if len(decoysPubKeys) == numDecoys {
-			break
-		}
-	}
-
-	return decoysPubKeys
-}
-
 func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
-
 	key := append(HeaderPrefix, hash...)
 	value, err := t.snapshot.Get(key, nil)
 
@@ -367,10 +293,9 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	return header, nil
 }
 
-func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transaction, error) {
-
+func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.ContractCall, error) {
 	scanFilter := append(TxPrefix, hashHeader...)
-	tempTxs := make(map[uint32]transactions.Transaction)
+	tempTxs := make(map[uint32]transactions.ContractCall)
 
 	// Read all the transactions that belong to a single block
 	// Scan filter = TX_PREFIX + block.header.hash
@@ -380,7 +305,6 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transactio
 	for iterator.Next() {
 		value := iterator.Value()
 		tx, txIndex, err := utils.DecodeBlockTx(value, database.AnyTxType)
-
 		if err != nil {
 			return nil, err
 		}
@@ -395,14 +319,16 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transactio
 	}
 
 	// Reorder Tx slice as per retrieved indexes
-	resultTxs := make([]transactions.Transaction, len(tempTxs))
+	resultTxs := make([]transactions.ContractCall, len(tempTxs))
 	for k, v := range tempTxs {
 		resultTxs[k] = v
 	}
 
 	// Let's ensure coinbase tx is here
 	if len(resultTxs) > 0 {
-		if resultTxs[0].Type() != transactions.CoinbaseType {
+		// NOTE: coinbase is the last tx in the block, with the upgrade to
+		// a VM-based tx layer
+		if resultTxs[len(resultTxs)-1].Type() != transactions.Distribute {
 			return resultTxs, errors.New("missing coinbase tx")
 		}
 	}
@@ -446,14 +372,12 @@ func (t transaction) put(key []byte, value []byte) {
 	}
 }
 
-func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, uint32, []byte, error) {
-
+func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall, uint32, []byte, error) {
 	txIndex := uint32(math.MaxUint32)
 
 	// Fetch the block header hash that this Tx belongs to
 	key := append(TxIDPrefix, txID...)
 	hashHeader, err := t.snapshot.Get(key, nil)
-
 	if err != nil {
 		if err == leveldb.ErrNotFound {
 			// overwrite error message
@@ -470,7 +394,6 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 	defer iterator.Release()
 
 	for iterator.Next() {
-
 		// Extract TxID from the key to avoid the need of CalculateHash
 		reader := bytes.NewReader(iterator.Key())
 		fetchedTxID := make([]byte, len(txID))
@@ -567,7 +490,7 @@ func (t transaction) FetchCurrentHeight() (uint64, error) {
 	return header.Height, nil
 }
 
-func (t transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
+func (t transaction) StoreBidValues(d, k []byte, index uint64, lockTime uint64) error {
 	// First, delete the old values (if any)
 	heightBytes := make([]byte, 8)
 	currentHeight, err := t.FetchCurrentHeight()
@@ -579,12 +502,20 @@ func (t transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
 	// approximation. On average, it will vary only a few blocks, but
 	// we can not know beforehand when a bid transaction is accepted.
 	binary.LittleEndian.PutUint64(heightBytes, lockTime+currentHeight)
+
+	// marshal index
+	idxBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(idxBytes, index)
+
 	key := append(BidValuesPrefix, heightBytes...)
-	t.put(key, append(d, k...))
+	t.put(key, append(d, append(k, idxBytes...)...))
 	return nil
 }
 
-func (t transaction) FetchBidValues() ([]byte, []byte, error) {
+// BidEncodingSize is the expected size of the serialized encoding of the bid
+var BidEncodingSize = 72
+
+func (t transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
 	key := BidValuesPrefix
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
 	defer iterator.Release()
@@ -614,15 +545,19 @@ func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 	}
 
 	if err := iterator.Error(); err != nil {
-		return nil, nil, err
+		return nil, nil, uint64(0), err
 	}
 
 	// Let's avoid any runtime panics by doing a sanity check on the value length before
-	if len(value) != 64 {
-		return nil, nil, errors.New("bid values non-existent or incorrectly encoded")
+	if len(value) != BidEncodingSize {
+		return nil, nil, uint64(0), fmt.Errorf("bid values non-existent or incorrectly encoded, expected %d bytes but found %d", BidEncodingSize, len(value))
 	}
 
-	return value[0:32], value[32:64], nil
+	D := value[0:32]
+	K := value[32:64]
+	index := binary.LittleEndian.Uint64(value[64:72])
+
+	return D, K, index, nil
 }
 
 // FetchBlockHeightSince uses binary search to find a block height
@@ -656,6 +591,45 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	return tip - n + pos, nil
 
+}
+
+func (t transaction) StoreCandidateMessage(cm message.Candidate) error {
+	buf := new(bytes.Buffer)
+
+	if err := message.MarshalCandidate(buf, cm); err != nil {
+		return err
+	}
+
+	key := append(CandidatePrefix, cm.Block.Header.Hash...)
+	t.put(key, buf.Bytes())
+	return nil
+}
+
+func (t transaction) FetchCandidateMessage(hash []byte) (message.Candidate, error) {
+	key := append(CandidatePrefix, hash...)
+	value, err := t.snapshot.Get(key, nil)
+	if err != nil {
+		return message.Candidate{}, database.ErrBlockNotFound
+	}
+
+	cm := new(message.Candidate)
+	cm.Block = block.NewBlock()
+	cm.Certificate = block.EmptyCertificate()
+	if err := message.UnmarshalCandidate(bytes.NewBuffer(value), cm); err != nil {
+		return message.Candidate{}, err
+	}
+
+	return *cm, nil
+}
+
+func (t transaction) ClearCandidateMessages() error {
+	iter := t.snapshot.NewIterator(util.BytesPrefix(CandidatePrefix), nil)
+	defer iter.Release()
+	for iter.Next() {
+		t.batch.Delete(iter.Key())
+	}
+
+	return iter.Error()
 }
 
 // ClearDatabase will wipe all of the data currently in the database.

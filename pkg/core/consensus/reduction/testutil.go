@@ -1,8 +1,16 @@
 package reduction
 
 import (
+	"context"
+	"errors"
 	"sync"
+	"testing"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
@@ -10,79 +18,74 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
-const round = uint64(1)
+// PrepareSendReductionTest tests that the reduction step completes without problems
+// and produces a StepVotesMsg in case it receives enough valid Reduction messages
+func PrepareSendReductionTest(hlp *Helper, stepFn consensus.PhaseFn) func(t *testing.T) {
+	return func(t *testing.T) {
+		require := require.New(t)
 
-type mockSigner struct {
-	bus    *eventbus.EventBus
-	pubkey []byte
+		streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+		hlp.EventBus.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			_, err := streamer.Read()
+			require.NoError(err)
+			require.Equal(streamer.SeenTopics()[0], topics.Reduction)
+			cancel()
+		}()
+
+		evChan := make(chan message.Message, 1)
+		n := stepFn.Run(ctx, consensus.NewQueue(), evChan, consensus.MockRoundUpdate(uint64(1), hlp.P), uint8(2))
+		require.Nil(n)
+	}
 }
-
-func (m *mockSigner) Sign(header.Header) ([]byte, error) {
-	return make([]byte, 33), nil
-}
-
-func (m *mockSigner) Compose(pf consensus.PacketFactory) consensus.InternalPacket {
-	return pf.Create(m.pubkey, 1, 1)
-}
-
-func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
-	m.bus.Publish(msg.Category(), msg)
-	return nil
-}
-
-func (m *mockSigner) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
-	m.bus.Publish(topic, msg)
-	return nil
-}
-
-// FactoryFunc is a shorthand for the reduction factories to create a Reducer
-type FactoryFunc func(*eventbus.EventBus, *rpcbus.RPCBus, key.Keys, time.Duration) Reducer
 
 // Helper for reducing test boilerplate
 type Helper struct {
-	PubKeyBLS []byte
-	Reducer   Reducer
-	Bus       *eventbus.EventBus
-	RBus      *rpcbus.RPCBus
-	Keys      []key.Keys
-	P         *user.Provisioners
-	signer    consensus.Signer
-	nr        int
-	Handler   *Handler
-	*consensus.SimplePlayer
-	CollectionWaitGroup sync.WaitGroup
+	*consensus.Emitter
+	lock               sync.RWMutex
+	failOnVerification bool
+
+	ThisSender       []byte
+	ProvisionersKeys []key.Keys
+	P                *user.Provisioners
+	Nr               int
+	Handler          *Handler
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, factory FactoryFunc, timeOut time.Duration) *Helper {
-	p, keys := consensus.MockProvisioners(provisioners)
-	helperKeys := keys[0]
-	red := factory(eb, rpcbus, helperKeys, timeOut)
-	hlp := &Helper{
-		PubKeyBLS: helperKeys.BLSPubKeyBytes,
-		Bus:       eb,
-		RBus:      rpcbus,
-		Keys:      keys,
-		P:         p,
-		Reducer:   red,
+func NewHelper(provisioners int, timeOut time.Duration) *Helper {
+	p, provisionersKeys := consensus.MockProvisioners(provisioners)
 
-		signer:       &mockSigner{eb, helperKeys.BLSPubKeyBytes},
-		nr:           provisioners,
-		Handler:      NewHandler(helperKeys, *p),
-		SimplePlayer: consensus.NewSimplePlayer(),
+	mockProxy := transactions.MockProxy{
+		P:  transactions.PermissiveProvisioner{},
+		BG: transactions.MockBlockGenerator{},
+	}
+	emitter := consensus.MockEmitter(timeOut, mockProxy)
+	emitter.Keys = provisionersKeys[0]
+
+	hlp := &Helper{
+		failOnVerification: false,
+
+		ThisSender:       emitter.Keys.BLSPubKeyBytes,
+		ProvisionersKeys: provisionersKeys,
+		P:                p,
+		Nr:               provisioners,
+		Handler:          NewHandler(emitter.Keys, *p),
+		Emitter:          emitter,
 	}
 
 	return hlp
 }
 
 // Verify StepVotes. The step must be specified otherwise verification would be dependent on the state of the Helper
-func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, step uint8) error {
-	vc := hlp.P.CreateVotingCommittee(round, step, hlp.nr)
+func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, round uint64, step uint8) error {
+	vc := hlp.P.CreateVotingCommittee(round, step, hlp.Nr)
 	sub := vc.IntersectCluster(sv.BitSet)
 	apk, err := agreement.ReconstructApk(sub.Set)
 	if err != nil {
@@ -92,38 +95,39 @@ func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, step uint8) error {
 	return header.VerifySignatures(round, step, hash, apk, sv.Signature)
 }
 
-// SendBatch of consensus events to the reducer callback CollectReductionEvent
-func (hlp *Helper) SendBatch(hash []byte) {
-	hlp.CollectionWaitGroup.Wait()
-	// creating a batch of Reduction events
-	batch := hlp.Spawn(hash)
-	hlp.CollectionWaitGroup.Add(len(batch))
-	for _, ev := range batch {
-		go func(ev consensus.Packet) {
-			if err := hlp.Reducer.Collect(ev); err != nil {
-				panic(err)
-			}
-
-			hlp.CollectionWaitGroup.Done()
-		}(ev)
-	}
-}
-
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
-func (hlp *Helper) Spawn(hash []byte) []message.Reduction {
-	evs := make([]message.Reduction, 0, hlp.nr)
-	step := hlp.Step()
+func (hlp *Helper) Spawn(hash []byte, round uint64, step uint8) []message.Reduction {
+	evs := make([]message.Reduction, 0, hlp.Nr)
 	i := 0
-	for count := 0; count < hlp.Handler.Quorum(hlp.Round); {
-		ev := message.MockReduction(hash, round, step, hlp.Keys, i)
+	for count := 0; count < hlp.Handler.Quorum(round); {
+		ev := message.MockReduction(hash, round, step, hlp.ProvisionersKeys, i)
 		i++
 		evs = append(evs, ev)
-		count += hlp.Handler.VotesFor(hlp.Keys[i].BLSPubKeyBytes, round, step)
+		count += hlp.Handler.VotesFor(hlp.ProvisionersKeys[i].BLSPubKeyBytes, round, step)
 	}
 	return evs
 }
 
-// Initialize the reducer with a Round update
-func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
-	hlp.Reducer.Initialize(hlp, hlp.signer, ru)
+// FailOnVerification tells the RPC bus to return an error
+func (hlp *Helper) FailOnVerification(flag bool) {
+	hlp.lock.Lock()
+	defer hlp.lock.Unlock()
+	hlp.failOnVerification = flag
+}
+
+func (hlp *Helper) shouldFailVerification() bool {
+	hlp.lock.RLock()
+	defer hlp.lock.RUnlock()
+	f := hlp.failOnVerification
+	return f
+}
+
+// ProcessCandidateVerificationRequest is a callback used by the firststep
+// reduction to verify potential winning candidates.
+func (hlp *Helper) ProcessCandidateVerificationRequest(blk block.Block) error {
+	if hlp.shouldFailVerification() {
+		return errors.New("verification failed")
+	}
+
+	return nil
 }

@@ -1,0 +1,96 @@
+package candidate
+
+import (
+	"bytes"
+	"context"
+	"encoding/hex"
+	"errors"
+	"sync"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	lg "github.com/sirupsen/logrus"
+)
+
+var log = lg.WithField("process", "candidate-requestor")
+
+// Requestor serves to retrieve certain Candidate messages from peers in the
+// network.
+type Requestor struct {
+	lock           sync.RWMutex
+	requesting     bool
+	publisher      eventbus.Publisher
+	candidateQueue chan message.Candidate
+}
+
+// NewRequestor returns an initialized Requestor struct.
+func NewRequestor(publisher eventbus.Publisher) *Requestor {
+	return &Requestor{
+		publisher:      publisher,
+		candidateQueue: make(chan message.Candidate, 100),
+	}
+}
+
+// ProcessCandidate will process a received Candidate message.
+// Invalid and non-matching Candidate messages are discarded.
+func (r *Requestor) ProcessCandidate(msg message.Message) ([]bytes.Buffer, error) {
+	if r.isRequesting() {
+		if err := Validate(msg); err != nil {
+			return nil, err
+		}
+
+		cm := msg.Payload().(message.Candidate)
+		r.candidateQueue <- cm
+	}
+
+	return nil, nil
+}
+
+// RequestCandidate will attempt to fetch a Candidate message for a given hash
+// from the network.
+func (r *Requestor) RequestCandidate(ctx context.Context, hash []byte) (message.Candidate, error) {
+	r.setRequesting(true)
+	defer r.setRequesting(false)
+
+	if err := r.publishGetCandidate(hash); err != nil {
+		return message.Candidate{}, nil
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.WithField("hash", hex.EncodeToString(hash)).Debug("failed to receive candidate from the network")
+			return message.Candidate{}, errors.New("failed to receive candidate from the network")
+		case cm := <-r.candidateQueue:
+			if bytes.Equal(cm.Block.Header.Hash, hash) {
+				return cm, nil
+			}
+		}
+	}
+}
+
+func (r *Requestor) publishGetCandidate(hash []byte) error {
+	// Send a request for this specific candidate
+	buf := bytes.NewBuffer(hash)
+	// Ugh! Move encoding after the Gossip ffs
+	if err := topics.Prepend(buf, topics.GetCandidate); err != nil {
+		return err
+	}
+	msg := message.New(topics.GetCandidate, *buf)
+	r.publisher.Publish(topics.Gossip, msg)
+	return nil
+}
+
+func (r *Requestor) setRequesting(status bool) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.requesting = status
+}
+
+func (r *Requestor) isRequesting() bool {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	req := r.requesting
+	return req
+}

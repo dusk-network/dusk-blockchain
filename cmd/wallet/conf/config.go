@@ -43,6 +43,8 @@ func InitConfig(cfg string) Registry {
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
+		// FIXME: 493 - this is completely outdated. We do not use dusk-wallet-cli
+		// anymore
 		_, _ = fmt.Fprintln(os.Stdout, "Config file not found. Please place dusk-wallet-cli in the same directory as your dusk.toml file.")
 		os.Exit(0)
 	}

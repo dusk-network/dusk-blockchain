@@ -15,6 +15,8 @@ type Accumulator struct {
 	eventChan          chan message.Agreement
 	CollectedVotesChan chan []message.Agreement
 	store              *store
+
+	workersQuitChan chan struct{}
 }
 
 // NewAccumulator initializes a worker pool, starts up an Accumulator and returns it.
@@ -26,6 +28,7 @@ func newAccumulator(handler Handler, workerAmount int) *Accumulator {
 		eventChan:          make(chan message.Agreement, 100),
 		CollectedVotesChan: make(chan []message.Agreement, 1),
 		store:              newStore(),
+		workersQuitChan:    make(chan struct{}),
 	}
 
 	a.CreateWorkers(workerAmount)
@@ -38,7 +41,7 @@ func newAccumulator(handler Handler, workerAmount int) *Accumulator {
 func (a *Accumulator) Process(ev message.Agreement) {
 	defer func() {
 		// we recover from panic in case of a late Process call which would attempt to write to the closed verificationChan
-		// the alternative would be to never close the verificationChan and either use a multitude of channels to  stop the workers or a shared boolean set in the Accumulator.Stop
+		// the alternative would be to never close the verificationChan and either use a multitude of channels to stop the workers or a shared boolean set in the Accumulator.Stop
 		if r := recover(); r != nil {
 			lg.Traceln("attempting to forward to a closed Accumulator")
 		}
@@ -50,6 +53,8 @@ func (a *Accumulator) Process(ev message.Agreement) {
 // Accumulate agreements per block hash until a quorum is reached or a stop is detected (by closing the internal event channel). Supposed to run in a goroutine
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
+		// FIXME: republish here to avoid race conditions for slower but safer
+		// re-propagation
 		hdr := ev.State()
 		collected := a.store.Get(hdr.Step)
 		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
@@ -60,6 +65,8 @@ func (a *Accumulator) Accumulate() {
 		}
 
 		lg.WithFields(log.Fields{
+			"step":   ev.State().Step,
+			"round":  ev.State().Round,
 			"count":  count,
 			"quorum": a.handler.Quorum(hdr.Round),
 		}).Debugln("collected agreement")
@@ -82,7 +89,7 @@ func (a *Accumulator) CreateWorkers(amount int) {
 
 	wg.Add(amount)
 	for i := 0; i < amount; i++ {
-		go verify(a.verificationChan, a.eventChan, a.handler.Verify, &wg)
+		go verify(a.verificationChan, a.eventChan, a.handler.Verify, &wg, a.workersQuitChan)
 	}
 
 	go func() {
@@ -91,24 +98,31 @@ func (a *Accumulator) CreateWorkers(amount int) {
 	}()
 }
 
-func verify(verificationChan <-chan message.Agreement, eventChan chan<- message.Agreement, verifyFunc func(message.Agreement) error, wg *sync.WaitGroup) {
-	for ev := range verificationChan {
+func verify(verificationChan <-chan message.Agreement, eventChan chan<- message.Agreement, verifyFunc func(message.Agreement) error, wg *sync.WaitGroup, quit chan struct{}) {
 
-		if err := verifyFunc(ev); err != nil {
-			lg.WithError(err).Errorln("event verification failed")
-			continue
-		}
+	defer wg.Done()
 
+	for {
 		select {
-		case eventChan <- ev:
-		default:
-			lg.Warnln("accumulator skipped sending event")
+		case ev := <-verificationChan:
+			if err := verifyFunc(ev); err != nil {
+				lg.WithError(err).Errorln("event verification failed")
+				break
+			}
+
+			select {
+			case eventChan <- ev:
+			default:
+				lg.Warnln("accumulator skipped sending event")
+			}
+		case <-quit:
+			return
 		}
 	}
-	wg.Done()
+
 }
 
 // Stop kills the thread pool and shuts down the Accumulator.
 func (a *Accumulator) Stop() {
-	close(a.verificationChan)
+	close(a.workersQuitChan)
 }

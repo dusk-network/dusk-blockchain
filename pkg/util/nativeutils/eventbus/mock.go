@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"sync"
 
@@ -204,7 +203,6 @@ func (ms *GossipStreamer) Read() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(topic)
 
 	ms.lock.Lock()
 	ms.seenTopics = append(ms.seenTopics, topic)
@@ -223,5 +221,55 @@ func (ms *GossipStreamer) SeenTopics() []topics.Topic {
 
 // Close implements io.WriteCloser.
 func (ms *SimpleStreamer) Close() error {
+	return nil
+}
+
+// RouterStreamer reroutes a gossiped message to a list of EventBus instances
+type RouterStreamer struct {
+
+	// list of peers eventBus instances to route msg to
+	lock  sync.Mutex
+	peers []*EventBus
+}
+
+// NewRouterStreamer instantiate RouterStreamer with empty list
+func NewRouterStreamer() *RouterStreamer {
+	return &RouterStreamer{peers: make([]*EventBus, 0)}
+}
+
+// Add adds a dest eventBus
+func (r *RouterStreamer) Add(p *EventBus) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.peers = append(r.peers, p)
+}
+
+// Write implements io.WriteCloser.
+func (r *RouterStreamer) Write(p []byte) (n int, err error) {
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	// Re-route message to all peers
+	for i := 0; i < len(r.peers); i++ {
+
+		b := bytes.NewBuffer(p)
+		msg, err := message.Unmarshal(b)
+		if err != nil {
+			return 0, err
+		}
+
+		r.peers[i].Publish(msg.Category(), msg)
+	}
+
+	return len(p), nil
+}
+
+func (r *RouterStreamer) Read() ([]byte, error) {
+	return nil, nil
+}
+
+// Close implements io.WriteCloser.
+func (r *RouterStreamer) Close() error {
 	return nil
 }

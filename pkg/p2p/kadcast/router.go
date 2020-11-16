@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -32,7 +31,7 @@ func (m *messageRouter) Collect(packet []byte, height byte) error {
 
 	// Always append kadcast height
 	msg = message.NewWithHeader(msg.Category(), msg.Payload(), []byte{height})
-	return m.route(*b, msg, height)
+	return m.route(msg)
 }
 
 // CanRoute allows only a few wire message that are of broadcast-type.
@@ -50,7 +49,7 @@ func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 	return false
 }
 
-func (m *messageRouter) route(b bytes.Buffer, msg message.Message, height byte) error {
+func (m *messageRouter) route(msg message.Message) error {
 
 	category := msg.Category()
 
@@ -79,13 +78,6 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message, height byte) 
 	case topics.Reduction: // TODO:  Not supported yet
 	case topics.Agreement: // TODO:  Not supported yet
 	case topics.Block:
-		blk := block.NewBlock()
-		if err := message.UnmarshalBlock(&b, blk); err != nil {
-			return err
-		}
-
-		header := []byte{height}
-		msg := message.NewWithHeader(topics.Block, *blk, header)
 		m.publisher.Publish(category, msg)
 	}
 

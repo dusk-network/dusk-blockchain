@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 )
 
@@ -29,11 +30,31 @@ func NewCandidate() *Candidate {
 // MakeCandidate creates a Candidate from a block and a certificate. It is
 // meant for actual creation of the Candidate, rather than struct-decoding of a
 // transmitted one
+// It includes the certificates of the previous block, so the generator can use
+// it in the Distribute transaction to reward those provisioners
 func MakeCandidate(blk *block.Block, cert *block.Certificate) Candidate {
 	c := NewCandidate()
 	c.Block = blk
 	c.Certificate = cert
 	return *c
+}
+
+// Copy complies with the message.Safe interface. It performs a DeepCopy
+// that can be handy when publishing this Payload for multiple subscribers to
+// consume
+func (c Candidate) Copy() payload.Safe {
+	r := Candidate{}
+
+	if c.Block != nil {
+		blk := c.Block.Copy().(block.Block)
+		r.Block = &blk
+	}
+
+	if c.Certificate != nil {
+		r.Certificate = c.Certificate.Copy()
+	}
+
+	return r
 }
 
 // State is for complying to the consensus.Message interface. In the case of

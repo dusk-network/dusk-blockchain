@@ -1,14 +1,15 @@
 package block
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 )
 
 // Block defines a block on the Dusk blockchain.
 type Block struct {
-	Header *Header
-	Txs    []transactions.Transaction
+	Header *Header                     `json:"header"`
+	Txs    []transactions.ContractCall `json:"transactions"`
 }
 
 // NewBlock will return an empty Block with an empty BlockHeader.
@@ -16,6 +17,20 @@ func NewBlock() *Block {
 	return &Block{
 		Header: NewHeader(),
 	}
+}
+
+// Copy returns a deep copy of the Block safe to publish to multiple subscribers
+func (b Block) Copy() payload.Safe {
+	cpy := Block{}
+	cpy.Header = b.Header.Copy()
+	if b.Txs != nil {
+		cpy.Txs = make([]transactions.ContractCall, len(b.Txs))
+		for i, tx := range b.Txs {
+			cpy.Txs[i] = tx.Copy().(transactions.ContractCall)
+		}
+	}
+
+	return cpy
 }
 
 // SetPrevBlock will set all the previous block hash field from a header.
@@ -28,7 +43,7 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 	// convert Transaction interface to Payload interface
 	var txs []merkletree.Payload
 	for _, tx := range b.Txs {
-		txs = append(txs, tx)
+		txs = append(txs, tx.(merkletree.Payload))
 	}
 
 	tree, err := merkletree.NewTree(txs)
@@ -40,7 +55,7 @@ func (b *Block) CalculateRoot() ([]byte, error) {
 }
 
 // AddTx will add a transaction to the block.
-func (b *Block) AddTx(tx transactions.Transaction) {
+func (b *Block) AddTx(tx *transactions.Transaction) {
 	b.Txs = append(b.Txs, tx)
 }
 
@@ -69,11 +84,8 @@ func (b *Block) Equals(other *Block) bool {
 		return false
 	}
 
-	for i := range b.Txs {
-		tx := b.Txs[i]
-		otherTx := other.Txs[i]
-
-		if !tx.Equals(otherTx) {
+	for i := 0; i < len(b.Txs); i++ {
+		if !transactions.Equal(b.Txs[i], other.Txs[i]) {
 			return false
 		}
 	}

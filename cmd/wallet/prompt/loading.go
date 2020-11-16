@@ -8,17 +8,17 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-func loadWallet(client node.NodeClient) (*node.LoadResponse, error) {
+func loadWallet(client node.WalletClient) (*node.LoadResponse, error) {
 	pw := getPassword()
 	return client.LoadWallet(context.Background(), &node.LoadRequest{Password: pw})
 }
 
-func createWallet(client node.NodeClient) (*node.LoadResponse, error) {
+func createWallet(client node.WalletClient) (*node.LoadResponse, error) {
 	pw := getPassword()
 	return client.CreateWallet(context.Background(), &node.CreateRequest{Password: pw})
 }
 
-func loadFromSeed(client node.NodeClient) (*node.LoadResponse, error) {
+func loadFromSeed(client node.WalletClient) (*node.LoadResponse, error) {
 	validate := func(input string) error {
 		if len(input) < 64 {
 			return errors.New("Seed must be 64 characters or more")

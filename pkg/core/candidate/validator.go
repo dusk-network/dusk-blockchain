@@ -15,13 +15,16 @@ func Validate(m message.Message) error {
 	return ValidateCandidate(cm)
 }
 
-// ValidateCandidate makes sure the hash and root are correct, to avoid malicious nodes from // overwriting the candidate block for a specific hash
+// ValidateCandidate makes sure the hash and root are correct, to avoid
+// malicious nodes from overwriting the candidate block for a specific hash
 func ValidateCandidate(cm message.Candidate) error {
 	if err := checkHash(cm.Block); err != nil {
+		log.WithError(err).Errorln("validation failed")
 		return republisher.InvalidError
 	}
 
 	if err := checkRoot(cm.Block); err != nil {
+		log.WithError(err).Errorln("validation failed")
 		return republisher.InvalidError
 	}
 

@@ -4,21 +4,22 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	"github.com/dusk-network/dusk-wallet/v2/key"
-	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	"github.com/manifoldco/promptui"
 )
 
-func transferDusk(client node.NodeClient) (*node.TransferResponse, error) {
+func transferDusk(client node.TransactorClient) (*node.TransactionResponse, error) {
 	amount := getAmount()
 
+	// FIXME: 493 - there should be syntax-validation of address
 	validateAddress := func(input string) error {
-		address := key.PublicAddress(input)
-		// TODO: use netprefix inferred from config
-		if _, err := address.ToKey(2); err != nil {
-			return err
-		}
+		// FIXME: there is no ToKey method in the wallet currently
+		//address := key.PublicAddress(input)
+		//// TODO: use netprefix inferred from config
+		//if _, err := address.ToKey(2); err != nil {
+		//	return err
+		//}
 
 		return nil
 	}
@@ -36,16 +37,18 @@ func transferDusk(client node.NodeClient) (*node.TransferResponse, error) {
 	return client.Transfer(context.Background(), &node.TransferRequest{Amount: amount, Address: []byte(address)})
 }
 
-func bidDusk(client node.NodeClient) (*node.TransferResponse, error) {
+func bidDusk(client node.TransactorClient) (*node.TransactionResponse, error) {
 	amount := getAmount()
 	lockTime := getLockTime()
-	return client.SendBid(context.Background(), &node.ConsensusTxRequest{Amount: amount, LockTime: lockTime})
+	// TODO: parameterize fee
+	return client.Bid(context.Background(), &node.BidRequest{Amount: amount, Fee: 100, Locktime: lockTime})
 }
 
-func stakeDusk(client node.NodeClient) (*node.TransferResponse, error) {
+func stakeDusk(client node.TransactorClient) (*node.TransactionResponse, error) {
 	amount := getAmount()
 	lockTime := getLockTime()
-	return client.SendStake(context.Background(), &node.ConsensusTxRequest{Amount: amount, LockTime: lockTime})
+	// TODO: parameterize fee
+	return client.Stake(context.Background(), &node.StakeRequest{Amount: amount, Fee: 100, Locktime: lockTime})
 }
 
 func getAmount() uint64 {

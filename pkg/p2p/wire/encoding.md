@@ -217,4 +217,3 @@ bs := make([]byte, 0, count)
 buf := bytes.NewBuffer(bs)
 err := StealthTX.Encode(buf)
 ```
-

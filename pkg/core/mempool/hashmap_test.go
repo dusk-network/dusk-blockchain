@@ -3,32 +3,26 @@ package mempool
 import (
 	"errors"
 	"math"
-	"math/big"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	assert "github.com/stretchr/testify/require"
 )
 
 func TestSortedKeys(t *testing.T) {
+	assert := assert.New(t)
 
-	pool := &HashMap{Capacity: 100}
+	pool := &HashMap{lock: &sync.RWMutex{}, Capacity: 100}
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
-
-		tx := helper.RandomStandardTx(t, false)
-
-		randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(10000)))
-		tx.Fee.SetBigInt(randFee)
-
+		tx := transactions.RandTx()
 		td := TxDesc{tx: tx}
-		if err := pool.Put(td); err != nil {
-			t.Fatal(err.Error())
-		}
+		assert.NoError(pool.Put(td))
 	}
 
 	// Iterate through all tx expecting each one has lower fee than
@@ -37,33 +31,25 @@ func TestSortedKeys(t *testing.T) {
 	prevVal = math.MaxUint64
 
 	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-
-		val := t.tx.StandardTx().Fee.BigInt().Uint64()
-		if prevVal < val {
+		_, fee := t.tx.Values()
+		if prevVal < fee {
 			return false, errors.New("keys not in a descending order")
 		}
 
-		prevVal = val
+		prevVal = fee
 		return false, nil
 	})
 
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
+	assert.NoError(err)
 }
 
 func TestStableSortedKeys(t *testing.T) {
-
-	pool := HashMap{Capacity: 100}
+	pool := HashMap{lock: &sync.RWMutex{}, Capacity: 100}
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
-
-		tx := helper.RandomStandardTx(t, false)
-
-		constFee := big.NewInt(0).SetUint64(20)
-		tx.Fee.SetBigInt(constFee)
-
+		bf := transactions.RandBlind()
+		tx := transactions.MockTx(false, bf, true)
 		td := TxDesc{tx: tx, received: time.Now()}
 		if err := pool.Put(td); err != nil {
 			t.Fatal(err.Error())
@@ -90,51 +76,39 @@ func TestStableSortedKeys(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
+	assert := assert.New(t)
 	txsCount := 10
-	pool := HashMap{Capacity: uint32(txsCount)}
+	pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(txsCount)}
 
 	// Generate 10 random txs
 	hashes := make([][]byte, txsCount)
 	for i := 0; i < txsCount; i++ {
-
-		tx := helper.RandomStandardTx(t, false)
-
-		constFee := big.NewInt(0).SetUint64(20)
-		tx.Fee.SetBigInt(constFee)
-
+		bf := transactions.RandBlind()
+		tx := transactions.MockTx(false, bf, true)
 		hash, _ := tx.CalculateHash()
-		tx.TxID = hash
-		hashes[i] = tx.TxID
+		hashes[i] = hash
 
 		td := TxDesc{tx: tx, received: time.Now()}
-		if err := pool.Put(td); err != nil {
-			t.Fatal(err.Error())
-		}
+		assert.NoError(pool.Put(td))
 	}
 
 	// Get a random tx from the pool
 	n := rand.Intn(txsCount)
-	tx := pool.Get(hashes[n])
-	if tx == nil {
-		t.Fatal("tx is not supposed to be nil")
-	}
+	assert.NotNil(pool.Get(hashes[n]))
 
 	// Now get a tx for a hash that is not in the pool
 	hash, _ := crypto.RandEntropy(32)
-	tx = pool.Get(hash)
-	if tx != nil {
-		t.Fatal("should not have gotten a tx")
-	}
+	assert.Nil(pool.Get(hash))
 }
 
 func BenchmarkPut(b *testing.B) {
 
-	txs := dummyTransactionsSet(50000)
+	txs := transactions.RandContractCalls(50000, 0, false)
 	b.ResetTimer()
 
 	// Put all transactions
 	for tN := 0; tN < b.N; tN++ {
-		pool := HashMap{Capacity: uint32(len(txs))}
+		pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(len(txs))}
 		for i := 0; i < len(txs); i++ {
 
 			td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
@@ -149,10 +123,10 @@ func BenchmarkPut(b *testing.B) {
 
 func BenchmarkContains(b *testing.B) {
 
-	txs := dummyTransactionsSet(50000)
+	txs := transactions.RandContractCalls(50000, 0, false)
 
 	// Put all transactions
-	pool := HashMap{Capacity: uint32(len(txs))}
+	pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(len(txs))}
 	for i := 0; i < len(txs); i++ {
 
 		td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
@@ -165,7 +139,8 @@ func BenchmarkContains(b *testing.B) {
 
 	for tN := 0; tN < b.N; tN++ {
 		for i := 0; i < len(txs); i++ {
-			if !pool.Contains(txs[i].TxID) {
+			txid, _ := txs[i].CalculateHash()
+			if !pool.Contains(txid) {
 				b.Fatal("missing tx")
 			}
 		}
@@ -176,10 +151,10 @@ func BenchmarkContains(b *testing.B) {
 
 func BenchmarkRangeSort(b *testing.B) {
 
-	txs := dummyTransactionsSet(10000)
+	txs := transactions.RandContractCalls(10000, 0, false)
 
 	// Put all transactions
-	pool := HashMap{Capacity: uint32(len(txs))}
+	pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(len(txs))}
 	for i := 0; i < len(txs); i++ {
 
 		td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
@@ -201,24 +176,4 @@ func BenchmarkRangeSort(b *testing.B) {
 	}
 
 	b.Logf("Pool number of txs: %d", pool.Len())
-}
-
-func dummyTransactionsSet(size int) []*transactions.Standard {
-
-	txs := make([]*transactions.Standard, size)
-	// Generate N random tx
-	dummyTx, _ := transactions.NewStandard(0, 2, 0)
-	for i := 0; i < len(txs); i++ {
-
-		// change fee to enable sorting
-		randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(1000000)))
-		dummyTx.Fee.SetBigInt(randFee)
-
-		clone := *dummyTx
-		clone.TxID, _ = crypto.RandEntropy(32)
-
-		txs[i] = &clone
-	}
-
-	return txs
 }

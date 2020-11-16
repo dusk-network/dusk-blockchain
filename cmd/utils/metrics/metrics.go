@@ -22,8 +22,8 @@ var (
 	localNet           engine.Network
 	duskInfo           *DuskInfo
 	node               *engine.DuskNode
-	currentBlockNumber uint64
 	pendingTx          int
+	currentBlockNumber uint64
 	//rpcClient       *Client
 )
 
@@ -39,18 +39,20 @@ type DuskInfo struct {
 	EffectiveBlockTime int64
 	GQLEndpoint        string
 	GQLClient          *graphql.Client
+	NodeAPIPort        int
 }
 
 // RunMetrics will run the metrics collection endpoint
-func RunMetrics(gqlPort, nodePort, port int, hostname string) {
+func RunMetrics(gqlPort, nodePort, nodeAPIPort, port int, hostname string) {
 	duskInfo = new(DuskInfo)
 	duskInfo.TotalDusk = big.NewInt(0)
+	duskInfo.NodeAPIPort = nodeAPIPort
 
-	node = engine.NewDuskNode(gqlPort, nodePort, "default")
-	localNet.Nodes = append(localNet.Nodes, node)
+	node = engine.NewDuskNode(gqlPort, nodePort, "default", localNet.IsSessionRequired())
+	localNet.AddNode(node)
 
-	// Instantiate graphQL client
 	duskInfo.GQLEndpoint = "http://" + node.Cfg.Gql.Address + "/graphql"
+	fmt.Printf("Instantiate graphQL client\n")
 	duskInfo.GQLClient = graphql.NewClient(duskInfo.GQLEndpoint)
 
 	// Instantiate gRPC client
@@ -75,14 +77,14 @@ func Routine() {
 		var err error
 		pendingTx, err = pendingTransactionCount(duskInfo)
 		if err != nil {
-			_ = fmt.Errorf("pendingTransactionCount, error: %+v", err)
+			fmt.Printf("ERROR: pendingTransactionCount: %+v\n", err)
 		}
 
-		newBlock, err := getBlockByNumber(duskInfo, map[string]interface{}{"height": currentBlockNumber + 1})
-
+		//newBlock, err := getBlockByNumber(duskInfo, map[string]interface{}{"height": currentBlockNumber + 1})
+		newBlock, err := getLatestBlock(duskInfo, currentBlockNumber+1)
 		if err != nil {
-			_ = fmt.Errorf("getBlockByNumber, error: %+v", err)
-			time.Sleep(1 * time.Second)
+			//fmt.Printf("ERROR: getBlockByNumber: %+v\n", err)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
@@ -118,7 +120,11 @@ func Routine() {
 
 			previousBlockNum := currentBlock.Header.Height - 1
 
-			lastBlock, _ := getBlockByNumber(duskInfo, map[string]interface{}{"height": previousBlockNum})
+			lastBlock, err := getBlockByNumber(duskInfo, map[string]interface{}{"height": previousBlockNum})
+			if err != nil {
+				fmt.Printf("Received Error on block  #%v, Error: %+v", previousBlockNum, err)
+				continue
+			}
 
 			newTimestamp, _ := time.Parse(layoutISO, newBlock.Header.Timestamp)
 			lastTimestamp, _ := time.Parse(layoutISO, lastBlock.Header.Timestamp)

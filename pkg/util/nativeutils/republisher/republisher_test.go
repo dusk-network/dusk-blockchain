@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -23,12 +25,13 @@ func TestRepublisher(t *testing.T) {
 
 	mockAggro := bytes.NewBuffer([]byte{1})
 	msg := message.New(topics.Agreement, *mockAggro)
-	eb.Publish(topics.Agreement, msg)
+	errList := eb.Publish(topics.Agreement, msg)
+	require.Empty(t, errList)
 
 	mPack := <-gossipChan
-	packet := mPack.Payload().(bytes.Buffer)
+	packet := mPack.Payload().(message.SafeBuffer)
 
-	tpc, err := topics.Extract(&packet)
+	tpc, err := topics.Extract(&packet.Buffer)
 	assert.NoError(t, err)
 	assert.Equal(t, topics.Agreement, tpc)
 	assert.Equal(t, []byte{1}, packet.Bytes())

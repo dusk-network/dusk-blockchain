@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,18 +34,25 @@ func TestReader(t *testing.T) {
 	client, srv := net.Pipe()
 
 	eb := eventbus.New()
-	rpcBus := rpcbus.New()
-	counter := chainsync.NewCounter(eb)
 
-	peerReader, err := StartPeerReader(srv, eb, rpcBus, counter, nil)
+	// Set up reader factory
+	processor := NewMessageProcessor(eb)
+	agreementChan := make(chan struct{}, 1)
+	respFn := func(_ message.Message) ([]bytes.Buffer, error) {
+		agreementChan <- struct{}{}
+		return nil, nil
+	}
+
+	processor.Register(topics.Agreement, respFn)
+	factory := NewReaderFactory(processor)
+
+	dupeMap := dupemap.NewDupeMap(5)
+	responseChan := make(chan bytes.Buffer, 100)
+	exitChan := make(chan struct{}, 1)
+	peerReader, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupeMap, responseChan, exitChan)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Our message should come in on the agreement topic
-	agreementChan := make(chan message.Message, 1)
-	l := eventbus.NewChanListener(agreementChan)
-	eb.Subscribe(topics.Agreement, l)
 
 	go peerReader.ReadLoop()
 
@@ -65,7 +73,6 @@ func TestReader(t *testing.T) {
 	select {
 	case err := <-errChan:
 		t.Fatal(err)
-
 	case <-agreementChan:
 	}
 }
@@ -83,7 +90,8 @@ func TestWriteRingBuffer(t *testing.T) {
 	msg := message.New(topics.Agreement, ev)
 
 	for i := 0; i < 1000; i++ {
-		bus.Publish(topics.Gossip, msg)
+		errList := bus.Publish(topics.Gossip, msg)
+		require.Empty(t, errList)
 	}
 }
 
@@ -100,12 +108,12 @@ func TestWriteLoop(t *testing.T) {
 	}
 
 	go func(g *protocol.Gossip) {
-		responseChan := make(chan *bytes.Buffer)
+		responseChan := make(chan bytes.Buffer)
 		writer := NewWriter(client, g, bus, 30*time.Millisecond)
 		go writer.Serve(responseChan, make(chan struct{}, 1))
 
 		bufCopy := buf
-		responseChan <- &bufCopy
+		responseChan <- bufCopy
 	}(g)
 
 	// Decode and remove magic
@@ -122,7 +130,7 @@ func TestWriteLoop(t *testing.T) {
 	assert.Equal(t, decoded, (&buf).Bytes())
 }
 
-func BenchmarkWriter(b *testing.B) {
+func BenchmarkWriter(t *testing.B) {
 	bus := eventbus.New()
 
 	for i := 0; i < 100; i++ {
@@ -132,9 +140,10 @@ func BenchmarkWriter(b *testing.B) {
 
 	msg := makeAgreementGossip(10)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		bus.Publish(topics.Gossip, msg)
+	t.ResetTimer()
+	for i := 0; i < t.N; i++ {
+		errList := bus.Publish(topics.Gossip, msg)
+		require.Empty(t, errList)
 	}
 }
 

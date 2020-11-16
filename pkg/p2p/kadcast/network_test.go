@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,9 +27,8 @@ const (
 	enableProfiling = false
 )
 
-func kadcastRandomBlock(t *testing.T, eventbus *eventbus.EventBus) (*block.Block, error) {
-
-	b := helper.RandomBlock(t, 1, 3)
+func kadcastRandomBlock(eventbus *eventbus.EventBus) (*block.Block, error) {
+	b := helper.RandomBlock(1, 3)
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, b); err != nil {
 		return b, err
@@ -47,6 +47,8 @@ func kadcastRandomBlock(t *testing.T, eventbus *eventbus.EventBus) (*block.Block
 // TestBroadcastChunksMsg boostrap a kadcast network and make an attempt to
 // broadcast a message to all network peers
 func TestBroadcastChunksMsg(t *testing.T) {
+	// suppressing annoying INFO messages
+	logrus.SetLevel(logrus.ErrorLevel)
 
 	if enableProfiling {
 		f, _ := os.Create("./cpu.prof")
@@ -95,13 +97,12 @@ func TestBroadcastChunksMsg(t *testing.T) {
 		ing operation.
 	*/
 	for i := 0; i < len(nodes); i++ {
-
 		log.WithField("from_node", i).Infof("Broadcasting a message")
 
 		// Publish topics.Kadcast with payload of a random block data to the
 		// eventbus of this node. As a result, all of the network nodes should
 		// have received the block only once as per beta value = 1
-		blk, err := kadcastRandomBlock(t, nodes[i].EventBus)
+		blk, err := kadcastRandomBlock(nodes[i].EventBus)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -12,19 +12,24 @@ import (
 
 // NodeClient holds node related fields
 type NodeClient struct {
-	dialTimeout int64
-	NodeClient  node.NodeClient
-	conn        *grpc.ClientConn
+	dialTimeout          int64
+	WalletClient         node.WalletClient
+	TransactorClient     node.TransactorClient
+	ProvisionerClient    node.ProvisionerClient
+	BlockGeneratorClient node.BlockGeneratorClient
+	ChainClient          node.ChainClient
+	MempoolClient        node.MempoolClient
+	conn                 *grpc.ClientConn
 }
 
-// NewNodeClient holds a nodeClient with fixed dialTimeout of 5s
+// NewNodeClient returns a nodeClient with fixed dialTimeout of 5s
 func NewNodeClient() *NodeClient {
 	return &NodeClient{
 		dialTimeout: 5,
 	}
 }
 
-// Connect initialize a grpcClient to dusk-blockchain node grpc interface.
+// Connect initializes a grpcClient to dusk-blockchain node grpc interface.
 // For over-tcp communication, it could enable TLS and Basic Authentication
 func (c *NodeClient) Connect(conf rpcConfiguration) error {
 
@@ -85,7 +90,12 @@ func (c *NodeClient) Connect(conf rpcConfiguration) error {
 	}
 
 	c.conn = conn
-	c.NodeClient = node.NewNodeClient(conn)
+	c.WalletClient = node.NewWalletClient(conn)
+	c.TransactorClient = node.NewTransactorClient(conn)
+	c.ProvisionerClient = node.NewProvisionerClient(conn)
+	c.BlockGeneratorClient = node.NewBlockGeneratorClient(conn)
+	c.ChainClient = node.NewChainClient(conn)
+	c.MempoolClient = node.NewMempoolClient(conn)
 
 	return nil
 }

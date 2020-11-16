@@ -63,7 +63,7 @@ Protocol version, expressed in a semver format.
 
 A block certificate, proving that this block was fairly decided upon during consensus. Equivalent to a proof-of-work in Bitcoin.
 
-### peermsg.InvVect
+### message.InvVect
 
 | Field Size | Title | Data Type | Description |
 | :--- | :--- | :--- | :--- |

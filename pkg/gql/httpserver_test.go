@@ -15,16 +15,18 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
+	assert "github.com/stretchr/testify/require"
 )
 
 func TestWebsocketEndpoint(t *testing.T) {
+	logrus.SetLevel(logrus.FatalLevel)
+	assert := assert.New(t)
 
 	// Set up HTTP server with notifications enabled
 	// config
-	s, eb, err := setupServer(t, "127.0.0.1:22222")
-	if err != nil {
-		t.Error(err)
-	}
+	s, eb, err := setupServer("127.0.0.1:22222")
+	assert.NoError(err)
 	defer s.Stop()
 
 	dialCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -33,9 +35,7 @@ func TestWebsocketEndpoint(t *testing.T) {
 	// Set up a websocket client
 	u := url.URL{Scheme: "ws", Host: "127.0.0.1:22222", Path: "/ws"}
 	c, _, e := websocket.DefaultDialer.DialContext(dialCtx, u.String(), nil)
-	if e != nil {
-		t.Fatal(e)
-	}
+	assert.NoError(e)
 	defer func() {
 		_ = c.Close()
 	}()
@@ -59,31 +59,24 @@ func TestWebsocketEndpoint(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	blk := helper.RandomBlock(t, uint64(0), 4)
+	blk := helper.RandomBlock(uint64(0), 4)
 	hash, _ := blk.CalculateHash()
 	blk.Header.Hash = hash
 	msg := message.New(topics.AcceptedBlock, *blk)
-	eb.Publish(topics.AcceptedBlock, msg)
+	errList := eb.Publish(topics.AcceptedBlock, msg)
+	assert.Empty(errList)
 
 	message := <-response
 
-	t.Logf("Message size %d", len(message))
+	assert.Greater(len(message), 0)
 
 	expMsg, err := notifications.MarshalBlockMsg(*blk)
-	if err != nil {
-		t.Errorf("marshaling failed")
-	}
-
-	if message == "no response" {
-		t.Fatalf("no response received")
-	}
-
-	if expMsg != message {
-		t.Errorf("malformed message received")
-	}
+	assert.NoError(err)
+	assert.NotEqual("no response", expMsg)
+	assert.NotEqual("malformed message received", expMsg)
 }
 
-func setupServer(t *testing.T, addr string) (*Server, *eventbus.EventBus, error) {
+func setupServer(addr string) (*Server, *eventbus.EventBus, error) {
 	// Set up HTTP server with notifications enabled
 	// config
 	r := config.Registry{}
@@ -100,10 +93,8 @@ func setupServer(t *testing.T, addr string) (*Server, *eventbus.EventBus, error)
 	rpcBus := rpcbus.New()
 	s, err := NewHTTPServer(eb, rpcBus)
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, err
 	}
 
-	err = s.Start()
-
-	return s, eb, err
+	return s, eb, s.Start()
 }

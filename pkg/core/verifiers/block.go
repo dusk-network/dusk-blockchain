@@ -8,7 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-crypto/bls"
 )
 
@@ -20,8 +20,8 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 
 	// First, lets get the actual reduction steps
 	// These would be the two steps preceding the one on the certificate
-	stepOne := blk.Header.Certificate.Step - 2
-	stepTwo := blk.Header.Certificate.Step - 1
+	stepOne := blk.Header.Certificate.Step - 1
+	stepTwo := blk.Header.Certificate.Step
 
 	// Reconstruct signatures
 	stepOneBatchedSig, err := bls.UnmarshalSignature(blk.Header.Certificate.StepOneBatchedSig)
@@ -101,10 +101,10 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 
 // CheckMultiCoinbases returns an error if there is more than one coinbase transaction
 //  in the list or if there are none
-func CheckMultiCoinbases(txs []transactions.Transaction) error {
+func CheckMultiCoinbases(txs []transactions.ContractCall) error {
 	var seen bool
 	for _, tx := range txs {
-		if tx.Type() != transactions.CoinbaseType {
+		if tx.Type() != transactions.Distribute {
 			continue
 		}
 		if seen {

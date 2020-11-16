@@ -2,15 +2,15 @@ package kadcast
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"io"
-	"time"
-
+	"math/big"
 	"math/bits"
-	"math/rand"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 )
@@ -228,9 +228,14 @@ func generateRandomDelegates(beta uint8, in []encoding.PeerInfo, out *[]encoding
 		return nil
 	}
 
-	maxVal := len(in)
-	// TODO: Consider crypto/rand here
-	ind := rand.Intn(maxVal)
+	maxval := int64(len(in))
+	// #654
+	nBig, err := rand.Int(rand.Reader, big.NewInt(maxval))
+	if err != nil {
+		panic(err)
+	}
+	n := nBig.Int64()
+	ind := uint32(n)
 
 	*out = append(*out, in[ind])
 

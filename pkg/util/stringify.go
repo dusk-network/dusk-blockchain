@@ -13,7 +13,7 @@ func StringifyBytes(b []byte) string {
 		_, _ = sb.WriteString("...")
 		_, _ = sb.WriteString(hex.EncodeToString(b[len(b)-5:]))
 	} else {
-		_, _ = sb.WriteString("empty")
+		_, _ = sb.WriteString("<empty>")
 	}
 	return sb.String()
 }

@@ -1,26 +1,41 @@
 package peer
 
 import (
+	"bytes"
 	"net"
+	"os"
 	"testing"
 	"time"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/stretchr/testify/require"
+
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 func TestHandshake(t *testing.T) {
+	//setup viper timeout
+	cwd, err := os.Getwd()
+	require.Nil(t, err)
+
+	r, err := cfg.LoadFromFile(cwd + "/../../../dusk.toml")
+	require.Nil(t, err)
+	cfg.Mock(&r)
 
 	eb := eventbus.New()
-	rpcBus := rpcbus.New()
-	counter := chainsync.NewCounter(eb)
+
+	processor := NewMessageProcessor(eb)
+	factory := NewReaderFactory(processor)
+
 	client, srv := net.Pipe()
 
 	go func() {
-		peerReader, err := StartPeerReader(srv, eb, rpcBus, counter, nil)
+		responseChan := make(chan bytes.Buffer, 100)
+		exitChan := make(chan struct{}, 1)
+		peerReader, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan, exitChan)
 		if err != nil {
 			panic(err)
 		}

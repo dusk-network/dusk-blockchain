@@ -1,11 +1,13 @@
 package eventbus
 
 import (
-	"bytes"
+	"crypto/rand"
 	"errors"
 	"io"
-	"math/rand"
+	"math/big"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -23,17 +25,34 @@ type Listener interface {
 
 // CallbackListener subscribes using callbacks
 type CallbackListener struct {
-	callback func(message.Message) error
+	callback func(message.Message)
+	safe     bool
 }
 
 // Notify the copy of a message as a parameter to a callback
 func (c *CallbackListener) Notify(m message.Message) error {
-	return c.callback(m)
+	if !c.safe {
+		go c.callback(m)
+		return nil
+	}
+
+	clone, err := message.Clone(m)
+	if err != nil {
+		log.WithError(err).Error("CallbackListener, failed to clone message")
+		return err
+	}
+	go c.callback(clone)
+	return nil
+}
+
+// NewSafeCallbackListener creates a callback based dispatcher
+func NewSafeCallbackListener(callback func(message.Message)) Listener {
+	return &CallbackListener{callback, true}
 }
 
 // NewCallbackListener creates a callback based dispatcher
-func NewCallbackListener(callback func(message.Message) error) Listener {
-	return &CallbackListener{callback}
+func NewCallbackListener(callback func(message.Message)) Listener {
+	return &CallbackListener{callback, false}
 }
 
 // Close as part of the Listener method
@@ -42,7 +61,8 @@ func (c *CallbackListener) Close() {
 
 var ringBufferLength = 2000
 
-// StreamListener uses a ring buffer to dispatch messages
+// StreamListener uses a ring buffer to dispatch messages. It is inherently
+// thread-safe
 type StreamListener struct {
 	ringbuffer *ring.Buffer
 }
@@ -59,17 +79,18 @@ func NewStreamListener(w io.WriteCloser) Listener {
 	return sh
 }
 
-// Notify puts a message to the Listener's ringbuffer
+// Notify puts a message to the Listener's ringbuffer. It uses a goroutine so
+// to not block while the item is put in the ringbuffer
 func (s *StreamListener) Notify(m message.Message) error {
-	if s.ringbuffer == nil {
-		return errors.New("no ringbuffer specified")
-	}
+	// writing on the ringbuffer happens asynchronously
+	go func() {
+		buf := m.Payload().(message.SafeBuffer)
+		if !s.ringbuffer.Put(buf.Bytes()) {
+			err := errors.New("ringbuffer is closed")
+			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("ringbuffer closed")
+		}
+	}()
 
-	// TODO: interface - the ring buffer should be able to handle interface
-	// payloads rather than restricting solely to buffers
-	// TODO: interface - This panics in case payload is not a buffer
-	buf := m.Payload().(bytes.Buffer)
-	s.ringbuffer.Put(buf.Bytes())
 	return nil
 }
 
@@ -95,17 +116,40 @@ func Consume(items [][]byte, w io.WriteCloser) bool {
 // ChanListener dispatches a message using a channel
 type ChanListener struct {
 	messageChannel chan<- message.Message
+	safe           bool
 }
 
-// NewChanListener creates a channel based dispatcher
+// NewChanListener creates a channel based dispatcher. Although the message is
+// passed by value, this is not enough to enforce thread-safety when the
+// listener tries to read/change slices or arrays carried by the message.
 func NewChanListener(msgChan chan<- message.Message) Listener {
-	return &ChanListener{msgChan}
+	return &ChanListener{msgChan, false}
 }
 
-// Notify sends a message to the internal dispatcher channel
+// NewSafeChanListener creates a channel based dispatcher which is thread-safe
+func NewSafeChanListener(msgChan chan<- message.Message) Listener {
+	return &ChanListener{msgChan, true}
+}
+
+// Notify sends a message to the internal dispatcher channel. It forwards the
+// message if the listener is unsafe. Otherwise, it forwards a message clone
 func (c *ChanListener) Notify(m message.Message) error {
+	if !c.safe {
+		return forward(c.messageChannel, m)
+	}
+
+	clone, err := message.Clone(m)
+	if err != nil {
+		log.WithError(err).Error("ChanListener, failed to clone message")
+		return err
+	}
+	return forward(c.messageChannel, clone)
+}
+
+// forward avoids code duplication in the ChanListener method
+func forward(msgChan chan<- message.Message, msg message.Message) error {
 	select {
-	case c.messageChannel <- m:
+	case msgChan <- msg:
 	default:
 		return errors.New("message channel buffer is full")
 	}
@@ -117,8 +161,10 @@ func (c *ChanListener) Notify(m message.Message) error {
 func (c *ChanListener) Close() {
 }
 
-// multilistener does not implement the Listener interface since the topic and
-// the message category will likely differ
+// multilistener does not implement the Listener interface itself since the topic and
+// the message category will likely differ. It delegates to the Notify method
+// specified by the internal listener
+//
 type multiListener struct {
 	sync.RWMutex
 	*hashset.Set
@@ -138,24 +184,34 @@ func (m *multiListener) Add(topic topics.Topic) {
 	m.Set.Add([]byte{byte(topic)})
 }
 
-func (m *multiListener) Forward(topic topics.Topic, msg message.Message) {
+func (m *multiListener) Forward(topic topics.Topic, msg message.Message) (errorList []error) {
 	m.RLock()
 	defer m.RUnlock()
 	if !m.Has([]byte{byte(topic)}) {
-		return
+		return errorList
 	}
 
 	for _, dispatcher := range m.dispatchers {
 		if err := dispatcher.Notify(msg); err != nil {
 			logEB.WithError(err).WithField("type", "multilistener").Warnln("notifying subscriber failed")
+			errorList = append(errorList, err)
 		}
 	}
+
+	return errorList
 }
 
 func (m *multiListener) Store(value Listener) uint32 {
+	// #654
+	nBig, err := rand.Int(rand.Reader, big.NewInt(32))
+	if err != nil {
+		panic(err)
+	}
+	n := nBig.Int64()
+
 	h := idListener{
 		Listener: value,
-		id:       rand.Uint32(),
+		id:       uint32(n),
 	}
 	m.Lock()
 	defer m.Unlock()

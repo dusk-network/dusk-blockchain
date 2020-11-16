@@ -7,18 +7,16 @@ import (
 	"io"
 	"math"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
 var (
 	byteOrder = binary.LittleEndian
 )
 
-// EncodeBlockTx tries to serialize type, index and encoded value of transactions.Transaction
-func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) {
-
+// EncodeBlockTx tries to serialize type, index and encoded value of transactions.ContractCall
+func EncodeBlockTx(tx transactions.ContractCall, txIndex uint32) ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	// Write tx type as first field
@@ -34,8 +32,8 @@ func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) 
 		return nil, err
 	}
 
-	// Write transactions.Transaction bytes
-	err := message.MarshalTx(buf, tx)
+	// Write transactions.ContractCall bytes
+	err := transactions.Marshal(buf, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -44,14 +42,13 @@ func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) 
 }
 
 // DecodeBlockTx tries to deserialize the type, index and decoded value of a tx
-func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Transaction, uint32, error) {
-
+func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.ContractCall, uint32, error) {
 	txIndex := uint32(math.MaxUint32)
 
-	var tx transactions.Transaction
+	tx := transactions.NewTransaction()
 	reader := bytes.NewBuffer(data)
 
-	// Peak the type from the first byte
+	// Peek the type from the first byte
 	typeBytes, err := reader.ReadByte()
 	if err != nil {
 		return nil, txIndex, err
@@ -71,7 +68,7 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Tr
 		return nil, txIndex, e
 	}
 
-	tx, err = message.UnmarshalTx(reader)
+	err = transactions.Unmarshal(reader, tx)
 	return tx, txIndex, err
 }
 

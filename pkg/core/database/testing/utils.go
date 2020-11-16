@@ -3,7 +3,6 @@ package test
 import (
 	"fmt"
 	"sync/atomic"
-	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -38,21 +37,19 @@ func storeBlocks(db database.DB, blocks []*block.Block) error {
 }
 
 // A helper function to generate a set of blocks that can be chained
-func generateChainBlocks(test *testing.T, blocksCount int) ([]*block.Block, error) {
-
+func generateChainBlocks(blocksCount int) ([]*block.Block, error) {
 	overallBlockTxs := 1 + 4*int(sampleTxsBatchCount)
 	overallTxsCount := blocksCount * overallBlockTxs
 	fmt.Printf("--- MSG  Generate sample data of %d blocks with %d txs each (overall txs %d)\n", blocksCount, overallBlockTxs, overallTxsCount)
 
 	newBlocks := make([]*block.Block, blocksCount)
 	for i := 0; i < blocksCount; i++ {
-		b := helper.RandomBlock(test, atomic.AddUint64(&heightCounter, 1), sampleTxsBatchCount)
+		b := helper.RandomBlock(atomic.AddUint64(&heightCounter, 1), sampleTxsBatchCount)
 		// assume consensus time is 10sec
 		b.Header.Timestamp = int64(10 * b.Header.Height)
 
 		for _, tx := range b.Txs {
-			_, err := tx.CalculateHash()
-			if err != nil {
+			if _, err := tx.CalculateHash(); err != nil {
 				return nil, err
 			}
 		}
@@ -63,10 +60,10 @@ func generateChainBlocks(test *testing.T, blocksCount int) ([]*block.Block, erro
 	return newBlocks, nil
 }
 
-func generateRandomBlocks(test *testing.T, blocksCount int) []*block.Block {
+func generateRandomBlocks(blocksCount int) []*block.Block {
 	newBlocks := make([]*block.Block, blocksCount)
 	for i := 0; i < blocksCount; i++ {
-		newBlocks[i] = helper.RandomBlock(test, uint64(i+1), sampleTxsBatchCount)
+		newBlocks[i] = helper.RandomBlock(uint64(i+1), sampleTxsBatchCount)
 	}
 	return newBlocks
 }

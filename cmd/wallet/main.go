@@ -54,7 +54,7 @@ func walletAction(ctx *cli.Context) error {
 	defer client.Close()
 
 	// Inquire node about its wallet state, so we know which menu to open.
-	resp, err := client.NodeClient.GetWalletStatus(context.Background(), &node.EmptyRequest{})
+	resp, err := client.WalletClient.GetWalletStatus(context.Background(), &node.EmptyRequest{})
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		return err
@@ -63,7 +63,7 @@ func walletAction(ctx *cli.Context) error {
 	// If we have no wallet loaded, we open the menu to load or
 	// create one.
 	if !resp.Loaded {
-		if err := prompt.LoadMenu(client.NodeClient); err != nil {
+		if err := prompt.LoadMenu(client.WalletClient); err != nil {
 			// If we get an error from `LoadMenu`, it means we lost
 			// our connection to the node.
 			_, _ = fmt.Fprintln(os.Stderr, err.Error())
@@ -72,7 +72,7 @@ func walletAction(ctx *cli.Context) error {
 	}
 
 	// Once loaded, we open the menu for wallet operations.
-	if err := prompt.WalletMenu(client.NodeClient); err != nil {
+	if err := prompt.WalletMenu(client); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err.Error())
 		return err
 	}

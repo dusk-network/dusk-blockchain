@@ -5,29 +5,31 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/stretchr/testify/assert"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	assert "github.com/stretchr/testify/require"
 )
 
 // TxsToBuffer converts a slice of transactions to a bytes.Buffer.
-func TxsToBuffer(t *testing.T, txs []transactions.Transaction) *bytes.Buffer {
-	buf := new(bytes.Buffer)
+func TxsToBuffer(t *testing.T, txs []transactions.ContractCall) *bytes.Buffer {
+	assert := assert.New(t)
+	whole := new(bytes.Buffer)
 
 	for _, tx := range txs {
-		err := message.MarshalTx(buf, tx)
-		if err != nil {
-			assert.Nil(t, err)
-		}
+		buf := new(bytes.Buffer)
+		assert.NoError(transactions.Marshal(buf, tx))
+		_, err := whole.ReadFrom(buf)
+		assert.NoError(err)
 	}
 
-	return bytes.NewBuffer(buf.Bytes())
+	return whole
 }
 
 // RandomSlice returns a random slice of size `size`
-func RandomSlice(t *testing.T, size uint32) []byte {
+func RandomSlice(size uint32) []byte {
 	randSlice := make([]byte, size)
 	_, err := rand.Read(randSlice)
-	assert.Nil(t, err)
+	if err != nil {
+		panic(err)
+	}
 	return randSlice
 }

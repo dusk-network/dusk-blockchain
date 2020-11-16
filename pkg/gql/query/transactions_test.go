@@ -1,64 +1,66 @@
 package query
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestTxByTxID(t *testing.T) {
 
-	query := `
+	query := fmt.Sprintf(`
 		{
-		   transactions(txid: "05300b8d9904a31241520bb2961ef2516401884b8f6fc3862542b13baa4089cc") {
+		   transactions(txid: "%s") {
 			  txid
 			  txtype
 			  blockhash
 		  }
 		}
-		`
-	response := `
+		`, bid1Hash)
+	response := fmt.Sprintf(`
 		{
 			"data": {
 				"transactions": [
 					{
-						"blockhash": "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620",
-						"txid": "05300b8d9904a31241520bb2961ef2516401884b8f6fc3862542b13baa4089cc",
+						"blockhash": "%s",
+						"txid": "%s",
 						"txtype": "3"
 					}
 				]
 			}
 		}
-	`
+	`, block1, bid1Hash)
 	assertQuery(t, query, response)
 }
 
 func TestTxByTxIDs(t *testing.T) {
 
-	query := `
+	query := fmt.Sprintf(`
 		{
-		   transactions(txids: ["6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
-		   "c1ecbbaab214ae2dc230c5adf57b0a13349cb1d1eb8fdfbc7722a5baa6276de8"]) {
+		   transactions(txids: ["%s", "%s"]) {
 			  txid
 			  txtype
 			  blockhash
 		  }
 		}
-		`
-	response := `
+		`, bid3Hash, bid2Hash)
+	response := fmt.Sprintf(`
 		{
 			"data": {
 				"transactions": [
 					{
-						"blockhash": "9467c5e774eb1b4825d08c0599a0b0815fca5dac16d9690026854ed8d1f229c9",
-						"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
+						"blockhash": "%s",
+						"txid": "%s",
 						"txtype": "3"
 					},
 					{
-						"blockhash": "9bf50e394bb81346f8b8db42bddd285ac344260c024a0df808baf7601417d748",
-						"txid": "c1ecbbaab214ae2dc230c5adf57b0a13349cb1d1eb8fdfbc7722a5baa6276de8",
+						"blockhash": "%s",
+						"txid": "%s",
 						"txtype": "3"
 					}
 				]
 			}
 		}
-	`
+	`, block3, bid3Hash, block2, bid2Hash)
 	assertQuery(t, query, response)
 }
 
@@ -73,22 +75,22 @@ func TestLastTxs(t *testing.T) {
 			}
 	  	}
 		`
-	response := `
+	response := fmt.Sprintf(`
 		{
 			"data": {
 				"transactions": [
 					{
-						"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
+						"txid": "%s",
 						"txtype": "3"
 					},
 					{
-						"txid": "c1ecbbaab214ae2dc230c5adf57b0a13349cb1d1eb8fdfbc7722a5baa6276de8",
+						"txid": "%s",
 						"txtype": "3"
 					}
 				]
 			}
 		}
-	`
+	`, bid3Hash, bid2Hash)
 	assertQuery(t, query, response)
 }
 func TestTxOutput(t *testing.T) {
@@ -105,22 +107,22 @@ func TestTxOutput(t *testing.T) {
 			}
 		}		 
 	`
-	response := `
+	response := fmt.Sprintf(`
 	{
 		"data": {
 			"transactions": [
 				{
 					"output": [
 						{
-							"pubkey": "ea2c58c43d2ac9783a25dae2399b227fc1fd2a8bca41ca34aef74c9a3f7b435f"
+							"pubkey": "0000000000000000000000000000000000000000000000000000000000000000"
 						}
 					],
-					"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955"
+					"txid": "%s"
 				}
 			]
 		}
 	}
-	`
+	`, bid3Hash)
 	assertQuery(t, query, response)
 }
 
@@ -138,22 +140,22 @@ func TestTxInput(t *testing.T) {
 			}
 		}		 
 	`
-	response := `
+	response := fmt.Sprintf(`
 	{
 		"data": {
 			"transactions": [
 				{
 					"input": [
 						{
-							"keyimage": "d886641e16a1165d70fa89413c4129d56b15d5f44d2dd2b09823cd723487656a"
+							"keyimage": "0000000000000000000000000000000000000000000000000000000000000000"
 						}
 					],
-					"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955"
+					"txid": "%s"
 				}
 			]
 		}
 	}
-	`
+	`, bid3Hash)
 	assertQuery(t, query, response)
 }
 
@@ -174,7 +176,7 @@ func TestTxSize(t *testing.T) {
 			"data": {
 				"transactions": [
 					{
-						"size": 766,
+						"size": 716,
 						"txtype": "3"
 					}
 				]

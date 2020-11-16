@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -16,6 +17,7 @@ const (
 	searchPath1 = "."
 	// home datadir
 	searchPath2 = "$HOME/.dusk/"
+	testnet     = "testnet"
 )
 
 var (
@@ -45,6 +47,7 @@ type Registry struct {
 
 	// All configuration groups
 	General   generalConfiguration
+	Timeout   timeoutConfiguration
 	Database  databaseConfiguration
 	Wallet    walletConfiguration
 	Network   networkConfiguration
@@ -54,10 +57,14 @@ type Registry struct {
 
 	RPC rpcConfiguration
 	Gql gqlConfiguration
+	API apiConfiguration
 
 	Performance performanceConfiguration
 	Logger      loggerConfiguration
 	Profile     []profileConfiguration
+
+	Genesis genesisConfiguration
+	lock    *sync.RWMutex
 }
 
 // Load makes an attempt to read and unmarshal any configs from flag, env and
@@ -75,6 +82,7 @@ type Registry struct {
 func Load(configFileName string, secondary interface{}, customflags func() (string, error)) error {
 
 	r = new(Registry)
+	r.lock = new(sync.RWMutex)
 	r.ConfigFileName = configFileName
 
 	r.loadFlagsFn = loadFlags
@@ -93,11 +101,12 @@ func Load(configFileName string, secondary interface{}, customflags func() (stri
 	return nil
 }
 
-// LoadFromFile unmarshals configPath file into a new Registry instance
+// LoadFromFile unmarshalls configPath file into a new Registry instance
 // NB. It does not overwrite the global Registry
 func LoadFromFile(configPath string) (Registry, error) {
 
 	registry := Registry{}
+	registry.lock = new(sync.RWMutex)
 	registry.FixedConfigFile = configPath
 
 	// Initialization
@@ -108,6 +117,8 @@ func LoadFromFile(configPath string) (Registry, error) {
 // Get returns registry by value in order to avoid further modifications after
 // initial configuration loading
 func Get() Registry {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 	return *r
 }
 
@@ -194,7 +205,7 @@ func loadFlags() (string, error) {
 // The settings that are needed to be passed frequently by CLI should be added here
 func defineFlags() {
 	_ = pflag.StringP("logger.level", "l", "", "override logger.level settings in config file")
-	_ = pflag.StringP("general.network", "n", "testnet", "override general.network settings in config file")
+	_ = pflag.StringP("general.network", "n", testnet, "override general.network settings in config file")
 	_ = pflag.StringP("network.port", "p", "7000", "port for the node to bind on")
 	_ = pflag.StringP("logger.output", "o", "dusk", "specifies the log output destination")
 	_ = pflag.StringP("database.dir", "b", "chain", "sets the blockchain database directory")
@@ -228,6 +239,11 @@ func defineENV() {
 // Mock should be used only in test packages. It could be useful when a unit
 // test needs to be rerun with configs different from the default ones.
 func Mock(m *Registry) {
+	if m.lock == nil {
+		m.lock = new(sync.RWMutex)
+	}
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	r = m
 }
 
@@ -235,11 +251,14 @@ func init() {
 	// By default Registry should be empty but not nil. In that way, consumers
 	// (packages) can use their default values on unit testing
 	r = new(Registry)
+	r.lock = new(sync.RWMutex)
 	r.Database.Driver = "lite_v0.1.0"
-	r.General.Network = "testnet"
+	r.General.Network = testnet
 	r.Wallet.File = "wallet.dat"
 	r.Wallet.Store = "walletDB"
 	r.Consensus.DefaultLockTime = 1000
 	r.Consensus.DefaultAmount = 10
+	r.Consensus.ConsensusTimeOut = 5
+	r.Timeout.TimeoutBrokerGetCandidate = 2
 	r.Mempool.MaxInvItems = 10000
 }

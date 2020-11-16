@@ -9,7 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-const m = topics.GetLastBlock
+const m = topics.GetMempoolTxs
 
 var errInvalidParams = errors.New("invalid params")
 
@@ -132,5 +132,28 @@ func setupConsumer(rpcBus *RPCBus, respond bool) {
 		}
 
 		r.RespChan <- Response{*bytes.NewBufferString("output params"), nil}
+	}
+}
+
+func TestRPCallNoTimeout(t *testing.T) {
+	bus := New()
+	go setupConsumer(bus, true)
+	time.Sleep(100 * time.Millisecond)
+
+	// produce the call
+	buf := bytes.Buffer{}
+	_, _ = buf.WriteString("input params")
+
+	// Request with no timeout.
+	// This should not block or panic
+	d := NewRequest(buf)
+	resp, err := bus.Call(m, d, 0)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	result := resp.(bytes.Buffer)
+
+	if result.String() != "output params" {
+		t.Errorf("expecting to retrieve response data")
 	}
 }

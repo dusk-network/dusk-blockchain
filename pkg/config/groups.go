@@ -1,13 +1,32 @@
 package config
 
 type generalConfiguration struct {
-	Network    string
-	WalletOnly bool
+	Network              string
+	WalletOnly           bool
+	SafeCallbackListener bool
+}
+
+type timeoutConfiguration struct {
+	TimeoutSendBidTX            int64
+	TimeoutGetLastCommittee     int64
+	TimeoutGetLastCertificate   int64
+	TimeoutGetMempoolTXsBySize  int64
+	TimeoutGetLastBlock         int64
+	TimeoutGetCandidate         int64
+	TimeoutClearWalletDatabase  int64
+	TimeoutVerifyCandidateBlock int64
+	TimeoutSendStakeTX          int64
+	TimeoutGetMempoolTXs        int64
+	TimeoutGetRoundResults      int64
+	TimeoutBrokerGetCandidate   int64
+	TimeoutReadWrite            int64
+	TimeoutKeepAliveTime        int64
 }
 
 type loggerConfiguration struct {
 	Level   string
 	Output  string
+	Format  string
 	Monitor logMonitorConfiguration
 }
 
@@ -75,8 +94,10 @@ type profileConfiguration struct {
 
 // pkg/rpc package configs
 type rpcConfiguration struct {
-	Network string
-	Address string
+	Network             string
+	Address             string
+	SessionDurationMins uint
+	RequireSession      bool
 
 	EnableTLS bool
 	CertFile  string
@@ -84,6 +105,18 @@ type rpcConfiguration struct {
 
 	User string
 	Pass string
+
+	Rusk ruskConfiguration
+}
+
+// rpc/rusk related configurations
+type ruskConfiguration struct {
+	Network string
+	Address string
+
+	// timeout for rusk calls
+	ContractTimeout uint
+	DefaultTimeout  uint
 }
 
 type gqlConfiguration struct {
@@ -99,6 +132,16 @@ type gqlConfiguration struct {
 	MaxRequestLimit uint
 
 	Notification notificationConfiguration
+}
+
+type apiConfiguration struct {
+	Enabled        bool
+	Address        string
+	EnableTLS      bool
+	CertFile       string
+	KeyFile        string
+	DBFile         string
+	ExpirationTime int
 }
 
 type notificationConfiguration struct {
@@ -121,4 +164,10 @@ type mempoolConfiguration struct {
 type consensusConfiguration struct {
 	DefaultLockTime uint64
 	DefaultAmount   uint64
+	// ConsensusTimeOut is the time out for consensus step timers.
+	ConsensusTimeOut int64
+}
+
+type genesisConfiguration struct {
+	Legacy bool
 }

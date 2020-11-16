@@ -3,11 +3,9 @@ package responding
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -17,33 +15,27 @@ import (
 // maintains a connection to the outgoing message queue of the peer it receives this
 // message from.
 type DataBroker struct {
-	db           database.DB
-	responseChan chan<- *bytes.Buffer
-	rpcBus       *rpcbus.RPCBus
+	db     database.DB
+	rpcBus *rpcbus.RPCBus
 }
 
 // NewDataBroker returns an initialized DataBroker.
-func NewDataBroker(db database.DB, rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer) *DataBroker {
+func NewDataBroker(db database.DB, rpcBus *rpcbus.RPCBus) *DataBroker {
 	return &DataBroker{
-		db:           db,
-		responseChan: responseChan,
-		rpcBus:       rpcBus,
+		db:     db,
+		rpcBus: rpcBus,
 	}
 }
 
 // SendItems takes a GetData message from the wire, and iterates through the list,
 // sending back each item's complete data to the requesting peer.
-func (d *DataBroker) SendItems(m *bytes.Buffer) error {
-	msg := &peermsg.Inv{}
-	if err := msg.Decode(m); err != nil {
-		return err
-	}
+func (d *DataBroker) SendItems(m message.Message) ([]bytes.Buffer, error) {
+	msg := m.Payload().(message.Inv)
 
+	bufs := make([]bytes.Buffer, 0, len(msg.InvList))
 	for _, obj := range msg.InvList {
-
-		var buf *bytes.Buffer
 		switch obj.Type {
-		case peermsg.InvTypeBlock:
+		case message.InvTypeBlock:
 			// Fetch block from local state. It must be available
 			var b *block.Block
 			err := d.db.View(func(t database.Transaction) error {
@@ -53,28 +45,32 @@ func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 			})
 
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			// Send the block data back to the initiator node as topics.Block msg
-			if buf, err = marshalBlock(b); err != nil {
-				return err
+			buf, err := marshalBlock(b)
+			if err != nil {
+				return nil, err
 			}
 
-		case peermsg.InvTypeMempoolTx:
+			bufs = append(bufs, *buf)
+		case message.InvTypeMempoolTx:
 			// Try to retrieve tx from local mempool state. It might not be
 			// available
 			txs, err := GetMempoolTxs(d.rpcBus, obj.Hash)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			if len(txs) != 0 {
 				// Send topics.Tx with the tx data back to the initiator
-				buf, err = marshalTx(txs[0])
+				buf, err := marshalTx(txs[0])
 				if err != nil {
-					return err
+					return nil, err
 				}
+
+				bufs = append(bufs, *buf)
 			}
 
 			// A txID will not be found in a few situations:
@@ -84,56 +80,9 @@ func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 			// No action to run in these cases.
 		}
 
-		if buf != nil {
-			d.responseChan <- buf
-		}
 	}
 
-	return nil
-}
-
-// SendTxsItems will run tx items
-func (d *DataBroker) SendTxsItems() error {
-
-	var maxItemsSent = config.Get().Mempool.MaxInvItems
-	if maxItemsSent == 0 {
-		// responding to wire.Mempool disabled
-		return nil
-	}
-
-	// TODO: Limit the returned txs slice size based on MaxInvTxs
-	txs, err := GetMempoolTxs(d.rpcBus, nil)
-	if err != nil {
-		return err
-	}
-
-	if len(txs) != 0 {
-		// Send topics.Inv with the tx data back to the initiator
-		msg := &peermsg.Inv{}
-
-		for _, tx := range txs {
-			txID, err := tx.CalculateHash()
-			if err != nil {
-				return err
-			}
-
-			msg.AddItem(peermsg.InvTypeMempoolTx, txID)
-
-			maxItemsSent--
-			if maxItemsSent == 0 {
-				break
-			}
-		}
-
-		buf, err := marshalInv(msg)
-		if err != nil {
-			return err
-		}
-
-		d.responseChan <- buf
-	}
-
-	return nil
+	return bufs, nil
 }
 
 func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
@@ -151,11 +100,11 @@ func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
 	return buf, nil
 }
 
-func marshalTx(tx transactions.Transaction) (*bytes.Buffer, error) {
+func marshalTx(tx transactions.ContractCall) (*bytes.Buffer, error) {
 	//TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
 	// buf := topics.Topics[topics.Block].Buffer
 	buf := new(bytes.Buffer)
-	if err := message.MarshalTx(buf, tx); err != nil {
+	if err := transactions.Marshal(buf, tx); err != nil {
 		return nil, err
 	}
 

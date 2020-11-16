@@ -1,8 +1,11 @@
 package query
 
 import (
+	"fmt"
 	"testing"
 )
+
+var txHash = "abff217058b7d30a8340cbcaddf97e0c90834323e88556dcf43c5cea9cfaeaa6"
 
 func TestBlocksByHeight(t *testing.T) {
 	query := `
@@ -43,65 +46,65 @@ func TestBlocksByHeight(t *testing.T) {
 }
 
 func TestBlocksByHash(t *testing.T) {
-	query := `
+	query := fmt.Sprintf(`
 		{
-		  blocks(hash: "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620") {
+		  blocks(hash: "%s") {
 			header {
                hash
 			   height
 			}
 		  },
 		}
-		`
-	response := `
+		`, block1)
+	response := fmt.Sprintf(`
 		{
         	"data": {
         		"blocks": [
         			{
         				"header": {
-        					"hash": "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620",
+        					"hash": "%s",
         					"height": 0
         				}
         			}
         		]
         	}
         }
-	`
+	`, block1)
 	assertQuery(t, query, response)
 }
 
 func TestBlocksByHashes(t *testing.T) {
-	query := `
+	query := fmt.Sprintf(`
 		{
-		  blocks(hashes: ["9bf50e394bb81346f8b8db42bddd285ac344260c024a0df808baf7601417d748", 
-                          "9467c5e774eb1b4825d08c0599a0b0815fca5dac16d9690026854ed8d1f229c9"] ) {
+		  blocks(hashes: ["%s", 
+                          "%s"] ) {
 			header {
                hash
 			   height
 			}
 		  },
 		}
-		`
-	response := `
+		`, block2, block3)
+	response := fmt.Sprintf(`
 		{
         	"data": {
         		"blocks": [
         			{
         				"header": {
-        					"hash": "9bf50e394bb81346f8b8db42bddd285ac344260c024a0df808baf7601417d748",
+        					"hash": "%s",
         					"height": 1
         				}
         			},
         			{
         				"header": {
-        					"hash": "9467c5e774eb1b4825d08c0599a0b0815fca5dac16d9690026854ed8d1f229c9",
+        					"hash": "%s",
         					"height": 2
         				}
         			}
         		]
         	}
         }
-	`
+	`, block2, block3)
 	assertQuery(t, query, response)
 
 	// Test Blocks By Range (same response expected)
@@ -132,7 +135,7 @@ func TestBlocksTxs(t *testing.T) {
 		  }
 		}
 		`
-	response := `
+	response := fmt.Sprintf(`
 		{
 			"data": {
 				"blocks": [
@@ -142,7 +145,7 @@ func TestBlocksTxs(t *testing.T) {
 						},
 						"transactions": [
 							{
-								"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
+								"txid": "%s",
 								"txtype": "3"
 							}
 						]
@@ -150,7 +153,7 @@ func TestBlocksTxs(t *testing.T) {
 				]
 			}
 		}
-	`
+	`, txHash)
 	assertQuery(t, query, response)
 }
 
@@ -165,37 +168,36 @@ func TestLastBlocks(t *testing.T) {
 		  }
 		}
 		`
-	response := `
+	response := fmt.Sprintf(`
 		 {
         	"data": {
         		"blocks": [
         			{
         				"header": {
-        					"hash": "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620",
+        					"hash": "%s",
         					"height": 0
         				}
         			},
         			{
         				"header": {
-        					"hash": "9bf50e394bb81346f8b8db42bddd285ac344260c024a0df808baf7601417d748",
+        					"hash": "%s",
         					"height": 1
         				}
         			},
         			{
         				"header": {
-        					"hash": "9467c5e774eb1b4825d08c0599a0b0815fca5dac16d9690026854ed8d1f229c9",
+        					"hash": "%s",
         					"height": 2
         				}
         			}
         		]
         	}
         }
-	`
+	`, block1, block2, block3)
 	assertQuery(t, query, response)
 }
 
 func TestBlocksTxsQuery(t *testing.T) {
-
 	query := `
 		{ 
 			blocks(last: 1)   
@@ -220,7 +222,7 @@ func TestBlocksTxsQuery(t *testing.T) {
 			}
 	  	} 
 		`
-	response := `
+	response := fmt.Sprintf(`
 	{
 		"data": {
 			"blocks": [
@@ -232,15 +234,15 @@ func TestBlocksTxsQuery(t *testing.T) {
 						{
 							"input": [
 								{
-									"keyimage": "d886641e16a1165d70fa89413c4129d56b15d5f44d2dd2b09823cd723487656a"
+									"keyimage": "0000000000000000000000000000000000000000000000000000000000000000"
 								}
 							],
 							"output": [
 								{
-									"pubkey": "ea2c58c43d2ac9783a25dae2399b227fc1fd2a8bca41ca34aef74c9a3f7b435f"
+									"pubkey": "0000000000000000000000000000000000000000000000000000000000000000"
 								}
 							],
-							"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
+							"txid": "%s",
 							"txtype": "3"
 						}
 					]
@@ -248,7 +250,7 @@ func TestBlocksTxsQuery(t *testing.T) {
 			]
 		}
 	}
-	`
+	`, txHash)
 	assertQuery(t, query, response)
 }
 
