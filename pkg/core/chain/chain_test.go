@@ -236,8 +236,7 @@ func TestFetchTip(t *testing.T) {
 	proxy := &transactions.MockProxy{
 		E: transactions.MockExecutor(0),
 	}
-	chain, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy)
-
+	chain, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, nil)
 	assert.NoError(err)
 
 	// on a modern chain, state(tip) must point at genesis
@@ -305,7 +304,7 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *rp
 	}
 	var c *Chain
 
-	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy)
+	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, nil)
 	assert.NoError(t, err)
 
 	return eb, rpc, c

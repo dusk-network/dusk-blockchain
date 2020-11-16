@@ -12,16 +12,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	assert "github.com/stretchr/testify/require"
 )
 
 func TestCandidateQueue(t *testing.T) {
-	bus, rpcBus := eventbus.New(), rpcbus.New()
+	bus := eventbus.New()
 	assert := assert.New(t)
 
-	req := NewRequestor(bus, rpcBus)
-	go req.Listen(context.Background())
+	req := NewRequestor(bus)
 
 	// Getting a block when no request is made should not result in it being
 	// pushed to the candidateQueue
@@ -30,9 +28,9 @@ func TestCandidateQueue(t *testing.T) {
 
 	assert.Empty(req.candidateQueue)
 
-	// Getting a desired block should make it end up in the queue
+	// Getting a block when requesting should make it end up in the queue
 	c := mockCandidate()
-	req.setRequestHash(c.Block.Header.Hash)
+	req.setRequesting(true)
 	_, err = req.ProcessCandidate(message.New(topics.Candidate, c))
 	assert.NoError(err)
 
@@ -42,11 +40,10 @@ func TestCandidateQueue(t *testing.T) {
 }
 
 func TestRequestor(t *testing.T) {
-	bus, rpcBus := eventbus.New(), rpcbus.New()
+	bus := eventbus.New()
 	assert := assert.New(t)
 
-	req := NewRequestor(bus, rpcBus)
-	go req.Listen(context.Background())
+	req := NewRequestor(bus)
 
 	c := mockCandidate()
 
@@ -55,9 +52,11 @@ func TestRequestor(t *testing.T) {
 	cChan := make(chan message.Candidate, 1)
 
 	go func() {
-		cm, err := rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(c.Block.Header.Hash), 2*time.Second)
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
+		defer cancel()
+		cm, err := req.RequestCandidate(ctx, c.Block.Header.Hash)
 		assert.NoError(err)
-		cChan <- cm.(message.Candidate)
+		cChan <- cm
 	}()
 
 	// Check if we receive a `GetCandidate` message

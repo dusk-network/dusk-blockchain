@@ -5,7 +5,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
@@ -13,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -37,7 +36,8 @@ type Phase struct {
 
 	selectionResult message.Score
 
-	verifyFn consensus.CandidateVerificationFunc
+	verifyFn  consensus.CandidateVerificationFunc
+	requestor *candidate.Requestor
 
 	next consensus.Phase
 }
@@ -45,12 +45,13 @@ type Phase struct {
 // New creates and launches the component which responsibility is to reduce the
 // candidates gathered as winner of the selection of all nodes in the committee
 // and reduce them to just one candidate obtaining 64% of the committee vote
-func New(next consensus.Phase, e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration, db database.DB) *Phase {
+func New(next consensus.Phase, e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration, db database.DB, requestor *candidate.Requestor) *Phase {
 	return &Phase{
 		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
 		verifyFn:  verifyFn,
 		next:      next,
 		db:        db,
+		requestor: requestor,
 	}
 }
 
@@ -171,7 +172,10 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 
 	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Block.Header.Hash) {
 		var err error
-		p.selectionResult.Candidate, err = p.fetchCandidateBlock(hdr.BlockHash)
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
+		// Ensure we release the resources associated to this context.
+		defer cancel()
+		p.selectionResult.Candidate, err = p.requestor.RequestCandidate(ctx, hdr.BlockHash)
 		if err != nil {
 			log.
 				WithError(err).
@@ -187,7 +191,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 				WithField("round", hdr.Round).
 				WithField("step", hdr.Step).
 				Error("firststep_storeCandidate failed")
-			// TODO: what should our response be?
+			panic(err)
 		}
 	}
 
@@ -217,22 +221,6 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 		},
 		StepVotes: r.SV,
 	}
-}
-
-func (p *Phase) fetchCandidateBlock(hash []byte) (message.Candidate, error) {
-	req := rpcbus.NewRequest(hash)
-	timeoutGetCandidate := time.Duration(config.Get().Timeout.TimeoutGetCandidate) * time.Second
-	resp, err := p.RPCBus.Call(topics.GetCandidate, req, timeoutGetCandidate)
-	if err != nil {
-		log.
-			WithError(err).
-			WithFields(log.Fields{
-				"process": "reduction",
-			}).Error("firststep, fetching the candidate block failed")
-		return message.Candidate{}, err
-	}
-
-	return resp.(message.Candidate), nil
 }
 
 func (p *Phase) storeCandidate(cm message.Candidate) error {

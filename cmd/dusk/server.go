@@ -57,7 +57,7 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (chain.Loader, peer.ProcessorFunc, func(keys.PublicKey, key.Keys) error, error) {
+func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB, requestor *candidate.Requestor) (chain.Loader, peer.ProcessorFunc, func(keys.PublicKey, key.Keys) error, error) {
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
@@ -72,7 +72,7 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 	}
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy)
+	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, requestor)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -115,9 +115,8 @@ func Setup() *Server {
 	processor.Register(topics.GetBlocks, bhb.AdvertiseMissingBlocks)
 	cb := responding.NewCandidateBroker(db)
 	processor.Register(topics.GetCandidate, cb.ProvideCandidate)
-	cr := candidate.NewRequestor(eventBus, rpcBus)
+	cr := candidate.NewRequestor(eventBus)
 	processor.Register(topics.Candidate, cr.ProcessCandidate)
-	go cr.Listen(ctx)
 	cp := consensus.NewPublisher(eventBus)
 	processor.Register(topics.Score, cp.Process)
 	processor.Register(topics.Reduction, cp.Process)
@@ -157,7 +156,7 @@ func Setup() *Server {
 		}
 	}
 
-	chainDBLoader, blkFn, consFn, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db)
+	chainDBLoader, blkFn, consFn, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db, cr)
 	if err != nil {
 		log.Panic(err)
 	}

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -93,7 +94,8 @@ type Chain struct {
 	cancel       context.CancelFunc
 
 	// Consensus loop
-	loop *loop.Consensus
+	loop      *loop.Consensus
+	requestor *candidate.Requestor
 
 	// rusk client
 	proxy transactions.Proxy
@@ -103,12 +105,8 @@ type Chain struct {
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
 // from (remote) consensus components, the RPCBus for dispatching synchronous
-// data related to Certificates, Blocks, Rounds and progress. It also accepts a
-// counter to manage the synchronization process and the hash of the genesis
-// block
-// TODO: the counter should be encapsulated in a specific component for
-// synchronization
-func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy) (*Chain, error) {
+// data related to Certificates, Blocks, Rounds and progress.
+func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, requestor *candidate.Requestor) (*Chain, error) {
 	chain := &Chain{
 		eventBus:  eventBus,
 		rpcBus:    rpcBus,
@@ -118,6 +116,7 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		verifier:  verifier,
 		proxy:     proxy,
 		ctx:       ctx,
+		requestor: requestor,
 	}
 
 	provisioners, err := proxy.Executor().GetProvisioners(ctx)
@@ -375,7 +374,7 @@ func (c *Chain) startConsensus() error {
 		c.lock.Lock()
 		ru := c.getRoundUpdate()
 		c.consensusCtx, c.cancel = context.WithCancel(c.ctx)
-		scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock)
+		scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock, c.requestor)
 		if err != nil {
 			log.WithError(err).Error("could not create consensus state machine")
 			c.lock.Unlock()

@@ -23,7 +23,7 @@ import (
 func TestSendReduction(t *testing.T) {
 	hlp := reduction.NewHelper(50, time.Second)
 	_, db := lite.CreateDBConnection()
-	step := New(nil, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, 10*time.Second, db)
+	step := New(nil, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, 10*time.Second, db, nil)
 	scoreMsg := consensus.MockScoreMsg(t, nil)
 	// injecting the result of the Selection step
 	stepFn := step.Fn(scoreMsg.Payload().(message.Score))
@@ -114,7 +114,7 @@ func TestFirstStepReduction(t *testing.T) {
 			// injecting the test phase in the reduction step
 			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, nil)
 			_, db := lite.CreateDBConnection()
-			firstStepReduction := New(testPhase, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, timeout, db)
+			firstStepReduction := New(testPhase, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, timeout, db, nil)
 
 			// injecting the result of the Selection step
 			msg := consensus.MockScoreMsg(t, &header.Header{BlockHash: hash})

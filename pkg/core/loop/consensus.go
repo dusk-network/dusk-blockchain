@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
@@ -49,22 +50,22 @@ type Consensus struct {
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing
-func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc) (consensus.Phase, consensus.Controller, error) {
+func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc, requestor *candidate.Requestor) (consensus.Phase, consensus.Controller, error) {
 	generator, err := blockgenerator.New(e, pubKey, db)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	selectionStep := CreateInitialStep(e, consensusTimeOut, generator, verifyFn, db)
+	selectionStep := CreateInitialStep(e, consensusTimeOut, generator, verifyFn, db, requestor)
 	agreementStep := agreement.New(e)
 	return selectionStep, agreementStep, nil
 }
 
 // CreateInitialStep creates the selection step by injecting a BlockGenerator
 // interface to it
-func CreateInitialStep(e *consensus.Emitter, consensusTimeOut time.Duration, bg blockgenerator.BlockGenerator, verifyFn consensus.CandidateVerificationFunc, db database.DB) consensus.Phase {
+func CreateInitialStep(e *consensus.Emitter, consensusTimeOut time.Duration, bg blockgenerator.BlockGenerator, verifyFn consensus.CandidateVerificationFunc, db database.DB, requestor *candidate.Requestor) consensus.Phase {
 	redu2 := secondstep.New(e, consensusTimeOut)
-	redu1 := firststep.New(redu2, e, verifyFn, consensusTimeOut, db)
+	redu1 := firststep.New(redu2, e, verifyFn, consensusTimeOut, db, requestor)
 	selectionStep := selection.New(redu1, bg, e, consensusTimeOut, db)
 	redu2.SetNext(selectionStep)
 	return selectionStep
