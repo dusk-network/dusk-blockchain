@@ -8,9 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
@@ -24,7 +22,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/sirupsen/logrus"
 	assert "github.com/stretchr/testify/require"
 )
@@ -34,7 +31,7 @@ import (
 func TestConcurrentAcceptBlock(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(1)
-	eb, _, _ := setupChainTest(t, startingHeight)
+	eb, _ := setupChainTest(t, startingHeight)
 
 	// Run two subscribers expecting acceptedBlock message
 	acceptedBlock1Chan := make(chan message.Message, 1)
@@ -93,7 +90,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	logrus.SetLevel(logrus.InfoLevel)
 	assert := assert.New(t)
 	startingHeight := uint64(1)
-	eb, _, c := setupChainTest(t, startingHeight)
+	eb, c := setupChainTest(t, startingHeight)
 
 	d, _ := crypto.RandEntropy(32)
 	k, _ := crypto.RandEntropy(32)
@@ -154,7 +151,7 @@ func TestAcceptBlock(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(1)
 
-	eb, _, c := setupChainTest(t, startingHeight)
+	eb, c := setupChainTest(t, startingHeight)
 
 	acceptedBlockChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.AcceptedBlock, eventbus.NewChanListener(acceptedBlockChan))
@@ -194,7 +191,7 @@ func TestReturnOnMissingCandidate(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(2)
 
-	_, _, c := setupChainTest(t, startingHeight)
+	_, c := setupChainTest(t, startingHeight)
 
 	blk := mockAcceptableBlock(*c.tip)
 	cert := block.EmptyCertificate()
@@ -207,17 +204,6 @@ func TestReturnOnMissingCandidate(t *testing.T) {
 
 	// Ensure everything is still the same
 	assert.True(currPrevBlock.Equals(c.tip))
-}
-
-func createMockedCertificate(hash []byte, round uint64, keys []key.Keys, p *user.Provisioners) *block.Certificate {
-	votes := message.GenVotes(hash, round, 3, keys, p)
-	return &block.Certificate{
-		StepOneBatchedSig: votes[0].Signature.Compress(),
-		StepTwoBatchedSig: votes[1].Signature.Compress(),
-		Step:              1,
-		StepOneCommittee:  votes[0].BitSet,
-		StepTwoCommittee:  votes[1].BitSet,
-	}
 }
 
 func createLoader(db database.DB) *DBLoader {
@@ -250,34 +236,6 @@ func TestFetchTip(t *testing.T) {
 	assert.Equal(chain.tip.Header.Hash, s.TipHash)
 }
 
-func TestRebuildChain(t *testing.T) {
-	_, rb, c := setupChainTest(t, 0)
-	catchClearWalletDatabaseRequest(t, rb)
-
-	// Add a block so that we have a bit of chain state
-	// to check against.
-	blk := mockAcceptableBlock(*c.tip)
-
-	assert.NoError(t, c.AcceptBlock(context.Background(), *blk))
-
-	// Chain prevBlock should now no longer be genesis
-	genesis := c.loader.(*DBLoader).genesis
-	//genesis := cfg.DecodeGenesis()
-	assert.False(t, genesis.Equals(c.tip))
-
-	p, ks := consensus.MockProvisioners(10)
-	c.lastCertificate = createMockedCertificate(c.tip.Header.Hash, 2, ks, p)
-
-	// Now, send a request to rebuild the chain
-	_, err := c.RebuildChain(context.Background(), &node.EmptyRequest{})
-	assert.NoError(t, err)
-
-	// We should be back at the genesis chain state
-	assert.True(t, genesis.Equals(c.tip))
-
-	assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
-}
-
 // mock a block which can be accepted by the chain.
 // note that this is only valid for height 1, as the certificate
 // is not checked on height 1 (for network bootstrapping)
@@ -292,7 +250,7 @@ func mockAcceptableBlock(prevBlock block.Block) *block.Block {
 	return blk
 }
 
-func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
+func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Chain) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 
@@ -307,16 +265,5 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *rp
 	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, nil)
 	assert.NoError(t, err)
 
-	return eb, rpc, c
-}
-
-func catchClearWalletDatabaseRequest(t *testing.T, rb *rpcbus.RPCBus) {
-	c := make(chan rpcbus.Request, 1)
-	err := rb.Register(topics.ClearWalletDatabase, c)
-	assert.NoError(t, err)
-
-	go func() {
-		r := <-c
-		r.RespChan <- rpcbus.NewResponse(nil, nil)
-	}()
+	return eb, c
 }

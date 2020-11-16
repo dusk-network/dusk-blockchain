@@ -22,7 +22,7 @@ import (
 func TestConcurrentBlock(t *testing.T) {
 	// Set up a chain instance with mocking verifiers
 	startingHeight := uint64(1)
-	_, _, chain := setupChainTest(t, startingHeight)
+	_, chain := setupChainTest(t, startingHeight)
 
 	BLSKeys, _ := key.NewRandKeys()
 	pk := keys.PublicKey{

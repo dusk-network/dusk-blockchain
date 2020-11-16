@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"sync"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
@@ -505,49 +504,10 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 
 // RebuildChain will delete all blocks except for the genesis block,
 // to allow for a full re-sync.
+// NOTE: This function no longer does anything, but is still here to conform to the
+// ChainServer interface, for GRPC communications.
 func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
-	// Halt consensus
-	if c.cancel != nil {
-		c.cancel()
-	}
-
-	// Remove EVERYTHING from the database. This includes the genesis
-	// block, so we need to add it afterwards.
-	if err := c.loader.Clear(); err != nil {
-		return nil, err
-	}
-
-	// Note that, beyond this point, an error in reconstructing our
-	// state is unrecoverable, as it deems the node totally useless.
-	// Therefore, any error encountered from now on is answered by
-	// a panic.
-	var tipErr error
-	var tip *block.Block
-	tip, tipErr = c.loader.LoadTip()
-	if tipErr != nil {
-		log.Panic(tipErr)
-	}
-	c.tip = tip
-
-	if unrecoverable := c.verifier.PerformSanityCheck(0, SanityCheckHeight, 0); unrecoverable != nil {
-		log.Panic(unrecoverable)
-	}
-
-	// Reset in-memory values
-	c.resetState()
-
-	// Clear walletDB
-	timeoutClearWalletDatabase := time.Duration(config.Get().Timeout.TimeoutClearWalletDatabase) * time.Second
-	if _, err := c.rpcBus.Call(topics.ClearWalletDatabase, rpcbus.NewRequest(bytes.Buffer{}), timeoutClearWalletDatabase); err != nil {
-		log.Panic(err)
-	}
-
-	return &node.GenericResponse{Response: "Blockchain deleted. Syncing from scratch..."}, nil
-}
-
-func (c *Chain) resetState() {
-	c.p = user.NewProvisioners()
-	c.lastCertificate = block.EmptyCertificate()
+	return &node.GenericResponse{Response: "Unimplemented"}, nil
 }
 
 func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
