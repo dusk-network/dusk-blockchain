@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -22,7 +21,7 @@ func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) me
 		panic(err)
 	}
 
-	return message.Candidate{Block: b, Certificate: block.EmptyCertificate()}
+	return message.Candidate{Block: b}
 }
 
 type mock struct {

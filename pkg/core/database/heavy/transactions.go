@@ -614,7 +614,6 @@ func (t transaction) FetchCandidateMessage(hash []byte) (message.Candidate, erro
 
 	cm := new(message.Candidate)
 	cm.Block = block.NewBlock()
-	cm.Certificate = block.EmptyCertificate()
 	if err := message.UnmarshalCandidate(bytes.NewBuffer(value), cm); err != nil {
 		return message.Candidate{}, err
 	}

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -80,6 +79,5 @@ func TestRequestor(t *testing.T) {
 //nolint:unused
 func mockCandidate() message.Candidate {
 	genesis := config.DecodeGenesis()
-	cert := block.EmptyCertificate()
-	return message.MakeCandidate(genesis, cert)
+	return message.MakeCandidate(genesis)
 }

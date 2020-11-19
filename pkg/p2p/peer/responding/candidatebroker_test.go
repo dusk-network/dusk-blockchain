@@ -44,7 +44,7 @@ func TestCandidateBroker(t *testing.T) {
 	_, _ = topics.Extract(&buf[0])
 
 	// Ensure it is the same block
-	cm := message.MakeCandidate(block.NewBlock(), block.EmptyCertificate())
+	cm := message.MakeCandidate(block.NewBlock())
 	assert.NoError(t, message.UnmarshalCandidate(&buf[0], &cm))
 	assert.True(t, cm.Block.Equals(blocks[0]))
 }

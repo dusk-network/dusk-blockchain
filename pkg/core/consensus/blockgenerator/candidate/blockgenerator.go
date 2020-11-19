@@ -73,7 +73,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.S
 	// Since the Candidate message goes straight to the Chain, there is
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
-	candidate := message.MakeCandidate(blk, r.LastCertificate)
+	candidate := message.MakeCandidate(blk)
 	return message.NewScore(sev, bg.Keys.BLSPubKeyBytes, r.Hash, candidate), nil
 }
 
