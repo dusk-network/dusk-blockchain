@@ -3,10 +3,10 @@ package transactor
 import (
 	"context"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -36,13 +36,13 @@ type Transactor struct { // TODO: rename
 	proxy     transactions.Proxy
 	keyMaster transactions.KeyMaster
 
-	setupConsensus func(keys.PublicKey, key.Keys) error
+	setupConsensus func(keys.PublicKey, *loop.Consensus)
 
 	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy, setupConsensusFn func(keys.PublicKey, key.Keys) error) (*Transactor, error) {
+func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy, setupConsensusFn func(keys.PublicKey, *loop.Consensus)) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}

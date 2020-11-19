@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
@@ -16,6 +18,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -91,6 +94,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(1)
 	eb, c := setupChainTest(t, startingHeight)
+	rb := rpcbus.New()
 
 	d, _ := crypto.RandEntropy(32)
 	k, _ := crypto.RandEntropy(32)
@@ -110,7 +114,15 @@ func TestAcceptFromPeer(t *testing.T) {
 		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
 	}
 
-	go c.SetupConsensus(pk, BLSKeys)
+	e := &consensus.Emitter{
+		EventBus:    eb,
+		RPCBus:      rb,
+		Keys:        BLSKeys,
+		Proxy:       c.proxy,
+		TimerLength: 5 * time.Second,
+	}
+	l := loop.New(e)
+	go c.SetupConsensus(pk, l)
 
 	blk := mockAcceptableBlock(*c.tip)
 

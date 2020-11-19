@@ -11,8 +11,15 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+
+	"encoding/hex"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -86,7 +93,7 @@ type Chain struct {
 
 	// Consensus context, used to cancel the loop.
 	consensusCtx context.Context
-	cancel       context.CancelFunc
+	interrupt    context.CancelFunc
 
 	// Consensus loop
 	loop      *loop.Consensus
@@ -152,20 +159,25 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 
 // SetupConsensus adds the missing fields on the Chain which need to be populated
 // by the user. Once the fields are populated, consensus is started.
-func (c *Chain) SetupConsensus(pk keys.PublicKey, blsKeys key.Keys) error {
+// NOTE: we need locking here so that there is no race condition between
+// the synchronization routine trying to figure out if there is a loop
+// available, and the setting of these fields.
+func (c *Chain) SetupConsensus(pk keys.PublicKey, l *loop.Consensus) {
 	c.lock.Lock()
 	c.pubKey = &pk
-	e := &consensus.Emitter{
-		EventBus:    c.eventBus,
-		RPCBus:      c.rpcBus,
-		Keys:        blsKeys,
-		Proxy:       c.proxy,
-		TimerLength: config.ConsensusTimeOut,
-	}
-
-	c.loop = loop.New(e)
+	c.loop = l
 	c.lock.Unlock()
-	return c.startConsensus()
+
+	// If we are on genesis and our consensus is being set up, it means
+	// the network has just bootstrapped. So, we need to start the consensus,
+	// and set up the interrupt.
+	if c.tip.Header.Height == 0 {
+		go func() {
+			if err := c.startConsensus(); err != nil {
+				log.WithError(err).Error("consensus failure")
+			}
+		}()
+	}
 }
 
 // ProcessBlock will handle blocks incoming from the network. It will allow
@@ -191,8 +203,8 @@ func (c *Chain) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	// If we are more than one block behind, stop the consensus
 	log.Debug("topics.StopConsensus")
 	// FIXME: this call should be blocking
-	if c.cancel != nil {
-		c.cancel()
+	if c.interrupt != nil {
+		c.interrupt()
 	}
 
 	// If this block is from far in the future, we should start syncing mode.
@@ -368,7 +380,7 @@ func (c *Chain) startConsensus() error {
 	for {
 		c.lock.Lock()
 		ru := c.getRoundUpdate()
-		c.consensusCtx, c.cancel = context.WithCancel(c.ctx)
+		c.consensusCtx, c.interrupt = context.WithCancel(c.ctx)
 		scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock, c.requestor)
 		if err != nil {
 			log.WithError(err).Error("could not create consensus state machine")
@@ -385,16 +397,16 @@ func (c *Chain) startConsensus() error {
 			return err
 		}
 
+		// If the context was canceled, the results will be nil. Thus, we can
+		// break the loop and exit the function, to make place for the new one.
 		if cert == nil || blockHash == nil {
-			break
+			return nil
 		}
 
 		if err := c.handleCertificateMessage(cert, blockHash); err != nil {
 			return err
 		}
 	}
-
-	return nil
 }
 
 // VerifyCandidateBlock can be used as a callback for the consensus in order to
