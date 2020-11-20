@@ -49,7 +49,7 @@ func TestSelection(t *testing.T) {
 
 			testPhase := consensus.NewTestPhase(t, ttestCB, nil)
 			sel := selection.New(testPhase, ttest.bg, hlp.Emitter, consensusTimeOut, db)
-			selFn := sel.Fn(nil)
+			selFn := sel.Initialize(nil)
 
 			msgChan := make(chan message.Message, 1)
 			go func() {

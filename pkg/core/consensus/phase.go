@@ -10,10 +10,10 @@ import (
 type (
 	// Phase is used whenever an instantiation is needed.
 	Phase interface {
-		// Fn accepts as an
+		// Initialize accepts as an
 		// argument an interface, usually a message or the result  of the state
 		// function execution. It provides the capability to create a closure of sort
-		Fn(InternalPacket) PhaseFn
+		Initialize(InternalPacket) PhaseFn
 	}
 
 	// PhaseFn represents the recursive consensus state function

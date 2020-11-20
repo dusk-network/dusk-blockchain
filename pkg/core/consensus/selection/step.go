@@ -72,9 +72,9 @@ func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emi
 	return selector
 }
 
-// Fn returns the Phase state function for the next phase, and initializes it
+// Initialize returns the Phase state function for the next phase, and initializes it
 // with the result from this phase
-func (p *Phase) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
+func (p *Phase) Initialize(_ consensus.InternalPacket) consensus.PhaseFn {
 	return p
 }
 
@@ -168,13 +168,13 @@ func (p *Phase) endSelection(_ uint64, _ uint8) consensus.PhaseFn {
 		//	BlockHash: emptyScore[:],
 		//}
 		log.Debug("endSelection, p.next.Fn(message.EmptyScore())")
-		return p.next.Fn(message.EmptyScore())
+		return p.next.Initialize(message.EmptyScore())
 	}
 
 	log.Debug("endSelection, p.next.Fn(p.bestEvent)")
 	e := p.bestEvent
 	p.bestEvent = message.EmptyScore()
-	return p.next.Fn(e)
+	return p.next.Initialize(e)
 }
 
 func (p *Phase) collectScore(ctx context.Context, sc message.Score) {

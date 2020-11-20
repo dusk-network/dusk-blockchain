@@ -26,7 +26,7 @@ func TestSendReduction(t *testing.T) {
 	step := New(nil, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, 10*time.Second, db, nil)
 	scoreMsg := consensus.MockScoreMsg(t, nil)
 	// injecting the result of the Selection step
-	stepFn := step.Fn(scoreMsg.Payload().(message.Score))
+	stepFn := step.Initialize(scoreMsg.Payload().(message.Score))
 	test := reduction.PrepareSendReductionTest(hlp, stepFn)
 	test(t)
 }
@@ -118,7 +118,7 @@ func TestFirstStepReduction(t *testing.T) {
 
 			// injecting the result of the Selection step
 			msg := consensus.MockScoreMsg(t, &header.Header{BlockHash: hash})
-			firstStepReduction.Fn(msg.Payload().(message.Score))
+			firstStepReduction.Initialize(msg.Payload().(message.Score))
 
 			// running the reduction step
 			ctx := context.Background()

@@ -97,7 +97,7 @@ type mockPhase struct {
 	packet   InternalPacket
 }
 
-func (m *mockPhase) Fn(packet InternalPacket) PhaseFn {
+func (m *mockPhase) Initialize(packet InternalPacket) PhaseFn {
 	m.packet = packet
 	return m
 }
@@ -153,8 +153,8 @@ func (t *TestPhase) String() string {
 	return "test"
 }
 
-// Fn is used by the step under test to provide its result
-func (t *TestPhase) Fn(sv InternalPacket) PhaseFn {
+// Initialize is used by the step under test to provide its result
+func (t *TestPhase) Initialize(sv InternalPacket) PhaseFn {
 	t.packet = sv
 	return t
 }
