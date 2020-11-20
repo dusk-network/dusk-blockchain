@@ -173,10 +173,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 
 	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Header.Hash) {
 		var err error
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
-		// Ensure we release the resources associated to this context.
-		defer cancel()
-		p.selectionResult.Candidate, err = p.requestor.RequestCandidate(ctx, hdr.BlockHash)
+		p.selectionResult.Candidate, err = p.fetchCandidate(hdr.BlockHash)
 		if err != nil {
 			log.
 				WithError(err).
@@ -184,15 +181,6 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 				WithField("step", hdr.Step).
 				Error("firststep_fetchCandidateBlock failed")
 			return p.createStepVoteMessage(reduction.EmptyResult, round, step)
-		}
-
-		// Store candidate for later use
-		if err := p.storeCandidate(p.selectionResult.Candidate); err != nil {
-			log.WithError(err).
-				WithField("round", hdr.Round).
-				WithField("step", hdr.Step).
-				Error("firststep_storeCandidate failed")
-			panic(err)
 		}
 	}
 
@@ -206,6 +194,39 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 	}
 
 	return p.createStepVoteMessage(result, round, step)
+}
+
+func (p *Phase) fetchCandidate(hash []byte) (message.Candidate, error) {
+	// First, check to see if we have the candidate in the db.
+	var cm message.Candidate
+	err := p.db.View(func(t database.Transaction) error {
+		var err error
+		cm, err = t.FetchCandidateMessage(hash)
+		return err
+	})
+
+	if err == nil && cm != (message.Candidate{}) {
+		return cm, nil
+	}
+
+	return p.requestCandidate(hash)
+}
+
+func (p *Phase) requestCandidate(hash []byte) (message.Candidate, error) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
+	// Ensure we release the resources associated to this context.
+	defer cancel()
+	cm, err := p.requestor.RequestCandidate(ctx, hash)
+	if err != nil {
+		return message.Candidate{}, err
+	}
+
+	// Store candidate for later use
+	if err := p.storeCandidate(p.selectionResult.Candidate); err != nil {
+		panic(err)
+	}
+
+	return cm, nil
 }
 
 func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8) *message.StepVotesMsg {
