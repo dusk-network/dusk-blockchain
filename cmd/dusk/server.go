@@ -7,37 +7,33 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/gql"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
+	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 var logServer = logrus.WithField("process", "server")
@@ -242,8 +238,7 @@ func Setup() *Server {
 // OnAccept read incoming packet from the peers
 func (s *Server) OnAccept(conn net.Conn) {
 	writeQueueChan := make(chan bytes.Buffer, 1000)
-	exitChan := make(chan struct{}, 1)
-	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan, exitChan)
+	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan)
 	if err != nil {
 		panic(err)
 	}
@@ -254,10 +249,8 @@ func (s *Server) OnAccept(conn net.Conn) {
 	}
 	logServer.WithField("address", peerReader.Addr()).Debugln("connection established")
 
-	go peerReader.ReadLoop()
-
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
-	go peerWriter.Serve(writeQueueChan, exitChan)
+	peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
 
 // OnConnection is the callback for writing to the peers
@@ -273,14 +266,12 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	logServer.WithField("address", address).
 		Debugln("connection established")
 
-	exitChan := make(chan struct{}, 1)
-	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan, exitChan)
+	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	go peerReader.ReadLoop()
-	go peerWriter.Serve(writeQueueChan, exitChan)
+	peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
 
 // Close the chain and the connections created through the RPC bus

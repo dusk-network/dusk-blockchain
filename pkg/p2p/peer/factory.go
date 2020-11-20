@@ -22,7 +22,7 @@ func NewReaderFactory(processor *MessageProcessor) *ReaderFactory {
 
 // SpawnReader returns a Reader. It will still need to be launched by
 // running ReadLoop in a goroutine.
-func (f *ReaderFactory) SpawnReader(conn net.Conn, gossip *protocol.Gossip, dupeMap *dupemap.DupeMap, responseChan chan<- bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
+func (f *ReaderFactory) SpawnReader(conn net.Conn, gossip *protocol.Gossip, dupeMap *dupemap.DupeMap, responseChan chan<- bytes.Buffer) (*Reader, error) {
 	pconn := &Connection{
 		Conn:   conn,
 		gossip: gossip,
@@ -30,7 +30,6 @@ func (f *ReaderFactory) SpawnReader(conn net.Conn, gossip *protocol.Gossip, dupe
 
 	reader := &Reader{
 		Connection:   pconn,
-		exitChan:     exitChan,
 		responseChan: responseChan,
 		processor:    f.processor,
 	}
