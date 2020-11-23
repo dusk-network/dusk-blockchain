@@ -11,7 +11,7 @@ import (
 )
 
 // MockCandidate ...
-func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) message.Candidate {
+func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) block.Block {
 	if previousBlock == nil {
 		previousBlock, _ = crypto.RandEntropy(32)
 	}
@@ -22,7 +22,7 @@ func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) me
 		panic(err)
 	}
 
-	return message.Candidate{Block: b, Certificate: block.EmptyCertificate()}
+	return *b
 }
 
 type mock struct {

@@ -3,6 +3,7 @@ package responding
 import (
 	"bytes"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -21,7 +22,7 @@ func NewCandidateBroker(db database.DB) *CandidateBroker {
 // ProvideCandidate for a given (m *bytes.Buffer)
 func (c *CandidateBroker) ProvideCandidate(m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.GetCandidate)
-	var cm message.Candidate
+	var cm block.Block
 	if err := c.db.View(func(t database.Transaction) error {
 		var err error
 		cm, err = t.FetchCandidateMessage(msg.Hash)
@@ -31,7 +32,7 @@ func (c *CandidateBroker) ProvideCandidate(m message.Message) ([]bytes.Buffer, e
 	}
 
 	candidateBytes := new(bytes.Buffer)
-	if err := message.MarshalCandidate(candidateBytes, cm); err != nil {
+	if err := message.MarshalBlock(candidateBytes, &cm); err != nil {
 		return nil, err
 	}
 

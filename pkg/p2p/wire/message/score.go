@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
@@ -30,7 +31,7 @@ type (
 	Score struct {
 		ScoreProposal
 		PrevHash  []byte
-		Candidate Candidate
+		Candidate block.Block
 	}
 )
 
@@ -106,7 +107,7 @@ func (e ScoreProposal) String() string {
 }
 
 // NewScore creates a new Score from a proposal
-func NewScore(proposal ScoreProposal, pubkey, prevHash []byte, candidate Candidate) *Score {
+func NewScore(proposal ScoreProposal, pubkey, prevHash []byte, candidate block.Block) *Score {
 
 	score := &Score{
 		ScoreProposal: proposal,
@@ -124,7 +125,7 @@ func (e Score) Copy() payload.Safe {
 	cpy := Score{
 		ScoreProposal: e.ScoreProposal.Copy().(ScoreProposal),
 		PrevHash:      make([]byte, len(e.PrevHash)),
-		Candidate:     e.Candidate.Copy().(Candidate),
+		Candidate:     e.Candidate.Copy().(block.Block),
 	}
 
 	copy(cpy.PrevHash, e.PrevHash)
@@ -136,7 +137,7 @@ func (e Score) Copy() payload.Safe {
 func EmptyScore() Score {
 	return Score{
 		ScoreProposal: EmptyScoreProposal(header.Header{BlockHash: make([]byte, 32)}),
-		Candidate:     *NewCandidate(),
+		Candidate:     *block.NewBlock(),
 	}
 }
 
@@ -147,7 +148,7 @@ func (e Score) Equal(s Score) bool {
 
 // VoteHash returns hash of the Candidate block
 func (e Score) VoteHash() []byte {
-	return e.Candidate.Block.Header.Hash
+	return e.Candidate.Header.Hash
 }
 
 // String representation of a Score
@@ -213,8 +214,8 @@ func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
 		return err
 	}
 
-	sev.Candidate = *NewCandidate()
-	if err := UnmarshalCandidate(r, &sev.Candidate); err != nil {
+	sev.Candidate = *block.NewBlock()
+	if err := UnmarshalBlock(r, &sev.Candidate); err != nil {
 		return err
 	}
 
@@ -255,7 +256,7 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 	}
 
 	// Candidate
-	if err := MarshalCandidate(r, sev.Candidate); err != nil {
+	if err := MarshalBlock(r, &sev.Candidate); err != nil {
 		return err
 	}
 	return nil
@@ -286,7 +287,7 @@ func MockScoreProposal(hdr header.Header) ScoreProposal {
 }
 
 // MockScore mocks a Score and returns it.
-func MockScore(hdr header.Header, c Candidate) Score {
+func MockScore(hdr header.Header, c block.Block) Score {
 	prevHash, _ := crypto.RandEntropy(32)
 
 	return Score{

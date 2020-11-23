@@ -3,35 +3,30 @@ package chain
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
-
-	"encoding/hex"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
@@ -474,7 +469,7 @@ func (c *Chain) handleCertificateMessage(cert *block.Certificate, blockHash []by
 	defer c.lock.Unlock()
 	c.lastCertificate = cert
 
-	var cm message.Candidate
+	var cm block.Block
 	if err := c.db.View(func(t database.Transaction) error {
 		var err error
 		cm, err = t.FetchCandidateMessage(blockHash)
@@ -491,12 +486,12 @@ func (c *Chain) handleCertificateMessage(cert *block.Certificate, blockHash []by
 	}
 
 	// Try to accept candidate block
-	cm.Block.Header.Certificate = cert
-	if err := c.AcceptBlock(c.ctx, *cm.Block); err != nil {
+	cm.Header.Certificate = cert
+	if err := c.AcceptBlock(c.ctx, cm); err != nil {
 		log.
 			WithError(err).
-			WithField("candidate_hash", hex.EncodeToString(cm.Block.Header.Hash)).
-			WithField("candidate_height", cm.Block.Header.Height).
+			WithField("candidate_hash", hex.EncodeToString(cm.Header.Hash)).
+			WithField("candidate_height", cm.Header.Height).
 			Error("could not accept candidate block")
 		return err
 	}

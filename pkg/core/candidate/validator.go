@@ -11,19 +11,19 @@ import (
 
 // Validate complies with the republisher.Validator interface. It internally invokes ValidateCandidate
 func Validate(m message.Message) error {
-	cm := m.Payload().(message.Candidate)
+	cm := m.Payload().(block.Block)
 	return ValidateCandidate(cm)
 }
 
 // ValidateCandidate makes sure the hash and root are correct, to avoid
 // malicious nodes from overwriting the candidate block for a specific hash
-func ValidateCandidate(cm message.Candidate) error {
-	if err := checkHash(cm.Block); err != nil {
+func ValidateCandidate(cm block.Block) error {
+	if err := checkHash(&cm); err != nil {
 		log.WithError(err).Errorln("validation failed")
 		return republisher.InvalidError
 	}
 
-	if err := checkRoot(cm.Block); err != nil {
+	if err := checkRoot(&cm); err != nil {
 		log.WithError(err).Errorln("validation failed")
 		return republisher.InvalidError
 	}

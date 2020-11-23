@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -170,7 +171,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
 	}
 
-	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Block.Header.Hash) {
+	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Header.Hash) {
 		var err error
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
 		// Ensure we release the resources associated to this context.
@@ -195,7 +196,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		}
 	}
 
-	if err := p.verifyFn(*p.selectionResult.Candidate.Block); err != nil {
+	if err := p.verifyFn(p.selectionResult.Candidate); err != nil {
 		log.
 			WithError(err).
 			WithField("round", hdr.Round).
@@ -223,7 +224,7 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 	}
 }
 
-func (p *Phase) storeCandidate(cm message.Candidate) error {
+func (p *Phase) storeCandidate(cm block.Block) error {
 	return p.db.Update(func(t database.Transaction) error {
 		return t.StoreCandidateMessage(cm)
 	})

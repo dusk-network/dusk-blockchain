@@ -23,20 +23,20 @@ func TestCandidateQueue(t *testing.T) {
 
 	// Getting a block when no request is made should not result in it being
 	// pushed to the candidateQueue
-	_, err := req.ProcessCandidate(message.New(topics.Candidate, mockCandidate()))
+	_, err := req.ProcessCandidate(message.New(topics.Candidate, *config.DecodeGenesis()))
 	assert.NoError(err)
 
 	assert.Empty(req.candidateQueue)
 
 	// Getting a block when requesting should make it end up in the queue
-	c := mockCandidate()
+	c := config.DecodeGenesis()
 	req.setRequesting(true)
-	_, err = req.ProcessCandidate(message.New(topics.Candidate, c))
+	_, err = req.ProcessCandidate(message.New(topics.Candidate, *c))
 	assert.NoError(err)
 
 	assert.True(len(req.candidateQueue) == 1)
 	c2 := <-req.candidateQueue
-	assert.True(c.Block.Equals(c2.Block))
+	assert.True(c.Equals(&c2))
 }
 
 func TestRequestor(t *testing.T) {
@@ -45,16 +45,16 @@ func TestRequestor(t *testing.T) {
 
 	req := NewRequestor(bus)
 
-	c := mockCandidate()
+	c := config.DecodeGenesis()
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 	bus.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
-	cChan := make(chan message.Candidate, 1)
+	cChan := make(chan block.Block, 1)
 
 	go func() {
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
 		defer cancel()
-		cm, err := req.RequestCandidate(ctx, c.Block.Header.Hash)
+		cm, err := req.RequestCandidate(ctx, c.Header.Hash)
 		assert.NoError(err)
 		cChan <- cm
 	}()
@@ -64,22 +64,13 @@ func TestRequestor(t *testing.T) {
 	assert.NoError(err)
 
 	assert.True(streamer.SeenTopics()[0] == topics.GetCandidate)
-	assert.True(bytes.Equal(c.Block.Header.Hash, m))
+	assert.True(bytes.Equal(c.Header.Hash, m))
 
-	_, err = req.ProcessCandidate(message.New(topics.Candidate, c))
+	_, err = req.ProcessCandidate(message.New(topics.Candidate, *c))
 	assert.NoError(err)
 
 	// Wait for the candidate to be processed
 	c2 := <-cChan
 	assert.NotEmpty(t, c2)
-	assert.True(c.Block.Equals(c2.Block))
-}
-
-// Mocks a candidate message. It is not in the message package since it uses
-// the genesis block as mockup block
-//nolint:unused
-func mockCandidate() message.Candidate {
-	genesis := config.DecodeGenesis()
-	cert := block.EmptyCertificate()
-	return message.MakeCandidate(genesis, cert)
+	assert.True(c.Equals(&c2))
 }

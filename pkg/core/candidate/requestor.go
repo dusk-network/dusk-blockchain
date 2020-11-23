@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -21,14 +22,14 @@ type Requestor struct {
 	lock           sync.RWMutex
 	requesting     bool
 	publisher      eventbus.Publisher
-	candidateQueue chan message.Candidate
+	candidateQueue chan block.Block
 }
 
 // NewRequestor returns an initialized Requestor struct.
 func NewRequestor(publisher eventbus.Publisher) *Requestor {
 	return &Requestor{
 		publisher:      publisher,
-		candidateQueue: make(chan message.Candidate, 100),
+		candidateQueue: make(chan block.Block, 100),
 	}
 }
 
@@ -40,7 +41,7 @@ func (r *Requestor) ProcessCandidate(msg message.Message) ([]bytes.Buffer, error
 			return nil, err
 		}
 
-		cm := msg.Payload().(message.Candidate)
+		cm := msg.Payload().(block.Block)
 		r.candidateQueue <- cm
 	}
 
@@ -49,21 +50,21 @@ func (r *Requestor) ProcessCandidate(msg message.Message) ([]bytes.Buffer, error
 
 // RequestCandidate will attempt to fetch a Candidate message for a given hash
 // from the network.
-func (r *Requestor) RequestCandidate(ctx context.Context, hash []byte) (message.Candidate, error) {
+func (r *Requestor) RequestCandidate(ctx context.Context, hash []byte) (block.Block, error) {
 	r.setRequesting(true)
 	defer r.setRequesting(false)
 
 	if err := r.publishGetCandidate(hash); err != nil {
-		return message.Candidate{}, nil
+		return block.Block{}, nil
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			log.WithField("hash", hex.EncodeToString(hash)).Debug("failed to receive candidate from the network")
-			return message.Candidate{}, errors.New("failed to receive candidate from the network")
+			return block.Block{}, errors.New("failed to receive candidate from the network")
 		case cm := <-r.candidateQueue:
-			if bytes.Equal(cm.Block.Header.Hash, hash) {
+			if bytes.Equal(cm.Header.Hash, hash) {
 				return cm, nil
 			}
 		}

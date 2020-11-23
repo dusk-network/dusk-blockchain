@@ -158,15 +158,14 @@ func TestAcceptBlock(t *testing.T) {
 
 	// Make a 'winning' candidate message
 	blk := helper.RandomBlock(startingHeight, 1)
-	cert := block.EmptyCertificate()
 	assert.NoError(c.db.Update(func(t database.Transaction) error {
-		return t.StoreCandidateMessage(message.MakeCandidate(blk, cert))
+		return t.StoreCandidateMessage(*blk)
 	}))
 
 	// Now send a `Certificate` message with this block's hash
 	// Make a certificate with a different step, to do a proper equality
 	// check later
-	cert = block.EmptyCertificate()
+	cert := block.EmptyCertificate()
 	cert.Step = 5
 
 	assert.NoError(c.handleCertificateMessage(cert, blk.Header.Hash))

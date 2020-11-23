@@ -6,7 +6,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
@@ -108,9 +107,9 @@ type Transaction interface {
 	FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error)
 
 	// StoreCandidateMessage will...
-	StoreCandidateMessage(cm message.Candidate) error
+	StoreCandidateMessage(cm block.Block) error
 
-	FetchCandidateMessage(hash []byte) (message.Candidate, error)
+	FetchCandidateMessage(hash []byte) (block.Block, error)
 
 	ClearCandidateMessages() error
 
