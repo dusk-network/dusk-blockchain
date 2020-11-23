@@ -4,13 +4,14 @@ import (
 	"context"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 // MockCandidate ...
-func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) message.Candidate {
+func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) block.Block {
 	if previousBlock == nil {
 		previousBlock, _ = crypto.RandEntropy(32)
 	}
@@ -21,7 +22,7 @@ func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) me
 		panic(err)
 	}
 
-	return message.Candidate{Block: b}
+	return *b
 }
 
 type mock struct {

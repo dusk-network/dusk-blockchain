@@ -13,10 +13,9 @@ func TestPriority(t *testing.T) {
 
 	// mock candidate
 	genesis := config.DecodeGenesis()
-	c := message.MakeCandidate(genesis)
 
 	hdr := header.Mock()
-	ev := message.MockScore(hdr, c)
+	ev := message.MockScore(hdr, *genesis)
 
 	// Comparing the same event should return true
 	handler := NewScoreHandler(nil)

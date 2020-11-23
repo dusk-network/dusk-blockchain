@@ -44,17 +44,15 @@ func TestCandidateBroker(t *testing.T) {
 	_, _ = topics.Extract(&buf[0])
 
 	// Ensure it is the same block
-	cm := message.MakeCandidate(block.NewBlock())
-	assert.NoError(t, message.UnmarshalCandidate(&buf[0], &cm))
-	assert.True(t, cm.Block.Equals(blocks[0]))
+	blk := block.NewBlock()
+	assert.NoError(t, message.UnmarshalBlock(&buf[0], blk))
+	assert.True(t, blk.Equals(blocks[0]))
 }
 
 func storeCandidates(db database.DB, blocks []*block.Block) error {
 	return db.Update(func(t database.Transaction) error {
 		for _, blk := range blocks {
-			cm := message.NewCandidate()
-			cm.Block = blk
-			if err := t.StoreCandidateMessage(*cm); err != nil {
+			if err := t.StoreCandidateMessage(*blk); err != nil {
 				return err
 			}
 		}

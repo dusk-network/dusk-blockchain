@@ -593,29 +593,28 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 }
 
-func (t transaction) StoreCandidateMessage(cm message.Candidate) error {
+func (t transaction) StoreCandidateMessage(cm block.Block) error {
 	buf := new(bytes.Buffer)
 
-	if err := message.MarshalCandidate(buf, cm); err != nil {
+	if err := message.MarshalBlock(buf, &cm); err != nil {
 		return err
 	}
 
-	key := append(CandidatePrefix, cm.Block.Header.Hash...)
+	key := append(CandidatePrefix, cm.Header.Hash...)
 	t.put(key, buf.Bytes())
 	return nil
 }
 
-func (t transaction) FetchCandidateMessage(hash []byte) (message.Candidate, error) {
+func (t transaction) FetchCandidateMessage(hash []byte) (block.Block, error) {
 	key := append(CandidatePrefix, hash...)
 	value, err := t.snapshot.Get(key, nil)
 	if err != nil {
-		return message.Candidate{}, database.ErrBlockNotFound
+		return block.Block{}, database.ErrBlockNotFound
 	}
 
-	cm := new(message.Candidate)
-	cm.Block = block.NewBlock()
-	if err := message.UnmarshalCandidate(bytes.NewBuffer(value), cm); err != nil {
-		return message.Candidate{}, err
+	cm := block.NewBlock()
+	if err := message.UnmarshalBlock(bytes.NewBuffer(value), cm); err != nil {
+		return block.Block{}, err
 	}
 
 	return *cm, nil

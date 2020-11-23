@@ -84,8 +84,7 @@ func (h *Helper) Spawn() []message.Score {
 			BlockHash: hash,
 		}
 		genesis := config.DecodeGenesis()
-		candidate := message.MakeCandidate(genesis)
-		evs = append(evs, message.MockScore(hdr, candidate))
+		evs = append(evs, message.MockScore(hdr, *genesis))
 	}
 	return evs
 }

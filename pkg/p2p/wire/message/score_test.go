@@ -20,9 +20,7 @@ func TestUnMarshal(t *testing.T) {
 
 	// mock candidate
 	genesis := config.DecodeGenesis()
-	c := message.MakeCandidate(genesis)
-
-	se := message.MockScore(hdr, c)
+	se := message.MockScore(hdr, *genesis)
 
 	buf := new(bytes.Buffer)
 	assert.NoError(t, message.MarshalScore(buf, se))
@@ -39,9 +37,7 @@ func TestDeepCopy(t *testing.T) {
 
 	// mock candidate
 	genesis := config.DecodeGenesis()
-	c := message.MakeCandidate(genesis)
-
-	se := message.MockScore(hdr, c)
+	se := message.MockScore(hdr, *genesis)
 
 	buf := new(bytes.Buffer)
 	assert.NoError(t, message.MarshalScore(buf, se))

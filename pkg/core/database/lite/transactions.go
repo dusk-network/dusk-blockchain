@@ -347,26 +347,25 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 }
 
-func (t *transaction) StoreCandidateMessage(cm message.Candidate) error {
+func (t *transaction) StoreCandidateMessage(cm block.Block) error {
 	buf := new(bytes.Buffer)
-	if err := message.MarshalCandidate(buf, cm); err != nil {
+	if err := message.MarshalBlock(buf, &cm); err != nil {
 		return err
 	}
 
-	t.db.storage[candidateInd][toKey(cm.Block.Header.Hash)] = buf.Bytes()
+	t.db.storage[candidateInd][toKey(cm.Header.Hash)] = buf.Bytes()
 	return nil
 }
 
-func (t *transaction) FetchCandidateMessage(hash []byte) (message.Candidate, error) {
+func (t *transaction) FetchCandidateMessage(hash []byte) (block.Block, error) {
 	cmBytes, ok := t.db.storage[candidateInd][toKey(hash)]
 	if !ok {
-		return message.Candidate{}, database.ErrBlockNotFound
+		return block.Block{}, database.ErrBlockNotFound
 	}
 
-	cm := new(message.Candidate)
-	cm.Block = block.NewBlock()
-	if err := message.UnmarshalCandidate(bytes.NewBuffer(cmBytes), cm); err != nil {
-		return message.Candidate{}, err
+	cm := block.NewBlock()
+	if err := message.UnmarshalBlock(bytes.NewBuffer(cmBytes), cm); err != nil {
+		return block.Block{}, err
 	}
 
 	return *cm, nil

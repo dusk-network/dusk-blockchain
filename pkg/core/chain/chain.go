@@ -469,7 +469,7 @@ func (c *Chain) handleCertificateMessage(cert *block.Certificate, blockHash []by
 	defer c.lock.Unlock()
 	c.lastCertificate = cert
 
-	var cm message.Candidate
+	var cm block.Block
 	if err := c.db.View(func(t database.Transaction) error {
 		var err error
 		cm, err = t.FetchCandidateMessage(blockHash)
@@ -486,12 +486,12 @@ func (c *Chain) handleCertificateMessage(cert *block.Certificate, blockHash []by
 	}
 
 	// Try to accept candidate block
-	cm.Block.Header.Certificate = cert
-	if err := c.AcceptBlock(c.ctx, *cm.Block); err != nil {
+	cm.Header.Certificate = cert
+	if err := c.AcceptBlock(c.ctx, cm); err != nil {
 		log.
 			WithError(err).
-			WithField("candidate_hash", hex.EncodeToString(cm.Block.Header.Hash)).
-			WithField("candidate_height", cm.Block.Header.Height).
+			WithField("candidate_hash", hex.EncodeToString(cm.Header.Hash)).
+			WithField("candidate_height", cm.Header.Height).
 			Error("could not accept candidate block")
 		return err
 	}

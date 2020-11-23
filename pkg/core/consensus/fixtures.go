@@ -179,9 +179,7 @@ func MockScoreMsg(t *testing.T, hdr *header.Header) message.Message {
 
 	// mock candidate
 	genesis := config.DecodeGenesis()
-	c := message.MakeCandidate(genesis)
-	c.Block.Header.Hash = h.BlockHash
-
-	se := message.MockScore(h, c)
+	genesis.Header.Hash = h.BlockHash
+	se := message.MockScore(h, *genesis)
 	return message.New(topics.Score, se)
 }
