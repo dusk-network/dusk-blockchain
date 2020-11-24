@@ -76,11 +76,10 @@ func TestConsensus(t *testing.T) {
 		counter := 0
 		for {
 			b := <-abChan
-			if b.Payload().(block.Block).Header.Height == uint64(i) {
-				counter++
-			} else {
+			if b.Payload().(block.Block).Header.Height != uint64(i) {
 				t.Fatal("consensus was desynchronized")
 			}
+			counter++
 
 			// Once we get the same block `numNodes` times, we can expect the blocks
 			// of the next round to come in.
