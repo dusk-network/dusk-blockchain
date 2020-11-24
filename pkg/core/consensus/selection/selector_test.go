@@ -22,7 +22,6 @@ type tparm struct {
 }
 
 func TestSelection(t *testing.T) {
-
 	hlp := selection.NewHelper(10)
 	consensusTimeOut := 300 * time.Millisecond
 
@@ -52,11 +51,12 @@ func TestSelection(t *testing.T) {
 			selFn := sel.Initialize(nil)
 
 			msgChan := make(chan message.Message, 1)
-			go func() {
-				for _, msg := range ttest.msgs {
+			msgs := ttest.msgs
+			go func(msgs []message.Score) {
+				for _, msg := range msgs {
 					msgChan <- message.New(topics.Score, msg)
 				}
-			}()
+			}(msgs)
 			testCallbackPhase := selFn.Run(context.Background(), consensus.NewQueue(), msgChan, hlp.RoundUpdate(), hlp.Step)
 			_ = testCallbackPhase.Run(context.Background(), nil, nil, hlp.RoundUpdate(), hlp.Step+1)
 		})
