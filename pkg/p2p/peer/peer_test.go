@@ -54,7 +54,7 @@ func TestReader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	go peerReader.ReadLoop(context.Background(), func() {})
+	go peerReader.ReadLoop(context.Background(), make(chan error, 1))
 
 	errChan := make(chan error, 1)
 	go func(eChan chan error) {
@@ -110,7 +110,7 @@ func TestWriteLoop(t *testing.T) {
 	go func(g *protocol.Gossip) {
 		responseChan := make(chan bytes.Buffer)
 		writer := NewWriter(client, g, bus, 30*time.Millisecond)
-		go writer.Serve(context.Background(), func() {}, responseChan)
+		go writer.Serve(context.Background(), responseChan, make(chan error, 1))
 
 		bufCopy := buf
 		responseChan <- bufCopy

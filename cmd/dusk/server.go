@@ -250,7 +250,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	logServer.WithField("address", peerReader.Addr()).Debugln("connection established")
 
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
-	peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
+	go peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
 
 // OnConnection is the callback for writing to the peers
@@ -271,7 +271,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		log.Panic(err)
 	}
 
-	peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
+	go peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
 
 // Close the chain and the connections created through the RPC bus

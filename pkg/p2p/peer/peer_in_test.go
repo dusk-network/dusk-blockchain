@@ -67,8 +67,8 @@ func TestPingLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	Create(context.Background(), reader, writer, responseChan)
-	Create(context.Background(), reader2, writer2, responseChan2)
+	go Create(context.Background(), reader, writer, responseChan)
+	go Create(context.Background(), reader2, writer2, responseChan2)
 
 	// We should eventually get a pong message out of responseChan2
 	for {
@@ -230,7 +230,7 @@ func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, ch
 	peer, _ := f.SpawnReader(r, g, d, respChan)
 
 	// Run the non-recover readLoop to watch for panics
-	go assert.NotPanics(t, func() { peer.readLoop(context.Background()) })
+	go assert.NotPanics(t, func() { peer.readLoop(context.Background(), make(chan error, 1)) })
 
 	time.Sleep(200 * time.Millisecond)
 
