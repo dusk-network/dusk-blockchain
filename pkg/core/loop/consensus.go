@@ -134,7 +134,7 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	}()
 
 	// score generation phase is the first step in the consensus
-	phaseFunction := scr.Fn(nil)
+	phaseFunction := scr.Initialize(nil)
 	// synchronous consensus loop keeps running until the agreement invokes
 	// context.Done or the context is canceled some other way
 	for step := uint8(1); ; step++ {

@@ -61,8 +61,8 @@ func (p *Phase) String() string {
 	return "reduction-first-step"
 }
 
-// Fn passes to this reduction step the best score collected during selection
-func (p *Phase) Fn(re consensus.InternalPacket) consensus.PhaseFn {
+// Initialize passes to this reduction step the best score collected during selection
+func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.selectionResult = re.(message.Score)
 	return p
 }
@@ -102,7 +102,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
 			if sv := p.collectReduction(rMsg, r.Round, step); sv != nil {
-				return p.next.Fn(*sv)
+				return p.next.Initialize(*sv)
 			}
 		}
 	}
@@ -122,14 +122,14 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 					go func() {
 						<-timeoutChan
 					}()
-					return p.next.Fn(*sv)
+					return p.next.Initialize(*sv)
 				}
 			}
 
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
 			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step)
-			return p.next.Fn(*sv)
+			return p.next.Initialize(*sv)
 
 		case <-ctx.Done():
 			// preventing timeout leakage

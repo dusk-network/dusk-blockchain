@@ -56,8 +56,8 @@ func (p *Phase) String() string {
 	return "reduction-second-step"
 }
 
-// Fn passes to this reduction step the best score collected during selection
-func (p *Phase) Fn(re consensus.InternalPacket) consensus.PhaseFn {
+// Initialize passes to this reduction step the best score collected during selection
+func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.firstStepVotesMsg = re.(message.StepVotesMsg)
 	return p
 }
@@ -96,7 +96,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			if stepVotesAreValid(&p.firstStepVotesMsg, svm) && p.handler.AmMember(r.Round, step) {
 				p.sendAgreement(r.Round, step, svm)
 			}
-			return p.next.Fn(nil)
+			return p.next.Initialize(nil)
 		}
 	}
 
@@ -121,13 +121,13 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 				if stepVotesAreValid(&p.firstStepVotesMsg, svm) && p.handler.AmMember(r.Round, step) {
 					p.sendAgreement(r.Round, step, svm)
 				}
-				return p.next.Fn(nil)
+				return p.next.Initialize(nil)
 			}
 
 		case <-timeoutChan:
 			// in case of timeout we increase the timeout and that's it
 			p.IncreaseTimeout(r.Round)
-			return p.next.Fn(nil)
+			return p.next.Initialize(nil)
 
 		case <-ctx.Done():
 			// preventing timeout leakage

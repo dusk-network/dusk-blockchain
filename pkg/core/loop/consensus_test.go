@@ -64,7 +64,7 @@ func (h *step) Run(ctx context.Context, _ *consensus.Queue, _ chan message.Messa
 }
 
 // Fn returns a phase function that simply hangs until canceled
-func (h *step) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
+func (h *step) Initialize(_ consensus.InternalPacket) consensus.PhaseFn {
 	return h
 }
 
@@ -112,7 +112,7 @@ func (h *stallingStep) Run(ctx context.Context, _ *consensus.Queue, _ chan messa
 }
 
 // Fn returns a phase function that simply hangs until canceled
-func (h *stallingStep) Fn(_ consensus.InternalPacket) consensus.PhaseFn {
+func (h *stallingStep) Initialize(_ consensus.InternalPacket) consensus.PhaseFn {
 	return h
 }
 

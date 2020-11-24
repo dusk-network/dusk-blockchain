@@ -34,7 +34,7 @@ func TestSendReduction(t *testing.T) {
 	msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0])
 
 	// injecting the stepVotes into secondStep
-	stepFn := secondStep.Fn(msg)
+	stepFn := secondStep.Initialize(msg)
 
 	test := reduction.PrepareSendReductionTest(hlp, stepFn)
 	test(t)
@@ -180,7 +180,7 @@ func TestSecondStepReduction(t *testing.T) {
 			secondStepReduction.SetNext(testPhase)
 
 			// injecting the stepVotes into secondStep
-			secondStepReduction.Fn(msg)
+			secondStepReduction.Initialize(msg)
 
 			runTestCallback := secondStepReduction.Run(ctx, queue, evChan, r, step)
 			// testing the status of the step
