@@ -101,7 +101,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
-			if sv := p.collectReduction(rMsg, r.Round, step); sv != nil {
+			if sv := p.collectReduction(ctx, rMsg, r.Round, step); sv != nil {
 				return p.next.Initialize(*sv)
 			}
 		}
@@ -116,7 +116,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 					continue
 				}
 
-				sv := p.collectReduction(rMsg, r.Round, step)
+				sv := p.collectReduction(ctx, rMsg, r.Round, step)
 				if sv != nil {
 					// preventing timeout leakage
 					go func() {
@@ -141,7 +141,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 }
 
-func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
+func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
 	if err := p.handler.VerifySignature(r); err != nil {
 		lg.
 			WithError(err).
@@ -173,10 +173,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 
 	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Header.Hash) {
 		var err error
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
-		// Ensure we release the resources associated to this context.
-		defer cancel()
-		p.selectionResult.Candidate, err = p.requestor.RequestCandidate(ctx, hdr.BlockHash)
+		p.selectionResult.Candidate, err = p.fetchCandidate(ctx, hdr.BlockHash)
 		if err != nil {
 			log.
 				WithError(err).
@@ -184,15 +181,6 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 				WithField("step", hdr.Step).
 				Error("firststep_fetchCandidateBlock failed")
 			return p.createStepVoteMessage(reduction.EmptyResult, round, step)
-		}
-
-		// Store candidate for later use
-		if err := p.storeCandidate(p.selectionResult.Candidate); err != nil {
-			log.WithError(err).
-				WithField("round", hdr.Round).
-				WithField("step", hdr.Step).
-				Error("firststep_storeCandidate failed")
-			panic(err)
 		}
 	}
 
@@ -206,6 +194,39 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 	}
 
 	return p.createStepVoteMessage(result, round, step)
+}
+
+func (p *Phase) fetchCandidate(ctx context.Context, hash []byte) (block.Block, error) {
+	// First, check to see if we have the candidate in the db.
+	var cm block.Block
+	err := p.db.View(func(t database.Transaction) error {
+		var err error
+		cm, err = t.FetchCandidateMessage(hash)
+		return err
+	})
+
+	if err == nil && !cm.Equals(&block.Block{}) {
+		return cm, nil
+	}
+
+	return p.requestCandidate(ctx, hash)
+}
+
+func (p *Phase) requestCandidate(ctx context.Context, hash []byte) (block.Block, error) {
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(2*time.Second))
+	// Ensure we release the resources associated to this context.
+	defer cancel()
+	cm, err := p.requestor.RequestCandidate(ctx, hash)
+	if err != nil {
+		return block.Block{}, err
+	}
+
+	// Store candidate for later use
+	if err := p.storeCandidate(cm); err != nil {
+		panic(err)
+	}
+
+	return cm, nil
 }
 
 func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8) *message.StepVotesMsg {
