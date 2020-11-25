@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"context"
 	"net"
 	"os"
 	"testing"
@@ -46,29 +47,28 @@ func TestPingLoop(t *testing.T) {
 
 	responseChan := make(chan bytes.Buffer, 10)
 	writer := NewWriter(client, protocol.NewGossip(protocol.TestNet), bus)
-	go writer.Serve(responseChan, make(chan struct{}, 1))
 
 	// Set up the other end of the exchange
 	responseChan2 := make(chan bytes.Buffer, 10)
 	writer2 := NewWriter(srv, protocol.NewGossip(protocol.TestNet), bus)
-	go writer2.Serve(responseChan2, make(chan struct{}, 1))
 
 	// Set up reader factory
 	processor := NewMessageProcessor(bus)
 	processor.Register(topics.Ping, responding.ProcessPing)
 	factory := NewReaderFactory(processor)
 
-	reader, err := factory.SpawnReader(client, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan, make(chan struct{}, 1))
+	reader, err := factory.SpawnReader(client, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	go reader.ReadLoop()
 
-	reader2, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan2, make(chan struct{}, 1))
+	reader2, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	go reader2.ReadLoop()
+
+	go Create(context.Background(), reader, writer, responseChan)
+	go Create(context.Background(), reader2, writer2, responseChan2)
 
 	// We should eventually get a pong message out of responseChan2
 	for {
@@ -227,10 +227,10 @@ func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, ch
 
 	respChan := make(chan bytes.Buffer, 10)
 	g := protocol.NewGossip(protocol.TestNet)
-	peer, _ := f.SpawnReader(r, g, d, respChan, make(chan struct{}, 1))
+	peer, _ := f.SpawnReader(r, g, d, respChan)
 
 	// Run the non-recover readLoop to watch for panics
-	go assert.NotPanics(t, peer.readLoop)
+	go assert.NotPanics(t, func() { peer.readLoop(context.Background(), make(chan error, 1)) })
 
 	time.Sleep(200 * time.Millisecond)
 

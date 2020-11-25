@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net"
 	"testing"
@@ -48,13 +49,12 @@ func TestReader(t *testing.T) {
 
 	dupeMap := dupemap.NewDupeMap(5)
 	responseChan := make(chan bytes.Buffer, 100)
-	exitChan := make(chan struct{}, 1)
-	peerReader, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupeMap, responseChan, exitChan)
+	peerReader, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupeMap, responseChan)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	go peerReader.ReadLoop()
+	go peerReader.ReadLoop(context.Background(), make(chan error, 1))
 
 	errChan := make(chan error, 1)
 	go func(eChan chan error) {
@@ -110,7 +110,7 @@ func TestWriteLoop(t *testing.T) {
 	go func(g *protocol.Gossip) {
 		responseChan := make(chan bytes.Buffer)
 		writer := NewWriter(client, g, bus, 30*time.Millisecond)
-		go writer.Serve(responseChan, make(chan struct{}, 1))
+		go writer.Serve(context.Background(), responseChan, make(chan error, 1))
 
 		bufCopy := buf
 		responseChan <- bufCopy

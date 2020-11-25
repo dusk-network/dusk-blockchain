@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -64,7 +65,6 @@ type Reader struct {
 	*Connection
 	processor    *MessageProcessor
 	responseChan chan<- bytes.Buffer
-	exitChan     chan<- struct{} // Way to kill the WriteLoop
 	// TODO: add service flag
 }
 
@@ -180,10 +180,36 @@ func (p *Reader) Accept() error {
 	return nil
 }
 
-// Serve utilizes two different methods for writing to the open connection
-func (w *Writer) Serve(writeQueueChan <-chan bytes.Buffer, exitChan chan struct{}) {
-	defer w.onDisconnect()
+// Create two-way communication with a peer. This function will allow both
+// goroutines to run as long as no errors are encountered. Once the first error
+// comes through, the context is canceled, and both goroutines are cleaned up.
+func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan <-chan bytes.Buffer) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
+	errChan := make(chan error, 1)
+
+	go reader.ReadLoop(ctx, errChan)
+	go writer.Serve(ctx, writeQueueChan, errChan)
+
+	// Errors are already getting logged with the proper fields attached.
+	// So, we will just wait for one error to come through, after which we can
+	// cancel the context and exit this function.
+	<-errChan
+	close(errChan)
+}
+
+// This attempts a non-blocking send to the errChan, which prevents panics
+// from sending to a closed channel.
+func sendError(errChan chan error, err error) {
+	select {
+	case errChan <- err:
+	default:
+	}
+}
+
+// Serve utilizes two different methods for writing to the open connection
+func (w *Writer) Serve(ctx context.Context, writeQueueChan <-chan bytes.Buffer, errChan chan error) {
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
 	g := &GossipConnector{w.gossip, w.Connection}
@@ -191,7 +217,8 @@ func (w *Writer) Serve(writeQueueChan <-chan bytes.Buffer, exitChan chan struct{
 
 	// writeQueue - FIFO queue
 	// writeLoop pushes first-in message to the socket
-	w.writeLoop(writeQueueChan, exitChan)
+	w.writeLoop(ctx, writeQueueChan, errChan)
+	w.onDisconnect()
 }
 
 func (w *Writer) onDisconnect() {
@@ -224,10 +251,26 @@ func (w *Writer) onDisconnect() {
 			}
 		}()
 	}
-
 }
 
-func (w *Writer) writeLoop(writeQueueChan <-chan bytes.Buffer, exitChan chan struct{}) {
+func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buffer, errChan chan error) {
+	defer func() {
+		if config.Get().API.Enabled {
+			go func() {
+				addr := w.Addr()
+				peerCount := capi.PeerCount{
+					ID: addr,
+				}
+				store := capi.GetStormDBInstance()
+				// delete count
+				err := store.Delete(&peerCount)
+				if err != nil {
+					log.WithField("process", "writeloop").Error("failed to Delete peerCount into StormDB")
+				}
+			}()
+		}
+	}()
+
 	for {
 		select {
 		case buf := <-writeQueueChan:
@@ -237,25 +280,12 @@ func (w *Writer) writeLoop(writeQueueChan <-chan bytes.Buffer, exitChan chan str
 			}
 
 			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
-				l.WithField("queue", "writequeue").WithError(err).Warnln("error writing message")
-				exitChan <- struct{}{}
+				l.WithField("process", "writeloop").WithError(err).Warnln("error writing message")
+				sendError(errChan, err)
+				return
 			}
-		case <-exitChan:
-			log.Error("writeLoop, exitChan called")
-			if config.Get().API.Enabled {
-				go func() {
-					addr := w.Addr()
-					peerCount := capi.PeerCount{
-						ID: addr,
-					}
-					store := capi.GetStormDBInstance()
-					// delete count
-					err := store.Delete(&peerCount)
-					if err != nil {
-						log.Error("writeLoop, failed to Delete peerCount into StormDB")
-					}
-				}()
-			}
+		case <-ctx.Done():
+			log.WithField("process", "writeloop").Debug("context canceled")
 			return
 		}
 	}
@@ -264,7 +294,7 @@ func (w *Writer) writeLoop(writeQueueChan <-chan bytes.Buffer, exitChan chan str
 // ReadLoop will block on the read until a message is read, or until the deadline
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
-func (p *Reader) ReadLoop() {
+func (p *Reader) ReadLoop(ctx context.Context, errChan chan error) {
 	// As the peer ReadLoop is at the front-line of P2P network, receiving a
 	// malformed frame by an adversary node could lead to a panic.
 	// In such situation, the node should survive but adversary conn gets dropped
@@ -274,47 +304,56 @@ func (p *Reader) ReadLoop() {
 	// 	}
 	// }()
 
-	p.readLoop()
+	p.readLoop(ctx, errChan)
 }
 
-func (p *Reader) readLoop() {
+func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
 	defer func() {
 		_ = p.Conn.Close()
 	}()
 
-	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second  // Max idle time for a peer
-	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
+	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second // Max idle time for a peer
 
 	// Set up a timer, which triggers the sending of a `keepalive` message
 	// when fired.
-	timer, quitChan := p.keepAliveLoop()
+	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
 
-	defer func() {
-		p.exitChan <- struct{}{}
-		quitChan <- struct{}{}
-	}()
+	timer := time.NewTimer(keepAliveTime)
+	go p.keepAliveLoop(ctx, timer)
 
 	for {
+		// Check if context was canceled
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		// Refresh the read deadline
 		err := p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
 		if err != nil {
 			l.WithError(err).Warnf("error setting read timeout")
+			sendError(errChan, err)
+			return
 		}
 
 		b, err := p.gossip.ReadMessage(p.Conn)
 		if err != nil {
 			l.WithError(err).Warnln("error reading message")
+			sendError(errChan, err)
 			return
 		}
 
 		message, cs, err := checksum.Extract(b)
 		if err != nil {
 			l.WithError(err).Warnln("error reading Extract message")
+			sendError(errChan, err)
 			return
 		}
 
 		if !checksum.Verify(message, cs) {
 			l.WithError(errors.New("invalid checksum")).Warnln("error reading message")
+			sendError(errChan, err)
 			return
 		}
 
@@ -323,7 +362,8 @@ func (p *Reader) readLoop() {
 			// or blacklist spammers
 			startTime := time.Now().UnixNano()
 			if err = p.processor.Collect(message, p.responseChan); err != nil {
-				l.WithError(err).Error("message routing")
+				l.WithField("process", "readloop").
+					WithError(err).Error("failed to process message")
 			}
 
 			duration := float64(time.Now().UnixNano()-startTime) / 1000000
@@ -350,48 +390,39 @@ func (p *Reader) readLoop() {
 				}
 			}()
 		}
-
 	}
 }
 
-func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
-	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
-
-	timer := time.NewTimer(keepAliveTime)
-	quitChan := make(chan struct{}, 1)
-	go func(p *Reader, t *time.Timer, quitChan chan struct{}) {
-		for {
-			select {
-			case <-t.C:
-				// TODO: why was the error never checked ?
-				err := p.Connection.keepAlive()
-				if err != nil {
-					log.WithError(err).Error("keepAliveLoop, got error back from keepAlive")
-					if config.Get().API.Enabled {
-						go func() {
-							addr := p.Addr()
-							peerCount := capi.PeerCount{
-								ID: addr,
-							}
-							store := capi.GetStormDBInstance()
-							// delete count
-							err = store.Delete(&peerCount)
-							if err != nil {
-								log.Error("keepAliveLoop, failed to Delete peerCount into StormDB")
-							}
-						}()
-					}
-
+func (p *Reader) keepAliveLoop(ctx context.Context, timer *time.Timer) {
+	for {
+		select {
+		case <-timer.C:
+			// TODO: why was the error never checked ?
+			err := p.Connection.keepAlive()
+			if err != nil {
+				log.WithError(err).WithField("process", "keepaliveloop").Error("got error back from keepAlive")
+				if config.Get().API.Enabled {
+					go func() {
+						addr := p.Addr()
+						peerCount := capi.PeerCount{
+							ID: addr,
+						}
+						store := capi.GetStormDBInstance()
+						// delete count
+						err = store.Delete(&peerCount)
+						if err != nil {
+							log.WithField("process", "keepaliveloop").Error("failed to Delete peerCount into StormDB")
+						}
+					}()
 				}
 
-			case <-quitChan:
-				t.Stop()
-				return
 			}
-		}
-	}(p, timer, quitChan)
 
-	return timer, quitChan
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		}
+	}
 }
 
 func (c *Connection) keepAlive() error {
