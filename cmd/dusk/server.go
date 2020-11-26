@@ -12,11 +12,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
@@ -42,7 +40,7 @@ var logServer = logrus.WithField("process", "server")
 type Server struct {
 	eventBus          *eventbus.EventBus
 	rpcBus            *rpcbus.RPCBus
-	loader            chain.Loader
+	c                 *chain.Chain
 	dupeMap           *dupemap.DupeMap
 	gossip            *protocol.Gossip
 	grpcServer        *grpc.Server
@@ -54,7 +52,7 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB, requestor *candidate.Requestor) (chain.Loader, peer.ProcessorFunc, func(keys.PublicKey, *loop.Consensus), error) {
+func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB, requestor *candidate.Requestor) (*chain.Chain, error) {
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
@@ -62,29 +60,29 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 		var err error
 		genesis, err = legacy.OldBlockToNewBlock(g)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		}
 	} else {
 		genesis = cfg.DecodeGenesis()
 	}
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, requestor)
+	// TODO: ADD LOOP
+	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, nil, nil, requestor)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	// Perform database sanity check to ensure that it is rational before
 	// bootstrapping all node subsystems
 	if err := l.PerformSanityCheck(0, 10, 0); err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	return l, chainProcess.ProcessBlock, chainProcess.SetupConsensus, nil
+	return chainProcess, nil
 }
 
 func (s *Server) launchKadcastPeer() {
-
 	kcfg := cfg.Get().Kadcast
 
 	if !kcfg.Enabled {
@@ -168,12 +166,14 @@ func Setup() *Server {
 		}
 	}
 
-	chainDBLoader, blkFn, consFn, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db, cr)
+	c, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db, cr)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	processor.Register(topics.Block, blkFn)
+	sync := chain.NewSynchronizer(ctx, eventBus, rpcBus, c.CatchBlockChan, c.CurrentHeight, c.ProcessSucceedingBlock, c.ProcessSyncBlock, c.CrunchBlocks)
+
+	processor.Register(topics.Block, sync.ProcessBlock)
 
 	// Setting up a dupemap
 	dupeBlacklist := dupemap.Launch(eventBus)
@@ -196,7 +196,7 @@ func Setup() *Server {
 	srv := &Server{
 		eventBus:          eventBus,
 		rpcBus:            rpcBus,
-		loader:            chainDBLoader,
+		c:                 c,
 		dupeMap:           dupeBlacklist,
 		gossip:            protocol.NewGossip(protocol.TestNet),
 		grpcServer:        grpcServer,
@@ -206,7 +206,7 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy, consFn)
+	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -277,7 +277,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 // Close the chain and the connections created through the RPC bus
 func (s *Server) Close() {
 	// TODO: disconnect peers
-	_ = s.loader.Close(cfg.Get().Database.Driver)
+	// _ = s.c.Close(cfg.Get().Database.Driver)
 	s.rpcBus.Close()
 	s.grpcServer.GracefulStop()
 	_ = s.ruskConn.Close()

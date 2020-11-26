@@ -19,6 +19,12 @@ import (
 )
 
 type (
+	// Results carries the eventual consensus results.
+	Results struct {
+		Blk block.Block
+		Err error
+	}
+
 	// CandidateVerificationFunc is a callback used to verify candidate blocks
 	// after the conclusion of the first reduction step.
 	CandidateVerificationFunc func(block.Block) error

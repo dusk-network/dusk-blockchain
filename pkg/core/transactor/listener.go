@@ -7,12 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
@@ -40,8 +37,6 @@ func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResp
 	if err != nil {
 		return nil, err
 	}
-
-	t.launchConsensus()
 
 	return loadResponseFromPub(t.w.PublicKey), nil
 }
@@ -98,8 +93,6 @@ func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse
 		return nil, err
 	}
 
-	t.launchConsensus()
-
 	return loadResponseFromPub(pubKey), nil
 }
 
@@ -109,8 +102,6 @@ func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadRe
 	}
 
 	err := t.createWallet(req.Seed, req.Password)
-
-	t.launchConsensus()
 
 	return loadResponseFromPub(t.w.PublicKey), err
 }
@@ -345,21 +336,6 @@ func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.Tran
 func loadResponseFromPub(pubKey keys.PublicKey) *node.LoadResponse {
 	pk := &node.PubKey{PublicKey: pubKey.ToAddr()}
 	return &node.LoadResponse{Key: pk}
-}
-
-//nolint:unused
-func (t *Transactor) launchConsensus() {
-	log.Tracef("Launch consensus")
-	e := &consensus.Emitter{
-		EventBus:    t.eb,
-		RPCBus:      t.rb,
-		Keys:        t.w.Keys(),
-		Proxy:       t.proxy,
-		TimerLength: config.ConsensusTimeOut,
-	}
-	l := loop.New(e)
-
-	t.setupConsensus(t.w.PublicKey, l)
 }
 
 //nolint:unused

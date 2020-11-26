@@ -94,7 +94,6 @@ func TestAcceptFromPeer(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(1)
 	eb, c := setupChainTest(t, startingHeight)
-	rb := rpcbus.New()
 
 	d, _ := crypto.RandEntropy(32)
 	k, _ := crypto.RandEntropy(32)
@@ -107,33 +106,9 @@ func TestAcceptFromPeer(t *testing.T) {
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
 
-	// Start consensus so that the chain has access to the needed keys
-	BLSKeys, _ := key.NewRandKeys()
-	pk := keys.PublicKey{
-		AG: &common.JubJubCompressed{Data: make([]byte, 32)},
-		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
-	}
-
-	e := &consensus.Emitter{
-		EventBus:    eb,
-		RPCBus:      rb,
-		Keys:        BLSKeys,
-		Proxy:       c.proxy,
-		TimerLength: 5 * time.Second,
-	}
-	l := loop.New(e)
-	go c.SetupConsensus(pk, l)
-
 	blk := mockAcceptableBlock(*c.tip)
 
-	errChan := make(chan error, 1)
-	go func(chan error) {
-		if _, err := c.ProcessBlock(message.New(topics.Block, *blk)); err != nil {
-			if err.Error() != "request timeout" {
-				errChan <- err
-			}
-		}
-	}(errChan)
+	c.ProcessSucceedingBlock(*blk)
 
 	// the order of received stuff cannot be guaranteed. So we just search for
 	// getRoundResult topic. If it hasn't been received the test fails.
@@ -170,51 +145,27 @@ func TestAcceptBlock(t *testing.T) {
 
 	// Make a 'winning' candidate message
 	blk := helper.RandomBlock(startingHeight, 1)
-	assert.NoError(c.db.Update(func(t database.Transaction) error {
-		return t.StoreCandidateMessage(*blk)
-	}))
 
 	// Now send a `Certificate` message with this block's hash
 	// Make a certificate with a different step, to do a proper equality
 	// check later
 	cert := block.EmptyCertificate()
 	cert.Step = 5
+	blk.Header.Certificate = cert
 
-	assert.NoError(c.handleCertificateMessage(cert, blk.Header.Hash))
+	assert.NoError(c.AcceptBlock(c.ctx, *blk))
 
 	// Should have `blk` as blockchain head now
 	assert.True(bytes.Equal(blk.Header.Hash, c.tip.Header.Hash))
 
 	// lastCertificate should be `cert`
-	assert.True(cert.Equals(c.lastCertificate))
+	assert.True(cert.Equals(c.tip.Header.Certificate))
 
 	// Should have gotten `blk` over topics.AcceptBlock
 	blkMsg := <-acceptedBlockChan
 	decodedBlk := blkMsg.Payload().(block.Block)
 
 	assert.True(decodedBlk.Equals(c.tip))
-}
-
-func TestReturnOnMissingCandidate(t *testing.T) {
-	// suppressing expected warning related to not finding a winning block
-	// candidate
-	logrus.SetLevel(logrus.ErrorLevel)
-	assert := assert.New(t)
-	startingHeight := uint64(2)
-
-	_, c := setupChainTest(t, startingHeight)
-
-	blk := mockAcceptableBlock(*c.tip)
-	cert := block.EmptyCertificate()
-
-	// Save current prevBlock
-	currPrevBlock := c.tip.Copy().(block.Block)
-
-	// Now pretend we finalized on it
-	c.handleCertificateMessage(cert, blk.Header.Hash)
-
-	// Ensure everything is still the same
-	assert.True(currPrevBlock.Equals(c.tip))
 }
 
 func createLoader(db database.DB) *DBLoader {
@@ -225,20 +176,12 @@ func createLoader(db database.DB) *DBLoader {
 
 func TestFetchTip(t *testing.T) {
 	assert := assert.New(t)
-
-	eb := eventbus.New()
-	rpc := rpcbus.New()
-	_, db := heavy.CreateDBConnection()
-	loader := createLoader(db)
-	proxy := &transactions.MockProxy{
-		E: transactions.MockExecutor(0),
-	}
-	chain, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, nil)
-	assert.NoError(err)
+	_, chain := setupChainTest(t, 0)
 
 	// on a modern chain, state(tip) must point at genesis
 	var s *database.State
-	err = loader.db.View(func(t database.Transaction) error {
+	err := chain.db.View(func(t database.Transaction) error {
+		var err error
 		s, err = t.FetchState()
 		return err
 	})
@@ -267,14 +210,34 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 
 	_, db := heavy.CreateDBConnection()
 	loader := createLoader(db)
+
 	proxy := &transactions.MockProxy{
 		E:  transactions.MockExecutor(startAtHeight),
 		BG: transactions.MockBlockGenerator{},
 	}
-	var c *Chain
 
-	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, nil)
+	BLSKeys, _ := key.NewRandKeys()
+	pk := keys.PublicKey{
+		AG: &common.JubJubCompressed{Data: make([]byte, 32)},
+		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
+	}
+
+	e := &consensus.Emitter{
+		EventBus:    eb,
+		RPCBus:      rpc,
+		Keys:        BLSKeys,
+		Proxy:       proxy,
+		TimerLength: 5 * time.Second,
+	}
+	l := loop.New(e)
+
+	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, l, &pk, nil)
 	assert.NoError(t, err)
+	assert.NoError(t, db.Update(func(tx database.Transaction) error {
+		return tx.StoreBidValues(make([]byte, 32), make([]byte, 32), 0, 100000)
+	}))
+
+	go c.CrunchBlocks(context.Background())
 
 	return eb, c
 }

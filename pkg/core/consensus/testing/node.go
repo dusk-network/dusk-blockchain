@@ -2,12 +2,18 @@ package testing
 
 import (
 	"context"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -21,7 +27,7 @@ type node struct {
 	chain *chain.Chain
 }
 
-func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventBus, rb *rpcbus.RPCBus, proxy transactions.Proxy) *node {
+func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventBus, rb *rpcbus.RPCBus, proxy transactions.Proxy, BLSKeys key.Keys) *node {
 	_, db := lite.CreateDBConnection()
 
 	// Just add genesis - we will fetch a different set of provisioners from
@@ -35,8 +41,27 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 	// we are mocking proof verification.
 	writeArbitraryBidValues(assert, db)
 
-	c, err := chain.New(ctx, db, eb, rb, l, l, nil, proxy, nil)
+	pk := keys.PublicKey{
+		AG: &common.JubJubCompressed{Data: make([]byte, 32)},
+		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
+	}
+
+	e := &consensus.Emitter{
+		EventBus:    eb,
+		RPCBus:      rb,
+		Keys:        BLSKeys,
+		Proxy:       proxy,
+		TimerLength: 5 * time.Second,
+	}
+	lp := loop.New(e)
+
+	c, err := chain.New(ctx, db, eb, rb, l, l, nil, proxy, lp, &pk, nil)
 	assert.NoError(err)
+	go func() {
+		if err := c.CrunchBlocks(ctx); err != nil && err != context.Canceled {
+			panic(err)
+		}
+	}()
 
 	return &node{chain: c}
 }

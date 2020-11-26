@@ -56,17 +56,9 @@ func TestConsensus(t *testing.T) {
 	nodes := make([]*node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nctx, cancelNode := context.WithCancel(ctx)
-		nodes[i] = newNode(nctx, assert, eb, rb, proxy)
+		nodes[i] = newNode(nctx, assert, eb, rb, proxy, keys[i])
 		// Resource clean up.
 		defer cancelNode()
-	}
-
-	// Let's now start consensus on each node.
-	for i, n := range nodes {
-		go func(n *node, i int) {
-			pk := randPublicKey(assert)
-			assert.NoError(n.chain.SetupConsensus(pk, keys[i]))
-		}(n, i)
 	}
 
 	// To follow consensus properly, we should see accepted blocks coming in

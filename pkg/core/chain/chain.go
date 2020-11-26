@@ -3,7 +3,6 @@ package chain
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"sync"
 
@@ -12,14 +11,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
-
-	"encoding/hex"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -70,34 +61,25 @@ type Chain struct {
 	rpcBus   *rpcbus.RPCBus
 	db       database.DB
 
-	highestSeen uint64
-	syncing     bool
-	syncTarget  uint64
-	*sequencer
-
 	// loader abstracts away the persistence aspect of Block operations
 	loader Loader
 
 	// verifier performs verifications on the block
 	verifier Verifier
 
-	lock sync.RWMutex
 	// current blockchain tip of local state
-	tip *block.Block
+	lock sync.RWMutex
+	tip  *block.Block
 
 	// Current set of provisioners
 	p *user.Provisioners
 
-	lastCertificate *block.Certificate
-	pubKey          *keys.PublicKey
-
-	// Consensus context, used to cancel the loop.
-	consensusCtx context.Context
-	interrupt    context.CancelFunc
-
 	// Consensus loop
-	loop      *loop.Consensus
-	requestor *candidate.Requestor
+	loop           *loop.Consensus
+	pubKey         *keys.PublicKey
+	requestor      *candidate.Requestor
+	newBlockChan   chan consensus.Results
+	CatchBlockChan chan consensus.Results
 
 	// rusk client
 	proxy transactions.Proxy
@@ -108,17 +90,20 @@ type Chain struct {
 // New returns a new chain object. It accepts the EventBus (for messages coming
 // from (remote) consensus components, the RPCBus for dispatching synchronous
 // data related to Certificates, Blocks, Rounds and progress.
-func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, requestor *candidate.Requestor) (*Chain, error) {
+func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus, pubKey *keys.PublicKey, requestor *candidate.Requestor) (*Chain, error) {
 	chain := &Chain{
-		eventBus:  eventBus,
-		rpcBus:    rpcBus,
-		db:        db,
-		sequencer: newSequencer(),
-		loader:    loader,
-		verifier:  verifier,
-		proxy:     proxy,
-		ctx:       ctx,
-		requestor: requestor,
+		eventBus:       eventBus,
+		rpcBus:         rpcBus,
+		db:             db,
+		loader:         loader,
+		verifier:       verifier,
+		proxy:          proxy,
+		ctx:            ctx,
+		loop:           loop,
+		pubKey:         pubKey,
+		requestor:      requestor,
+		newBlockChan:   make(chan consensus.Results, 1),
+		CatchBlockChan: make(chan consensus.Results),
 	}
 
 	provisioners, err := proxy.Executor().GetProvisioners(ctx)
@@ -135,9 +120,6 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 	chain.tip = prevBlock
 
 	if prevBlock.Header.Height == 0 {
-		// TODO: maybe it would be better to have a consensus-compatible certificate.
-		chain.lastCertificate = block.EmptyCertificate()
-
 		// If we're running the test harness, we should also populate some consensus values
 		if config.Get().Genesis.Legacy {
 			if errV := setupBidValues(); errV != nil {
@@ -157,134 +139,100 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 	return chain, nil
 }
 
-// SetupConsensus adds the missing fields on the Chain which need to be populated
-// by the user. Once the fields are populated, consensus is started.
-// NOTE: we need locking here so that there is no race condition between
-// the synchronization routine trying to figure out if there is a loop
-// available, and the setting of these fields.
-func (c *Chain) SetupConsensus(pk keys.PublicKey, l *loop.Consensus) {
-	c.lock.Lock()
-	c.pubKey = &pk
-	c.loop = l
-	c.lock.Unlock()
+// CurrentHeight returns the height of the chain tip.
+func (c *Chain) CurrentHeight() uint64 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.tip.Header.Height
+}
 
-	// If we are on genesis and our consensus is being set up, it means
-	// the network has just bootstrapped. So, we need to start the consensus,
-	// and set up the interrupt.
-	if c.tip.Header.Height == 0 {
-		go func() {
-			if err := c.startConsensus(); err != nil {
-				log.WithError(err).Error("consensus failure")
+func (c *Chain) catchNewBlocks(ctx context.Context, ru consensus.RoundUpdate) {
+	for {
+		select {
+		case r := <-c.CatchBlockChan:
+			if r.Blk.Header != nil && r.Blk.Header.Height != ru.Round {
+				continue
 			}
-		}()
+
+			c.newBlockChan <- r
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
-// ProcessBlock will handle blocks incoming from the network. It will allow
-// the chain to enter sync mode if it detects that we are behind, which will
-// cancel the running consensus loop and attempt to reach the new chain tip.
-// Satisfied the peer.ProcessorFunc interface.
-func (c *Chain) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
-	blk := m.Payload().(block.Block)
-	log.WithField("height", blk.Header.Height).Trace("received block")
-
-	c.lock.Lock()
-	// Is it worth looking at this?
-	if blk.Header.Height <= c.tip.Header.Height {
-		log.Debug("discarded block from the past")
-		c.lock.Unlock()
-		return nil, nil
-	}
-
-	if blk.Header.Height > c.highestSeen {
-		c.highestSeen = blk.Header.Height
-	}
-
-	// If we are more than one block behind, stop the consensus
-	log.Debug("topics.StopConsensus")
-	// FIXME: this call should be blocking
-	if c.interrupt != nil {
-		c.interrupt()
-	}
-
-	// If this block is from far in the future, we should start syncing mode.
-	if blk.Header.Height > c.tip.Header.Height+1 {
-		c.sequencer.add(blk)
-
-		if !c.syncing {
-			msgGetBlocks := createGetBlocksMsg(c.tip.Header.Hash)
-			buf, err := marshalGetBlocks(msgGetBlocks)
+// CrunchBlocks will...
+func (c *Chain) CrunchBlocks(ctx context.Context) error {
+	for {
+		crunchCtx, cancel := context.WithCancel(ctx)
+		c.lock.RLock()
+		ru := c.getRoundUpdate()
+		c.lock.RUnlock()
+		go c.catchNewBlocks(crunchCtx, ru)
+		var winner consensus.Results
+		if c.loop != nil {
+			scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock, c.requestor, c.newBlockChan)
 			if err != nil {
-				log.WithError(err).Error("could not marshalGetBlocks")
-				c.lock.Unlock()
-				return nil, err
+				log.WithError(err).Error("could not create consensus state machine")
+				cancel()
+				return err
 			}
-
-			c.syncTarget = blk.Header.Height
-			if c.syncTarget > c.tip.Header.Height+config.MaxInvBlocks {
-				c.syncTarget = c.tip.Header.Height + config.MaxInvBlocks
-			}
-
-			c.syncing = true
-			c.lock.Unlock()
-			return []bytes.Buffer{*buf}, nil
+			winner = c.loop.Spin(ctx, scr, agr, ru)
+		} else {
+			winner = <-c.newBlockChan
 		}
 
-		c.lock.Unlock()
-		return nil, nil
-	}
-
-	// Otherwise, put it into the acceptance pipeline.
-	return nil, c.onAcceptBlock(blk)
-}
-
-func createGetBlocksMsg(latestHash []byte) *message.GetBlocks {
-	msg := &message.GetBlocks{}
-	msg.Locators = append(msg.Locators, latestHash)
-	return msg
-}
-
-//nolint:unparam
-func marshalGetBlocks(msg *message.GetBlocks) (*bytes.Buffer, error) {
-	buf := topics.GetBlocks.ToBuffer()
-	if err := msg.Encode(&buf); err != nil {
-		//FIXME: shall this panic here ?  result 1 (error) is always nil (unparam)
-		//log.Panic(err)
-		return nil, err
-	}
-
-	return &buf, nil
-}
-
-func (c *Chain) onAcceptBlock(blk block.Block) error {
-	field := logger.Fields{"process": "onAcceptBlock", "height": blk.Header.Height}
-	lg := log.WithFields(field)
-
-	// Retrieve all successive blocks that need to be accepted
-	blks := c.sequencer.provideSuccessors(blk)
-
-	for _, blk := range blks {
-		if err := c.AcceptBlock(c.ctx, blk); err != nil {
-			lg.WithError(err).Debug("could not AcceptBlock")
-			c.lock.Unlock()
-			return err
+		// On error, we exit the loop, because we will be syncing, or consensus
+		// has encountered an error.
+		if winner.Err != nil {
+			cancel()
+			return winner.Err
 		}
-		c.lastCertificate = blk.Header.Certificate
+
+		// Otherwise, accept the block directly.
+		if !winner.Blk.IsEmpty() {
+			if err := c.AcceptSuccessiveBlock(ctx, winner.Blk); err != nil {
+				cancel()
+				return err
+			}
+		}
+
+		cancel()
+	}
+}
+
+// ProcessSucceedingBlock will handle blocks incoming from the network,
+// which directly succeed the known chain tip.
+func (c *Chain) ProcessSucceedingBlock(blk block.Block) {
+	log.WithField("height", blk.Header.Height).Trace("received succeeding block")
+
+	select {
+	case c.CatchBlockChan <- consensus.Results{Blk: blk, Err: nil}:
+	default:
+	}
+}
+
+// ProcessSyncBlock will handle blocks which are received through a
+// synchronization procedure.
+func (c *Chain) ProcessSyncBlock(blk block.Block) error {
+	log.WithField("height", blk.Header.Height).Trace("received sync block")
+	return c.AcceptBlock(c.ctx, blk)
+}
+
+// AcceptSuccessiveBlock will accept a block which directly follows the chain
+// tip, and advertises it to the node's peers.
+func (c *Chain) AcceptSuccessiveBlock(ctx context.Context, blk block.Block) error {
+	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
+	if err := c.AcceptBlock(ctx, blk); err != nil {
+		return err
 	}
 
-	// If we are no longer syncing after accepting this block,
-	// request a certificate for the second to last round.
-	if !c.syncing && c.pubKey != nil && c.loop != nil {
-		// Once received, we can re-start consensus.
-		// This sets off a chain of processing which goes from sending the
-		// round update, to re-instantiating the consensus, to setting off
-		// the first consensus loop. So, we do this in a goroutine to
-		// avoid blocking other requests to the chain.
-		c.lock.Unlock()
-		return c.startConsensus()
+	log.Trace("gossiping block")
+	if err := c.advertiseBlock(blk); err != nil {
+		log.WithError(err).Error("block advertising failed")
+		return err
 	}
 
-	c.lock.Unlock()
 	return nil
 }
 
@@ -296,8 +244,11 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	field := logger.Fields{"process": "accept block", "height": blk.Header.Height}
 	l := log.WithFields(field)
 
-	l.Trace("verifying block")
+	// Guard the c.tip field
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
+	l.Trace("verifying block")
 	// 1. Check that stateless and stateful checks pass
 	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
 		l.WithError(err).Error("block verification failed")
@@ -350,63 +301,17 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 		return err
 	}
 
-	// 5. Gossip advertise block Hash
-	l.Trace("gossiping block")
-	if err := c.advertiseBlock(blk); err != nil {
-		l.WithError(err).Error("block advertising failed")
-		return err
-	}
-
 	// 6. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
-	// consensus.generation.broker
 	l.Trace("notifying internally")
 
 	msg := message.New(topics.AcceptedBlock, blk)
 	errList := c.eventBus.Publish(topics.AcceptedBlock, msg)
 	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
 
-	if blk.Header.Height == c.syncTarget {
-		l.Trace("ending sync")
-		c.syncing = false
-	}
-
 	l.Trace("procedure ended")
 	return nil
-}
-
-func (c *Chain) startConsensus() error {
-	for {
-		c.lock.Lock()
-		ru := c.getRoundUpdate()
-		c.consensusCtx, c.interrupt = context.WithCancel(c.ctx)
-		scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock, c.requestor)
-		if err != nil {
-			log.WithError(err).Error("could not create consensus state machine")
-			c.lock.Unlock()
-			return err
-		}
-
-		c.lock.Unlock()
-		cert, blockHash, err := c.loop.Spin(c.consensusCtx, scr, agr, ru)
-		if err != nil {
-			// This is likely because of the consensus reaching max steps.
-			// If this is the case, we simply propagate the error upwards.
-			// TODO: maybe figure out a way to respond to this kind of error.
-			return err
-		}
-
-		// If the context was canceled, the results will be nil. Thus, we can
-		// break the loop and exit the function, to make place for the new one.
-		if cert == nil || blockHash == nil {
-			return nil
-		}
-
-		if err := c.handleCertificateMessage(cert, blockHash); err != nil {
-			return err
-		}
-	}
 }
 
 // VerifyCandidateBlock can be used as a callback for the consensus in order to
@@ -476,70 +381,22 @@ func (c *Chain) kadcastBlock(m message.Message) error {
 	return nil
 }
 
-func (c *Chain) handleCertificateMessage(cert *block.Certificate, blockHash []byte) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.lastCertificate = cert
-
-	var cm block.Block
-	if err := c.db.View(func(t database.Transaction) error {
-		var err error
-		cm, err = t.FetchCandidateMessage(blockHash)
-		return err
-	}); err != nil {
-		// If we can't get the block, we will fall
-		// back and catch up later.
-		//FIXME: restart consensus when handleCertificateMessage flow return err
-		log.
-			WithError(err).
-			WithField("height", c.tip.Header.Height+1).
-			Error("could not find winning candidate block")
-		return err
-	}
-
-	// Try to accept candidate block
-	cm.Header.Certificate = cert
-	if err := c.AcceptBlock(c.ctx, cm); err != nil {
-		log.
-			WithError(err).
-			WithField("candidate_hash", hex.EncodeToString(cm.Header.Hash)).
-			WithField("candidate_height", cm.Header.Height).
-			Error("could not accept candidate block")
-		return err
-	}
-
-	return nil
-}
-
 func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 	return consensus.RoundUpdate{
 		Round:           c.tip.Header.Height + 1,
 		P:               c.p.Copy(),
 		Seed:            c.tip.Header.Seed,
 		Hash:            c.tip.Header.Hash,
-		LastCertificate: c.lastCertificate,
+		LastCertificate: c.tip.Header.Certificate,
 	}
 }
 
 // GetSyncProgress returns how close the node is to being synced to the tip,
 // as a percentage value.
-// TODO: fix
+// NOTE: this is just here to satisfy the grpc interface. It should be removed
+// and the method should be moved to a synchronizer service.
 func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
-	if c.highestSeen == 0 {
-		return &node.SyncProgressResponse{Progress: 0}, nil
-	}
-
-	prevBlockHeight := c.tip.Header.Height
-	progressPercentage := (float64(prevBlockHeight) / float64(c.highestSeen)) * 100
-
-	// Avoiding strange output when the chain can be ahead of the highest
-	// seen block, as in most cases, consensus terminates before we see
-	// the new block from other peers.
-	if progressPercentage > 100 {
-		progressPercentage = 100
-	}
-
-	return &node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil
+	return &node.SyncProgressResponse{Progress: float32(100.0)}, nil
 }
 
 // RebuildChain will delete all blocks except for the genesis block,

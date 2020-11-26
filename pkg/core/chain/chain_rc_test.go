@@ -3,20 +3,15 @@
 package chain
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -24,42 +19,19 @@ import (
 func TestConcurrentBlock(t *testing.T) {
 	// Set up a chain instance with mocking verifiers
 	startingHeight := uint64(1)
-	eb, chain := setupChainTest(t, startingHeight)
-	rb := rpcbus.New()
-
-	BLSKeys, _ := key.NewRandKeys()
-	pk := keys.PublicKey{
-		AG: &common.JubJubCompressed{Data: make([]byte, 32)},
-		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
-	}
-
-	e := &consensus.Emitter{
-		EventBus:    eb,
-		RPCBus:      rb,
-		Keys:        BLSKeys,
-		Proxy:       chain.proxy,
-		TimerLength: 5 * time.Second,
-	}
-	l := loop.New(e)
-	go chain.SetupConsensus(pk, l)
+	_, chain := setupChainTest(t, startingHeight)
+	go chain.CrunchBlocks(context.Background())
 
 	var wg sync.WaitGroup
 	for n := 0; n < 50; n++ {
-		wg.Add(2)
+		wg.Add(1)
 
 		// Publish concurrently topics.Block from different goroutines
 		go func() {
 			defer wg.Done()
 
 			blk := helper.RandomBlock(1, 3)
-			msg := message.New(topics.Block, *blk)
-			chain.ProcessBlock(msg)
-		}()
-
-		// Publish concurrently topics.Certificate from different goroutines
-		go func() {
-			defer wg.Done()
-			chain.handleCertificateMessage(mockCertificate())
+			chain.ProcessSyncBlock(*blk)
 		}()
 	}
 
