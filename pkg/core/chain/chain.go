@@ -54,6 +54,14 @@ type Loader interface {
 	Append(*block.Block) error
 }
 
+// Ledger is the Chain interface
+type Ledger interface {
+	CurrentHeight() uint64
+	CrunchBlocks(context.Context) error
+	ProcessSucceedingBlock(block.Block)
+	ProcessSyncBlock(context.Context, block.Block) error
+}
+
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
@@ -161,44 +169,52 @@ func (c *Chain) catchNewBlocks(ctx context.Context, ru consensus.RoundUpdate) {
 	}
 }
 
+// GetRoundUpdate returns the current RoundUpdate
+func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.getRoundUpdate()
+}
+
 // CrunchBlocks will...
 func (c *Chain) CrunchBlocks(ctx context.Context) error {
 	for {
-		crunchCtx, cancel := context.WithCancel(ctx)
-		c.lock.RLock()
-		ru := c.getRoundUpdate()
-		c.lock.RUnlock()
-		go c.catchNewBlocks(crunchCtx, ru)
-		var winner consensus.Results
-		if c.loop != nil {
-			scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock, c.requestor, c.newBlockChan)
-			if err != nil {
-				log.WithError(err).Error("could not create consensus state machine")
-				cancel()
-				return err
-			}
-			winner = c.loop.Spin(ctx, scr, agr, ru)
-		} else {
-			winner = <-c.newBlockChan
-		}
-
-		// On error, we exit the loop, because we will be syncing, or consensus
-		// has encountered an error.
-		if winner.Err != nil {
-			cancel()
-			return winner.Err
+		candidate := c.crunchBlock(ctx)
+		block, err := candidate.Blk, candidate.Err
+		if err != nil {
+			return err
 		}
 
 		// Otherwise, accept the block directly.
-		if !winner.Blk.IsEmpty() {
-			if err := c.AcceptSuccessiveBlock(ctx, winner.Blk); err != nil {
-				cancel()
+		if !block.IsEmpty() {
+			if err = c.AcceptSuccessiveBlock(ctx, block); err != nil {
 				return err
 			}
 		}
-
-		cancel()
 	}
+}
+
+func (c *Chain) crunchBlock(ctx context.Context) (winner consensus.Results) {
+	crunchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	ru := c.GetRoundUpdate()
+
+	go c.catchNewBlocks(crunchCtx, ru)
+
+	if c.loop != nil {
+		scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock, c.requestor, c.newBlockChan)
+		if err != nil {
+			// TODO: errors should be handled by the caller
+			log.WithError(err).Error("could not create consensus state machine")
+			winner.Err = err
+			return winner
+		}
+
+		return c.loop.Spin(ctx, scr, agr, ru)
+	}
+
+	return <-c.newBlockChan
 }
 
 // ProcessSucceedingBlock will handle blocks incoming from the network,
@@ -214,16 +230,16 @@ func (c *Chain) ProcessSucceedingBlock(blk block.Block) {
 
 // ProcessSyncBlock will handle blocks which are received through a
 // synchronization procedure.
-func (c *Chain) ProcessSyncBlock(blk block.Block) error {
+func (c *Chain) ProcessSyncBlock(ctx context.Context, blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("received sync block")
-	return c.AcceptBlock(c.ctx, blk)
+	return c.acceptBlock(ctx, blk)
 }
 
 // AcceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
 func (c *Chain) AcceptSuccessiveBlock(ctx context.Context, blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
-	if err := c.AcceptBlock(ctx, blk); err != nil {
+	if err := c.acceptBlock(ctx, blk); err != nil {
 		return err
 	}
 
@@ -236,11 +252,11 @@ func (c *Chain) AcceptSuccessiveBlock(ctx context.Context, blk block.Block) erro
 	return nil
 }
 
-// AcceptBlock will accept a block if
+// acceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved
-func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
+func (c *Chain) acceptBlock(ctx context.Context, blk block.Block) error {
 	field := logger.Fields{"process": "accept block", "height": blk.Header.Height}
 	l := log.WithFields(field)
 
