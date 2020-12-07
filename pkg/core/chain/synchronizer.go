@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -21,6 +22,7 @@ import (
 type Synchronizer struct {
 	eb eventbus.Broker
 	rb *rpcbus.RPCBus
+	db database.DB
 
 	highestSeen uint64
 	syncing     bool
@@ -37,10 +39,11 @@ type Synchronizer struct {
 }
 
 // NewSynchronizer returns an initialized Synchronizer, ready for use.
-func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, catchBlockChan chan consensus.Results, currentHeight func() uint64, processSucceedingBlock func(block.Block), processSyncBlock func(block.Block) error, crunchBlocks func(context.Context) error) *Synchronizer {
+func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, catchBlockChan chan consensus.Results, currentHeight func() uint64, processSucceedingBlock func(block.Block), processSyncBlock func(block.Block) error, crunchBlocks func(context.Context) error) *Synchronizer {
 	return &Synchronizer{
 		eb:                     eb,
 		rb:                     rb,
+		db:                     db,
 		sequencer:              newSequencer(),
 		ctx:                    ctx,
 		catchBlockChan:         catchBlockChan,
@@ -71,7 +74,7 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	if blk.Header.Height > currentHeight+1 {
 		s.sequencer.add(blk)
 		if !s.syncing {
-			return s.startSync(blk, currentHeight)
+			return s.startSync(blk.Header.Height, currentHeight)
 		}
 
 		return nil, nil
@@ -109,21 +112,30 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	return nil, nil
 }
 
-func (s *Synchronizer) startSync(tip block.Block, currentHeight uint64) ([]bytes.Buffer, error) {
+func (s *Synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
 	// Kill the `CrunchBlocks` goroutine.
 	select {
 	case s.catchBlockChan <- consensus.Results{Blk: block.Block{}, Err: errors.New("syncing mode started")}:
 	default:
 	}
 
-	s.syncTarget = tip.Header.Height
+	s.syncTarget = tipHeight
 	if s.syncTarget > currentHeight+config.MaxInvBlocks {
 		s.syncTarget = currentHeight + config.MaxInvBlocks
 	}
 
 	s.syncing = true
 
-	msgGetBlocks := createGetBlocksMsg(tip.Header.Hash)
+	var hash []byte
+	if err := s.db.View(func(t database.Transaction) error {
+		var err error
+		hash, err = t.FetchBlockHashByHeight(currentHeight)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+
+	msgGetBlocks := createGetBlocksMsg(hash)
 	return marshalGetBlocks(msgGetBlocks)
 }
 

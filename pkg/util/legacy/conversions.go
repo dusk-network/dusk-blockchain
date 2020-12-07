@@ -14,7 +14,6 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
-	"github.com/sirupsen/logrus"
 )
 
 // OldBlockToNewBlock will convert a dusk-wallet block into a dusk-blockchain block.
@@ -332,7 +331,6 @@ func RuskDistributeToCoinbase(tx *rusk.Transaction) (*transactions.Coinbase, err
 	if err := encoding.ReadUint64LE(buf, &amount); err != nil {
 		return nil, err
 	}
-	logrus.WithField("coinbase amount", amount).Infoln(amount)
 
 	var amountScalar ristretto.Scalar
 	amountScalar.SetBigInt(new(big.Int).SetUint64(amount))

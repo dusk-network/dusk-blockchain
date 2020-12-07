@@ -3,7 +3,6 @@ package transactor
 import (
 	"context"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -30,10 +29,7 @@ type Transactor struct { // TODO: rename
 	// c                 *chainsync.Counter
 	// acceptedBlockChan <-chan block.Block
 
-	secretKey keys.SecretKey
-
-	proxy     transactions.Proxy
-	keyMaster transactions.KeyMaster
+	proxy transactions.Proxy
 
 	w *wallet.Wallet
 }

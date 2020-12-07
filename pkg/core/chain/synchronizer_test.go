@@ -4,8 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -75,8 +78,16 @@ func setupSynchronizerTest() (*Synchronizer, chan consensus.Results, *mockChain)
 	eb, rb := eventbus.New(), rpcbus.New()
 	catchBlockChan := make(chan consensus.Results, 1)
 	m := &mockChain{tipHeight: 0, catchBlockChan: catchBlockChan}
+	_, db := lite.CreateDBConnection()
+	// Give DB a genesis to avoid errors
+	genesis := config.DecodeGenesis()
+	if err := db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(genesis)
+	}); err != nil {
+		panic(err)
+	}
 
-	return NewSynchronizer(ctx, eb, rb, catchBlockChan, m.currentHeight, m.processSucceedingBlock, m.processSyncBlock, m.crunchBlocks), catchBlockChan, m
+	return NewSynchronizer(ctx, eb, rb, db, catchBlockChan, m.currentHeight, m.processSucceedingBlock, m.processSyncBlock, m.crunchBlocks), catchBlockChan, m
 }
 
 type mockChain struct {
