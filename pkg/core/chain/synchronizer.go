@@ -91,6 +91,10 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 			log.WithError(err).Debug("could not AcceptBlock")
 			return nil, err
 		}
+
+		if blk.Header.Height == s.syncTarget {
+			s.syncing = false
+		}
 	}
 
 	// Did we finish syncing? If so, restart the `CrunchBlocks` loop.
