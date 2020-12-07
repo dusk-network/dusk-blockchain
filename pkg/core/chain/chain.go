@@ -58,8 +58,9 @@ type Loader interface {
 type Ledger interface {
 	CurrentHeight() uint64
 	ProduceBlocks(context.Context) error
-	ProcessSucceedingBlock(block.Block)
-	ProcessSyncBlock(context.Context, block.Block) error
+	NotifyBlock(context.Context, block.Block) error
+	// ProcessSucceedingBlock(block.Block)
+	// ProcessSyncBlock(context.Context, block.Block) error
 }
 
 // Chain represents the nodes blockchain
@@ -82,13 +83,6 @@ type Chain struct {
 	// Current set of provisioners
 	p *user.Provisioners
 
-	// Consensus loop
-	loop           *loop.Consensus
-	pubKey         *keys.PublicKey
-	requestor      *candidate.Requestor
-	newBlockChan   chan consensus.Results
-	CatchBlockChan chan consensus.Results
-
 	// rusk client
 	proxy transactions.Proxy
 
@@ -98,7 +92,7 @@ type Chain struct {
 // New returns a new chain object. It accepts the EventBus (for messages coming
 // from (remote) consensus components, the RPCBus for dispatching synchronous
 // data related to Certificates, Blocks, Rounds and progress.
-func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus, pubKey *keys.PublicKey, requestor *candidate.Requestor) (*Chain, error) {
+func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy) (*Chain, error) {
 	chain := &Chain{
 		eventBus:       eventBus,
 		rpcBus:         rpcBus,
@@ -107,16 +101,11 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		verifier:       verifier,
 		proxy:          proxy,
 		ctx:            ctx,
-		loop:           loop,
-		pubKey:         pubKey,
-		requestor:      requestor,
-		newBlockChan:   make(chan consensus.Results, 1),
-		CatchBlockChan: make(chan consensus.Results),
 	}
 
 	provisioners, err := proxy.Executor().GetProvisioners(ctx)
 	if err != nil {
-		log.WithError(err).Error("Error in getting provisioners")
+	log.WithError(err).Error("Error in getting provisioners")
 		return nil, err
 	}
 	chain.p = &provisioners
@@ -154,21 +143,6 @@ func (c *Chain) CurrentHeight() uint64 {
 	return c.tip.Header.Height
 }
 
-func (c *Chain) catchNewBlocks(ctx context.Context, ru consensus.RoundUpdate) {
-	for {
-		select {
-		case r := <-c.CatchBlockChan:
-			if r.Blk.Header != nil && r.Blk.Header.Height != ru.Round {
-				continue
-			}
-
-			c.newBlockChan <- r
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
 // GetRoundUpdate returns the current RoundUpdate
 func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
 	c.lock.RLock()
@@ -176,80 +150,11 @@ func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
 	return c.getRoundUpdate()
 }
 
-// ProduceBlocks will...
-func (c *Chain) ProduceBlocks(ctx context.Context) error {
-	for {
-		candidate := c.crunchBlock(ctx)
-		block, err := candidate.Blk, candidate.Err
-		if err != nil {
-			return err
-		}
-
-		// Otherwise, accept the block directly.
-		if !block.IsEmpty() {
-			if err = c.AcceptSuccessiveBlock(ctx, block); err != nil {
-				return err
-			}
-		}
-	}
-}
-
-func (c *Chain) crunchBlock(ctx context.Context) (winner consensus.Results) {
-	crunchCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	ru := c.GetRoundUpdate()
-
-	go c.catchNewBlocks(crunchCtx, ru)
-
-	if c.loop != nil {
-		scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock, c.requestor, c.newBlockChan)
-		if err != nil {
-			// TODO: errors should be handled by the caller
-			log.WithError(err).Error("could not create consensus state machine")
-			winner.Err = err
-			return winner
-		}
-
-		return c.loop.Spin(ctx, scr, agr, ru)
-	}
-
-	return <-c.newBlockChan
-}
-
-// ProcessSucceedingBlock will handle blocks incoming from the network,
-// which directly succeed the known chain tip.
-func (c *Chain) ProcessSucceedingBlock(blk block.Block) {
-	log.WithField("height", blk.Header.Height).Trace("received succeeding block")
-
-	select {
-	case c.CatchBlockChan <- consensus.Results{Blk: blk, Err: nil}:
-	default:
-	}
-}
-
-// ProcessSyncBlock will handle blocks which are received through a
+// NotifyBlock will handle blocks which are received through a
 // synchronization procedure.
-func (c *Chain) ProcessSyncBlock(ctx context.Context, blk block.Block) error {
+func (c *Chain) NotifyBlock(ctx context.Context, blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("received sync block")
 	return c.acceptBlock(ctx, blk)
-}
-
-// AcceptSuccessiveBlock will accept a block which directly follows the chain
-// tip, and advertises it to the node's peers.
-func (c *Chain) AcceptSuccessiveBlock(ctx context.Context, blk block.Block) error {
-	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
-	if err := c.acceptBlock(ctx, blk); err != nil {
-		return err
-	}
-
-	log.Trace("gossiping block")
-	if err := c.advertiseBlock(blk); err != nil {
-		log.WithError(err).Error("block advertising failed")
-		return err
-	}
-
-	return nil
 }
 
 // acceptBlock will accept a block if
@@ -342,60 +247,6 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 	return err
 }
 
-// Send Inventory message to all peers
-func (c *Chain) advertiseBlock(b block.Block) error {
-	// Disable gossiping messages if kadcast mode
-	if config.Get().Kadcast.Enabled {
-		return nil
-	}
-
-	msg := &message.Inv{}
-	msg.AddItem(message.InvTypeBlock, b.Header.Hash)
-
-	buf := new(bytes.Buffer)
-	if err := msg.Encode(buf); err != nil {
-		//TODO: shall this really panic ?
-		log.Panic(err)
-	}
-
-	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		//TODO: shall this really panic ?
-		log.Panic(err)
-	}
-
-	m := message.New(topics.Inv, *buf)
-	errList := c.eventBus.Publish(topics.Gossip, m)
-	diagnostics.LogPublishErrors("chain/chain.go, topics.Gossip, topics.Inv", errList)
-
-	return nil
-}
-
-//nolint:unused
-func (c *Chain) kadcastBlock(m message.Message) error {
-	var kadHeight byte = 255
-	if len(m.Header()) > 0 {
-		kadHeight = m.Header()[0]
-	}
-
-	b, ok := m.Payload().(block.Block)
-	if !ok {
-		return errors.New("message payload not a block")
-	}
-
-	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, &b); err != nil {
-		return err
-	}
-
-	if err := topics.Prepend(buf, topics.Block); err != nil {
-		return err
-	}
-
-	m = message.NewWithHeader(topics.Block, *buf, []byte{kadHeight})
-	c.eventBus.Publish(topics.Kadcast, m)
-
-	return nil
-}
 
 func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 	return consensus.RoundUpdate{
