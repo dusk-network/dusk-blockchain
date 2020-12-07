@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
@@ -12,9 +14,13 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
@@ -31,10 +37,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh/terminal"
 	"google.golang.org/grpc"
 )
 
 var logServer = logrus.WithField("process", "server")
+var testnet = byte(2)
 
 // Server is the main process of the node
 type Server struct {
@@ -52,7 +60,7 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB, requestor *candidate.Requestor) (*chain.Chain, error) {
+func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB, requestor *candidate.Requestor, w *wallet.Wallet) (*chain.Chain, error) {
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
@@ -67,8 +75,16 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 	}
 	l := chain.NewDBLoader(db, genesis)
 
-	// TODO: ADD LOOP
-	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, nil, nil, requestor)
+	e := &consensus.Emitter{
+		EventBus:    eventBus,
+		RPCBus:      rpcBus,
+		Keys:        w.Keys(),
+		Proxy:       proxy,
+		TimerLength: cfg.ConsensusTimeOut,
+	}
+	cl := loop.New(e)
+
+	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, cl, &w.PublicKey, requestor)
 	if err != nil {
 		return nil, err
 	}
@@ -102,35 +118,24 @@ func (s *Server) launchKadcastPeer() {
 // Stake and Blind Bid channels
 func Setup() *Server {
 	ctx := context.Background()
+	fmt.Println("Enter password:")
+	pw, err := terminal.ReadPassword(0)
+	if err != nil {
+		log.Panic(err)
+	}
+
 	grpcServer, err := server.SetupGRPC(server.FromCfg())
 	if err != nil {
 		log.Panic(err)
 	}
 
-	// creating the eventbus
 	eventBus := eventbus.New()
-
-	// creating the rpcbus
 	rpcBus := rpcbus.New()
 
 	_, db := heavy.CreateDBConnection()
+
 	processor := peer.NewMessageProcessor(eventBus)
-	// Register peer services
-	processor.Register(topics.Ping, responding.ProcessPing)
-	dataBroker := responding.NewDataBroker(db, rpcBus)
-	processor.Register(topics.GetData, dataBroker.SendItems)
-	dataRequestor := responding.NewDataRequestor(db, rpcBus, eventBus)
-	processor.Register(topics.Inv, dataRequestor.RequestMissingItems)
-	bhb := responding.NewBlockHashBroker(db)
-	processor.Register(topics.GetBlocks, bhb.AdvertiseMissingBlocks)
-	cb := responding.NewCandidateBroker(db)
-	processor.Register(topics.GetCandidate, cb.ProvideCandidate)
-	cr := candidate.NewRequestor(eventBus)
-	processor.Register(topics.Candidate, cr.ProcessCandidate)
-	cp := consensus.NewPublisher(eventBus)
-	processor.Register(topics.Score, cp.Process)
-	processor.Register(topics.Reduction, cp.Process)
-	processor.Register(topics.Agreement, cp.Process)
+	registerPeerServices(processor, db, eventBus, rpcBus)
 
 	_ = republisher.New(eventBus, topics.Score)
 	_ = republisher.New(eventBus, topics.Reduction)
@@ -138,16 +143,17 @@ func Setup() *Server {
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	ruskClient, ruskConn := client.CreateStateClient(ctx, cfg.Get().RPC.Rusk.Address)
-	keysClient, _ := client.CreateKeysClient(ctx, cfg.Get().RPC.Rusk.Address)
-	blindbidServiceClient, _ := client.CreateBlindBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
-	bidServiceClient, _ := client.CreateBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
-	transferClient, _ := client.CreateTransferClient(ctx, cfg.Get().RPC.Rusk.Address)
-	stakeClient, _ := client.CreateStakeClient(ctx, cfg.Get().RPC.Rusk.Address)
+	proxy, ruskConn := setupGRPCClients(ctx)
 
-	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
-	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	proxy := transactions.NewProxy(ruskClient, keysClient, blindbidServiceClient, bidServiceClient, transferClient, stakeClient, txTimeout, defaultTimeout)
+	var w *wallet.Wallet
+	if _, err := os.Stat("wallet.dat"); err == nil {
+		w, err = loadWallet(string(pw))
+	} else {
+		w, err = createWallet(nil, string(pw), proxy.KeyMaster())
+	}
+	if err != nil {
+		log.Panic(err)
+	}
 
 	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run()
@@ -166,7 +172,10 @@ func Setup() *Server {
 		}
 	}
 
-	c, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db, cr)
+	cr := candidate.NewRequestor(eventBus)
+	processor.Register(topics.Candidate, cr.ProcessCandidate)
+
+	c, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db, cr, w)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -175,7 +184,6 @@ func Setup() *Server {
 
 	processor.Register(topics.Block, sync.ProcessBlock)
 
-	// Setting up a dupemap
 	dupeBlacklist := dupemap.Launch(eventBus)
 
 	// Instantiate GraphQL server
@@ -206,7 +214,7 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy)
+	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy, w)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -285,4 +293,86 @@ func (s *Server) Close() {
 	if s.kadPeer != nil {
 		s.kadPeer.Close()
 	}
+}
+
+func registerPeerServices(processor *peer.MessageProcessor, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) {
+	processor.Register(topics.Ping, responding.ProcessPing)
+	dataBroker := responding.NewDataBroker(db, rpcBus)
+	processor.Register(topics.GetData, dataBroker.SendItems)
+	dataRequestor := responding.NewDataRequestor(db, rpcBus, eventBus)
+	processor.Register(topics.Inv, dataRequestor.RequestMissingItems)
+	bhb := responding.NewBlockHashBroker(db)
+	processor.Register(topics.GetBlocks, bhb.AdvertiseMissingBlocks)
+	cb := responding.NewCandidateBroker(db)
+	processor.Register(topics.GetCandidate, cb.ProvideCandidate)
+	cp := consensus.NewPublisher(eventBus)
+	processor.Register(topics.Score, cp.Process)
+	processor.Register(topics.Reduction, cp.Process)
+	processor.Register(topics.Agreement, cp.Process)
+}
+
+func setupGRPCClients(ctx context.Context) (transactions.Proxy, *grpc.ClientConn) {
+	ruskClient, ruskConn := client.CreateStateClient(ctx, cfg.Get().RPC.Rusk.Address)
+	keysClient, _ := client.CreateKeysClient(ctx, cfg.Get().RPC.Rusk.Address)
+	blindbidServiceClient, _ := client.CreateBlindBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
+	bidServiceClient, _ := client.CreateBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
+	transferClient, _ := client.CreateTransferClient(ctx, cfg.Get().RPC.Rusk.Address)
+	stakeClient, _ := client.CreateStakeClient(ctx, cfg.Get().RPC.Rusk.Address)
+
+	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
+	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
+	return transactions.NewProxy(ruskClient, keysClient, blindbidServiceClient, bidServiceClient, transferClient, stakeClient, txTimeout, defaultTimeout), ruskConn
+}
+
+func loadWallet(password string) (*wallet.Wallet, error) {
+	// First load the database
+	db, err := walletdb.New(cfg.Get().Wallet.Store)
+	if err != nil {
+		return nil, err
+	}
+
+	// Then load the wallet
+	return wallet.LoadFromFile(testnet, db, password, cfg.Get().Wallet.File)
+}
+
+func createWallet(seed []byte, password string, keyMaster transactions.KeyMaster) (*wallet.Wallet, error) {
+	// First load the database
+	db, err := walletdb.New(cfg.Get().Wallet.Store)
+	if err != nil {
+		return nil, err
+	}
+
+	if seed == nil {
+		seed, err = wallet.GenerateNewSeed(nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	sk, pk, vk, err := keyMaster.GenerateKeys(context.Background(), seed)
+	if err != nil {
+		return nil, err
+	}
+
+	skBuf := new(bytes.Buffer)
+	if err = keys.MarshalSecretKey(skBuf, &sk); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	keysJSON := wallet.KeysJSON{
+		Seed:      seed,
+		SecretKey: skBuf.Bytes(),
+		PublicKey: pk,
+		ViewKey:   vk,
+	}
+
+	// Then create the wallet with seed and password
+	w, err := wallet.LoadFromSeed(testnet, db, password, cfg.Get().Wallet.File, keysJSON)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	return w, nil
 }

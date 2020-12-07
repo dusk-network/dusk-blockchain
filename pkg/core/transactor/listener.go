@@ -26,21 +26,6 @@ var (
 	errWalletAlreadyLoaded = errors.New("wallet is already loaded") //nolint
 )
 
-func (t *Transactor) handleCreateWallet(req *node.CreateRequest) (*node.LoadResponse, error) {
-	//return err if user sends no seed
-	if len(req.Seed) < 64 {
-		return nil, errors.New("seed must be at least 64 bytes in size")
-	}
-
-	//create wallet with seed and pass
-	err := t.createWallet(nil, req.Password)
-	if err != nil {
-		return nil, err
-	}
-
-	return loadResponseFromPub(t.w.PublicKey), nil
-}
-
 func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
 	// sk := t.w.SecretKey
 	/*
@@ -81,29 +66,6 @@ func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
 	}
 
 	return resp, nil
-}
-
-func (t *Transactor) handleLoadWallet(req *node.LoadRequest) (*node.LoadResponse, error) {
-	if t.w != nil {
-		return nil, errWalletAlreadyLoaded
-	}
-
-	pubKey, err := t.loadWallet(req.Password)
-	if err != nil {
-		return nil, err
-	}
-
-	return loadResponseFromPub(pubKey), nil
-}
-
-func (t *Transactor) handleCreateFromSeed(req *node.CreateRequest) (*node.LoadResponse, error) {
-	if t.w != nil {
-		return nil, errWalletAlreadyLoaded
-	}
-
-	err := t.createWallet(req.Seed, req.Password)
-
-	return loadResponseFromPub(t.w.PublicKey), err
 }
 
 func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionResponse, error) {
@@ -288,14 +250,6 @@ func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) 
 		return nil, err
 	}
 	return &node.GenericResponse{Response: "Wallet database deleted."}, nil
-}
-
-func (t *Transactor) handleIsWalletLoaded() (*node.WalletStatusResponse, error) {
-	isLoaded := false
-	if t.w != nil /*&& !t.w.SecretKey.IsEmpty() */ {
-		isLoaded = true
-	}
-	return &node.WalletStatusResponse{Loaded: isLoaded}, nil
 }
 
 func (t *Transactor) publishTx(tx transactions.ContractCall) ([]byte, error) {

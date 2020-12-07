@@ -39,7 +39,7 @@ type Transactor struct { // TODO: rename
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy) (*Transactor, error) {
+func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy, w *wallet.Wallet) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -54,6 +54,7 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 		stakeChan: stakeChan,
 		bidChan:   bidChan,
 		proxy:     proxy,
+		w:         w,
 	}
 
 	if srv != nil {
@@ -110,18 +111,21 @@ func (t *Transactor) GetTxHistory(ctx context.Context, e *node.EmptyRequest) (*n
 }
 
 // CreateWallet creates a new wallet from a password or seed
+// XXX: DEPRECATED
 func (t *Transactor) CreateWallet(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
-	return t.handleCreateWallet(c)
+	return nil, nil
 }
 
 // LoadWallet from a password
+// XXX: DEPRECATED
 func (t *Transactor) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node.LoadResponse, error) {
-	return t.handleLoadWallet(l)
+	return nil, nil
 }
 
 // CreateFromSeed creates a wallet from a seed
+// XXX: DEPRECATED
 func (t *Transactor) CreateFromSeed(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
-	return t.handleCreateFromSeed(c)
+	return nil, nil
 }
 
 // ClearWalletDatabase clears the wallet database, containing the unspent outputs.
@@ -150,8 +154,9 @@ func (t *Transactor) Stake(ctx context.Context, c *node.StakeRequest) (*node.Tra
 }
 
 // GetWalletStatus returns whether or not the wallet is currently loaded.
+// XXX: DEPRECATED
 func (t *Transactor) GetWalletStatus(ctx context.Context, e *node.EmptyRequest) (*node.WalletStatusResponse, error) {
-	return t.handleIsWalletLoaded()
+	return nil, nil
 }
 
 // GetAddress returns the address of the loaded wallet.
