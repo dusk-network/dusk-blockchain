@@ -237,7 +237,7 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 		return tx.StoreBidValues(make([]byte, 32), make([]byte, 32), 0, 100000)
 	}))
 
-	go c.CrunchBlocks(context.Background())
+	go c.ProduceBlocks(context.Background())
 
 	return eb, c
 }

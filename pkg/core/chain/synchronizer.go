@@ -96,7 +96,7 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	// Did we finish syncing? If so, restart the `CrunchBlocks` loop.
 	if !s.syncing {
 		go func() {
-			if err := s.chain.CrunchBlocks(s.ctx); err != nil {
+			if err := s.chain.ProduceBlocks(s.ctx); err != nil {
 				log.WithError(err).Error("crunchBlocks exited with error")
 			}
 		}()

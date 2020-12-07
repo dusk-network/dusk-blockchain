@@ -96,6 +96,6 @@ func (m *mockChain) ProcessSyncBlock(ctx context.Context, blk block.Block) error
 	return nil
 }
 
-func (m *mockChain) CrunchBlocks(ctx context.Context) error {
+func (m *mockChain) ProduceBlocks(ctx context.Context) error {
 	return nil
 }

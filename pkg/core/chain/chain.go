@@ -57,7 +57,7 @@ type Loader interface {
 // Ledger is the Chain interface
 type Ledger interface {
 	CurrentHeight() uint64
-	CrunchBlocks(context.Context) error
+	ProduceBlocks(context.Context) error
 	ProcessSucceedingBlock(block.Block)
 	ProcessSyncBlock(context.Context, block.Block) error
 }
@@ -176,8 +176,8 @@ func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
 	return c.getRoundUpdate()
 }
 
-// CrunchBlocks will...
-func (c *Chain) CrunchBlocks(ctx context.Context) error {
+// ProduceBlocks will...
+func (c *Chain) ProduceBlocks(ctx context.Context) error {
 	for {
 		candidate := c.crunchBlock(ctx)
 		block, err := candidate.Blk, candidate.Err
