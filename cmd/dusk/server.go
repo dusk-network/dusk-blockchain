@@ -113,18 +113,19 @@ func (s *Server) launchKadcastPeer() {
 	s.kadPeer = kadPeer
 }
 
-func getPassword() ([]byte, error) {
+func getPassword() (string, error) {
 	fd := int(os.Stdin.Fd())
 	if terminal.IsTerminal(fd) {
 		fmt.Println("Enter password:")
-		return terminal.ReadPassword(fd)
+		pw, err := terminal.ReadPassword(fd)
+		return string(pw), err
 	}
 
 	// This catches the password during test-harness execution.
 	f := os.NewFile(uintptr(fd), "stdin")
-	r := bufio.NewReader(f)
-	pw, _, err := r.ReadLine()
-	return pw, err
+	s := bufio.NewScanner(f)
+	_ = s.Scan()
+	return s.Text(), s.Err()
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
@@ -161,9 +162,9 @@ func Setup() *Server {
 
 	var w *wallet.Wallet
 	if _, err = os.Stat("wallet.dat"); err == nil {
-		w, err = loadWallet(string(pw))
+		w, err = loadWallet(pw)
 	} else {
-		w, err = createWallet(nil, string(pw), proxy.KeyMaster())
+		w, err = createWallet(nil, pw, proxy.KeyMaster())
 	}
 	if err != nil {
 		log.Panic(err)
