@@ -28,7 +28,13 @@ type Producer struct {
 }
 
 func New(chain *Chain, loop *loop.Consensus, pubKey *keys.PublicKey, requestor *candidate.Requestor) *Producer {
-
+	return &Producer{
+		Chain:          chain,
+		loop:           loop,
+		requestor:      requestor,
+		newBlockChan:   make(chan consensus.Results, 1),
+		CatchBlockChan: make(chan consensus.Results, 1),
+	}
 }
 
 // ProduceBlocks will
@@ -42,7 +48,7 @@ func (p *Producer) ProduceBlocks(ctx context.Context) error {
 
 		// Otherwise, accept the block directly.
 		if !block.IsEmpty() {
-			if err = c.AppendBlock(ctx, block); err != nil {
+			if err = p.AppendBlock(ctx, block); err != nil {
 				return err
 			}
 		}
@@ -57,7 +63,7 @@ func (p *Producer) crunchBlock(ctx context.Context) (winner consensus.Results) {
 
 	go p.catchNewBlocks(crunchCtx, ru)
 
-	if c.loop != nil {
+	if p.loop != nil {
 		scr, agr, err := loop.CreateStateMachine(p.loop.Emitter, p.db, config.ConsensusTimeOut, p.pubKey.Copy(), p.VerifyCandidateBlock, p.requestor, p.newBlockChan)
 		if err != nil {
 			// TODO: errors should be handled by the caller
@@ -75,12 +81,14 @@ func (p *Producer) crunchBlock(ctx context.Context) (winner consensus.Results) {
 func (p *Producer) catchNewBlocks(ctx context.Context, ru consensus.RoundUpdate) {
 	for {
 		select {
+		// TODO: this is useless. This check would better be in the loop so to
+		// get rid of this useless channel piping
 		case r := <-p.CatchBlockChan:
 			if r.Blk.Header != nil && r.Blk.Header.Height != ru.Round {
 				continue
 			}
 
-			c.newBlockChan <- r
+			p.newBlockChan <- r
 		case <-ctx.Done():
 			return
 		}
@@ -102,7 +110,7 @@ func (p *Producer) NotifyBlock(ctx context.Context, blk block.Block) {
 // tip, and advertises it to the node's peers.
 func (p *Producer) AppendBlock(ctx context.Context, blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
-	if err := c.acceptBlock(ctx, blk); err != nil {
+	if err := p.acceptBlock(ctx, blk); err != nil {
 		return err
 	}
 
@@ -165,7 +173,7 @@ func (p *Producer) kadcastBlock(m message.Message) error {
 	}
 
 	m = message.NewWithHeader(topics.Block, *buf, []byte{kadHeight})
-	c.eventBus.Publish(topics.Kadcast, m)
+	p.eventBus.Publish(topics.Kadcast, m)
 
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -21,6 +22,7 @@ import (
 type Synchronizer struct {
 	eb eventbus.Broker
 	rb *rpcbus.RPCBus
+	db database.DB
 
 	highestSeen uint64
 	syncing     bool
@@ -67,7 +69,7 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	if blk.Header.Height > currentHeight+1 {
 		s.sequencer.add(blk)
 		if !s.syncing {
-			return s.startSync(blk, currentHeight)
+			return s.startSync(blk.Header.Height, currentHeight)
 		}
 
 		return nil, nil
@@ -105,21 +107,30 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	return nil, nil
 }
 
-func (s *Synchronizer) startSync(tip block.Block, currentHeight uint64) ([]bytes.Buffer, error) {
+func (s *Synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
 	// Kill the `CrunchBlocks` goroutine.
 	select {
 	case s.catchBlockChan <- consensus.Results{Blk: block.Block{}, Err: errors.New("syncing mode started")}:
 	default:
 	}
 
-	s.syncTarget = tip.Header.Height
+	s.syncTarget = tipHeight
 	if s.syncTarget > currentHeight+config.MaxInvBlocks {
 		s.syncTarget = currentHeight + config.MaxInvBlocks
 	}
 
 	s.syncing = true
 
-	msgGetBlocks := createGetBlocksMsg(tip.Header.Hash)
+	var hash []byte
+	if err := s.db.View(func(t database.Transaction) error {
+		var err error
+		hash, err = t.FetchBlockHashByHeight(currentHeight)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+
+	msgGetBlocks := createGetBlocksMsg(hash)
 	return marshalGetBlocks(msgGetBlocks)
 }
 

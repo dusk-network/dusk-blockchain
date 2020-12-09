@@ -309,7 +309,19 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 		cmd.Stderr = stdErrFile
 	}
 
+	w, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
 	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	// Send password to stdin
+	walletsPass := os.Getenv("DUSK_WALLET_PASS")
+
+	if _, err := w.Write(append([]byte(walletsPass), byte('\n'))); err != nil {
 		return err
 	}
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -112,14 +113,27 @@ func (s *Server) launchKadcastPeer() {
 	s.kadPeer = kadPeer
 }
 
+func getPassword() ([]byte, error) {
+	fd := int(os.Stdin.Fd())
+	if terminal.IsTerminal(fd) {
+		fmt.Println("Enter password:")
+		return terminal.ReadPassword(fd)
+	}
+
+	// This catches the password during test-harness execution.
+	f := os.NewFile(uintptr(fd), "stdin")
+	r := bufio.NewReader(f)
+	pw, _, err := r.ReadLine()
+	return pw, err
+}
+
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
 // launches a new `CommitteeStore`, launches the Blockchain process, creates
 // and launches a monitor client (if configuration demands it), and inits the
 // Stake and Blind Bid channels
 func Setup() *Server {
 	ctx := context.Background()
-	fmt.Println("Enter password:")
-	pw, err := terminal.ReadPassword(0)
+	pw, err := getPassword()
 	if err != nil {
 		log.Panic(err)
 	}
@@ -146,7 +160,7 @@ func Setup() *Server {
 	proxy, ruskConn := setupGRPCClients(ctx)
 
 	var w *wallet.Wallet
-	if _, err := os.Stat("wallet.dat"); err == nil {
+	if _, err = os.Stat("wallet.dat"); err == nil {
 		w, err = loadWallet(string(pw))
 	} else {
 		w, err = createWallet(nil, string(pw), proxy.KeyMaster())
@@ -237,6 +251,12 @@ func Setup() *Server {
 
 		if err := grpcServer.Serve(l); err != nil {
 			log.WithError(err).Warn("Serve returned err")
+		}
+	}()
+
+	go func() {
+		if err := c.CrunchBlocks(ctx); err != nil {
+			log.WithError(err).Warn("crunchBlocks returned err")
 		}
 	}()
 
