@@ -36,6 +36,10 @@ var ErrMaxStepsReached = errors.New("consensus reached max number of steps witho
 // the Agreement which should be run asynchronously by design)
 type Consensus struct {
 	*consensus.Emitter
+	*candidate.Requestor
+
+	pubKey *keys.PublicKey
+
 	eventQueue *consensus.Queue
 	roundQueue *consensus.Queue
 
@@ -69,7 +73,7 @@ func CreateInitialStep(e *consensus.Emitter, consensusTimeOut time.Duration, bg 
 // New creates a new Consensus struct. The legacy StopConsensus and RoundUpdate
 // are now replaced with context cancellation and direct function call operated
 // by the chain component
-func New(e *consensus.Emitter) *Consensus {
+func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 	// TODO: channel size should be configurable
 	agreementChan := make(chan message.Message, 1000)
 	eventChan := make(chan message.Message, 1000)
@@ -85,6 +89,8 @@ func New(e *consensus.Emitter) *Consensus {
 
 	c := &Consensus{
 		Emitter:       e,
+		Requestor:     candidate.NewRequestor(e.EventBus),
+		pubKey:        pubKey,
 		eventQueue:    consensus.NewQueue(),
 		roundQueue:    consensus.NewQueue(),
 		agreementChan: agreementChan,
@@ -92,6 +98,12 @@ func New(e *consensus.Emitter) *Consensus {
 	}
 
 	return c
+}
+
+// CreateStateMachine uses Consensus parameters as a shorthand for the static
+// CreateStateMachine
+func (c *Consensus) CreateStateMachine(db database.DB, consensusTimeOut time.Duration, verifyFn consensus.CandidateVerificationFunc, newBlockChan chan consensus.Results) (consensus.Phase, consensus.Controller, error) {
+	return CreateStateMachine(c.Emitter, db, consensusTimeOut, c.pubKey.Copy(), verifyFn, c.Requestor, newBlockChan)
 }
 
 // Spin the consensus state machine. The consensus runs for the whole round

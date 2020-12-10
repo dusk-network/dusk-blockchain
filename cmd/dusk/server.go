@@ -11,7 +11,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -61,7 +60,7 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB, requestor *candidate.Requestor, w *wallet.Wallet) (*chain.Chain, error) {
+func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (*chain.Chain, error) {
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
@@ -76,16 +75,7 @@ func LaunchChain(ctx context.Context, proxy transactions.Proxy, eventBus *eventb
 	}
 	l := chain.NewDBLoader(db, genesis)
 
-	e := &consensus.Emitter{
-		EventBus:    eventBus,
-		RPCBus:      rpcBus,
-		Keys:        w.Keys(),
-		Proxy:       proxy,
-		TimerLength: cfg.ConsensusTimeOut,
-	}
-	cl := loop.New(e)
-
-	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, cl, &w.PublicKey, requestor)
+	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, cl)
 	if err != nil {
 		return nil, err
 	}
@@ -187,15 +177,23 @@ func Setup() *Server {
 		}
 	}
 
-	cr := candidate.NewRequestor(eventBus)
-	processor.Register(topics.Candidate, cr.ProcessCandidate)
+	e := &consensus.Emitter{
+		EventBus:    eventBus,
+		RPCBus:      rpcBus,
+		Keys:        w.Keys(),
+		Proxy:       proxy,
+		TimerLength: cfg.ConsensusTimeOut,
+	}
 
-	c, err := LaunchChain(ctx, proxy, eventBus, rpcBus, grpcServer, db, cr, w)
+	cl := loop.New(e, &w.PublicKey)
+	processor.Register(topics.Candidate, cl.ProcessCandidate)
+
+	c, err := LaunchChain(ctx, cl, proxy, eventBus, rpcBus, grpcServer, db)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	sync := chain.NewSynchronizer(ctx, eventBus, rpcBus, db, c.CatchBlockChan, c.CurrentHeight, c.ProcessSucceedingBlock, c.ProcessSyncBlock, c.CrunchBlocks)
+	sync := chain.NewSynchronizer(ctx, eventBus, rpcBus, db, c.CatchBlockChan, c)
 
 	processor.Register(topics.Block, sync.ProcessBlock)
 
@@ -256,8 +254,8 @@ func Setup() *Server {
 	}()
 
 	go func() {
-		if err := c.CrunchBlocks(ctx); err != nil {
-			log.WithError(err).Warn("crunchBlocks returned err")
+		if err := c.ProduceBlock(ctx); err != nil {
+			log.WithError(err).Warn("ProduceBlock returned err")
 		}
 	}()
 

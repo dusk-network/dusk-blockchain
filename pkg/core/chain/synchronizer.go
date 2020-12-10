@@ -29,28 +29,22 @@ type Synchronizer struct {
 	syncTarget  uint64
 	*sequencer
 
-	ctx context.Context
+	ctx            context.Context
+	catchBlockChan chan consensus.Results
 
-	catchBlockChan         chan consensus.Results
-	currentHeight          func() uint64
-	processSucceedingBlock func(block.Block)
-	processSyncBlock       func(block.Block) error
-	crunchBlocks           func(context.Context) error
+	chain Ledger
 }
 
 // NewSynchronizer returns an initialized Synchronizer, ready for use.
-func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, catchBlockChan chan consensus.Results, currentHeight func() uint64, processSucceedingBlock func(block.Block), processSyncBlock func(block.Block) error, crunchBlocks func(context.Context) error) *Synchronizer {
+func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, catchBlockChan chan consensus.Results, chain Ledger) *Synchronizer {
 	return &Synchronizer{
-		eb:                     eb,
-		rb:                     rb,
-		db:                     db,
-		sequencer:              newSequencer(),
-		ctx:                    ctx,
-		catchBlockChan:         catchBlockChan,
-		currentHeight:          currentHeight,
-		processSucceedingBlock: processSucceedingBlock,
-		processSyncBlock:       processSyncBlock,
-		crunchBlocks:           crunchBlocks,
+		eb:             eb,
+		rb:             rb,
+		db:             db,
+		sequencer:      newSequencer(),
+		ctx:            ctx,
+		catchBlockChan: catchBlockChan,
+		chain:          chain,
 	}
 }
 
@@ -58,7 +52,7 @@ func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus,
 func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	blk := m.Payload().(block.Block)
 
-	currentHeight := s.currentHeight()
+	currentHeight := s.chain.CurrentHeight()
 
 	// Is it worth looking at this?
 	if blk.Header.Height <= currentHeight {
@@ -82,7 +76,7 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 
 	// If we are not syncing, then we should send it and forget about it.
 	if !s.syncing {
-		s.processSucceedingBlock(blk)
+		s.chain.ProcessSucceedingBlock(blk)
 		return nil, nil
 	}
 
@@ -90,7 +84,7 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	blks := s.sequencer.provideSuccessors(blk)
 
 	for _, blk := range blks {
-		if err := s.processSyncBlock(blk); err != nil {
+		if err := s.chain.ProcessSyncBlock(blk); err != nil {
 			log.WithError(err).Debug("could not AcceptBlock")
 			return nil, err
 		}
@@ -103,7 +97,7 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	// Did we finish syncing? If so, restart the `CrunchBlocks` loop.
 	if !s.syncing {
 		go func() {
-			if err := s.crunchBlocks(s.ctx); err != nil {
+			if err := s.chain.ProduceBlock(s.ctx); err != nil {
 				log.WithError(err).Error("crunchBlocks exited with error")
 			}
 		}()
@@ -146,7 +140,7 @@ func (s *Synchronizer) GetSyncProgress(ctx context.Context, e *node.EmptyRequest
 		return &node.SyncProgressResponse{Progress: 0}, nil
 	}
 
-	prevBlockHeight := s.currentHeight()
+	prevBlockHeight := s.chain.CurrentHeight()
 	progressPercentage := (float64(prevBlockHeight) / float64(s.highestSeen)) * 100
 
 	// Avoiding strange output when the chain can be ahead of the highest
