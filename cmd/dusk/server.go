@@ -60,7 +60,7 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check
-func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB, w *wallet.Wallet) (*chain.Chain, error) {
+func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (*chain.Chain, error) {
 	// creating and firing up the chain process
 	var genesis *block.Block
 	if cfg.Get().Genesis.Legacy {
@@ -75,7 +75,7 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 	}
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, cl, &w.PublicKey)
+	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, cl)
 	if err != nil {
 		return nil, err
 	}
@@ -185,10 +185,10 @@ func Setup() *Server {
 		TimerLength: cfg.ConsensusTimeOut,
 	}
 
-	cl := loop.New(e)
+	cl := loop.New(e, &w.PublicKey)
 	processor.Register(topics.Candidate, cl.ProcessCandidate)
 
-	c, err := LaunchChain(ctx, cl, proxy, eventBus, rpcBus, grpcServer, db, w)
+	c, err := LaunchChain(ctx, cl, proxy, eventBus, rpcBus, grpcServer, db)
 	if err != nil {
 		log.Panic(err)
 	}

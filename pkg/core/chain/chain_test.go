@@ -229,9 +229,9 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 		Proxy:       proxy,
 		TimerLength: 5 * time.Second,
 	}
-	l := loop.New(e)
+	l := loop.New(e, &pk)
 
-	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, l, &pk)
+	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, l)
 	assert.NoError(t, err)
 	assert.NoError(t, db.Update(func(tx database.Transaction) error {
 		return tx.StoreBidValues(make([]byte, 32), make([]byte, 32), 0, 100000)

@@ -11,7 +11,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
@@ -75,7 +74,6 @@ type Chain struct {
 
 	// Consensus loop
 	loop           *loop.Consensus
-	pubKey         *keys.PublicKey
 	newBlockChan   chan consensus.Results
 	CatchBlockChan chan consensus.Results
 
@@ -88,7 +86,7 @@ type Chain struct {
 // New returns a new chain object. It accepts the EventBus (for messages coming
 // from (remote) consensus components, the RPCBus for dispatching synchronous
 // data related to Certificates, Blocks, Rounds and progress.
-func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus, pubKey *keys.PublicKey) (*Chain, error) {
+func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus) (*Chain, error) {
 	chain := &Chain{
 		eventBus:       eventBus,
 		rpcBus:         rpcBus,
@@ -98,7 +96,6 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		proxy:          proxy,
 		ctx:            ctx,
 		loop:           loop,
-		pubKey:         pubKey,
 		newBlockChan:   make(chan consensus.Results, 1),
 		CatchBlockChan: make(chan consensus.Results),
 	}
@@ -168,7 +165,7 @@ func (c *Chain) CrunchBlocks(ctx context.Context) error {
 		go c.catchNewBlocks(crunchCtx, ru)
 		var winner consensus.Results
 		if c.loop != nil {
-			scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock, c.newBlockChan)
+			scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock, c.newBlockChan)
 			if err != nil {
 				log.WithError(err).Error("could not create consensus state machine")
 				cancel()
