@@ -74,7 +74,6 @@ type Chain struct {
 
 	// Consensus loop
 	loop           *loop.Consensus
-	newBlockChan   chan consensus.Results
 	CatchBlockChan chan consensus.Results
 
 	// rusk client
@@ -96,7 +95,6 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		proxy:          proxy,
 		ctx:            ctx,
 		loop:           loop,
-		newBlockChan:   make(chan consensus.Results, 1),
 		CatchBlockChan: make(chan consensus.Results),
 	}
 
@@ -140,21 +138,6 @@ func (c *Chain) CurrentHeight() uint64 {
 	return c.tip.Header.Height
 }
 
-func (c *Chain) catchNewBlocks(ctx context.Context, ru consensus.RoundUpdate) {
-	for {
-		select {
-		case r := <-c.CatchBlockChan:
-			if r.Blk.Header != nil && r.Blk.Header.Height != ru.Round {
-				continue
-			}
-
-			c.newBlockChan <- r
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
 // GetRoundUpdate returns the current RoundUpdate
 func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
 	c.lock.RLock()
@@ -181,15 +164,10 @@ func (c *Chain) CrunchBlocks(ctx context.Context) error {
 }
 
 func (c *Chain) crunchBlock(ctx context.Context) (winner consensus.Results) {
-	crunchCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	ru := c.GetRoundUpdate()
 
-	go c.catchNewBlocks(crunchCtx, ru)
-
 	if c.loop != nil {
-		scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock, c.newBlockChan)
+		scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock, c.CatchBlockChan)
 		if err != nil {
 			// TODO: errors should be handled by the caller
 			log.WithError(err).Error("could not create consensus state machine")
@@ -200,7 +178,19 @@ func (c *Chain) crunchBlock(ctx context.Context) (winner consensus.Results) {
 		return c.loop.Spin(ctx, scr, agr, ru)
 	}
 
-	return <-c.newBlockChan
+	for {
+		select {
+		case r := <-c.CatchBlockChan:
+			if r.Blk.Header != nil && r.Blk.Header.Height != ru.Round {
+				continue
+			}
+
+			winner = r
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // ProcessSucceedingBlock will handle blocks incoming from the network,
