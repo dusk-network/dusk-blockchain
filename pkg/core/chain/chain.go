@@ -145,10 +145,10 @@ func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
 	return c.getRoundUpdate()
 }
 
-// CrunchBlocks ...
-func (c *Chain) CrunchBlocks(ctx context.Context) error {
+// ProduceBlock ...
+func (c *Chain) ProduceBlock(ctx context.Context) error {
 	for {
-		candidate := c.crunchBlock(ctx)
+		candidate := c.produceBlock(ctx)
 		block, err := candidate.Blk, candidate.Err
 		if err != nil {
 			return err
@@ -163,7 +163,7 @@ func (c *Chain) CrunchBlocks(ctx context.Context) error {
 	}
 }
 
-func (c *Chain) crunchBlock(ctx context.Context) (winner consensus.Results) {
+func (c *Chain) produceBlock(ctx context.Context) (winner consensus.Results) {
 	ru := c.GetRoundUpdate()
 
 	if c.loop != nil {

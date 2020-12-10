@@ -193,7 +193,7 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
-	sync := chain.NewSynchronizer(ctx, eventBus, rpcBus, db, c.CatchBlockChan, c.CurrentHeight, c.ProcessSucceedingBlock, c.ProcessSyncBlock, c.CrunchBlocks)
+	sync := chain.NewSynchronizer(ctx, eventBus, rpcBus, db, c.CatchBlockChan, c.CurrentHeight, c.ProcessSucceedingBlock, c.ProcessSyncBlock, c.ProduceBlock)
 
 	processor.Register(topics.Block, sync.ProcessBlock)
 
@@ -254,8 +254,8 @@ func Setup() *Server {
 	}()
 
 	go func() {
-		if err := c.CrunchBlocks(ctx); err != nil {
-			log.WithError(err).Warn("crunchBlocks returned err")
+		if err := c.ProduceBlock(ctx); err != nil {
+			log.WithError(err).Warn("ProduceBlock returned err")
 		}
 	}()
 
