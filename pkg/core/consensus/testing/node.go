@@ -55,7 +55,7 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 	}
 	lp := loop.New(e)
 
-	c, err := chain.New(ctx, db, eb, rb, l, l, nil, proxy, lp, &pk, nil)
+	c, err := chain.New(ctx, db, eb, rb, l, l, nil, proxy, lp, &pk)
 	assert.NoError(err)
 	go func() {
 		if err := c.CrunchBlocks(ctx); err != nil && err != context.Canceled {

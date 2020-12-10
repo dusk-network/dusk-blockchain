@@ -36,6 +36,8 @@ var ErrMaxStepsReached = errors.New("consensus reached max number of steps witho
 // the Agreement which should be run asynchronously by design)
 type Consensus struct {
 	*consensus.Emitter
+	*candidate.Requestor
+
 	eventQueue *consensus.Queue
 	roundQueue *consensus.Queue
 
@@ -85,6 +87,7 @@ func New(e *consensus.Emitter) *Consensus {
 
 	c := &Consensus{
 		Emitter:       e,
+		Requestor:     candidate.NewRequestor(e.EventBus),
 		eventQueue:    consensus.NewQueue(),
 		roundQueue:    consensus.NewQueue(),
 		agreementChan: agreementChan,
@@ -92,6 +95,12 @@ func New(e *consensus.Emitter) *Consensus {
 	}
 
 	return c
+}
+
+// CreateStateMachine uses Consensus parameters as a shorthand for the static
+// CreateStateMachine
+func (c *Consensus) CreateStateMachine(db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc, newBlockChan chan consensus.Results) (consensus.Phase, consensus.Controller, error) {
+	return CreateStateMachine(c.Emitter, db, consensusTimeOut, pubKey, verifyFn, c.Requestor, newBlockChan)
 }
 
 // Spin the consensus state machine. The consensus runs for the whole round
