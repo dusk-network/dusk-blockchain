@@ -127,7 +127,7 @@ func TestSendBidTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 1; i < localNet.Size(); i++ {
+	for i := 0; i < localNet.Size(); i++ {
 		t.Logf("Send request to node %d to generate and process a Bid transaction", i)
 		if _, err := localNet.SendBidCmd(uint(i), 10, 10); err != nil {
 			t.Error(err)
