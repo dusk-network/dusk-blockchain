@@ -155,44 +155,52 @@ func (c *Chain) catchNewBlocks(ctx context.Context, ru consensus.RoundUpdate) {
 	}
 }
 
-// CrunchBlocks will...
+// GetRoundUpdate returns the current RoundUpdate
+func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.getRoundUpdate()
+}
+
+// CrunchBlocks ...
 func (c *Chain) CrunchBlocks(ctx context.Context) error {
 	for {
-		crunchCtx, cancel := context.WithCancel(ctx)
-		c.lock.RLock()
-		ru := c.getRoundUpdate()
-		c.lock.RUnlock()
-		go c.catchNewBlocks(crunchCtx, ru)
-		var winner consensus.Results
-		if c.loop != nil {
-			scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock, c.newBlockChan)
-			if err != nil {
-				log.WithError(err).Error("could not create consensus state machine")
-				cancel()
-				return err
-			}
-			winner = c.loop.Spin(ctx, scr, agr, ru)
-		} else {
-			winner = <-c.newBlockChan
-		}
-
-		// On error, we exit the loop, because we will be syncing, or consensus
-		// has encountered an error.
-		if winner.Err != nil {
-			cancel()
-			return winner.Err
+		candidate := c.crunchBlock(ctx)
+		block, err := candidate.Blk, candidate.Err
+		if err != nil {
+			return err
 		}
 
 		// Otherwise, accept the block directly.
-		if !winner.Blk.IsEmpty() {
-			if err := c.AcceptSuccessiveBlock(ctx, winner.Blk); err != nil {
-				cancel()
+		if !block.IsEmpty() {
+			if err = c.AcceptSuccessiveBlock(ctx, block); err != nil {
 				return err
 			}
 		}
-
-		cancel()
 	}
+}
+
+func (c *Chain) crunchBlock(ctx context.Context) (winner consensus.Results) {
+	crunchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	ru := c.GetRoundUpdate()
+
+	go c.catchNewBlocks(crunchCtx, ru)
+
+	if c.loop != nil {
+		scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock, c.newBlockChan)
+		if err != nil {
+			// TODO: errors should be handled by the caller
+			log.WithError(err).Error("could not create consensus state machine")
+			winner.Err = err
+			return winner
+		}
+
+		return c.loop.Spin(ctx, scr, agr, ru)
+	}
+
+	return <-c.newBlockChan
 }
 
 // ProcessSucceedingBlock will handle blocks incoming from the network,
