@@ -52,6 +52,14 @@ type Loader interface {
 	Append(*block.Block) error
 }
 
+// Ledger is the Chain interface used in tests
+type Ledger interface {
+	CurrentHeight() uint64
+    ProcessSucceedingBlock(block.Block)
+	ProcessSyncBlock(block.Block) error
+	ProduceBlock(context.Context) error
+}
+
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {

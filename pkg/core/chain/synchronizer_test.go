@@ -87,7 +87,7 @@ func setupSynchronizerTest() (*Synchronizer, chan consensus.Results, *mockChain)
 		panic(err)
 	}
 
-	return NewSynchronizer(ctx, eb, rb, db, catchBlockChan, m.currentHeight, m.processSucceedingBlock, m.processSyncBlock, m.crunchBlocks), catchBlockChan, m
+	return NewSynchronizer(ctx, eb, rb, db, catchBlockChan, m), catchBlockChan, m
 }
 
 type mockChain struct {
@@ -95,18 +95,18 @@ type mockChain struct {
 	catchBlockChan chan consensus.Results
 }
 
-func (m *mockChain) currentHeight() uint64 {
+func (m *mockChain) CurrentHeight() uint64 {
 	return m.tipHeight
 }
 
-func (m *mockChain) processSucceedingBlock(blk block.Block) {
+func (m *mockChain) ProcessSucceedingBlock(blk block.Block) {
 	m.catchBlockChan <- consensus.Results{Blk: blk, Err: nil}
 }
 
-func (m *mockChain) processSyncBlock(blk block.Block) error {
+func (m *mockChain) ProcessSyncBlock(blk block.Block) error {
 	return nil
 }
 
-func (m *mockChain) crunchBlocks(ctx context.Context) error {
+func (m *mockChain) ProduceBlock(ctx context.Context) error {
 	return nil
 }
