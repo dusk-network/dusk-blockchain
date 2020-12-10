@@ -4,6 +4,7 @@ type generalConfiguration struct {
 	Network              string
 	WalletOnly           bool
 	SafeCallbackListener bool
+	TestHarness          bool
 }
 
 type timeoutConfiguration struct {
