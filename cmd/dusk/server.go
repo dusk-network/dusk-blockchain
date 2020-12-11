@@ -251,7 +251,7 @@ func Setup() *Server {
 	}()
 
 	go func() {
-		if err := c.ProduceBlock(ctx); err != nil {
+		if err := c.ProduceBlock(); err != nil {
 			log.WithError(err).Warn("ProduceBlock returned err")
 		}
 	}()

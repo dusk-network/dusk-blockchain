@@ -27,8 +27,7 @@ type Synchronizer struct {
 	*sequencer
 
 	state syncState
-
-	ctx context.Context
+	ctx   context.Context
 
 	chain Ledger
 }
@@ -70,7 +69,7 @@ func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState
 			// if we reach the target we get into sync mode
 			// and trigger the consensus again
 			go func() {
-				if err := s.chain.ProduceBlock(s.ctx); err != nil {
+				if err := s.chain.ProduceBlock(); err != nil {
 					// TODO we need to have a recovery procedure rather than
 					// just log and forget
 					log.WithError(err).Error("crunchBlocks exited with error")
@@ -107,6 +106,10 @@ func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err 
 	if blk.Header.Height <= currentHeight {
 		log.Debug("discarded block from the past")
 		return
+	}
+
+	if blk.Header.Height > s.highestSeen {
+		s.highestSeen = blk.Header.Height
 	}
 
 	s.state, res, err = s.state(currentHeight, blk)

@@ -153,7 +153,7 @@ func TestAcceptBlock(t *testing.T) {
 	cert.Step = 5
 	blk.Header.Certificate = cert
 
-	assert.NoError(c.AcceptBlock(c.ctx, *blk))
+	assert.NoError(c.AcceptBlock(*blk))
 
 	// Should have `blk` as blockchain head now
 	assert.True(bytes.Equal(blk.Header.Hash, c.tip.Header.Hash))
@@ -237,7 +237,7 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 		return tx.StoreBidValues(make([]byte, 32), make([]byte, 32), 0, 100000)
 	}))
 
-	go c.ProduceBlock(context.Background())
+	go c.ProduceBlock()
 
 	return eb, c
 }

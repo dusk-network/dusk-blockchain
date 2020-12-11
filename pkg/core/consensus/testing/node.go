@@ -58,7 +58,7 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 	c, err := chain.New(ctx, db, eb, rb, l, l, nil, proxy, lp)
 	assert.NoError(err)
 	go func() {
-		if err := c.ProduceBlock(ctx); err != nil && err != context.Canceled {
+		if err := c.ProduceBlock(); err != nil && err != context.Canceled {
 			panic(err)
 		}
 	}()

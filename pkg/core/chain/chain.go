@@ -57,7 +57,7 @@ type Ledger interface {
 	CurrentHeight() uint64
 	ProcessSucceedingBlock(block.Block)
 	ProcessSyncBlock(block.Block) error
-	ProduceBlock(context.Context) error
+	ProduceBlock() error
 	StopBlockProduction()
 }
 
@@ -165,7 +165,9 @@ func (c *Chain) StopBlockProduction() {
 }
 
 // ProduceBlock ...
-func (c *Chain) ProduceBlock(ctx context.Context) error {
+func (c *Chain) ProduceBlock() error {
+	ctx, cancel := context.WithCancel(c.ctx)
+	defer cancel()
 	for {
 		candidate := c.produceBlock(ctx)
 		block, err := candidate.Blk, candidate.Err
@@ -175,7 +177,7 @@ func (c *Chain) ProduceBlock(ctx context.Context) error {
 
 		// Otherwise, accept the block directly.
 		if !block.IsEmpty() {
-			if err = c.AcceptSuccessiveBlock(ctx, block); err != nil {
+			if err = c.AcceptSuccessiveBlock(block); err != nil {
 				return err
 			}
 		}
@@ -227,14 +229,14 @@ func (c *Chain) ProcessSucceedingBlock(blk block.Block) {
 // synchronization procedure.
 func (c *Chain) ProcessSyncBlock(blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("received sync block")
-	return c.AcceptBlock(c.ctx, blk)
+	return c.AcceptBlock(blk)
 }
 
 // AcceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
-func (c *Chain) AcceptSuccessiveBlock(ctx context.Context, blk block.Block) error {
+func (c *Chain) AcceptSuccessiveBlock(blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
-	if err := c.AcceptBlock(ctx, blk); err != nil {
+	if err := c.AcceptBlock(blk); err != nil {
 		return err
 	}
 
@@ -251,7 +253,7 @@ func (c *Chain) AcceptSuccessiveBlock(ctx context.Context, blk block.Block) erro
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved
-func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
+func (c *Chain) AcceptBlock(blk block.Block) error {
 	field := logger.Fields{"process": "accept block", "height": blk.Header.Height}
 	l := log.WithFields(field)
 
@@ -280,7 +282,8 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	prov_num := c.p.Set.Len()
 	l.WithField("provisioners", prov_num).Info("calling ExecuteStateTransitionFunction")
 
-	provisioners, err := c.proxy.Executor().ExecuteStateTransition(ctx, blk.Txs, blk.Header.Height)
+	// TODO: the context here should maybe used to set a timeout
+	provisioners, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
 	if err != nil {
 		l.WithError(err).Error("Error in executing the state transition")
 		return err
@@ -333,6 +336,7 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 		return err
 	}
 
+	// TODO: consider using the context for timeouts
 	_, err := c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, blk.Header.Height)
 	return err
 }
@@ -406,7 +410,7 @@ func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 // as a percentage value.
 // NOTE: this is just here to satisfy the grpc interface. It should be removed
 // and the method should be moved to a synchronizer service.
-func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
+func (c *Chain) GetSyncProgress(_ context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
 	return &node.SyncProgressResponse{Progress: float32(100.0)}, nil
 }
 
@@ -414,7 +418,7 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 // to allow for a full re-sync.
 // NOTE: This function no longer does anything, but is still here to conform to the
 // ChainServer interface, for GRPC communications.
-func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
+func (c *Chain) RebuildChain(_ context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	return &node.GenericResponse{Response: "Unimplemented"}, nil
 }
 

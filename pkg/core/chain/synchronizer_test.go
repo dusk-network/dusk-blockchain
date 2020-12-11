@@ -102,11 +102,11 @@ func (m *mockChain) ProcessSucceedingBlock(blk block.Block) {
 	m.catchBlockChan <- consensus.Results{Blk: blk, Err: nil}
 }
 
-func (m *mockChain) ProcessSyncBlock(blk block.Block) error {
+func (m *mockChain) ProcessSyncBlock(_ block.Block) error {
 	return nil
 }
 
-func (m *mockChain) ProduceBlock(ctx context.Context) error {
+func (m *mockChain) ProduceBlock() error {
 	return nil
 }
 
