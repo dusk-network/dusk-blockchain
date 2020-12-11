@@ -48,7 +48,6 @@ func TestFutureBlocks(t *testing.T) {
 	assert.NotEmpty(s.sequencer.blockPool[height])
 
 	assert.Equal(s.highestSeen, height)
-	assert.True(s.syncing)
 }
 
 func TestSyncProgress(t *testing.T) {
@@ -87,7 +86,7 @@ func setupSynchronizerTest() (*Synchronizer, chan consensus.Results, *mockChain)
 		panic(err)
 	}
 
-	return NewSynchronizer(ctx, eb, rb, db, catchBlockChan, m), catchBlockChan, m
+	return NewSynchronizer(ctx, eb, rb, db, m), catchBlockChan, m
 }
 
 type mockChain struct {
@@ -109,4 +108,7 @@ func (m *mockChain) ProcessSyncBlock(blk block.Block) error {
 
 func (m *mockChain) ProduceBlock(ctx context.Context) error {
 	return nil
+}
+
+func (m *mockChain) StopBlockProduction() {
 }

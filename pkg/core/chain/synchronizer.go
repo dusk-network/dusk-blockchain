@@ -3,10 +3,8 @@ package chain
 import (
 	"bytes"
 	"context"
-	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -25,14 +23,12 @@ type Synchronizer struct {
 	db database.DB
 
 	highestSeen uint64
-	syncing     bool
 	syncTarget  uint64
 	*sequencer
 
 	state syncState
 
-	ctx            context.Context
-	catchBlockChan chan consensus.Results
+	ctx context.Context
 
 	chain Ledger
 }
@@ -43,6 +39,7 @@ func (s *Synchronizer) inSync(currentHeight uint64, blk block.Block) (syncState,
 	if blk.Header.Height > currentHeight+1 {
 		// If this block is from far in the future, we should start syncing mode.
 		s.sequencer.add(blk)
+		s.chain.StopBlockProduction()
 		b, err := s.startSync(blk.Header.Height, currentHeight)
 		return s.outSync, b, err
 	}
@@ -74,6 +71,8 @@ func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState
 			// and trigger the consensus again
 			go func() {
 				if err := s.chain.ProduceBlock(s.ctx); err != nil {
+					// TODO we need to have a recovery procedure rather than
+					// just log and forget
 					log.WithError(err).Error("crunchBlocks exited with error")
 				}
 			}()
@@ -85,15 +84,14 @@ func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState
 }
 
 // NewSynchronizer returns an initialized Synchronizer, ready for use.
-func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, catchBlockChan chan consensus.Results, chain Ledger) *Synchronizer {
+func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, chain Ledger) *Synchronizer {
 	s := &Synchronizer{
-		eb:             eb,
-		rb:             rb,
-		db:             db,
-		sequencer:      newSequencer(),
-		ctx:            ctx,
-		catchBlockChan: catchBlockChan,
-		chain:          chain,
+		eb:        eb,
+		rb:        rb,
+		db:        db,
+		sequencer: newSequencer(),
+		ctx:       ctx,
+		chain:     chain,
 	}
 	s.state = s.inSync
 	return s
@@ -116,18 +114,10 @@ func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err 
 }
 
 func (s *Synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
-	// Kill the `ProduceBlock` goroutine.
-	select {
-	case s.catchBlockChan <- consensus.Results{Blk: block.Block{}, Err: errors.New("syncing mode started")}:
-	default:
-	}
-
 	s.syncTarget = tipHeight
 	if s.syncTarget > currentHeight+config.MaxInvBlocks {
 		s.syncTarget = currentHeight + config.MaxInvBlocks
 	}
-
-	s.syncing = true
 
 	var hash []byte
 	if err := s.db.View(func(t database.Transaction) error {

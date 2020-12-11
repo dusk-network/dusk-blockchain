@@ -55,9 +55,10 @@ type Loader interface {
 // Ledger is the Chain interface used in tests
 type Ledger interface {
 	CurrentHeight() uint64
-    ProcessSucceedingBlock(block.Block)
+	ProcessSucceedingBlock(block.Block)
 	ProcessSyncBlock(block.Block) error
 	ProduceBlock(context.Context) error
+	StopBlockProduction()
 }
 
 // Chain represents the nodes blockchain
@@ -151,6 +152,16 @@ func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return c.getRoundUpdate()
+}
+
+// StopBlockProduction notifies the loop that it must return immediately. It
+// does that by pushing an error through the Block Result channel
+func (c *Chain) StopBlockProduction() {
+	// Kill the `ProduceBlock` goroutine.
+	select {
+	case c.CatchBlockChan <- consensus.Results{Blk: block.Block{}, Err: errors.New("syncing mode started")}:
+	default:
+	}
 }
 
 // ProduceBlock ...

@@ -100,7 +100,7 @@ func TestNonExistingMethod(t *testing.T) {
 
 	d := NewRequest(buf)
 	resp, err := bus.Call(0xff, d, 2*time.Second)
-	if err != ErrMethodNotExists {
+	if _, ok := err.(*ErrMethodNotExists); !ok {
 		t.Error("expecting methodNotExists error")
 	}
 	responseResult := resp.(bytes.Buffer)
