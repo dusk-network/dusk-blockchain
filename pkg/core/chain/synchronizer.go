@@ -29,15 +29,64 @@ type Synchronizer struct {
 	syncTarget  uint64
 	*sequencer
 
+	state syncState
+
 	ctx            context.Context
 	catchBlockChan chan consensus.Results
 
 	chain Ledger
 }
 
+type syncState func(currentHeight uint64, blk block.Block) (syncState, []bytes.Buffer, error)
+
+func (s *Synchronizer) inSync(currentHeight uint64, blk block.Block) (syncState, []bytes.Buffer, error) {
+	if blk.Header.Height > currentHeight+1 {
+		// If this block is from far in the future, we should start syncing mode.
+		s.sequencer.add(blk)
+		b, err := s.startSync(blk.Header.Height, currentHeight)
+		return s.outSync, b, err
+	}
+
+	// otherwise notify the chain (and the consensus loop)
+	s.chain.ProcessSucceedingBlock(blk)
+	return s.inSync, nil, nil
+}
+
+func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState, []bytes.Buffer, error) {
+	if blk.Header.Height > currentHeight+1 {
+		// if there is a gap we add the future block to the sequencer
+		s.sequencer.add(blk)
+		return s.outSync, nil, nil
+	}
+
+	// Retrieve all successive blocks that need to be accepted
+	blks := s.sequencer.provideSuccessors(blk)
+
+	for _, blk := range blks {
+		// append them all to the ledger
+		if err := s.chain.ProcessSyncBlock(blk); err != nil {
+			log.WithError(err).Debug("could not AcceptBlock")
+			return s.outSync, nil, err
+		}
+
+		if blk.Header.Height == s.syncTarget {
+			// if we reach the target we get into sync mode
+			// and trigger the consensus again
+			go func() {
+				if err := s.chain.ProduceBlock(s.ctx); err != nil {
+					log.WithError(err).Error("crunchBlocks exited with error")
+				}
+			}()
+			return s.inSync, nil, nil
+		}
+	}
+
+	return s.outSync, nil, nil
+}
+
 // NewSynchronizer returns an initialized Synchronizer, ready for use.
 func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, catchBlockChan chan consensus.Results, chain Ledger) *Synchronizer {
-	return &Synchronizer{
+	s := &Synchronizer{
 		eb:             eb,
 		rb:             rb,
 		db:             db,
@@ -46,10 +95,12 @@ func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus,
 		catchBlockChan: catchBlockChan,
 		chain:          chain,
 	}
+	s.state = s.inSync
+	return s
 }
 
 // ProcessBlock handles an incoming block from the network.
-func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
+func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err error) {
 	blk := m.Payload().(block.Block)
 
 	currentHeight := s.chain.CurrentHeight()
@@ -57,57 +108,15 @@ func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
 	// Is it worth looking at this?
 	if blk.Header.Height <= currentHeight {
 		log.Debug("discarded block from the past")
-		return nil, nil
+		return
 	}
 
-	if blk.Header.Height > s.highestSeen {
-		s.highestSeen = blk.Header.Height
-	}
-
-	// If this block is from far in the future, we should start syncing mode.
-	if blk.Header.Height > currentHeight+1 {
-		s.sequencer.add(blk)
-		if !s.syncing {
-			return s.startSync(blk.Header.Height, currentHeight)
-		}
-
-		return nil, nil
-	}
-
-	// If we are not syncing, then we should send it and forget about it.
-	if !s.syncing {
-		s.chain.ProcessSucceedingBlock(blk)
-		return nil, nil
-	}
-
-	// Retrieve all successive blocks that need to be accepted
-	blks := s.sequencer.provideSuccessors(blk)
-
-	for _, blk := range blks {
-		if err := s.chain.ProcessSyncBlock(blk); err != nil {
-			log.WithError(err).Debug("could not AcceptBlock")
-			return nil, err
-		}
-
-		if blk.Header.Height == s.syncTarget {
-			s.syncing = false
-		}
-	}
-
-	// Did we finish syncing? If so, restart the `CrunchBlocks` loop.
-	if !s.syncing {
-		go func() {
-			if err := s.chain.ProduceBlock(s.ctx); err != nil {
-				log.WithError(err).Error("crunchBlocks exited with error")
-			}
-		}()
-	}
-
-	return nil, nil
+	s.state, res, err = s.state(currentHeight, blk)
+	return
 }
 
 func (s *Synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
-	// Kill the `CrunchBlocks` goroutine.
+	// Kill the `ProduceBlock` goroutine.
 	select {
 	case s.catchBlockChan <- consensus.Results{Blk: block.Block{}, Err: errors.New("syncing mode started")}:
 	default:

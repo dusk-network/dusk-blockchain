@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -105,17 +104,9 @@ func (s *Server) launchKadcastPeer() {
 
 func getPassword() (string, error) {
 	fd := int(os.Stdin.Fd())
-	if terminal.IsTerminal(fd) {
-		fmt.Println("Enter password:")
-		pw, err := terminal.ReadPassword(fd)
-		return string(pw), err
-	}
-
-	// This catches the password during test-harness execution.
-	f := os.NewFile(uintptr(fd), "stdin")
-	s := bufio.NewScanner(f)
-	_ = s.Scan()
-	return s.Text(), s.Err()
+	fmt.Println("Enter password:")
+	pw, err := terminal.ReadPassword(fd)
+	return string(pw), err
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
@@ -124,9 +115,15 @@ func getPassword() (string, error) {
 // Stake and Blind Bid channels
 func Setup() *Server {
 	ctx := context.Background()
-	pw, err := getPassword()
-	if err != nil {
-		log.Panic(err)
+	var pw string
+	if cfg.Get().General.TestHarness {
+		pw = os.Getenv("DUSK_WALLET_PASS")
+	} else {
+		var err error
+		pw, err = getPassword()
+		if err != nil {
+			log.Panic(err)
+		}
 	}
 
 	grpcServer, err := server.SetupGRPC(server.FromCfg())
