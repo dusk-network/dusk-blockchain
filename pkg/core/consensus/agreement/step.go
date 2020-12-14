@@ -72,8 +72,11 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 			cert := evs[0].GenerateCertificate()
 			blk, err := s.createWinningBlock(evs[0].State().BlockHash, cert)
 			return consensus.Results{Blk: blk, Err: err}
-		case r := <-s.newBlockChan:
-			return r
+		case newBlockResult := <-s.newBlockChan:
+			if newBlockResult.Blk.Header != nil && newBlockResult.Blk.Header.Height != r.Round {
+				continue
+			}
+			return newBlockResult
 		case <-ctx.Done():
 			// finalize the worker pool
 			return consensus.Results{Blk: block.Block{}, Err: context.Canceled}

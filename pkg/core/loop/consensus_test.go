@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -32,7 +33,7 @@ func TestContextCancellation(t *testing.T) {
 		}
 	}
 
-	l := loop.New(e)
+	l := loop.New(e, keys.NewPublicKey())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -90,7 +91,7 @@ func (c *succesfulAgreement) GetControlFn() consensus.ControlFn {
 func TestAgreementCompletion(t *testing.T) {
 	e := consensus.MockEmitter(time.Second, nil)
 	ctx := context.Background()
-	l := loop.New(e)
+	l := loop.New(e, keys.NewPublicKey())
 	var wg sync.WaitGroup
 	wg.Add(1)
 	results := l.Spin(ctx, &step{&wg}, &succesfulAgreement{&wg}, consensus.RoundUpdate{Round: uint64(1)})
@@ -135,7 +136,7 @@ func (c *unsuccesfulAgreement) GetControlFn() consensus.ControlFn {
 func TestStall(t *testing.T) {
 	e := consensus.MockEmitter(time.Second, nil)
 	ctx := context.Background()
-	l := loop.New(e)
+	l := loop.New(e, keys.NewPublicKey())
 	_ = l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
 	// require.Equal(t, loop.ErrMaxStepsReached, err)
 }

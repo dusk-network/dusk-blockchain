@@ -7,12 +7,10 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
@@ -54,6 +52,15 @@ type Loader interface {
 	Append(*block.Block) error
 }
 
+// Ledger is the Chain interface used in tests
+type Ledger interface {
+	CurrentHeight() uint64
+	ProcessSucceedingBlock(block.Block)
+	ProcessSyncBlock(block.Block) error
+	ProduceBlock() error
+	StopBlockProduction()
+}
+
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
@@ -76,9 +83,6 @@ type Chain struct {
 
 	// Consensus loop
 	loop           *loop.Consensus
-	pubKey         *keys.PublicKey
-	requestor      *candidate.Requestor
-	newBlockChan   chan consensus.Results
 	CatchBlockChan chan consensus.Results
 
 	// rusk client
@@ -90,7 +94,7 @@ type Chain struct {
 // New returns a new chain object. It accepts the EventBus (for messages coming
 // from (remote) consensus components, the RPCBus for dispatching synchronous
 // data related to Certificates, Blocks, Rounds and progress.
-func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus, pubKey *keys.PublicKey, requestor *candidate.Requestor) (*Chain, error) {
+func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus) (*Chain, error) {
 	chain := &Chain{
 		eventBus:       eventBus,
 		rpcBus:         rpcBus,
@@ -100,9 +104,6 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		proxy:          proxy,
 		ctx:            ctx,
 		loop:           loop,
-		pubKey:         pubKey,
-		requestor:      requestor,
-		newBlockChan:   make(chan consensus.Results, 1),
 		CatchBlockChan: make(chan consensus.Results),
 	}
 
@@ -146,7 +147,58 @@ func (c *Chain) CurrentHeight() uint64 {
 	return c.tip.Header.Height
 }
 
-func (c *Chain) catchNewBlocks(ctx context.Context, ru consensus.RoundUpdate) {
+// GetRoundUpdate returns the current RoundUpdate
+func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.getRoundUpdate()
+}
+
+// StopBlockProduction notifies the loop that it must return immediately. It
+// does that by pushing an error through the Block Result channel
+func (c *Chain) StopBlockProduction() {
+	// Kill the `ProduceBlock` goroutine.
+	select {
+	case c.CatchBlockChan <- consensus.Results{Blk: block.Block{}, Err: errors.New("syncing mode started")}:
+	default:
+	}
+}
+
+// ProduceBlock ...
+func (c *Chain) ProduceBlock() error {
+	ctx, cancel := context.WithCancel(c.ctx)
+	defer cancel()
+	for {
+		candidate := c.produceBlock(ctx)
+		block, err := candidate.Blk, candidate.Err
+		if err != nil {
+			return err
+		}
+
+		// Otherwise, accept the block directly.
+		if !block.IsEmpty() {
+			if err = c.AcceptSuccessiveBlock(block); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func (c *Chain) produceBlock(ctx context.Context) (winner consensus.Results) {
+	ru := c.GetRoundUpdate()
+
+	if c.loop != nil {
+		scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock, c.CatchBlockChan)
+		if err != nil {
+			// TODO: errors should be handled by the caller
+			log.WithError(err).Error("could not create consensus state machine")
+			winner.Err = err
+			return winner
+		}
+
+		return c.loop.Spin(ctx, scr, agr, ru)
+	}
+
 	for {
 		select {
 		case r := <-c.CatchBlockChan:
@@ -154,50 +206,11 @@ func (c *Chain) catchNewBlocks(ctx context.Context, ru consensus.RoundUpdate) {
 				continue
 			}
 
-			c.newBlockChan <- r
+			winner = r
+			return
 		case <-ctx.Done():
 			return
 		}
-	}
-}
-
-// CrunchBlocks will...
-func (c *Chain) CrunchBlocks(ctx context.Context) error {
-	for {
-		crunchCtx, cancel := context.WithCancel(ctx)
-		c.lock.RLock()
-		ru := c.getRoundUpdate()
-		c.lock.RUnlock()
-		go c.catchNewBlocks(crunchCtx, ru)
-		var winner consensus.Results
-		if c.loop != nil {
-			scr, agr, err := loop.CreateStateMachine(c.loop.Emitter, c.db, config.ConsensusTimeOut, c.pubKey.Copy(), c.VerifyCandidateBlock, c.requestor, c.newBlockChan)
-			if err != nil {
-				log.WithError(err).Error("could not create consensus state machine")
-				cancel()
-				return err
-			}
-			winner = c.loop.Spin(ctx, scr, agr, ru)
-		} else {
-			winner = <-c.newBlockChan
-		}
-
-		// On error, we exit the loop, because we will be syncing, or consensus
-		// has encountered an error.
-		if winner.Err != nil {
-			cancel()
-			return winner.Err
-		}
-
-		// Otherwise, accept the block directly.
-		if !winner.Blk.IsEmpty() {
-			if err := c.AcceptSuccessiveBlock(ctx, winner.Blk); err != nil {
-				cancel()
-				return err
-			}
-		}
-
-		cancel()
 	}
 }
 
@@ -216,14 +229,14 @@ func (c *Chain) ProcessSucceedingBlock(blk block.Block) {
 // synchronization procedure.
 func (c *Chain) ProcessSyncBlock(blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("received sync block")
-	return c.AcceptBlock(c.ctx, blk)
+	return c.AcceptBlock(blk)
 }
 
 // AcceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
-func (c *Chain) AcceptSuccessiveBlock(ctx context.Context, blk block.Block) error {
+func (c *Chain) AcceptSuccessiveBlock(blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
-	if err := c.AcceptBlock(ctx, blk); err != nil {
+	if err := c.AcceptBlock(blk); err != nil {
 		return err
 	}
 
@@ -240,7 +253,7 @@ func (c *Chain) AcceptSuccessiveBlock(ctx context.Context, blk block.Block) erro
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved
-func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
+func (c *Chain) AcceptBlock(blk block.Block) error {
 	field := logger.Fields{"process": "accept block", "height": blk.Header.Height}
 	l := log.WithFields(field)
 
@@ -269,7 +282,8 @@ func (c *Chain) AcceptBlock(ctx context.Context, blk block.Block) error {
 	prov_num := c.p.Set.Len()
 	l.WithField("provisioners", prov_num).Info("calling ExecuteStateTransitionFunction")
 
-	provisioners, err := c.proxy.Executor().ExecuteStateTransition(ctx, blk.Txs, blk.Header.Height)
+	// TODO: the context here should maybe used to set a timeout
+	provisioners, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
 	if err != nil {
 		l.WithError(err).Error("Error in executing the state transition")
 		return err
@@ -322,6 +336,7 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 		return err
 	}
 
+	// TODO: consider using the context for timeouts
 	_, err := c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, blk.Header.Height)
 	return err
 }
@@ -395,7 +410,7 @@ func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 // as a percentage value.
 // NOTE: this is just here to satisfy the grpc interface. It should be removed
 // and the method should be moved to a synchronizer service.
-func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
+func (c *Chain) GetSyncProgress(_ context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
 	return &node.SyncProgressResponse{Progress: float32(100.0)}, nil
 }
 
@@ -403,7 +418,7 @@ func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*nod
 // to allow for a full re-sync.
 // NOTE: This function no longer does anything, but is still here to conform to the
 // ChainServer interface, for GRPC communications.
-func (c *Chain) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
+func (c *Chain) RebuildChain(_ context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	return &node.GenericResponse{Response: "Unimplemented"}, nil
 }
 

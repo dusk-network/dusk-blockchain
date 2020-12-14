@@ -53,12 +53,12 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 		Proxy:       proxy,
 		TimerLength: 5 * time.Second,
 	}
-	lp := loop.New(e)
+	lp := loop.New(e, &pk)
 
-	c, err := chain.New(ctx, db, eb, rb, l, l, nil, proxy, lp, &pk, nil)
+	c, err := chain.New(ctx, db, eb, rb, l, l, nil, proxy, lp)
 	assert.NoError(err)
 	go func() {
-		if err := c.CrunchBlocks(ctx); err != nil && err != context.Canceled {
+		if err := c.ProduceBlock(); err != nil && err != context.Canceled {
 			panic(err)
 		}
 	}()

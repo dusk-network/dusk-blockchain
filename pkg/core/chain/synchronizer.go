@@ -3,10 +3,8 @@ package chain
 import (
 	"bytes"
 	"context"
-	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -25,106 +23,104 @@ type Synchronizer struct {
 	db database.DB
 
 	highestSeen uint64
-	syncing     bool
 	syncTarget  uint64
 	*sequencer
 
-	ctx context.Context
+	state syncState
+	ctx   context.Context
 
-	catchBlockChan         chan consensus.Results
-	currentHeight          func() uint64
-	processSucceedingBlock func(block.Block)
-	processSyncBlock       func(block.Block) error
-	crunchBlocks           func(context.Context) error
+	chain Ledger
 }
 
-// NewSynchronizer returns an initialized Synchronizer, ready for use.
-func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, catchBlockChan chan consensus.Results, currentHeight func() uint64, processSucceedingBlock func(block.Block), processSyncBlock func(block.Block) error, crunchBlocks func(context.Context) error) *Synchronizer {
-	return &Synchronizer{
-		eb:                     eb,
-		rb:                     rb,
-		db:                     db,
-		sequencer:              newSequencer(),
-		ctx:                    ctx,
-		catchBlockChan:         catchBlockChan,
-		currentHeight:          currentHeight,
-		processSucceedingBlock: processSucceedingBlock,
-		processSyncBlock:       processSyncBlock,
-		crunchBlocks:           crunchBlocks,
-	}
-}
+type syncState func(currentHeight uint64, blk block.Block) (syncState, []bytes.Buffer, error)
 
-// ProcessBlock handles an incoming block from the network.
-func (s *Synchronizer) ProcessBlock(m message.Message) ([]bytes.Buffer, error) {
-	blk := m.Payload().(block.Block)
-
-	currentHeight := s.currentHeight()
-
-	// Is it worth looking at this?
-	if blk.Header.Height <= currentHeight {
-		log.Debug("discarded block from the past")
-		return nil, nil
-	}
-
-	if blk.Header.Height > s.highestSeen {
-		s.highestSeen = blk.Header.Height
-	}
-
-	// If this block is from far in the future, we should start syncing mode.
+func (s *Synchronizer) inSync(currentHeight uint64, blk block.Block) (syncState, []bytes.Buffer, error) {
 	if blk.Header.Height > currentHeight+1 {
+		// If this block is from far in the future, we should start syncing mode.
 		s.sequencer.add(blk)
-		if !s.syncing {
-			return s.startSync(blk.Header.Height, currentHeight)
-		}
-
-		return nil, nil
+		s.chain.StopBlockProduction()
+		b, err := s.startSync(blk.Header.Height, currentHeight)
+		return s.outSync, b, err
 	}
 
-	// If we are not syncing, then we should send it and forget about it.
-	if !s.syncing {
-		s.processSucceedingBlock(blk)
-		return nil, nil
+	// otherwise notify the chain (and the consensus loop)
+	s.chain.ProcessSucceedingBlock(blk)
+	return s.inSync, nil, nil
+}
+
+func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState, []bytes.Buffer, error) {
+	if blk.Header.Height > currentHeight+1 {
+		// if there is a gap we add the future block to the sequencer
+		s.sequencer.add(blk)
+		return s.outSync, nil, nil
 	}
 
 	// Retrieve all successive blocks that need to be accepted
 	blks := s.sequencer.provideSuccessors(blk)
 
 	for _, blk := range blks {
-		if err := s.processSyncBlock(blk); err != nil {
+		// append them all to the ledger
+		if err := s.chain.ProcessSyncBlock(blk); err != nil {
 			log.WithError(err).Debug("could not AcceptBlock")
-			return nil, err
+			return s.outSync, nil, err
 		}
 
 		if blk.Header.Height == s.syncTarget {
-			s.syncing = false
+			// if we reach the target we get into sync mode
+			// and trigger the consensus again
+			go func() {
+				if err := s.chain.ProduceBlock(); err != nil {
+					// TODO we need to have a recovery procedure rather than
+					// just log and forget
+					log.WithError(err).Error("crunchBlocks exited with error")
+				}
+			}()
+			return s.inSync, nil, nil
 		}
 	}
 
-	// Did we finish syncing? If so, restart the `CrunchBlocks` loop.
-	if !s.syncing {
-		go func() {
-			if err := s.crunchBlocks(s.ctx); err != nil {
-				log.WithError(err).Error("crunchBlocks exited with error")
-			}
-		}()
+	return s.outSync, nil, nil
+}
+
+// NewSynchronizer returns an initialized Synchronizer, ready for use.
+func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, chain Ledger) *Synchronizer {
+	s := &Synchronizer{
+		eb:        eb,
+		rb:        rb,
+		db:        db,
+		sequencer: newSequencer(),
+		ctx:       ctx,
+		chain:     chain,
+	}
+	s.state = s.inSync
+	return s
+}
+
+// ProcessBlock handles an incoming block from the network.
+func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err error) {
+	blk := m.Payload().(block.Block)
+
+	currentHeight := s.chain.CurrentHeight()
+
+	// Is it worth looking at this?
+	if blk.Header.Height <= currentHeight {
+		log.Debug("discarded block from the past")
+		return
 	}
 
-	return nil, nil
+	if blk.Header.Height > s.highestSeen {
+		s.highestSeen = blk.Header.Height
+	}
+
+	s.state, res, err = s.state(currentHeight, blk)
+	return
 }
 
 func (s *Synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
-	// Kill the `CrunchBlocks` goroutine.
-	select {
-	case s.catchBlockChan <- consensus.Results{Blk: block.Block{}, Err: errors.New("syncing mode started")}:
-	default:
-	}
-
 	s.syncTarget = tipHeight
 	if s.syncTarget > currentHeight+config.MaxInvBlocks {
 		s.syncTarget = currentHeight + config.MaxInvBlocks
 	}
-
-	s.syncing = true
 
 	var hash []byte
 	if err := s.db.View(func(t database.Transaction) error {
@@ -146,7 +142,7 @@ func (s *Synchronizer) GetSyncProgress(ctx context.Context, e *node.EmptyRequest
 		return &node.SyncProgressResponse{Progress: 0}, nil
 	}
 
-	prevBlockHeight := s.currentHeight()
+	prevBlockHeight := s.chain.CurrentHeight()
 	progressPercentage := (float64(prevBlockHeight) / float64(s.highestSeen)) * 100
 
 	// Avoiding strange output when the chain can be ahead of the highest
