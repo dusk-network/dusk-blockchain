@@ -2,7 +2,7 @@ on: [pull_request]
 name: Continuous Integration
 jobs:
   lint:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
     - name: Install Go
       uses: actions/setup-go@v2
@@ -13,7 +13,7 @@ jobs:
     - name: Lint
       run: rm -rf $HOME/.cache/golangci-lint || true && make lint
   test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
     - name: Install Go
       uses: actions/setup-go@v2
@@ -26,7 +26,7 @@ jobs:
     - name: Upload coverage report
       run: bash <(curl -s https://codecov.io/bash)
   test-harness:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
     - name: Install Go
       uses: actions/setup-go@v2

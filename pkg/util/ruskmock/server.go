@@ -241,7 +241,7 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 		return nil, err
 	}
 
-	seed := make([]byte, 32)
+	seed := make([]byte, 64)
 	if _, err = rand.Read(seed); err != nil {
 		return nil, err
 	}
@@ -268,15 +268,15 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 				Data: pSpend,
 			},
 			B: &rusk.JubJubScalar{
-				Data: make([]byte, 0),
+				Data: make([]byte, 32),
 			},
 		},
 		Vk: &rusk.ViewKey{
 			A: &rusk.JubJubScalar{
-				Data: make([]byte, 0),
+				Data: make([]byte, 32),
 			},
 			BG: &rusk.JubJubCompressed{
-				Data: make([]byte, 0),
+				Data: make([]byte, 32),
 			},
 		},
 		Pk: &rusk.PublicKey{
@@ -284,7 +284,7 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 				Data: addr.P.Bytes(),
 			},
 			BG: &rusk.JubJubCompressed{
-				Data: make([]byte, 0),
+				Data: make([]byte, 32),
 			},
 		},
 	}, nil

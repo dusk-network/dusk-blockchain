@@ -148,7 +148,7 @@ func Setup() *Server {
 	proxy, ruskConn := setupGRPCClients(ctx)
 
 	var w *wallet.Wallet
-	if _, err = os.Stat("wallet.dat"); err == nil {
+	if _, err = os.Stat(cfg.Get().Wallet.File); err == nil {
 		w, err = loadWallet(pw)
 	} else {
 		w, err = createWallet(nil, pw, proxy.KeyMaster())
