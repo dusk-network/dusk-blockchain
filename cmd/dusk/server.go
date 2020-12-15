@@ -238,11 +238,7 @@ func Setup() *Server {
 // OnAccept read incoming packet from the peers
 func (s *Server) OnAccept(conn net.Conn) {
 	writeQueueChan := make(chan bytes.Buffer, 1000)
-	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan)
-	if err != nil {
-		panic(err)
-	}
-
+	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan)
 	if err := peerReader.Accept(); err != nil {
 		logServer.WithError(err).Warnln("OnAccept, problem performing handshake")
 		return
@@ -266,10 +262,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	logServer.WithField("address", address).
 		Debugln("connection established")
 
-	peerReader, err := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan)
-	if err != nil {
-		log.Panic(err)
-	}
+	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan)
 
 	go peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
