@@ -52,7 +52,12 @@ func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState
 	if blk.Header.Height > currentHeight+1 {
 		// if there is a gap we add the future block to the sequencer
 		s.sequencer.add(blk)
-		return s.outSync, nil, nil
+		// do we have a successive block that we might've missed?
+		var err error
+		blk, err = s.sequencer.get(currentHeight + 1)
+		if err != nil {
+			return s.outSync, nil, nil
+		}
 	}
 
 	// Retrieve all successive blocks that need to be accepted

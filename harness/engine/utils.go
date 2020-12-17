@@ -218,8 +218,9 @@ func (n *Network) WaitUntilTx(t *testing.T, ind uint, txID string) string {
 		return true
 	}
 
-	// asserts that given condition will be met in 1 minute, by checking condition function each second.
-	assert.Eventuallyf(t, condition, 1*time.Minute, time.Second, "failed node %s", ind)
+	// asserts that given condition will be met in 2 minutes, by checking
+	// condition function each second.
+	assert.Eventuallyf(t, condition, 2*time.Minute, time.Second, "failed node %s", ind)
 
 	return blockhash
 }

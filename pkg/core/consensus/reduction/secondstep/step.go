@@ -141,7 +141,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
 	hdr := r.State()
-	if err := p.handler.VerifySignature(r); err != nil {
+	if err := p.handler.VerifySignature(r.Copy().(message.Reduction)); err != nil {
 		lg.
 			WithError(err).
 			WithFields(log.Fields{
@@ -152,6 +152,11 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 			}).
 			Warn("signature verification error for second step reduction, discarding")
 		return nil
+	}
+
+	// Once the event is verified, we can republish it.
+	if err := p.Emitter.Gossip(message.New(topics.Reduction, r)); err != nil {
+		lg.WithError(err).Error("could not republish reduction event")
 	}
 
 	lg.WithFields(log.Fields{

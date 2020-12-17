@@ -212,6 +212,12 @@ func (p *Phase) collectScore(ctx context.Context, sc message.Score) {
 			"new_best": sc.Score,
 		}).Debugln("swapping best score")
 
+	// Once the event is verified, and has passed all preliminary checks,
+	// we can republish it to the network.
+	if err := p.Emitter.Gossip(message.New(topics.Score, sc)); err != nil {
+		lg.WithError(err).Error("could not republish score event")
+	}
+
 	p.bestEvent = sc
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -58,22 +59,25 @@ func mockProxy(p user.Provisioners) transactions.Proxy {
 
 type gossipRouter struct {
 	eb eventbus.Publisher
+	d  *dupemap.DupeMap
 }
 
 func (g *gossipRouter) route(m message.Message) {
-	// The incoming message will be a message.SafeBuffer, as it's coming from
-	// the consensus.Emitter.
 	b := m.Payload().(message.SafeBuffer).Buffer
-	m, err := message.Unmarshal(&b)
-	if err != nil {
-		panic(err)
-	}
+	if g.d.CanFwd(&b) {
+		// The incoming message will be a message.SafeBuffer, as it's coming from
+		// the consensus.Emitter.
+		m, err := message.Unmarshal(&b)
+		if err != nil {
+			panic(err)
+		}
 
-	g.eb.Publish(m.Category(), m)
+		go g.eb.Publish(m.Category(), m)
+	}
 }
 
 func rerouteGossip(eb *eventbus.EventBus) {
-	router := &gossipRouter{eb}
+	router := &gossipRouter{eb, dupemap.Launch(eb)}
 	gossipListener := eventbus.NewSafeCallbackListener(router.route)
 	eb.Subscribe(topics.Gossip, gossipListener)
 }
