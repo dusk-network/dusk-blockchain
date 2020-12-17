@@ -44,7 +44,7 @@ func TestContextCancellation(t *testing.T) {
 	// the cancelation after 100ms should make the agreement end its loop with
 	// a nil return value
 	_, db := lite.CreateDBConnection()
-	results := l.Spin(ctx, consensus.MockPhase(cb), agreement.New(e, db, make(chan consensus.Results, 1)), consensus.RoundUpdate{Round: uint64(1)})
+	results := l.Spin(ctx, consensus.MockPhase(cb), agreement.New(e, db, make(chan consensus.Results, 1), nil), consensus.RoundUpdate{Round: uint64(1)})
 	require.Empty(t, results.Blk)
 	require.Equal(t, results.Err, context.Canceled)
 }

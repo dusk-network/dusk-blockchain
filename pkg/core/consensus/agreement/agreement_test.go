@@ -2,8 +2,10 @@ package agreement_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -11,6 +13,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -43,7 +46,7 @@ func TestAgreement(t *testing.T) {
 		return t.StoreCandidateMessage(*blk)
 	}))
 
-	loop := agreement.New(hlp.Emitter, db, make(chan consensus.Results, 1))
+	loop := agreement.New(hlp.Emitter, db, make(chan consensus.Results, 1), nil)
 
 	agreementEvs := hlp.Spawn(blk.Header.Hash)
 	agreementChan := make(chan message.Message, 100)
@@ -56,4 +59,59 @@ func TestAgreement(t *testing.T) {
 	results := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(blk.Header.Hash))
 
 	assert.Equal(t, blk.Header.Hash, results.Blk.Header.Hash)
+}
+
+// Test the usage of the candidate requestor in case of a missing candidate block
+func TestRequestor(t *testing.T) {
+	nr := 50
+	hlp := agreement.NewHelper(nr)
+	blk := helper.RandomBlock(1, 1)
+	_, db := lite.CreateDBConnection()
+
+	req := candidate.NewRequestor(hlp.Emitter.EventBus)
+
+	c := make(chan message.Message, 100)
+	l := eventbus.NewChanListener(c)
+	hlp.Emitter.EventBus.Subscribe(topics.Gossip, l)
+
+	loop := agreement.New(hlp.Emitter, db, make(chan consensus.Results, 1), req)
+
+	agreementEvs := hlp.Spawn(blk.Header.Hash)
+	agreementChan := make(chan message.Message, 100)
+
+	for _, aggro := range agreementEvs {
+		agreementChan <- message.New(topics.Agreement, aggro)
+	}
+
+	ctx := context.Background()
+	resChan := make(chan consensus.Results, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		results := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(blk.Header.Hash))
+		wg.Done()
+		resChan <- results
+	}()
+
+	// Catch request, and return the desired block.
+	// We loop here because we also catch republished messages.
+	for {
+		m := <-c
+		b := m.Payload().(message.SafeBuffer).Buffer
+		request, err := message.Unmarshal(&b)
+		assert.NoError(t, err)
+		if request.Category() == topics.GetCandidate {
+			assert.Equal(t, request.Payload().(message.GetCandidate).Hash, blk.Header.Hash)
+
+			_, err := req.ProcessCandidate(message.New(topics.Candidate, *blk))
+			assert.NoError(t, err)
+
+			wg.Wait()
+
+			results := <-resChan
+			assert.NoError(t, results.Err)
+			assert.Equal(t, blk.Header.Hash, results.Blk.Header.Hash)
+			return
+		}
+	}
 }
