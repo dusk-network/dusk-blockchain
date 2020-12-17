@@ -65,10 +65,7 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 				_, err := streamer.Read()
 				require.NoError(err)
 
-				for i := 0; ; i++ {
-					if i == 2 {
-						break
-					}
+				for {
 					tpcs := streamer.SeenTopics()
 					for _, tpc := range tpcs {
 						if tpc == topics.Agreement {
@@ -77,8 +74,6 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 					}
 					streamer.Read()
 				}
-
-				require.FailNow("no agreement received")
 			},
 
 			// testing that the timeout remained the same after a successful run

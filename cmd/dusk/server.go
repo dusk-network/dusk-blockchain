@@ -33,7 +33,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh/terminal"
@@ -138,10 +137,6 @@ func Setup() *Server {
 
 	processor := peer.NewMessageProcessor(eventBus)
 	registerPeerServices(processor, db, eventBus, rpcBus)
-
-	_ = republisher.New(eventBus, topics.Score)
-	_ = republisher.New(eventBus, topics.Reduction)
-	_ = republisher.New(eventBus, topics.Agreement)
 
 	// Instantiate gRPC client
 	// TODO: get address from config

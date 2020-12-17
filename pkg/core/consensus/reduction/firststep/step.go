@@ -142,7 +142,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 }
 
 func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
-	if err := p.handler.VerifySignature(r); err != nil {
+	if err := p.handler.VerifySignature(r.Copy().(message.Reduction)); err != nil {
 		lg.
 			WithError(err).
 			WithField("round", r.State().Round).
@@ -150,6 +150,11 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 			WithField("hash", util.StringifyBytes(r.State().BlockHash)).
 			Warn("error in verifying reduction, message discarded")
 		return nil
+	}
+
+	// Once the event is verified, we can republish it.
+	if err := p.Emitter.Gossip(message.New(topics.Reduction, r)); err != nil {
+		lg.WithError(err).Error("could not republish reduction event")
 	}
 
 	hdr := r.State()
