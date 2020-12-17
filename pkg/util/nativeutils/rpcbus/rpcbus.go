@@ -3,11 +3,22 @@ package rpcbus
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
+
+// ErrMethodNotExists is returned when calling an unregistered method
+type ErrMethodNotExists struct {
+	topic topics.Topic
+}
+
+// Error obeys the error interface
+func (e *ErrMethodNotExists) Error() string {
+	return fmt.Sprintf("method not registered: %s", e.topic)
+}
 
 var (
 	// ErrRequestTimeout is returned when request timeout-ed
@@ -15,9 +26,6 @@ var (
 
 	// ErrMethodExists is returned when method is already registered
 	ErrMethodExists = errors.New("method exists already")
-
-	// ErrMethodNotExists is returned when calling an unregistered method
-	ErrMethodNotExists = errors.New("method not registered")
 
 	// ErrInvalidRequestChan is returned method is bound to nil chan
 	ErrInvalidRequestChan = errors.New("invalid request channel")
@@ -145,7 +153,7 @@ func (bus *RPCBus) getReqChan(t topics.Topic) (chan<- Request, error) {
 		return reqChan, nil
 	}
 
-	return nil, ErrMethodNotExists
+	return nil, &ErrMethodNotExists{t}
 }
 
 // Close the RPCBus by resetting the registry

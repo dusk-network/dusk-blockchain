@@ -6,14 +6,11 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,22 +76,6 @@ func rerouteGossip(eb *eventbus.EventBus) {
 	router := &gossipRouter{eb}
 	gossipListener := eventbus.NewSafeCallbackListener(router.route)
 	eb.Subscribe(topics.Gossip, gossipListener)
-}
-
-func randPublicKey(assert *assert.Assertions) keys.PublicKey {
-	ag, err := crypto.RandEntropy(32)
-	assert.NoError(err)
-	bg, err := crypto.RandEntropy(32)
-	assert.NoError(err)
-
-	return keys.PublicKey{
-		AG: &common.JubJubCompressed{
-			Data: ag,
-		},
-		BG: &common.JubJubCompressed{
-			Data: bg,
-		},
-	}
 }
 
 func getNumNodes(assert *assert.Assertions) int {

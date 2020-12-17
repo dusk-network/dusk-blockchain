@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
@@ -16,6 +18,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -103,25 +106,9 @@ func TestAcceptFromPeer(t *testing.T) {
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
 
-	// Start consensus so that the chain has access to the needed keys
-	BLSKeys, _ := key.NewRandKeys()
-	pk := keys.PublicKey{
-		AG: &common.JubJubCompressed{Data: make([]byte, 32)},
-		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
-	}
-
-	go c.SetupConsensus(pk, BLSKeys)
-
 	blk := mockAcceptableBlock(*c.tip)
 
-	errChan := make(chan error, 1)
-	go func(chan error) {
-		if _, err := c.ProcessBlock(message.New(topics.Block, *blk)); err != nil {
-			if err.Error() != "request timeout" {
-				errChan <- err
-			}
-		}
-	}(errChan)
+	c.ProcessSucceedingBlock(*blk)
 
 	// the order of received stuff cannot be guaranteed. So we just search for
 	// getRoundResult topic. If it hasn't been received the test fails.
@@ -158,51 +145,27 @@ func TestAcceptBlock(t *testing.T) {
 
 	// Make a 'winning' candidate message
 	blk := helper.RandomBlock(startingHeight, 1)
-	assert.NoError(c.db.Update(func(t database.Transaction) error {
-		return t.StoreCandidateMessage(*blk)
-	}))
 
 	// Now send a `Certificate` message with this block's hash
 	// Make a certificate with a different step, to do a proper equality
 	// check later
 	cert := block.EmptyCertificate()
 	cert.Step = 5
+	blk.Header.Certificate = cert
 
-	assert.NoError(c.handleCertificateMessage(cert, blk.Header.Hash))
+	assert.NoError(c.AcceptBlock(*blk))
 
 	// Should have `blk` as blockchain head now
 	assert.True(bytes.Equal(blk.Header.Hash, c.tip.Header.Hash))
 
 	// lastCertificate should be `cert`
-	assert.True(cert.Equals(c.lastCertificate))
+	assert.True(cert.Equals(c.tip.Header.Certificate))
 
 	// Should have gotten `blk` over topics.AcceptBlock
 	blkMsg := <-acceptedBlockChan
 	decodedBlk := blkMsg.Payload().(block.Block)
 
 	assert.True(decodedBlk.Equals(c.tip))
-}
-
-func TestReturnOnMissingCandidate(t *testing.T) {
-	// suppressing expected warning related to not finding a winning block
-	// candidate
-	logrus.SetLevel(logrus.ErrorLevel)
-	assert := assert.New(t)
-	startingHeight := uint64(2)
-
-	_, c := setupChainTest(t, startingHeight)
-
-	blk := mockAcceptableBlock(*c.tip)
-	cert := block.EmptyCertificate()
-
-	// Save current prevBlock
-	currPrevBlock := c.tip.Copy().(block.Block)
-
-	// Now pretend we finalized on it
-	c.handleCertificateMessage(cert, blk.Header.Hash)
-
-	// Ensure everything is still the same
-	assert.True(currPrevBlock.Equals(c.tip))
 }
 
 func createLoader(db database.DB) *DBLoader {
@@ -213,20 +176,12 @@ func createLoader(db database.DB) *DBLoader {
 
 func TestFetchTip(t *testing.T) {
 	assert := assert.New(t)
-
-	eb := eventbus.New()
-	rpc := rpcbus.New()
-	_, db := heavy.CreateDBConnection()
-	loader := createLoader(db)
-	proxy := &transactions.MockProxy{
-		E: transactions.MockExecutor(0),
-	}
-	chain, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, nil)
-	assert.NoError(err)
+	_, chain := setupChainTest(t, 0)
 
 	// on a modern chain, state(tip) must point at genesis
 	var s *database.State
-	err = loader.db.View(func(t database.Transaction) error {
+	err := chain.db.View(func(t database.Transaction) error {
+		var err error
 		s, err = t.FetchState()
 		return err
 	})
@@ -255,14 +210,34 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 
 	_, db := heavy.CreateDBConnection()
 	loader := createLoader(db)
+
 	proxy := &transactions.MockProxy{
 		E:  transactions.MockExecutor(startAtHeight),
 		BG: transactions.MockBlockGenerator{},
 	}
-	var c *Chain
 
-	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, nil)
+	BLSKeys, _ := key.NewRandKeys()
+	pk := keys.PublicKey{
+		AG: &common.JubJubCompressed{Data: make([]byte, 32)},
+		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
+	}
+
+	e := &consensus.Emitter{
+		EventBus:    eb,
+		RPCBus:      rpc,
+		Keys:        BLSKeys,
+		Proxy:       proxy,
+		TimerLength: 5 * time.Second,
+	}
+	l := loop.New(e, &pk)
+
+	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, l)
 	assert.NoError(t, err)
+	assert.NoError(t, db.Update(func(tx database.Transaction) error {
+		return tx.StoreBidValues(make([]byte, 32), make([]byte, 32), 0, 100000)
+	}))
+
+	go c.ProduceBlock()
 
 	return eb, c
 }

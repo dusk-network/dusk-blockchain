@@ -5,6 +5,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	log "github.com/sirupsen/logrus"
 )
@@ -19,12 +20,16 @@ var WorkerAmount = 4
 // change during the consensus loop
 type Loop struct {
 	*consensus.Emitter
+	db           database.DB
+	newBlockChan chan consensus.Results
 }
 
 // New creates a round-specific agreement step
-func New(e *consensus.Emitter) *Loop {
+func New(e *consensus.Emitter, db database.DB, newBlockChan chan consensus.Results) *Loop {
 	return &Loop{
-		Emitter: e,
+		Emitter:      e,
+		db:           db,
+		newBlockChan: newBlockChan,
 	}
 }
 
@@ -35,7 +40,7 @@ func (s *Loop) GetControlFn() consensus.ControlFn {
 }
 
 // Run the agreement step loop
-func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) (*block.Certificate, []byte) {
+func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) consensus.Results {
 	// creating accumulator and handler
 	h := NewHandler(s.Keys, r.P)
 	acc := newAccumulator(h, WorkerAmount)
@@ -65,11 +70,16 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 				Debugln("quorum reached")
 
 			cert := evs[0].GenerateCertificate()
-			return cert, evs[0].State().BlockHash
-
+			blk, err := s.createWinningBlock(evs[0].State().BlockHash, cert)
+			return consensus.Results{Blk: blk, Err: err}
+		case newBlockResult := <-s.newBlockChan:
+			if newBlockResult.Blk.Header != nil && newBlockResult.Blk.Header.Height != r.Round {
+				continue
+			}
+			return newBlockResult
 		case <-ctx.Done():
 			// finalize the worker pool
-			return nil, nil
+			return consensus.Results{Blk: block.Block{}, Err: context.Canceled}
 		}
 	}
 }
@@ -103,6 +113,20 @@ func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensu
 	}
 
 	return true
+}
+
+func (s *Loop) createWinningBlock(hash []byte, cert *block.Certificate) (block.Block, error) {
+	var cm block.Block
+	if err := s.db.View(func(t database.Transaction) error {
+		var err error
+		cm, err = t.FetchCandidateMessage(hash)
+		return err
+	}); err != nil {
+		return block.Block{}, err
+	}
+
+	cm.Header.Certificate = cert
+	return cm, nil
 }
 
 func collectEvent(h *handler, accumulator *Accumulator, a message.Agreement) {

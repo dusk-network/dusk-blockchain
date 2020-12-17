@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -19,7 +18,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/status"
 )
 
 // PublishTopic publishes an event bus topic to the specified node via
@@ -79,43 +77,6 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 	}
 
 	return nil
-}
-
-// LoadWalletCmd sends gRPC command LoadWallet and returns pubkey (if loaded)
-func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
-	// session has been setup already in the TestMain, so here the client
-	// should be returning the permanent connection
-	conn, err := n.GetGrpcConn(ind, grpc.WithInsecure())
-	if err != nil {
-		return "", err
-	}
-
-	client := pb.NewWalletClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	req := pb.LoadRequest{Password: password}
-	resp, err := client.LoadWallet(ctx, &req)
-	if err != nil {
-		return "", err
-	}
-
-	return string(resp.GetKey().PublicKey), nil
-}
-
-// LoadNetworkWallets sends a LoadWallet request to N nodes of the network
-func (n *Network) LoadNetworkWallets(t *testing.T, nodesNum int) {
-	walletsPass := os.Getenv("DUSK_WALLET_PASS")
-	t.Logf("Send request to %d nodes to loadWallet", nodesNum)
-	for i := 0; i < nodesNum; i++ {
-		_, err := n.LoadWalletCmd(uint(i), walletsPass)
-		if err != nil {
-			st := status.Convert(err)
-			if st.Message() != "wallet is already loaded" {
-				t.Fatal(err)
-			}
-		}
-	}
 }
 
 // SendBidCmd sends gRPC command SendBid and returns tx hash
@@ -288,7 +249,6 @@ func (n *Network) SendStakeCmd(ind uint, amount, locktime uint64) ([]byte, error
 
 // GetLastBlockHeight makes an attempt to fetch last block height of a specified node
 func (n *Network) GetLastBlockHeight(ind uint) (uint64, error) {
-
 	// Construct query to fetch block height
 	query := "{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}"
 	var result map[string]map[string][]map[string]map[string]int
@@ -301,7 +261,6 @@ func (n *Network) GetLastBlockHeight(ind uint) (uint64, error) {
 //IsSynced checks if each node blockchain tip is close to the blockchain tip of node 0.
 // threshold param is the number of blocks the last block can differ
 func (n *Network) IsSynced(threshold uint64) (uint64, error) {
-
 	forks := make(map[uint64][]int)
 	primaryHeight := uint64(0)
 	for nodeID := 0; nodeID < n.Size(); nodeID++ {

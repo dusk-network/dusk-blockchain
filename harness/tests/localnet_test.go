@@ -121,15 +121,13 @@ func monitorNetwork() {
 // by all nodes in the network within a particular time frame and within the
 // same block
 func TestSendBidTransaction(t *testing.T) {
-	localNet.LoadNetworkWallets(t, localNet.Size())
-
 	t.Log("Send request to node 0 to generate and process a Bid transaction")
 	txidBytes, err := localNet.SendBidCmd(0, 10, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for i := 1; i < localNet.Size(); i++ {
+	for i := 0; i < localNet.Size(); i++ {
 		t.Logf("Send request to node %d to generate and process a Bid transaction", i)
 		if _, err := localNet.SendBidCmd(uint(i), 10, 10); err != nil {
 			t.Error(err)
@@ -163,8 +161,6 @@ func TestSendBidTransaction(t *testing.T) {
 // TestCatchup tests that a node which falls behind during consensus will
 // properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
-	localNet.LoadNetworkWallets(t, localNet.Size())
-
 	t.Log("Wait till we are at height 3")
 	localNet.WaitUntil(t, 0, 3, 3*time.Minute, 5*time.Second)
 
@@ -185,8 +181,6 @@ func TestCatchup(t *testing.T) {
 }
 
 func TestSendStakeTransaction(t *testing.T) {
-	localNet.LoadNetworkWallets(t, localNet.Size())
-
 	t.Log("Send request to node 1 to generate and process a Stake transaction")
 	txidBytes, err := localNet.SendStakeCmd(0, 10, 10)
 	if err != nil {
@@ -227,9 +221,6 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 	}
 
 	logrus.Infof("TestMultipleBiddersProvisioners with staking")
-
-	// Network setup procedure
-	localNet.LoadNetworkWallets(t, localNet.Size())
 
 	defaultLocktime := uint64(100000)
 
@@ -277,7 +268,6 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	log.Info("60sec Wait for network nodes to complete bootstrapping procedure")
 	time.Sleep(60 * time.Second)
 
-	walletsPass := os.Getenv("DUSK_WALLET_PASS")
 	consensusNodes := os.Getenv("DUSK_CONSENSUS_NODES")
 	if len(consensusNodes) == 0 {
 		consensusNodes = "10"
@@ -286,12 +276,6 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	nodesNum, err := strconv.Atoi(consensusNodes)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	//Send to all consensus-running nodes a request for wallet loading. This
-	//will trigger consensus as well
-	for i := 0; i < nodesNum; i++ {
-		_, _ = localNet.LoadWalletCmd(uint(i), walletsPass)
 	}
 
 	log.Info("10sec Wait for consensus-nodes to kick off consensus")

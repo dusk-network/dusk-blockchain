@@ -55,9 +55,6 @@ const (
 	// Cross-process RPCBus topics
 	// Wallet
 	GetMempoolView
-	CreateWallet
-	CreateFromSeed
-	LoadWallet
 	SendBidTx
 	SendStakeTx
 	SendStandardTx
@@ -67,7 +64,6 @@ const (
 	GetTxHistory
 	AutomateConsensusTxs
 	GetSyncProgress
-	IsWalletLoaded
 	RebuildChain
 	ClearWalletDatabase
 	StartProfile
@@ -121,9 +117,6 @@ var Topics = [...]topicBuf{
 	{VerifyStateTransition, *(bytes.NewBuffer([]byte{byte(VerifyStateTransition)})), "validatestatetransition"},
 	{ExecuteStateTransition, *(bytes.NewBuffer([]byte{byte(ExecuteStateTransition)})), "executestatetransition"},
 	{GetMempoolView, *(bytes.NewBuffer([]byte{byte(GetMempoolView)})), "getmempoolview"},
-	{CreateWallet, *(bytes.NewBuffer([]byte{byte(CreateWallet)})), "createwallet"},
-	{CreateFromSeed, *(bytes.NewBuffer([]byte{byte(CreateFromSeed)})), "createfromseed"},
-	{LoadWallet, *(bytes.NewBuffer([]byte{byte(LoadWallet)})), "loadwallet"},
 	{SendBidTx, *(bytes.NewBuffer([]byte{byte(SendBidTx)})), "sendbidtx"},
 	{SendStakeTx, *(bytes.NewBuffer([]byte{byte(SendStakeTx)})), "sendstaketx"},
 	{SendStandardTx, *(bytes.NewBuffer([]byte{byte(SendStandardTx)})), "sendstandardtx"},
@@ -133,7 +126,6 @@ var Topics = [...]topicBuf{
 	{GetTxHistory, *(bytes.NewBuffer([]byte{byte(GetTxHistory)})), "gettxhistory"},
 	{AutomateConsensusTxs, *(bytes.NewBuffer([]byte{byte(AutomateConsensusTxs)})), "automateconsensustxs"},
 	{GetSyncProgress, *(bytes.NewBuffer([]byte{byte(GetSyncProgress)})), "getsyncprogress"},
-	{IsWalletLoaded, *(bytes.NewBuffer([]byte{byte(IsWalletLoaded)})), "iswalletloaded"},
 	{RebuildChain, *(bytes.NewBuffer([]byte{byte(RebuildChain)})), "rebuildchain"},
 	{ClearWalletDatabase, *(bytes.NewBuffer([]byte{byte(ClearWalletDatabase)})), "clearwalletdatabase"},
 	{StartProfile, *(bytes.NewBuffer([]byte{byte(StartProfile)})), "startprofile"},

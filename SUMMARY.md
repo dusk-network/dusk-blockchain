@@ -28,6 +28,7 @@
     * [README](pkg/core/verifiers.md)
     * [chain](pkg/core/chain/README.md)
       * [Chain](pkg/core/chain/chain.md)
+      * [Synchronizer](pkg/core/chain/synchronizer.md)
   * [README](pkg/gql/README.md)
     * [README](pkg/gql/notifications.md)
   * [p2p](pkg/p2p/README.md)

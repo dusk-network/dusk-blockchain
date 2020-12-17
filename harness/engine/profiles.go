@@ -21,6 +21,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("general.network", "testnet")
 	viper.Set("general.walletonly", "false")
 	viper.Set("general.safecallbacklistener", "false")
+	viper.Set("general.testharness", "true")
 
 	//bidautomaton.go
 	viper.Set("timeout.timeoutsendbidtx", 5)

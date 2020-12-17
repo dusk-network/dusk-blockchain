@@ -19,6 +19,14 @@ func NewBlock() *Block {
 	}
 }
 
+// IsEmpty tells us if a block is empty. We can check this easily, because an
+// empty block will be created as `block.Block{}`, meaning that the header
+// is always nil. This function basically checks the existence of the block
+// header.
+func (b Block) IsEmpty() bool {
+	return b.Header == nil
+}
+
 // Copy returns a deep copy of the Block safe to publish to multiple subscribers
 func (b Block) Copy() payload.Safe {
 	cpy := Block{}

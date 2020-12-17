@@ -6,6 +6,9 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -28,16 +31,21 @@ func TestMockValidity(t *testing.T) {
 	}
 }
 
-// Test the accumulation of agreement events. It should result in the agreement component
-// sending a valid certificate
+// Test the accumulation of agreement events. It should result in the agreement
+// component sending a valid certificate
 func TestAgreement(t *testing.T) {
 	nr := 50
 	hlp := agreement.NewHelper(nr)
-	hash, _ := crypto.RandEntropy(32)
+	blk := helper.RandomBlock(1, 1)
+	_, db := lite.CreateDBConnection()
 
-	loop := agreement.New(hlp.Emitter)
+	assert.NoError(t, db.Update(func(t database.Transaction) error {
+		return t.StoreCandidateMessage(*blk)
+	}))
 
-	agreementEvs := hlp.Spawn(hash)
+	loop := agreement.New(hlp.Emitter, db, make(chan consensus.Results, 1))
+
+	agreementEvs := hlp.Spawn(blk.Header.Hash)
 	agreementChan := make(chan message.Message, 100)
 
 	for _, aggro := range agreementEvs {
@@ -45,7 +53,7 @@ func TestAgreement(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, retHash := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(hash))
+	results := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(blk.Header.Hash))
 
-	assert.Equal(t, hash, retHash)
+	assert.Equal(t, blk.Header.Hash, results.Blk.Header.Hash)
 }
