@@ -34,11 +34,7 @@ func TestHandshake(t *testing.T) {
 
 	go func() {
 		responseChan := make(chan bytes.Buffer, 100)
-		peerReader, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan)
-		if err != nil {
-			panic(err)
-		}
-
+		peerReader := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan)
 		if err := peerReader.Accept(); err != nil {
 			panic(err)
 		}

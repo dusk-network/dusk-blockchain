@@ -57,15 +57,9 @@ func TestPingLoop(t *testing.T) {
 	processor.Register(topics.Ping, responding.ProcessPing)
 	factory := NewReaderFactory(processor)
 
-	reader, err := factory.SpawnReader(client, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan)
-	if err != nil {
-		t.Fatal(err)
-	}
+	reader := factory.SpawnReader(client, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan)
 
-	reader2, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	reader2 := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan2)
 
 	go Create(context.Background(), reader, writer, responseChan)
 	go Create(context.Background(), reader2, writer2, responseChan2)
@@ -227,7 +221,7 @@ func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, ch
 
 	respChan := make(chan bytes.Buffer, 10)
 	g := protocol.NewGossip(protocol.TestNet)
-	peer, _ := f.SpawnReader(r, g, d, respChan)
+	peer := f.SpawnReader(r, g, d, respChan)
 
 	// Run the non-recover readLoop to watch for panics
 	go assert.NotPanics(t, func() { peer.readLoop(context.Background(), make(chan error, 1)) })

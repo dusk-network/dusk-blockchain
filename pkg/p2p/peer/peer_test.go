@@ -49,10 +49,7 @@ func TestReader(t *testing.T) {
 
 	dupeMap := dupemap.NewDupeMap(5)
 	responseChan := make(chan bytes.Buffer, 100)
-	peerReader, err := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupeMap, responseChan)
-	if err != nil {
-		t.Fatal(err)
-	}
+	peerReader := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupeMap, responseChan)
 
 	go peerReader.ReadLoop(context.Background(), make(chan error, 1))
 
