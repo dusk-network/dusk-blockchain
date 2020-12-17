@@ -6,10 +6,9 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 )
 
-// Validate complies with the republisher.Validator interface. It internally invokes ValidateCandidate
+// Validate an incoming Candidate message.
 func Validate(m message.Message) error {
 	cm := m.Payload().(block.Block)
 	return ValidateCandidate(cm)
@@ -20,12 +19,12 @@ func Validate(m message.Message) error {
 func ValidateCandidate(cm block.Block) error {
 	if err := checkHash(&cm); err != nil {
 		log.WithError(err).Errorln("validation failed")
-		return republisher.InvalidError
+		return errors.New("invalid candidate received")
 	}
 
 	if err := checkRoot(&cm); err != nil {
 		log.WithError(err).Errorln("validation failed")
-		return republisher.InvalidError
+		return errors.New("invalid candidate received")
 	}
 
 	return nil
