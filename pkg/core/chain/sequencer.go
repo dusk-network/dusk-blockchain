@@ -1,6 +1,9 @@
 package chain
 
 import (
+	"errors"
+	"sync"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 )
 
@@ -10,6 +13,7 @@ import (
 // directly during the acceptance procedure. The mutex in this procedure
 // should be sufficient to guard this map.
 type sequencer struct {
+	lock      sync.RWMutex
 	blockPool map[uint64]block.Block
 }
 
@@ -18,12 +22,27 @@ func newSequencer() *sequencer {
 }
 
 func (s *sequencer) add(blk block.Block) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.blockPool[blk.Header.Height] = blk
+}
+
+func (s *sequencer) get(height uint64) (block.Block, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	blk, ok := s.blockPool[height]
+	if !ok {
+		return block.Block{}, errors.New("block not found")
+	}
+
+	return blk, nil
 }
 
 // Provide successive blocks to the given height. Once a gap is detected, the loop
 // quits and returns a set of blocks.
 func (s *sequencer) provideSuccessors(blk block.Block) []block.Block {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	blks := []block.Block{blk}
 	for i := blk.Header.Height + 1; ; i++ {
 		blk, ok := s.blockPool[i]
