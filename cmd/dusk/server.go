@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"time"
@@ -102,10 +104,44 @@ func (s *Server) launchKadcastPeer() {
 }
 
 func getPassword() (string, error) {
-	fd := int(os.Stdin.Fd())
-	fmt.Println("Enter password:")
-	pw, err := terminal.ReadPassword(fd)
+	pw, err := readPassword("Enter password:")
 	return string(pw), err
+}
+
+// From: https://github.com/golang/go/issues/19909#issuecomment-462103555
+// To bypass issue with stdin from non-tty.
+func readPassword(prompt string) (pw []byte, err error) {
+	fd := int(os.Stdin.Fd())
+	if terminal.IsTerminal(fd) {
+		fmt.Fprint(os.Stderr, prompt)
+		pw, err = terminal.ReadPassword(fd)
+		fmt.Fprintln(os.Stderr)
+		return
+	}
+
+	var b [1]byte
+	for {
+		n, err := os.Stdin.Read(b[:])
+		// terminal.ReadPassword discards any '\r', so we do the same
+		if n > 0 && b[0] != '\r' {
+			if b[0] == '\n' {
+				return pw, nil
+			}
+			pw = append(pw, b[0])
+			// limit size, so that a wrong input won't fill up the memory
+			if len(pw) > 1024 {
+				err = errors.New("password too long")
+			}
+		}
+		if err != nil {
+			// terminal.ReadPassword accepts EOF-terminated passwords
+			// if non-empty, so we do the same
+			if err == io.EOF && len(pw) > 0 {
+				err = nil
+			}
+			return pw, err
+		}
+	}
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
