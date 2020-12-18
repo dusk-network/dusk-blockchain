@@ -1,11 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"time"
@@ -108,40 +107,20 @@ func getPassword() (string, error) {
 	return string(pw), err
 }
 
-// From: https://github.com/golang/go/issues/19909#issuecomment-462103555
-// To bypass issue with stdin from non-tty.
-func readPassword(prompt string) (pw []byte, err error) {
+// This is to bypass issue with stdin from non-tty.
+func readPassword(prompt string) ([]byte, error) {
 	fd := int(os.Stdin.Fd())
 	if terminal.IsTerminal(fd) {
-		fmt.Fprint(os.Stderr, prompt)
-		pw, err = terminal.ReadPassword(fd)
-		fmt.Fprintln(os.Stderr)
-		return
+		fmt.Fprintln(os.Stderr, prompt)
+		return terminal.ReadPassword(fd)
 	}
 
-	var b [1]byte
-	for {
-		n, err := os.Stdin.Read(b[:])
-		// terminal.ReadPassword discards any '\r', so we do the same
-		if n > 0 && b[0] != '\r' {
-			if b[0] == '\n' {
-				return pw, nil
-			}
-			pw = append(pw, b[0])
-			// limit size, so that a wrong input won't fill up the memory
-			if len(pw) > 1024 {
-				err = errors.New("password too long")
-			}
-		}
-		if err != nil {
-			// terminal.ReadPassword accepts EOF-terminated passwords
-			// if non-empty, so we do the same
-			if err == io.EOF && len(pw) > 0 {
-				err = nil
-			}
-			return pw, err
-		}
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		return scanner.Bytes(), nil
 	}
+
+	return nil, scanner.Err()
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
