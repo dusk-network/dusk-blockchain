@@ -1,11 +1,13 @@
 package selection
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -14,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
@@ -94,6 +97,21 @@ func (p *Phase) generateCandidate(ctx context.Context, round consensus.RoundUpda
 		WithField("step", step).
 		WithField("round", round.Round).
 		Debugln("sending score")
+
+	if config.Get().Kadcast.Enabled {
+		buf := new(bytes.Buffer)
+		if err := message.MarshalScore(buf, *scr); err != nil {
+			lg.WithError(err).Errorln("could not kadcast candidate block")
+		}
+
+		if err := topics.Prepend(buf, topics.Score); err != nil {
+			lg.WithError(err).Errorln("could not prepend topic to kadcast message")
+		}
+
+		msg := message.NewWithHeader(topics.Score, *buf, []byte{kadcast.InitHeight})
+		p.EventBus.Publish(topics.Kadcast, msg)
+		return
+	}
 
 	// create the message
 	msg := message.New(topics.Score, *scr)

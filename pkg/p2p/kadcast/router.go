@@ -40,7 +40,7 @@ func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 	switch topic {
 	case topics.Tx,
 		topics.Block,
-		topics.Candidate, // TODO: Pending
+		topics.Candidate,
 		topics.Reduction, // TODO: Pending
 		topics.Agreement: // TODO: Pending
 		return true
