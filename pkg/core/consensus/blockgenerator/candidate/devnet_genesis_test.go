@@ -1,30 +1,6 @@
 package candidate
 
-import (
-	"bytes"
-	"context"
-	"encoding/binary"
-	"encoding/hex"
-	"fmt"
-	"os"
-	"strconv"
-	"testing"
-	"time"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-)
-
+/*
 const walletsAmount = 120
 
 // NOTE: exclusively for generating devnet genesis blocks. Generates up to
@@ -189,3 +165,4 @@ func generateWallet(t *testing.T, i int, keyMaster rusk.KeysClient) *wallet.Wall
 
 	return w
 }
+*/
