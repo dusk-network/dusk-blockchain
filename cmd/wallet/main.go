@@ -7,7 +7,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"time"
@@ -16,8 +15,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/cmd/wallet/conf"
 	"github.com/dusk-network/dusk-blockchain/cmd/wallet/prompt"
-
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 )
 
 var (
@@ -59,25 +56,7 @@ func walletAction(ctx *cli.Context) error {
 	// TODO: deferred functions are not run when os.Exit is called
 	defer client.Close()
 
-	// Inquire node about its wallet state, so we know which menu to open.
-	resp, err := client.WalletClient.GetWalletStatus(context.Background(), &node.EmptyRequest{})
-	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
-		return err
-	}
-
-	// If we have no wallet loaded, we open the menu to load or
-	// create one.
-	if !resp.Loaded {
-		if err := prompt.LoadMenu(client.WalletClient); err != nil {
-			// If we get an error from `LoadMenu`, it means we lost
-			// our connection to the node.
-			_, _ = fmt.Fprintln(os.Stderr, err.Error())
-			return err
-		}
-	}
-
-	// Once loaded, we open the menu for wallet operations.
+	// Once connected, we open the menu for wallet operations.
 	if err := prompt.WalletMenu(client); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err.Error())
 		return err
