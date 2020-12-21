@@ -140,7 +140,9 @@ func Setup() *Server {
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	proxy, ruskConn := setupGRPCClients(ctx)
+	gctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Get().RPC.Rusk.ConnectionTimeout)*time.Millisecond)
+	defer cancel()
+	proxy, ruskConn := setupGRPCClients(gctx)
 
 	var w *wallet.Wallet
 	if _, err = os.Stat(cfg.Get().Wallet.File); err == nil {
