@@ -241,8 +241,6 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
-	// TODO: maintainer should be started here
-
 	// Setting up and launch kadcast peer
 	srv.launchKadcastPeer()
 
