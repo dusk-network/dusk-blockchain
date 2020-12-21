@@ -13,6 +13,8 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/bidautomaton"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
@@ -241,7 +243,8 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
-	// TODO: maintainer should be started here
+	_ = stakeautomaton.New(eventBus, rpcBus, grpcServer)
+	_ = bidautomaton.New(eventBus, rpcBus, grpcServer)
 
 	// Setting up and launch kadcast peer
 	srv.launchKadcastPeer()
