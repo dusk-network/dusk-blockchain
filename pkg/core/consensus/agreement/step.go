@@ -2,7 +2,9 @@ package agreement
 
 import (
 	"context"
+	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -23,14 +25,16 @@ type Loop struct {
 	*consensus.Emitter
 	db           database.DB
 	newBlockChan chan consensus.Results
+	requestor    *candidate.Requestor
 }
 
 // New creates a round-specific agreement step
-func New(e *consensus.Emitter, db database.DB, newBlockChan chan consensus.Results) *Loop {
+func New(e *consensus.Emitter, db database.DB, newBlockChan chan consensus.Results, requestor *candidate.Requestor) *Loop {
 	return &Loop{
 		Emitter:      e,
 		db:           db,
 		newBlockChan: newBlockChan,
+		requestor:    requestor,
 	}
 }
 
@@ -71,7 +75,7 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 				Debugln("quorum reached")
 
 			cert := evs[0].GenerateCertificate()
-			blk, err := s.createWinningBlock(evs[0].State().BlockHash, cert)
+			blk, err := s.createWinningBlock(ctx, evs[0].State().BlockHash, cert)
 			return consensus.Results{Blk: blk, Err: err}
 		case newBlockResult := <-s.newBlockChan:
 			if newBlockResult.Blk.Header != nil && newBlockResult.Blk.Header.Height != r.Round {
@@ -116,18 +120,30 @@ func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensu
 	return true
 }
 
-func (s *Loop) createWinningBlock(hash []byte, cert *block.Certificate) (block.Block, error) {
+func (s *Loop) createWinningBlock(ctx context.Context, hash []byte, cert *block.Certificate) (block.Block, error) {
 	var cm block.Block
-	if err := s.db.View(func(t database.Transaction) error {
+	err := s.db.View(func(t database.Transaction) error {
 		var err error
 		cm, err = t.FetchCandidateMessage(hash)
 		return err
-	}); err != nil {
-		return block.Block{}, err
+	})
+
+	if err != nil {
+		cm, err = s.requestCandidate(ctx, hash)
+		if err != nil {
+			return block.Block{}, err
+		}
 	}
 
 	cm.Header.Certificate = cert
 	return cm, nil
+}
+
+func (s *Loop) requestCandidate(ctx context.Context, hash []byte) (block.Block, error) {
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(2*time.Second))
+	// Ensure we release the resources associated to this context.
+	defer cancel()
+	return s.requestor.RequestCandidate(ctx, hash)
 }
 
 func collectEvent(h *handler, accumulator *Accumulator, a message.Agreement, e *consensus.Emitter) {

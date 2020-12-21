@@ -56,7 +56,7 @@ func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut t
 	}
 
 	selectionStep := CreateInitialStep(e, consensusTimeOut, generator, verifyFn, db, requestor)
-	agreementStep := agreement.New(e, db, newBlockChan)
+	agreementStep := agreement.New(e, db, newBlockChan, requestor)
 	return selectionStep, agreementStep, nil
 }
 
