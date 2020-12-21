@@ -116,8 +116,9 @@ type ruskConfiguration struct {
 	Address string
 
 	// timeout for rusk calls
-	ContractTimeout uint
-	DefaultTimeout  uint
+	ContractTimeout   uint
+	DefaultTimeout    uint
+	ConnectionTimeout uint
 }
 
 type gqlConfiguration struct {
