@@ -152,8 +152,8 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
-	m := mempool.NewMempool(ctx, eventBus, rpcBus, proxy.Prober(), grpcServer)
-	m.Run()
+	m := mempool.NewMempool(eventBus, rpcBus, proxy.Prober(), grpcServer)
+	m.Run(ctx)
 	processor.Register(topics.Tx, m.ProcessTx)
 
 	// Instantiate API server
