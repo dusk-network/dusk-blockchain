@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -102,10 +103,24 @@ func (s *Server) launchKadcastPeer() {
 }
 
 func getPassword() (string, error) {
-	fd := int(os.Stdin.Fd())
-	fmt.Println("Enter password:")
-	pw, err := terminal.ReadPassword(fd)
+	pw, err := readPassword("Enter password:")
 	return string(pw), err
+}
+
+// This is to bypass issue with stdin from non-tty.
+func readPassword(prompt string) ([]byte, error) {
+	fd := int(os.Stdin.Fd())
+	if terminal.IsTerminal(fd) {
+		fmt.Fprintln(os.Stderr, prompt)
+		return terminal.ReadPassword(fd)
+	}
+
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		return scanner.Bytes(), nil
+	}
+
+	return nil, scanner.Err()
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
