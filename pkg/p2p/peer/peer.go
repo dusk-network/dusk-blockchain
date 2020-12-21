@@ -183,20 +183,14 @@ func (p *Reader) Accept() error {
 // Create two-way communication with a peer. This function will allow both
 // goroutines to run as long as no errors are encountered. Once the first error
 // comes through, the context is canceled, and both goroutines are cleaned up.
-func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan <-chan bytes.Buffer) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
+func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan <-chan bytes.Buffer) error {
 	errChan := make(chan error, 1)
+	defer close(errChan)
 
 	go reader.ReadLoop(ctx, errChan)
 	go writer.Serve(ctx, writeQueueChan, errChan)
 
-	// Errors are already getting logged with the proper fields attached.
-	// So, we will just wait for one error to come through, after which we can
-	// cancel the context and exit this function.
-	<-errChan
-	close(errChan)
+	return <-errChan
 }
 
 // This attempts a non-blocking send to the errChan, which prevents panics
