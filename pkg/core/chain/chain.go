@@ -121,12 +121,13 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 	chain.tip = prevBlock
 
 	if prevBlock.Header.Height == 0 {
-		// If we're running the test harness, we should also populate some consensus values
-		if config.Get().Genesis.Legacy {
-			if errV := setupBidValues(); errV != nil {
-				return nil, errV
-			}
+		// TODO: this is currently mocking bid values, and should be removed when
+		// RUSK integration is finished, and testnet is ready to launch.
+		if errV := setupBidValues(chain.db); errV != nil {
+			return nil, errV
+		}
 
+		if config.Get().Genesis.Legacy {
 			if errV := reconstructCommittee(chain.p, prevBlock); errV != nil {
 				return nil, errV
 			}

@@ -149,7 +149,7 @@ func (p Provisioners) SubsetSizeAt(round uint64) int {
 
 // MemberAt returns the Member at a certain index.
 func (p Provisioners) MemberAt(i int) (*Member, error) {
-	if i > len(p.Set) {
+	if i > len(p.Set)-1 {
 		return nil, errors.New("index out of bound")
 	}
 	bigI := p.Set[i]
