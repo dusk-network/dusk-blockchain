@@ -1,6 +1,32 @@
 package candidate
 
 /*
+import (
+	"bytes"
+	"context"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"github.com/stretchr/testify/assert"
+)
+
 const walletsAmount = 120
 
 // NOTE: exclusively for generating devnet genesis blocks. Generates up to
@@ -53,7 +79,7 @@ func TestGenerateDevNetGenesis(t *testing.T) {
 	stake.TxPayload.CallData = buf.Bytes()
 	amount := 10000 * wallet.DUSK
 	amountBytes := make([]byte, 32)
-	binary.LittleEndian.PutUint64(amountBytes[24:32], amount)
+	binary.LittleEndian.PutUint64(amountBytes[0:8], amount)
 	stake.TxPayload.Notes = append(stake.TxPayload.Notes, &transactions.Note{
 		Randomness:    &common.JubJubCompressed{Data: make([]byte, 32)},
 		PkR:           &common.JubJubCompressed{Data: wallets[0].PublicKey.AG.Data},
@@ -94,6 +120,7 @@ func TestGenerateDevNetGenesis(t *testing.T) {
 		}
 
 		coinbase := transactions.NewTransaction()
+		coinbase.TxPayload.CallData = buf.Bytes()
 		coinbase.TxPayload.Notes = append(coinbase.TxPayload.Notes, &transactions.Note{
 			Randomness:    &common.JubJubCompressed{Data: make([]byte, 32)},
 			PkR:           &common.JubJubCompressed{Data: w.PublicKey.AG.Data},
@@ -104,6 +131,15 @@ func TestGenerateDevNetGenesis(t *testing.T) {
 		coinbase.TxType = transactions.Distribute
 		b.AddTx(coinbase)
 	}
+
+	// Set root and hash, since they have changed because of the adding of txs.
+	root, err := b.CalculateRoot()
+	assert.NoError(t, err)
+	b.Header.TxRoot = root
+
+	hash, err := b.CalculateHash()
+	assert.NoError(t, err)
+	b.Header.Hash = hash
 
 	// Print the block hex
 	buf = new(bytes.Buffer)

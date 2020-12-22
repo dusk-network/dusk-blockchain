@@ -258,8 +258,10 @@ func RuskTxToTx(tx *rusk.Transaction) (*transactions.Standard, error) {
 		Fee:     feeScalar,
 	}
 
-	if err := stx.RangeProof.Decode(bytes.NewBuffer(tx.TxPayload.SpendingProof.Data), true); err != nil {
-		return nil, err
+	if len(tx.TxPayload.SpendingProof.Data) != 0 {
+		if err := stx.RangeProof.Decode(bytes.NewBuffer(tx.TxPayload.SpendingProof.Data), true); err != nil {
+			return nil, err
+		}
 	}
 
 	return stx, nil
@@ -377,7 +379,7 @@ func RuskDistributeToCoinbase(tx *rusk.Transaction) (*transactions.Coinbase, err
 	var amountScalar ristretto.Scalar
 	amountScalar.SetBigInt(new(big.Int).SetUint64(amount))
 	var pk ristretto.Scalar
-	pk.Rand()
+	pk.SetBigInt(new(big.Int).SetBytes(tx.TxPayload.Notes[0].PkR.Data))
 	c.Rewards = append(c.Rewards, &transactions.Output{
 		EncryptedAmount: amountScalar,
 		EncryptedMask:   pk,
