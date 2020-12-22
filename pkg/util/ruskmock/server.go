@@ -2,13 +2,13 @@ package ruskmock
 
 import (
 	"context"
-	"crypto/rand"
 	"math/big"
 	"net"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	corewallet "github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/mlsag"
@@ -240,9 +240,12 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = db.Close()
+	}()
 
-	seed := make([]byte, 64)
-	if _, err = rand.Read(seed); err != nil {
+	seed, err := corewallet.GenerateNewSeed(nil)
+	if err != nil {
 		return nil, err
 	}
 
