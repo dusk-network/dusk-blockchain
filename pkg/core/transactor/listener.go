@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
@@ -125,15 +126,32 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 		return nil, err
 	}
 
-	// TODO: store the K and D in storage for the block generator
+	if err = t.db.Update(func(t database.Transaction) error {
+		var height uint64
+		height, err = t.FetchCurrentHeight()
+		if err != nil {
+			return err
+		}
 
-	hash, err := t.publishTx(tx.Tx)
-	if err != nil {
+		return t.StoreBidValues(secret.Data, k.Data, tx.BidTreeStorageIndex, height+250000)
+	}); err != nil {
 		log.
 			WithField("amount", req.Amount).
 			WithField("locktime", req.Locktime).
-			Error("handleSendBidTx, failed to create publishTx")
+			Error("handleSendBidTx, failed to store bid values")
 		return nil, err
+	}
+
+	hash, err := t.publishTx(tx.Tx)
+	if err != nil {
+		// DB operations should never fail. If for some reason during runtime we
+		// can no longer use the DB, we should panic.
+		// TODO: maybe we can figure out a recovery procedure if this is the case.
+		log.
+			WithError(err).
+			WithField("amount", req.Amount).
+			WithField("locktime", req.Locktime).
+			Panic("handleSendBidTx, failed to create publishTx")
 	}
 
 	return &node.TransactionResponse{Hash: hash}, nil
