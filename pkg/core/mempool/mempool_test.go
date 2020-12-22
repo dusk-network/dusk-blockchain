@@ -21,36 +21,8 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
-// Helper struct around mempool asserts to shorten common code
-var c *ctx
-
-// ctx main role is to collect the expected verified and propagated txs so that
-// it can assert that mempool has the proper set of txs after particular events
-type ctx struct {
-	verifiedTx []transactions.ContractCall
-	propagated [][]byte
-	mu         sync.Mutex
-
-	m      *Mempool
-	bus    *eventbus.EventBus
-	rpcBus *rpcbus.RPCBus
-}
-
-func (c *ctx) reset() {
-	// Reset shared context state
-	c.mu.Lock()
-	c.m.Quit()
-	c.m.verified = c.m.newPool()
-	c.verifiedTx = make([]transactions.ContractCall, 0)
-	c.propagated = make([][]byte, 0)
-	c.mu.Unlock()
-
-	c.m.Run()
-}
-
 func TestMain(m *testing.M) {
 	logrus.SetLevel(logrus.FatalLevel)
-	c = &ctx{}
 
 	// config
 	r := config.Registry{}
@@ -59,124 +31,81 @@ func TestMain(m *testing.M) {
 	r.Mempool.MaxInvItems = 10000
 	config.Mock(&r)
 
-	var streamer *eventbus.GossipStreamer
-	c.bus, streamer = eventbus.CreateGossipStreamer()
-	c.rpcBus = rpcbus.New()
-
-	go func(streamer *eventbus.GossipStreamer, c *ctx) {
-		for {
-			tx, err := streamer.Read()
-			if err != nil {
-				log.Panic(err)
-			}
-
-			c.mu.Lock()
-			c.propagated = append(c.propagated, tx)
-			c.mu.Unlock()
-		}
-	}(streamer, c)
-
-	// initiate a mempool with custom verification function
-	v := &transactions.MockProxy{}
-	c.m = NewMempool(context.Background(), c.bus, c.rpcBus, v.Prober(), nil)
-	c.m.Run()
-
 	code := m.Run()
 	os.Exit(code)
 }
 
-// adding tx in ctx means mempool is expected to store it in the verified list
-func (c *ctx) addTx(tx transactions.ContractCall) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	// Distribute transactions should not get into the mempool
-	if tx.Type() == transactions.Distribute {
-		return
-	}
+func startMempoolTest(ctx context.Context) (*Mempool, *eventbus.EventBus, *rpcbus.RPCBus, *eventbus.GossipStreamer) {
+	var streamer *eventbus.GossipStreamer
+	bus, streamer := eventbus.CreateGossipStreamer()
 
-	if err := c.m.verifier.VerifyTransaction(context.Background(), tx); err == nil {
-		c.verifiedTx = append(c.verifiedTx, tx)
-	}
+	rpcBus := rpcbus.New()
+	v := &transactions.MockProxy{}
+	m := NewMempool(bus, rpcBus, v.Prober(), nil)
+	m.Run(ctx)
+	return m, bus, rpcBus, streamer
 }
 
-// Wait until the EventBus chan is drained and all pending txs are fully
-// processed. This is important to synchronously compare the expected with the
-// yielded results.
-func (c *ctx) wait() {
-	time.Sleep(500 * time.Millisecond)
-}
+func TestTxAdvertising(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	m, _, _, streamer := startMempoolTest(ctx)
 
-func (c *ctx) assert(t *testing.T, checkPropagated bool) {
-	c.wait()
+	tx := transactions.RandTx()
+	go func() {
+		_, err := m.ProcessTx(message.New(topics.Tx, tx))
+		assert.NoError(t, err)
+	}()
 
-	resp, _ := c.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
-	txs := resp.([]transactions.ContractCall)
+	inv, err := streamer.Read()
+	assert.NoError(t, err)
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	hash, err := tx.CalculateHash()
+	assert.NoError(t, err)
 
-	if len(txs) != len(c.verifiedTx) {
-		t.Fatalf("expecting %d verified txs but mempool stores %d txs", len(c.verifiedTx), len(txs))
-	}
+	msg := &message.Inv{}
+	err = msg.Decode(bytes.NewBuffer(inv))
+	assert.NoError(t, err)
 
-	for i, tx := range c.verifiedTx {
-		var exists bool
-		for _, memTx := range txs {
-			if transactions.Equal(memTx, tx) {
-				exists = true
-				break
-			}
-		}
-
-		if !exists {
-			// ctx is expected to have the same list of verified txs as mempool stores
-			t.Fatalf("a verified tx not found (index %d)", i)
-		}
-	}
-
-	if checkPropagated {
-		if len(txs) != len(c.propagated) {
-			t.Fatalf("expecting %d propagated txs but mempool stores %d txs", len(c.propagated), len(txs))
-		}
-	}
-}
-
-func prepTx(tx transactions.ContractCall) message.Message {
-	return message.New(topics.Tx, tx)
+	assert.Equal(t, msg.InvList[0].Hash, hash)
 }
 
 // QUESTION: What does this test actually do?
 func TestProcessPendingTxs(t *testing.T) {
-	c.reset()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	m, _, _, _ := startMempoolTest(ctx)
 
 	cc := transactions.RandContractCalls(10, 0, false)
 
 	for i := 0; i < 5; i++ {
 		// Publish valid tx
-		txMsg := prepTx(cc[i])
-		c.addTx(cc[i])
-		_, errList := c.m.ProcessTx(txMsg)
+		_, errList := m.ProcessTx(message.New(topics.Tx, cc[i]))
 		assert.Empty(t, errList)
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
 		invalid := transactions.RandContractCall()
 		transactions.Invalidate(invalid)
-		txMsg = prepTx(invalid)
-		c.addTx(invalid)
-		_, errList = c.m.ProcessTx(txMsg)
+		_, errList = m.ProcessTx(message.New(topics.Tx, invalid))
 		assert.NotEmpty(t, errList)
 
 		// Publish a duplicated tx
-		c.addTx(invalid)
-		_, errList = c.m.ProcessTx(txMsg)
+		_, errList = m.ProcessTx(message.New(topics.Tx, invalid))
 		assert.NotEmpty(t, errList)
 	}
 
-	c.assert(t, true)
+	assert.Equal(t, m.verified.Len(), 5)
+	for i := 0; i < 5; i++ {
+		hash, err := cc[i].CalculateHash()
+		assert.NoError(t, err)
+		assert.True(t, m.verified.Contains(hash))
+	}
 }
 
 func TestProcessPendingTxsAsync(t *testing.T) {
-	c.reset()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	m, _, _, _ := startMempoolTest(ctx)
 
 	// A batch consists of all 4 types of Dusk transactions (excluding coinbase)
 	// The number of batches is the number of concurrent routines that will be
@@ -185,13 +114,12 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	// go-routines publishing
 	batchCount := 8
 	const numOfTxsPerBatch = 4
+	txs := make([]transactions.ContractCall, 0)
 	// generate and store txs that are expected to be valid
 	for i := 0; i <= batchCount; i++ {
 		// Generate a single batch of txs and added to the expected list of verified
-		txs := transactions.RandContractCalls(4, 0, false)
-		for _, tx := range txs {
-			c.addTx(tx)
-		}
+		batchTxs := transactions.RandContractCalls(numOfTxsPerBatch, 0, false)
+		txs = append(txs, batchTxs...)
 	}
 
 	wg := sync.WaitGroup{}
@@ -205,22 +133,20 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		wg.Add(1)
 		go func(txs []transactions.ContractCall) {
 			for _, tx := range txs {
-				txMsg := prepTx(tx)
-				_, errList := c.m.ProcessTx(txMsg)
+				_, errList := m.ProcessTx(message.New(topics.Tx, tx))
 				assert.Empty(t, errList)
 			}
 			wg.Done()
-		}(c.verifiedTx[from:to])
+		}(txs[from:to])
 	}
 
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		// Publish invalid txs
 		go func() {
-			for y := 0; y <= 5; y++ {
+			for j := 0; j <= 5; j++ {
 				tx := transactions.MockInvalidTx()
-				txMsg := prepTx(tx)
-				_, errList := c.m.ProcessTx(txMsg)
+				_, errList := m.ProcessTx(message.New(topics.Tx, tx))
 				assert.NotEmpty(t, errList)
 			}
 			wg.Done()
@@ -228,88 +154,97 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	}
 
 	wg.Wait()
-	c.wait()
 
-	c.assert(t, true)
+	for _, tx := range txs {
+		hash, err := tx.CalculateHash()
+		assert.NoError(t, err)
+		assert.True(t, m.verified.Contains(hash))
+	}
 }
 
 func TestRemoveAccepted(t *testing.T) {
 	assert := assert.New(t)
 
-	c.reset()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	m, bus, rb, _ := startMempoolTest(ctx)
 
 	// Create a random block
 	b := helper.RandomBlock(200, 0)
 	b.Txs = make([]transactions.ContractCall, 0)
 
-	counter := 0
-
 	// generate 3*4 random txs
 	txs := transactions.RandContractCalls(12, 0, false)
-	for _, tx := range txs {
-		// We avoid sharing this pointer between the mempool and the block
-		// by marshaling and unmarshaling the tx
-		buf := new(bytes.Buffer)
-		assert.NoError(transactions.Marshal(buf, tx))
-
-		txCopy := transactions.NewTransaction()
-		err := transactions.Unmarshal(buf, txCopy)
-		assert.NoError(err)
-
-		txMsg := prepTx(txCopy)
-
+	for i, tx := range txs {
 		// Publish valid tx
-		_, errList := c.m.ProcessTx(txMsg)
+		// Copy the tx to avoid sharing pointers
+		_, errList := m.ProcessTx(message.New(topics.Tx, tx.Copy()))
 		assert.Empty(errList)
 
 		// Simulate a situation where the block has accepted each 2nd tx
-		counter++
-		if math.Mod(float64(counter), 2) == 0 {
+		if math.Mod(float64(i), 2) == 0 {
 			t := tx.(*transactions.Transaction)
 			b.AddTx(t)
 			// If tx is accepted, it is expected to be removed from mempool on
 			// onAcceptBlock event
-		} else {
-			c.addTx(tx)
 		}
 	}
-
-	c.wait()
 
 	root, _ := b.CalculateRoot()
 	b.Header.TxRoot = root
 	blockMsg := message.New(topics.AcceptedBlock, *b)
-	errList := c.bus.Publish(topics.AcceptedBlock, blockMsg)
+	errList := bus.Publish(topics.AcceptedBlock, blockMsg)
 	assert.Empty(errList)
 
-	c.assert(t, false)
+	time.Sleep(1 * time.Second)
+
+	resp, err := rb.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
+	assert.NoError(err)
+	memTxs := resp.([]transactions.ContractCall)
+
+	assert.Equal(len(memTxs), 6)
+
+	for i, tx := range txs {
+		hash, err := tx.CalculateHash()
+		assert.NoError(err)
+		if math.Mod(float64(i), 2) == 0 {
+			assert.False(m.verified.Contains(hash))
+		} else {
+			assert.True(m.verified.Contains(hash))
+		}
+	}
 }
 
 func TestCoinbaseTxsNotAllowed(t *testing.T) {
-	c.reset()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	m, _, rb, _ := startMempoolTest(ctx)
 
 	// Publish a set of valid txs and a Coinbase one
 	txs := transactions.RandContractCalls(5, 0, true)
 
 	for _, tx := range txs {
-		txMsg := prepTx(tx)
-		c.addTx(tx)
-		_, errList := c.m.ProcessTx(txMsg)
+		_, errList := m.ProcessTx(message.New(topics.Tx, tx))
 		if tx.Type() == transactions.Distribute {
 			assert.NotEmpty(t, errList)
 		}
 	}
 
-	c.wait()
-
 	// Assert that all non-coinbase txs have been verified
-	c.assert(t, true)
+	resp, err := rb.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
+	assert.NoError(t, err)
+	memTxs := resp.([]transactions.ContractCall)
+	for _, tx := range memTxs {
+		assert.False(t, tx.Type() == transactions.Distribute)
+	}
 }
 
 func TestSendMempoolTx(t *testing.T) {
 	assert := assert.New(t)
 
-	c.reset()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	m, _, rb, _ := startMempoolTest(ctx)
 
 	txs := transactions.RandContractCalls(4, 0, false)
 
@@ -320,7 +255,7 @@ func TestSendMempoolTx(t *testing.T) {
 
 		totalSize += uint32(buf.Len())
 
-		resp, err := c.rpcBus.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 0)
+		resp, err := rb.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 0)
 		assert.NoError(err)
 		txidBytes := resp.([]byte)
 
@@ -330,7 +265,7 @@ func TestSendMempoolTx(t *testing.T) {
 		assert.Equal(txidBytes, txid)
 	}
 
-	assert.Equal(c.m.verified.Size(), totalSize)
+	assert.Equal(m.verified.Size(), totalSize)
 }
 
 /*

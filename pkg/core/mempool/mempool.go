@@ -63,23 +63,23 @@ type Mempool struct {
 
 	// the magic function that knows best what is valid chain Tx
 	verifier transactions.UnconfirmedTxProber
-	quitChan chan struct{}
-
-	ctx context.Context
 }
 
 // checkTx is responsible to determine if a tx is valid or not.
 // Among the other checks, the underlying verifier also checks double spending
 func (m *Mempool) checkTx(tx transactions.ContractCall) error {
+	ctx, cancel := context.WithTimeout(context.Background(),
+		time.Duration(config.Get().RPC.Rusk.ContractTimeout)*time.Millisecond)
+	defer cancel()
 	// check if external verifyTx is provided
-	if err := m.verifier.VerifyTransaction(m.ctx, tx); err != nil {
+	if err := m.verifier.VerifyTransaction(ctx, tx); err != nil {
 		return fmt.Errorf("transaction verification failed: %v", err)
 	}
 	return nil
 }
 
 // NewMempool instantiates and initializes node mempool
-func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
+func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
 	log.Infof("Create instance")
 
 	getMempoolTxsChan := make(chan rpcbus.Request, 1)
@@ -100,10 +100,8 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
 	m := &Mempool{
-		ctx:                     ctx,
 		eventBus:                eventBus,
 		latestBlockTimestamp:    math.MinInt32,
-		quitChan:                make(chan struct{}),
 		acceptedBlockChan:       acceptedBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
@@ -129,7 +127,7 @@ func NewMempool(ctx context.Context, eventBus *eventbus.EventBus, rpcBus *rpcbus
 //
 // All operations are always executed in a single go-routine so no
 // protection-by-mutex needed
-func (m *Mempool) Run() {
+func (m *Mempool) Run(ctx context.Context) {
 	go func() {
 		for {
 			select {
@@ -145,7 +143,7 @@ func (m *Mempool) Run() {
 			case <-time.After(20 * time.Second):
 				m.onIdle()
 			// Mempool terminating
-			case <-m.quitChan:
+			case <-ctx.Done():
 				//m.eventBus.Unsubscribe(topics.Tx, m.txSubscriberID)
 				return
 			}
@@ -517,11 +515,6 @@ func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, err
 
 	t := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len()), kadHeight: kadcast.InitHeight}
 	return m.processTx(t)
-}
-
-// Quit makes mempool main loop to terminate
-func (m *Mempool) Quit() {
-	m.quitChan <- struct{}{}
 }
 
 // Send Inventory message to all peers

@@ -175,8 +175,6 @@ func (v *verifier) VerifyTransaction(ctx context.Context, cc ContractCall) error
 			return err
 		}
 
-		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(v.timeout))
-		defer cancel()
 		if res, err := v.client.VerifyTransaction(ctx, ccTx); err != nil {
 			return err
 		} else if !res.Verified {
