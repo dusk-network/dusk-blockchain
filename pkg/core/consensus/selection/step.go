@@ -122,7 +122,12 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 	// channel for the blockgenerator to communicate a score message as soon as
 	// it gets generated
 	internalScoreChan := make(chan message.Message, 1)
-	go p.generateCandidate(ctx, r, step, internalScoreChan)
+
+	// Since the generator can be nil in the case of the node not being a
+	// block generator, let's check to see first if we actually have something.
+	if p.g != nil {
+		go p.generateCandidate(ctx, r, step, internalScoreChan)
+	}
 
 	p.handler = NewScoreHandler(p.provisioner)
 	timeoutChan := time.After(p.timeout)
