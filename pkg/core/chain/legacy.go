@@ -27,7 +27,7 @@ func setupBidValues(db database.DB) error {
 
 // ReconstructCommittee will fill in the committee members that are present from genesis.
 //nolint
-func reconstructCommittee(p *user.Provisioners, b *block.Block) error {
+func ReconstructCommittee(p *user.Provisioners, b *block.Block) error {
 	// We should properly reconstruct the committee, though. This is because the keys
 	// need to match up with what's found in the wallet.
 	for _, tx := range b.Txs {

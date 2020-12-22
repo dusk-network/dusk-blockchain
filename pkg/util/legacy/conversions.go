@@ -16,6 +16,25 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
+// NewBlockToOldBlock will convert a dusk-blockchain block into a dusk-wallet block.
+func NewBlockToOldBlock(b *newblock.Block) (*block.Block, error) {
+	ob := block.NewBlock()
+	ob.Header = newHeaderToOldHeader(b.Header)
+	rtxs := make([]*rusk.Transaction, len(b.Txs))
+	for i, call := range b.Txs {
+		tx := new(rusk.Transaction)
+		newtx.MTransaction(tx, call.(*newtx.Transaction))
+		rtxs[i] = tx
+	}
+	txs, err := ContractCallsToTxs(rtxs)
+	if err != nil {
+		return nil, err
+	}
+
+	ob.Txs = txs
+	return ob, nil
+}
+
 // OldBlockToNewBlock will convert a dusk-wallet block into a dusk-blockchain block.
 func OldBlockToNewBlock(b *block.Block) (*newblock.Block, error) {
 	nb := newblock.NewBlock()
@@ -29,6 +48,19 @@ func OldBlockToNewBlock(b *block.Block) (*newblock.Block, error) {
 	return nb, nil
 }
 
+func newHeaderToOldHeader(h *newblock.Header) *block.Header {
+	oh := block.NewHeader()
+	oh.Version = h.Version
+	oh.Height = h.Height
+	oh.Timestamp = h.Timestamp
+	oh.PrevBlockHash = h.PrevBlockHash
+	oh.Seed = h.Seed
+	oh.TxRoot = h.TxRoot
+	oh.Certificate = newCertificateToOldCertificate(h.Certificate)
+	oh.Hash = h.Hash
+	return oh
+}
+
 func oldHeaderToNewHeader(h *block.Header) *newblock.Header {
 	nh := newblock.NewHeader()
 	nh.Version = h.Version
@@ -40,6 +72,16 @@ func oldHeaderToNewHeader(h *block.Header) *newblock.Header {
 	nh.Certificate = oldCertificateToNewCertificate(h.Certificate)
 	nh.Hash = h.Hash
 	return nh
+}
+
+func newCertificateToOldCertificate(c *newblock.Certificate) *block.Certificate {
+	oc := block.EmptyCertificate()
+	oc.StepOneBatchedSig = c.StepOneBatchedSig
+	oc.StepTwoBatchedSig = c.StepTwoBatchedSig
+	oc.Step = c.Step
+	oc.StepOneCommittee = c.StepOneCommittee
+	oc.StepTwoCommittee = c.StepTwoCommittee
+	return oc
 }
 
 func oldCertificateToNewCertificate(c *block.Certificate) *newblock.Certificate {

@@ -137,6 +137,11 @@ var (
 		Value: "password",
 	}
 
+	legacyFlag = cli.BoolFlag{
+		Name:  "legacy",
+		Usage: "Use the legacy genesis block, eg: --legacy",
+	}
+
 	metricsCMD = cli.Command{
 		Name:      "metrics",
 		Usage:     "expose a metrics endpoint",
@@ -188,6 +193,7 @@ var (
 			ruskAddressFlag,
 			walletStoreFlag,
 			walletFileFlag,
+			legacyFlag,
 		},
 		Description: `Execute/Query transactions for a Dusk node`,
 	}
@@ -266,8 +272,9 @@ func mockRuskAction(ctx *cli.Context) error {
 
 	walletStore := ctx.String(walletStoreFlag.Name)
 	walletFile := ctx.String(walletFileFlag.Name)
+	legacyFlag := ctx.Bool(legacyFlag.Name)
 
-	err := mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
+	err := mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile, legacyFlag)
 	return err
 }
 

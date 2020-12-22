@@ -128,7 +128,7 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		}
 
 		if config.Get().Genesis.Legacy {
-			if errV := reconstructCommittee(chain.p, prevBlock); errV != nil {
+			if errV := ReconstructCommittee(chain.p, prevBlock); errV != nil {
 				return nil, errV
 			}
 		}
