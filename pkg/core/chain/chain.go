@@ -132,12 +132,6 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		if errV := setupBidValues(chain.db); errV != nil {
 			return nil, errV
 		}
-
-		if config.Get().Genesis.Legacy {
-			if errV := ReconstructCommittee(chain.p, prevBlock); errV != nil {
-				return nil, errV
-			}
-		}
 	}
 
 	if srv != nil {

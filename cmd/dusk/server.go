@@ -21,7 +21,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/bidautomaton"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -40,7 +39,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/sirupsen/logrus"
@@ -69,17 +67,7 @@ type Server struct {
 // component and performs a DB sanity check
 func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (*chain.Chain, error) {
 	// creating and firing up the chain process
-	var genesis *block.Block
-	if cfg.Get().Genesis.Legacy {
-		g := legacy.DecodeGenesis()
-		var err error
-		genesis, err = legacy.OldBlockToNewBlock(g)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		genesis = cfg.DecodeGenesis()
-	}
+	genesis := cfg.DecodeGenesis()
 	l := chain.NewDBLoader(db, genesis)
 
 	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, cl)

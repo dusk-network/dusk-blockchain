@@ -38,8 +38,6 @@ Once these structures are decoded, the RUSK mock server uses the imported legacy
 
 The RUSK mock server attempts to read the node's config file on startup, in order to determine the wallet and database that it wishes to use. The server maintains a proper `walletDB` for the wallet that it is started with, and all operations related to transfer of funds are performed on this database.
 
-Depending on the config, the RUSK mock server can either decode the legacy genesis block, or the testnet genesis block, and it should be fully functional with both types of blocks, thanks to the conversion functions provided in `legacy`.
-
 ## Future work
 
 As we move closer towards integration with RUSK, the node will need to change its behaviour a little bit, since some currently mocked procedures will need to be performed properly. For the mock RUSK server, this currently means that the `FindBid` method needs to be implemented - it currently does not do anything, and just returns nil pointers. Since it is not necessary at this point in time, this should not be an issue.

@@ -62,7 +62,7 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 		return nil, err
 	}
 
-	return srv, srv.bootstrapBlockchain(c)
+	return srv, srv.bootstrapBlockchain()
 }
 
 func (s *Server) setupWallet(c config.Registry) error {
@@ -88,31 +88,21 @@ func (s *Server) setupWallet(c config.Registry) error {
 	return nil
 }
 
-func (s *Server) bootstrapBlockchain(c config.Registry) error {
+func (s *Server) bootstrapBlockchain() error {
 	var genesis *block.Block
-	if c.Genesis.Legacy {
-		// Sync up the provisioners
-		genesis = legacy.DecodeGenesis()
-		// Note that we don't use `chain.addConsensusNodes` here because the transaction types
-		// are incompatible.
-		if err := s.addConsensusNodes(genesis.Txs, 0); err != nil {
-			return err
-		}
-	} else {
-		g := config.DecodeGenesis()
+	g := config.DecodeGenesis()
 
-		var err error
-		if err = chain.ReconstructCommittee(s.p, g); err != nil {
-			return err
-		}
-
-		genesis, err = legacy.NewBlockToOldBlock(g)
-		if err != nil {
-			return err
-		}
+	var err error
+	if err = chain.ReconstructCommittee(s.p, g); err != nil {
+		return err
 	}
 
-	_, _, err := s.w.CheckWireBlock(*genesis)
+	genesis, err = legacy.NewBlockToOldBlock(g)
+	if err != nil {
+		return err
+	}
+
+	_, _, err = s.w.CheckWireBlock(*genesis)
 	return err
 }
 

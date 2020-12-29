@@ -237,7 +237,6 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 			"--ruskaddress", node.Cfg.RPC.Rusk.Address,
 			"--walletstore", node.Cfg.Wallet.Store,
 			"--walletfile", node.Cfg.Wallet.File,
-			"--legacy",
 		); startErr != nil {
 			return startErr
 		}
