@@ -104,8 +104,8 @@ func (s *Server) launchKadcastPeer() {
 	s.kadPeer = kadPeer
 }
 
-func getPassword() (string, error) {
-	pw, err := readPassword("Enter password:")
+func getPassword(prompt string) (string, error) {
+	pw, err := readPassword(prompt)
 	return string(pw), err
 }
 
@@ -132,11 +132,32 @@ func readPassword(prompt string) ([]byte, error) {
 func Setup() *Server {
 	ctx := context.Background()
 	var pw string
-	if cfg.Get().General.TestHarness {
+	_, err := os.Stat(cfg.Get().Wallet.File)
+	switch {
+	case cfg.Get().General.TestHarness:
 		pw = os.Getenv("DUSK_WALLET_PASS")
-	} else {
-		var err error
-		pw, err = getPassword()
+	case os.IsNotExist(err):
+		fmt.Fprintln(os.Stderr, "Wallet file not found. Creating new file...")
+		for {
+			pw, err = getPassword("Enter password:")
+			if err != nil {
+				log.Panic(err)
+			}
+
+			var pw2 string
+			pw2, err = getPassword("Confirm password:")
+			if err != nil {
+				log.Panic(err)
+			}
+
+			if pw == pw2 {
+				break
+			}
+		}
+	case err != nil:
+		log.Panic(err)
+	default:
+		pw, err = getPassword("Enter password:")
 		if err != nil {
 			log.Panic(err)
 		}
