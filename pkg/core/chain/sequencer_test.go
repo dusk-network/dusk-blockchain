@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -46,4 +47,39 @@ func TestSequencer(t *testing.T) {
 
 		assert.Empty(t, seq.blockPool[uint64(i)])
 	}
+}
+
+func TestSequencerConcurrency(t *testing.T) {
+	seq := newSequencer()
+
+	// Populate sequencer with 100 blocks
+	for i := 1; i <= 100; i++ {
+		blk := helper.RandomBlock(uint64(i), 1)
+		seq.add(*blk)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Concurrently adding new blocks
+	go func() {
+		for i := 101; i < 10000; i++ {
+			blk := block.NewBlock()
+			blk.Header.Height = uint64(i)
+			seq.add(*blk)
+		}
+		wg.Done()
+	}()
+
+	// Start asking for successors for blk 100 backward
+	go func() {
+		for i := 100; i >= 1; i-- {
+			blk := block.NewBlock()
+			blk.Header.Height = uint64(i)
+			_ = seq.provideSuccessors(*blk)
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
 }
