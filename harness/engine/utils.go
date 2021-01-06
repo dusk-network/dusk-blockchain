@@ -311,7 +311,7 @@ func (n *Network) IsSynced(threshold uint64) (uint64, error) {
 		// Trace network status
 		for tip := range forks {
 			logMsg := fmt.Sprintf("Network at round [%d] driven by nodes [", tip)
-			for nodeID := range forks[tip] {
+			for _, nodeID := range forks[tip] {
 				logMsg += fmt.Sprintf(" %d,", nodeID)
 			}
 			logMsg += "]"
