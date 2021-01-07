@@ -47,7 +47,7 @@ func TestFutureBlocks(t *testing.T) {
 	// Block should be in the sequencer
 	assert.NotEmpty(s.sequencer.blockPool[height])
 
-	assert.Equal(s.highestSeen, height)
+	assert.Equal(s.highestSeenHeight, height)
 }
 
 func TestSyncProgress(t *testing.T) {
