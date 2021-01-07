@@ -222,9 +222,6 @@ func (c *Chain) ProcessSucceedingBlock(blk block.Block) {
 	select {
 	case c.CatchBlockChan <- consensus.Results{Blk: blk, Err: nil}:
 	default:
-		if err := c.AcceptSuccessiveBlock(blk); err != nil {
-			log.WithError(err).Debug("could not accept succeeding block")
-		}
 	}
 }
 
