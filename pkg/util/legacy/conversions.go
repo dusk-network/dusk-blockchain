@@ -8,7 +8,6 @@ package legacy
 
 import (
 	"bytes"
-	"encoding/binary"
 	"math/big"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -391,25 +390,6 @@ func RuskDistributeToCoinbase(tx *rusk.Transaction) (*transactions.Coinbase, err
 		EncryptedMask:   pk,
 	})
 	return c, nil
-}
-
-// CoinbaseToRuskDistribute turns a legacy coinbase into an equivalent rusk distribute call.
-func CoinbaseToRuskDistribute(cb *transactions.Coinbase) (*rusk.Transaction, error) {
-	amount := cb.Rewards[0].EncryptedAmount.BigInt().Uint64()
-	amountBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(amountBytes, amount)
-	tx := &rusk.Transaction{
-		TxPayload: &rusk.TransactionPayload{
-			Anchor:        &rusk.BlsScalar{Data: make([]byte, 32)},
-			Nullifier:     make([]*rusk.BlsScalar, 0),
-			Notes:         make([]*rusk.Note, 0),
-			Crossover:     newtx.MockRuskCrossover(false),
-			Fee:           newtx.MockRuskFee(false),
-			SpendingProof: &rusk.Proof{Data: make([]byte, 0)},
-			CallData:      amountBytes,
-		},
-	}
-	return tx, nil
 }
 
 func inputsToRuskInputs(inputs transactions.Inputs) ([]*rusk.BlsScalar, error) {

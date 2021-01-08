@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 )
 
 // A single point of constants definition
@@ -43,16 +42,6 @@ const (
 
 // DecodeGenesis marshals a genesis block into a buffer
 func DecodeGenesis() *block.Block {
-	if Get().Genesis.Legacy {
-		g := legacy.DecodeGenesis()
-		c, err := legacy.OldBlockToNewBlock(g)
-		if err != nil {
-			log.Panic(err)
-		}
-
-		return c
-	}
-
 	b := block.NewBlock()
 	switch Get().General.Network {
 	case "testnet": //nolint

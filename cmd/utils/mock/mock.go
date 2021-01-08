@@ -20,7 +20,6 @@ import (
 
 // RunMock will run a grpc mock for rusk wallet and transactor
 func RunMock(grpcMockHost string) error {
-
 	s := grpc.NewServer()
 	rusk.RegisterStateServer(s, &rusk.StateMock{})
 	node.RegisterWalletServer(s, &node.WalletMock{})
@@ -38,13 +37,11 @@ func RunMock(grpcMockHost string) error {
 }
 
 // RunRUSKMock will run a RUSK mock
-func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile string, legacy bool) error {
-
+func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile string) error {
 	r := new(config.Registry)
 
 	r.Wallet.File = walletFile
 	r.Wallet.Store = walletStore
-	r.Genesis.Legacy = legacy
 
 	// Start the mock RUSK server
 	srv, err := ruskmock.New(nil, *r)

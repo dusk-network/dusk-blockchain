@@ -175,7 +175,3 @@ type consensusConfiguration struct {
 	// ConsensusTimeOut is the time out for consensus step timers.
 	ConsensusTimeOut int64
 }
-
-type genesisConfiguration struct {
-	Legacy bool
-}

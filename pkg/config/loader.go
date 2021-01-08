@@ -69,8 +69,7 @@ type Registry struct {
 	Logger      loggerConfiguration
 	Profile     []profileConfiguration
 
-	Genesis genesisConfiguration
-	lock    *sync.RWMutex
+	lock *sync.RWMutex
 }
 
 // Load makes an attempt to read and unmarshal any configs from flag, env and

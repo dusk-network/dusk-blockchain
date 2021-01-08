@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	corewallet "github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/mlsag"
@@ -30,25 +29,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Config contains a list of settings that determine the behavior
-// of the `Server`.
-type Config struct {
-	PassScoreValidation           bool
-	PassTransactionValidation     bool
-	PassStateTransition           bool
-	PassStateTransitionValidation bool
-}
-
-// DefaultConfig returns the default configuration for the Rusk mock server.
-func DefaultConfig() *Config {
-	return &Config{
-		PassScoreValidation:           true,
-		PassTransactionValidation:     true,
-		PassStateTransition:           true,
-		PassStateTransitionValidation: true,
-	}
-}
-
 // Server is a stand-in Rusk server, which can be used during any kind of
 // testing. Its behavior can be modified depending on the settings of the
 // `Config` struct, contained in the `Server`, to simulate different types
@@ -57,8 +37,9 @@ type Server struct {
 	cfg *Config
 	s   *grpc.Server
 
-	w *wallet.Wallet
-	p *user.Provisioners
+	w  *wallet.Wallet
+	db *database.DB
+	p  *user.Provisioners
 }
 
 // New returns a new Rusk mock server with the given config. If no config is
@@ -74,60 +55,64 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 	}
 
 	grpcServer := grpc.NewServer()
-	rusk.RegisterStateServer(grpcServer, srv)
-	rusk.RegisterKeysServer(grpcServer, srv)
-	rusk.RegisterBlindBidServiceServer(grpcServer, srv)
-	rusk.RegisterBidServiceServer(grpcServer, srv)
-	rusk.RegisterTransferServer(grpcServer, srv)
-	rusk.RegisterStakeServiceServer(grpcServer, srv)
+	registerGRPCServers(grpcServer, srv)
 	srv.s = grpcServer
 
+	if err := srv.setupWallet(c); err != nil {
+		return nil, err
+	}
+
+	return srv, srv.bootstrapBlockchain()
+}
+
+func (s *Server) setupWallet(c config.Registry) error {
 	// First load the database
 	db, err := database.New(c.Wallet.Store + "_2")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Then load the wallet
 	w, err := wallet.LoadFromFile(byte(2), db, fetchDecoys, fetchInputs, "password", c.Wallet.File)
 	if err != nil {
 		_ = db.Close()
-		return nil, err
+		return err
 	}
 
-	if err = w.UpdateWalletHeight(0); err != nil {
-		return nil, err
+	if err := w.UpdateWalletHeight(0); err != nil {
+		return err
 	}
 
-	srv.w = w
+	s.w = w
+	s.db = db
+	return nil
+}
 
+func (s *Server) bootstrapBlockchain() error {
 	var genesis *block.Block
-	if c.Genesis.Legacy {
-		// Sync up the provisioners
-		genesis = legacy.DecodeGenesis()
-		// Note that we don't use `chain.addConsensusNodes` here because the transaction types
-		// are incompatible.
-		if err = srv.addConsensusNodes(genesis.Txs, 0); err != nil {
-			return nil, err
-		}
-	} else {
-		g := config.DecodeGenesis()
+	g := config.DecodeGenesis()
 
-		if err = chain.ReconstructCommittee(srv.p, g); err != nil {
-			return nil, err
-		}
-
-		genesis, err = legacy.NewBlockToOldBlock(g)
-		if err != nil {
-			return nil, err
-		}
+	var err error
+	if err = chain.ReconstructCommittee(s.p, g); err != nil {
+		return err
 	}
 
-	if _, _, err := srv.w.CheckWireBlock(*genesis); err != nil {
-		return nil, err
+	genesis, err = legacy.NewBlockToOldBlock(g)
+	if err != nil {
+		return err
 	}
 
-	return srv, nil
+	_, _, err = s.w.CheckWireBlock(*genesis)
+	return err
+}
+
+func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
+	rusk.RegisterStateServer(grpcServer, srv)
+	rusk.RegisterKeysServer(grpcServer, srv)
+	rusk.RegisterBlindBidServiceServer(grpcServer, srv)
+	rusk.RegisterBidServiceServer(grpcServer, srv)
+	rusk.RegisterTransferServer(grpcServer, srv)
+	rusk.RegisterStakeServiceServer(grpcServer, srv)
 }
 
 // Serve will start listening on a hardcoded IP and port. The server will then accept
@@ -145,11 +130,6 @@ func (s *Server) Serve(network, url string) error {
 	}()
 
 	return nil
-}
-
-// Echo the rusk server to see if it's still running.
-func (s *Server) Echo(ctx context.Context, req *rusk.EchoRequest) (*rusk.EchoResponse, error) {
-	return &rusk.EchoResponse{}, nil
 }
 
 // VerifyStateTransition simulates a state transition validation. The outcome is dictated
@@ -174,6 +154,12 @@ func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStat
 // ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
 // configuration.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
+	if !s.cfg.PassStateTransition {
+		return &rusk.ExecuteStateTransitionResponse{
+			Success: s.cfg.PassStateTransition,
+		}, nil
+	}
+
 	txs, err := legacy.ContractCallsToTxs(req.Txs)
 	if err != nil {
 		return nil, err
@@ -217,7 +203,9 @@ func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight u
 }
 
 // GenerateScore returns a mocked Score.
-// TODO: investigate if we should instead, launch a blindbid process and do this properly.
+// We do this entirely randomly, as score verification is completely up to
+// the server configuration. This makes it easier for us to test different
+// scenarios, and it greatly simplifies the bootstrapping of a network.
 func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreRequest) (*rusk.GenerateScoreResponse, error) {
 	proof, err := crypto.RandEntropy(400)
 	if err != nil {
@@ -254,34 +242,14 @@ func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) 
 	}, nil
 }
 
-// GenerateKeys returns a set of randomly generated keys. They will contain Ristretto
-// points under the hood.
+// GenerateKeys returns the server's wallet private key, and a stealth address.
+// The response will contain Ristretto points under the hood.
 func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest) (*rusk.GenerateKeysResponse, error) {
-	db, err := database.New(config.Get().Wallet.Store)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = db.Close()
-	}()
-
-	seed, err := corewallet.GenerateNewSeed(nil)
-	if err != nil {
-		return nil, err
-	}
-
-	w, err := wallet.LoadFromSeed(seed, byte(2), db, fetchDecoys, fetchInputs, "password", config.Get().Wallet.File)
-	if err != nil {
-		return nil, err
-	}
-
-	s.w = w
-
 	var r ristretto.Scalar
 	r.Rand()
-	pk := w.PublicKey()
+	pk := s.w.PublicKey()
 	addr := pk.StealthAddress(r, 0)
-	pSpend, err := w.PrivateSpend()
+	pSpend, err := s.w.PrivateSpend()
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +282,8 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 	}, nil
 }
 
-// GenerateStealthAddress returns a stealth address generated from a public key.
+// GenerateStealthAddress returns a stealth address generated from the server's
+// wallet public key.
 func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey) (*rusk.StealthAddress, error) {
 	var r ristretto.Scalar
 	r.Rand()
@@ -369,7 +338,10 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 
 // NewStake creates a staking transaction and returns it to the caller.
 func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.Transaction, error) {
-	stake, err := transactions.NewStake(0, byte(2), int64(0), 250000, s.w.ConsensusKeys().EdPubKeyBytes, req.PublicKeyBls)
+	var value ristretto.Scalar
+	value.SetBigInt(big.NewInt(0).SetUint64(req.Value))
+
+	stake, err := s.w.NewStakeTx(int64(0), 250000, value)
 	if err != nil {
 		return nil, err
 	}
@@ -437,4 +409,10 @@ func fetchDecoys(numMixins int) []mlsag.PubKeys {
 		pubKeys = append(pubKeys, keyVector)
 	}
 	return pubKeys
+}
+
+// Stop the rusk mock server.
+func (s *Server) Stop() error {
+	s.s.Stop()
+	return s.db.Close()
 }
