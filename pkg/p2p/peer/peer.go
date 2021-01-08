@@ -369,7 +369,7 @@ func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
 			duration := float64(time.Now().UnixNano()-startTime) / 1000000
 			l.WithField("cs", hex.EncodeToString(cs)).
 				WithField("len", len(message)).
-				WithField("ms", duration).Debug("trace message routing")
+				WithField("ms", duration).Trace("message routing")
 		}()
 
 		// Reset the keepalive timer
