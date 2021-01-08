@@ -58,7 +58,10 @@ type Consensus struct {
 func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc, requestor *candidate.Requestor, newBlockChan chan consensus.Results) (consensus.Phase, consensus.Controller, error) {
 	generator, err := blockgenerator.New(e, pubKey, db)
 	if err != nil {
-		return nil, nil, err
+		// This error means (in all cases) that there are no bid values present
+		// in the db, meaning that this node is not a block generator. We will
+		// not return the error, but we will log it.
+		lg.WithError(err).Warnln("starting consensus loop without block generator")
 	}
 
 	selectionStep := CreateInitialStep(e, consensusTimeOut, generator, verifyFn, db, requestor)

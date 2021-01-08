@@ -15,16 +15,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
-func setupBidValues() error {
+func setupBidValues(db database.DB) error {
 	// We can just use anything for the D and K, since the blind bid is currently
 	// mocked.
 	// NOTE: this should be changed if we choose to use the actual blind bid.
-	_, db := heavy.CreateDBConnection()
 	return db.Update(func(t database.Transaction) error {
 		k, _ := crypto.RandEntropy(32)
 		d, _ := crypto.RandEntropy(32)
@@ -35,7 +33,7 @@ func setupBidValues() error {
 
 // ReconstructCommittee will fill in the committee members that are present from genesis.
 //nolint
-func reconstructCommittee(p *user.Provisioners, b *block.Block) error {
+func ReconstructCommittee(p *user.Provisioners, b *block.Block) error {
 	// We should properly reconstruct the committee, though. This is because the keys
 	// need to match up with what's found in the wallet.
 	for _, tx := range b.Txs {

@@ -38,12 +38,13 @@ func RunMock(grpcMockHost string) error {
 }
 
 // RunRUSKMock will run a RUSK mock
-func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile string) error {
+func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile string, legacy bool) error {
 
 	r := new(config.Registry)
 
 	r.Wallet.File = walletFile
 	r.Wallet.Store = walletStore
+	r.Genesis.Legacy = legacy
 
 	// Start the mock RUSK server
 	srv, err := ruskmock.New(nil, *r)

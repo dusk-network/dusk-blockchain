@@ -13,6 +13,7 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	corewallet "github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
@@ -94,18 +95,32 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 		return nil, err
 	}
 
-	if err := w.UpdateWalletHeight(0); err != nil {
+	if err = w.UpdateWalletHeight(0); err != nil {
 		return nil, err
 	}
 
 	srv.w = w
 
-	// Sync up the provisioners
-	genesis := legacy.DecodeGenesis()
-	// Note that we don't use `chain.addConsensusNodes` here because the transaction types
-	// are incompatible.
-	if err := srv.addConsensusNodes(genesis.Txs, 0); err != nil {
-		return nil, err
+	var genesis *block.Block
+	if c.Genesis.Legacy {
+		// Sync up the provisioners
+		genesis = legacy.DecodeGenesis()
+		// Note that we don't use `chain.addConsensusNodes` here because the transaction types
+		// are incompatible.
+		if err = srv.addConsensusNodes(genesis.Txs, 0); err != nil {
+			return nil, err
+		}
+	} else {
+		g := config.DecodeGenesis()
+
+		if err = chain.ReconstructCommittee(srv.p, g); err != nil {
+			return nil, err
+		}
+
+		genesis, err = legacy.NewBlockToOldBlock(g)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if _, _, err := srv.w.CheckWireBlock(*genesis); err != nil {

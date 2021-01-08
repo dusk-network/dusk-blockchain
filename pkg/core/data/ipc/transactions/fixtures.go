@@ -279,7 +279,11 @@ func RandStakeTx(expiration uint64) *Transaction {
 	if expiration < 1 {
 		expiration = RandUint64()
 	}
-	return MockStakeTx(expiration, Rand32Bytes(), true)
+	blsKey := make([]byte, 129)
+	if _, err := rand.Read(blsKey); err != nil {
+		panic(err)
+	}
+	return MockStakeTx(expiration, blsKey, true)
 }
 
 // MockStakeTx creates a StakeTransaction
@@ -288,11 +292,11 @@ func MockStakeTx(expiration uint64, blsKey []byte, randomized bool) *Transaction
 	rtx := mockRuskTx(false, Rand32Bytes(), randomized)
 	UTransaction(rtx, stx)
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteVarBytes(buf, blsKey); err != nil {
+	if err := encoding.WriteUint64LE(buf, expiration); err != nil {
 		panic(err)
 	}
 
-	if err := encoding.WriteUint64LE(buf, expiration); err != nil {
+	if err := encoding.WriteVarBytes(buf, blsKey); err != nil {
 		panic(err)
 	}
 

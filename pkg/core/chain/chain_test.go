@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 
@@ -175,8 +176,8 @@ func TestAcceptBlock(t *testing.T) {
 }
 
 func createLoader(db database.DB) *DBLoader {
-	//genesis := cfg.DecodeGenesis()
-	genesis := helper.RandomBlock(0, 12)
+	genesis := config.DecodeGenesis()
+	//genesis := helper.RandomBlock(0, 12)
 	return NewDBLoader(db, genesis)
 }
 
