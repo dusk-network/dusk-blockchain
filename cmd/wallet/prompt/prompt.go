@@ -21,40 +21,6 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-// LoadMenu opens the prompt for loading a wallet.
-func LoadMenu(client node.WalletClient) error {
-
-	prompt := promptui.Select{
-		Label: "Select action",
-		Items: []string{"Load Wallet", "Create Wallet", "Load Wallet From Seed", "Exit"},
-	}
-
-	_, result, err := prompt.Run()
-	if err != nil {
-		// Prompts should always succeed.
-		panic(err)
-	}
-
-	var resp *node.LoadResponse
-	switch result {
-	case "Load Wallet":
-		resp, err = loadWallet(client)
-	case "Create Wallet":
-		resp, err = createWallet(client)
-	case "Load Wallet From Seed":
-		resp, err = loadFromSeed(client)
-	case "Exit":
-		os.Exit(0)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	_, _ = fmt.Fprintln(os.Stdout, string(resp.Key.PublicKey))
-	return nil
-}
-
 // WalletMenu opens the prompt for doing wallet operations.
 func WalletMenu(client *conf.NodeClient) error {
 	for {
