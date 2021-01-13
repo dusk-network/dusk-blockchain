@@ -66,6 +66,8 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 
 	viper.Set("gql.address", node.Cfg.Gql.Address)
 	viper.Set("gql.network", node.Cfg.Gql.Network)
+	viper.Set("gql.notification.brokersNum", "1")
+	viper.Set("gql.notification.clientsPerBroker", "1000")
 	viper.Set("gql.enabled", "true")
 
 	viper.Set("rpc.network", node.Cfg.RPC.Network)

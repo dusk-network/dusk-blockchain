@@ -163,7 +163,7 @@ maxRequestLimit = 20
 [gql.notification]
 # Number of pub/sub brokers to broadcast new blocks. 
 # 0 brokersNum disables notifications system
-brokersNum = 0
+brokersNum = 1
 clientsPerBroker = 1000
 
 [[profile]]
