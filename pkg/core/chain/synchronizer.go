@@ -9,6 +9,7 @@ package chain
 import (
 	"bytes"
 	"context"
+	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -28,12 +29,14 @@ type Synchronizer struct {
 	rb *rpcbus.RPCBus
 	db database.DB
 
-	highestSeen uint64
-	syncTarget  uint64
+	lock              sync.RWMutex
+	highestSeenHeight uint64
+	syncTargetHeight  uint64
+	state             syncState
+
 	*sequencer
 
-	state syncState
-	ctx   context.Context
+	ctx context.Context
 
 	chain Ledger
 }
@@ -76,7 +79,7 @@ func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState
 			return s.outSync, nil, err
 		}
 
-		if blk.Header.Height == s.syncTarget {
+		if blk.Header.Height == s.syncTarget() {
 			// if we reach the target we get into sync mode
 			// and trigger the consensus again
 			go func() {
@@ -119,19 +122,31 @@ func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err 
 		return
 	}
 
-	if blk.Header.Height > s.highestSeen {
-		s.highestSeen = blk.Header.Height
+	s.lock.Lock()
+	currState := s.state
+	if blk.Header.Height > s.highestSeenHeight {
+		s.highestSeenHeight = blk.Header.Height
 	}
+	s.lock.Unlock()
 
-	s.state, res, err = s.state(currentHeight, blk)
+	var newState syncState
+	newState, res, err = currState(currentHeight, blk)
+
+	s.lock.Lock()
+	s.state = newState
+	s.lock.Unlock()
+
 	return
 }
 
 func (s *Synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
-	s.syncTarget = tipHeight
-	if s.syncTarget > currentHeight+config.MaxInvBlocks {
-		s.syncTarget = currentHeight + config.MaxInvBlocks
+
+	s.lock.Lock()
+	s.syncTargetHeight = tipHeight
+	if s.syncTargetHeight > currentHeight+config.MaxInvBlocks {
+		s.syncTargetHeight = currentHeight + config.MaxInvBlocks
 	}
+	s.lock.Unlock()
 
 	var hash []byte
 	if err := s.db.View(func(t database.Transaction) error {
@@ -149,12 +164,12 @@ func (s *Synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffe
 // GetSyncProgress returns how close the node is to being synced to the tip,
 // as a percentage value.
 func (s *Synchronizer) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
-	if s.highestSeen == 0 {
+	if s.highestSeen() == 0 {
 		return &node.SyncProgressResponse{Progress: 0}, nil
 	}
 
 	prevBlockHeight := s.chain.CurrentHeight()
-	progressPercentage := (float64(prevBlockHeight) / float64(s.highestSeen)) * 100
+	progressPercentage := (float64(prevBlockHeight) / float64(s.highestSeen())) * 100
 
 	// Avoiding strange output when the chain can be ahead of the highest
 	// seen block, as in most cases, consensus terminates before we see
@@ -164,6 +179,20 @@ func (s *Synchronizer) GetSyncProgress(ctx context.Context, e *node.EmptyRequest
 	}
 
 	return &node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil
+}
+
+// highestSeen gets highestSeenHeight safely
+func (s *Synchronizer) highestSeen() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.highestSeenHeight
+}
+
+// syncTarget gets syncTargetHeight safely
+func (s *Synchronizer) syncTarget() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.syncTargetHeight
 }
 
 func createGetBlocksMsg(latestHash []byte) *message.GetBlocks {
