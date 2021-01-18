@@ -80,7 +80,6 @@ func TestSyncProgress(t *testing.T) {
 }
 
 func TestSyncConcurrency(t *testing.T) {
-
 	s, _, _ := setupSynchronizerTest()
 
 	var wg sync.WaitGroup

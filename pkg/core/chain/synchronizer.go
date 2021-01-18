@@ -131,22 +131,13 @@ func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err 
 
 	var newState syncState
 	newState, res, err = currState(currentHeight, blk)
-
-	s.lock.Lock()
-	s.state = newState
-	s.lock.Unlock()
+	s.setState(newState)
 
 	return
 }
 
 func (s *Synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
-
-	s.lock.Lock()
-	s.syncTargetHeight = tipHeight
-	if s.syncTargetHeight > currentHeight+config.MaxInvBlocks {
-		s.syncTargetHeight = currentHeight + config.MaxInvBlocks
-	}
-	s.lock.Unlock()
+	s.setSyncTarget(tipHeight, currentHeight+config.MaxInvBlocks)
 
 	var hash []byte
 	if err := s.db.View(func(t database.Transaction) error {
@@ -188,11 +179,25 @@ func (s *Synchronizer) highestSeen() uint64 {
 	return s.highestSeenHeight
 }
 
+func (s *Synchronizer) setState(newState syncState) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.state = newState
+}
+
 // syncTarget gets syncTargetHeight safely
 func (s *Synchronizer) syncTarget() uint64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.syncTargetHeight
+}
+func (s *Synchronizer) setSyncTarget(tipHeight, maxHeight uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.syncTargetHeight = tipHeight
+	if s.syncTargetHeight > maxHeight {
+		s.syncTargetHeight = maxHeight
+	}
 }
 
 func createGetBlocksMsg(latestHash []byte) *message.GetBlocks {
