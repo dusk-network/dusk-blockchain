@@ -44,19 +44,23 @@ func (s *sequencer) get(height uint64) (block.Block, error) {
 	return blk, nil
 }
 
+func (s *sequencer) remove(height uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	delete(s.blockPool, height)
+}
+
 // Provide successive blocks to the given height. Once a gap is detected, the loop
 // quits and returns a set of blocks.
 func (s *sequencer) provideSuccessors(blk block.Block) []block.Block {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
 	blks := []block.Block{blk}
 	for i := blk.Header.Height + 1; ; i++ {
-		blk, ok := s.blockPool[i]
-		if !ok {
+		blk, err := s.get(i)
+		if err != nil {
 			return blks
 		}
 
 		blks = append(blks, blk)
-		delete(s.blockPool, i)
+		s.remove(i)
 	}
 }

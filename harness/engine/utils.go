@@ -317,13 +317,13 @@ func (n *Network) IsSynced(threshold uint64) (uint64, error) {
 		// Trace network status
 		for tip := range forks {
 			logMsg := fmt.Sprintf("Network at round [%d] driven by nodes [", tip)
-			for nodeID := range forks[tip] {
+			for _, nodeID := range forks[tip] {
 				logMsg += fmt.Sprintf(" %d,", nodeID)
 			}
 			logMsg += "]"
 			logrus.WithField("process", "monitor").Info(logMsg)
 		}
-		return 0, errors.New("potential network inconsistency detected")
+		return 0, errors.New("network inconsistency detected")
 	}
 
 	if len(forks) == 0 {
