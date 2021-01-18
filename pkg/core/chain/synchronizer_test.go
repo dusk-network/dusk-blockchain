@@ -8,6 +8,7 @@ package chain
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -53,7 +54,7 @@ func TestFutureBlocks(t *testing.T) {
 	// Block should be in the sequencer
 	assert.NotEmpty(s.sequencer.blockPool[height])
 
-	assert.Equal(s.highestSeen, height)
+	assert.Equal(s.highestSeen(), height)
 }
 
 func TestSyncProgress(t *testing.T) {
@@ -76,6 +77,22 @@ func TestSyncProgress(t *testing.T) {
 	assert.NoError(err)
 
 	assert.Equal(resp.Progress, float32(50.0))
+}
+
+func TestSyncConcurrency(t *testing.T) {
+	s, _, _ := setupSynchronizerTest()
+
+	var wg sync.WaitGroup
+	for h := uint64(0); h < 100; h++ {
+		wg.Add(1)
+		go func(height uint64) {
+			blk := helper.RandomBlock(height, 1)
+			s.ProcessBlock(message.New(topics.Block, *blk))
+			wg.Done()
+		}(h)
+	}
+
+	wg.Wait()
 }
 
 func setupSynchronizerTest() (*Synchronizer, chan consensus.Results, *mockChain) {
