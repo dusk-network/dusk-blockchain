@@ -50,6 +50,17 @@ func (s *sequencer) remove(height uint64) {
 	delete(s.blockPool, height)
 }
 
+// cleanup removes all blocks that are lower than currentHeight
+func (s *sequencer) cleanup(currentHeight uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	for height := range s.blockPool {
+		if height < currentHeight {
+			delete(s.blockPool, height)
+		}
+	}
+}
+
 // Provide successive blocks to the given height. Once a gap is detected, the loop
 // quits and returns a set of blocks.
 func (s *sequencer) provideSuccessors(blk block.Block) []block.Block {

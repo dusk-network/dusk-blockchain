@@ -61,7 +61,7 @@ type Loader interface {
 // Ledger is the Chain interface used in tests
 type Ledger interface {
 	CurrentHeight() uint64
-	ProcessSucceedingBlock(block.Block)
+	ProcessSucceedingBlock(block.Block) error
 	ProcessSyncBlock(block.Block) error
 	ProduceBlock() error
 	StopBlockProduction()
@@ -217,13 +217,16 @@ func (c *Chain) produceBlock(ctx context.Context) (winner consensus.Results) {
 
 // ProcessSucceedingBlock will handle blocks incoming from the network,
 // which directly succeed the known chain tip.
-func (c *Chain) ProcessSucceedingBlock(blk block.Block) {
+func (c *Chain) ProcessSucceedingBlock(blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("received succeeding block")
 
 	select {
 	case c.CatchBlockChan <- consensus.Results{Blk: blk, Err: nil}:
 	default:
+		return errors.New("block discarded")
 	}
+
+	return nil
 }
 
 // ProcessSyncBlock will handle blocks which are received through a

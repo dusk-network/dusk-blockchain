@@ -53,7 +53,16 @@ func (s *Synchronizer) inSync(currentHeight uint64, blk block.Block) (syncState,
 	}
 
 	// otherwise notify the chain (and the consensus loop)
-	s.chain.ProcessSucceedingBlock(blk)
+	if err := s.chain.ProcessSucceedingBlock(blk); err != nil {
+		// Add successive block to sequencer, if block was discarded.
+		// Usually this happens due to consensus loop not running.
+		//
+		// If block is not kept in sequencer, Synchronizer does not reach
+		// syncTarget and as a result consensus loop is never restarted
+		//
+		s.sequencer.add(blk)
+	}
+
 	return s.inSync, nil, nil
 }
 
@@ -61,7 +70,6 @@ func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState
 	if blk.Header.Height > currentHeight+1 {
 		// if there is a gap we add the future block to the sequencer
 		s.sequencer.add(blk)
-		// do we have a successive block that we might've missed?
 		var err error
 		blk, err = s.sequencer.get(currentHeight + 1)
 		if err != nil {
@@ -115,6 +123,9 @@ func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err 
 	blk := m.Payload().(block.Block)
 
 	currentHeight := s.chain.CurrentHeight()
+
+	// Clean up sequencer
+	s.sequencer.cleanup(currentHeight)
 
 	// Is it worth looking at this?
 	if blk.Header.Height <= currentHeight {
