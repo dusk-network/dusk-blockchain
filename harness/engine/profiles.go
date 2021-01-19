@@ -23,6 +23,8 @@ var profileList Profiles
 
 // Profile1 builds the default dusk.toml definition
 func Profile1(index int, node *DuskNode, walletPath string) {
+	walletFileName := "wallet" + strconv.Itoa(index) + ".dat"
+
 	viper.Reset()
 	viper.Set("general.network", "testnet")
 	viper.Set("general.walletonly", "false")
@@ -88,7 +90,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("database.driver", heavy.DriverName)
 	viper.Set("database.dir", node.Dir+"/chain/")
 	viper.Set("wallet.store", node.Dir+"/walletDB/")
-	viper.Set("wallet.file", walletPath+"/wallet-"+node.Id+".dat")
+	viper.Set("wallet.file", walletPath+"/"+walletFileName)
 	viper.Set("network.seeder.addresses", []string{"127.0.0.1:8081"})
 	viper.Set("network.port", strconv.Itoa(7100+index))
 	viper.Set("mempool.maxSizeMB", "100")
