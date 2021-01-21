@@ -67,6 +67,15 @@ func TestConsensus(t *testing.T) {
 		defer cancelNode()
 	}
 
+	// Start the consensus loop on all nodes
+	for _, n := range nodes {
+		go func(n *node) {
+			if err := n.chain.ProduceBlock(); err != nil && err != context.Canceled {
+				panic(err)
+			}
+		}(n)
+	}
+
 	// To follow consensus properly, we should see accepted blocks coming in
 	// from each node.
 	// Let's make sure the consensus can survive for at least up to 10 rounds.
