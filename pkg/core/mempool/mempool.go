@@ -79,14 +79,14 @@ func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 	defer cancel()
 	// check if external verifyTx is provided
 	if err := m.verifier.VerifyTransaction(ctx, tx); err != nil {
-		return fmt.Errorf("transaction verification failed: %v", err)
+		return err
 	}
 	return nil
 }
 
 // NewMempool instantiates and initializes node mempool
 func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
-	log.Infof("Create instance")
+	log.Infof("create instance")
 
 	getMempoolTxsChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetMempoolTxs, getMempoolTxsChan); err != nil {
@@ -119,7 +119,7 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 	// The pool is normally a Hashmap
 	m.verified = m.newPool()
 
-	log.Infof("Running with pool type %s", config.Get().Mempool.PoolType)
+	log.WithField("type", config.Get().Mempool.PoolType).Info("running")
 
 	if srv != nil {
 		node.RegisterMempoolServer(srv, m)
@@ -160,7 +160,6 @@ func (m *Mempool) Run(ctx context.Context) {
 // ProcessTx handles a submitted tx from any source (rpcBus or eventBus)
 func (m *Mempool) ProcessTx(msg message.Message) ([]bytes.Buffer, error) {
 	t := TxDesc{tx: msg.Payload().(transactions.ContractCall), received: time.Now(), size: uint(len(msg.Id()))}
-	log.Info("handle submitted tx")
 
 	start := time.Now()
 	txid, err := m.processTx(t)
@@ -169,13 +168,16 @@ func (m *Mempool) ProcessTx(msg message.Message) ([]bytes.Buffer, error) {
 	if err != nil {
 		log.WithError(err).
 			WithField("txid", toHex(txid)).
+			WithField("txtype", t.tx.Type()).
+			WithField("txsize", t.size).
 			WithField("duration", elapsed.Microseconds()).
-			Error("Failed handle submitted tx")
+			Error("failed to accept transaction")
 	} else {
-		log.WithError(err).
-			WithField("txid", toHex(txid)).
+		log.WithField("txid", toHex(txid)).
+			WithField("txtype", t.tx.Type()).
+			WithField("txsize", t.size).
 			WithField("duration", elapsed.Microseconds()).
-			Infof("Verified handle submitted tx")
+			Info("accepted transaction")
 	}
 
 	return nil, err
@@ -190,7 +192,6 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	}
 
 	log.WithField("txid", txid).
-		WithField("size_bytes", t.size).
 		Info("ensuring transaction rules satisfied")
 
 	if t.tx.Type() == transactions.Distribute {
@@ -205,7 +206,7 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 
 	// execute tx verification procedure
 	if err := m.checkTx(t.tx); err != nil {
-		return txid, fmt.Errorf("verification: %v", err)
+		return txid, fmt.Errorf("verification err - %v", err)
 	}
 
 	// if consumer's verification passes, mark it as verified
@@ -213,7 +214,7 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 
 	// we've got a valid transaction pushed
 	if err := m.verified.Put(t); err != nil {
-		return txid, fmt.Errorf("store: %v", err)
+		return txid, fmt.Errorf("store err - %v", err)
 	}
 
 	// try to (re)propagate transaction in both gossip and kadcast networks
@@ -228,12 +229,18 @@ func (m *Mempool) propagateTx(t TxDesc, txid []byte) {
 	if config.Get().Kadcast.Enabled {
 		// Kadcast complete transaction data
 		if err := m.kadcastTx(t); err != nil {
-			log.WithError(err).Warn("Transaction kadcast sending failed")
+			log.
+				WithError(err).
+				WithField("txid", txid).
+				Error("kadcast propagation failed")
 		}
 	} else {
 		// Advertise the transaction hash to gossip network via "Inventory Vectors"
 		if err := m.advertiseTx(txid); err != nil {
-			log.WithError(err).Error("transaction advertising failed")
+			log.
+				WithError(err).
+				WithField("txid", txid).
+				Error("gossip propagation failed")
 		}
 	}
 }
@@ -258,7 +265,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 		WithField("height", b.Header.Height).
 		WithField("hash", blockHash).
 		WithField("len_txs", len(b.Txs)).
-		Info("processing_block")
+		Info("process an accepted block")
 
 	if m.verified.Len() == 0 {
 		// No txs accepted then no cleanup needed
@@ -307,7 +314,10 @@ func (m *Mempool) onIdle() {
 
 	// stats to log
 	poolSize := float32(m.verified.Size()) / 1000
-	log.WithField("txs_count", m.verified.Len()).WithField("pool_size", poolSize).Infof("stats to log")
+	log.
+		WithField("pool_txs_count", m.verified.Len()).
+		WithField("pool_size", poolSize).
+		Infof("process onidle")
 
 	// trigger alarms/notifications in case of abnormal state
 
@@ -316,13 +326,13 @@ func (m *Mempool) onIdle() {
 	if m.verified.Size() > maxSizeBytes {
 		log.WithField("max_size_mb", config.Get().Mempool.MaxSizeMB).
 			WithField("current_size", m.verified.Size()).
-			Warn("Mempool is too big")
+			Warn("exceeding max size")
 	}
 
 	if log.Logger.Level == logger.TraceLevel {
 		if m.verified.Len() > 0 {
 			_ = m.verified.Range(func(k txHash, t TxDesc) error {
-				log.WithField("txid", toHex(k[:])).Trace("verified transaction")
+				log.WithField("txid", toHex(k[:])).Trace("accepted transaction")
 				return nil
 			})
 		}

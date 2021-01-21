@@ -23,3 +23,9 @@ func ProcessPing(_ message.Message) ([]bytes.Buffer, error) {
 
 	return []bytes.Buffer{*buf}, nil
 }
+
+// ProcessPong empty processor to process a Pong message
+// Satisfies the peer.ProcessorFunc interface.
+func ProcessPong(_ message.Message) ([]bytes.Buffer, error) {
+	return []bytes.Buffer{}, nil
+}
