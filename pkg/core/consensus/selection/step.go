@@ -260,6 +260,7 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 			WithFields(log.Fields{
 				"topic":          m.Category(),
 				"round":          hdr.Round,
+				"step":           hdr.Step,
 				"expected round": round,
 			}).
 			Debugln("discarding obsolete event")
@@ -271,6 +272,7 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 			WithFields(log.Fields{
 				"topic":          m.Category(),
 				"round":          hdr.Round,
+				"step":           hdr.Step,
 				"expected round": round,
 			}).
 			Debugln("storing future event for later")
@@ -283,6 +285,7 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 			WithFields(log.Fields{
 				"topic": m.Category(),
 				"round": hdr.Round,
+				"step":  hdr.Step,
 			}).
 			Warnln("message not topics.Score")
 		return false
