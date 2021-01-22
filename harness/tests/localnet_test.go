@@ -26,15 +26,18 @@ var (
 	localNetSize    = 10
 )
 
-var localNet engine.Network
-var workspace string
+var (
+	localNet  engine.Network
+	workspace string
+)
 
 // TestMain sets up a temporarily local network of N nodes running from genesis
-// block
+// block.
 //
-// The network should be fully functioning and ready to accept messaging
+// The network should be fully functioning and ready to accept messaging.
 func TestMain(m *testing.M) {
 	var err error
+
 	flag.Parse()
 
 	// create the temp-dir workspace. Quit on error
@@ -49,6 +52,7 @@ func TestMain(m *testing.M) {
 		if currentErr != nil {
 			quit(localNet, workspace, currentErr)
 		}
+
 		fmt.Println("Going to setup NETWORK_SIZE with custom value", "currentLocalNetSize", currentLocalNetSize)
 		localNetSize = currentLocalNetSize
 	}
@@ -63,6 +67,7 @@ func TestMain(m *testing.M) {
 
 	if err := localNet.Bootstrap(workspace); err != nil {
 		fmt.Println(err)
+
 		if err == engine.ErrDisabledHarness {
 			_ = os.RemoveAll(workspace)
 			os.Exit(0)
@@ -72,6 +77,7 @@ func TestMain(m *testing.M) {
 		log.Fatal(err)
 		exit(localNet, workspace, 1)
 	}
+
 	fmt.Println("Nodes started")
 
 	// Start all tests
@@ -97,13 +103,16 @@ func quit(network engine.Network, workspace string, err error) {
 func exit(localNet engine.Network, workspace string, code int) {
 	if *engine.KeepAlive != true {
 		localNet.Teardown()
+
 		_ = os.RemoveAll(workspace)
 	}
+
 	os.Exit(code)
 }
 
 func monitorNetwork() {
 	logrus.Info("Network status monitoring")
+
 	// Monitor network, consensus, enviornement status  etc
 	// Pending to add more run-time assertion points
 	for {
@@ -113,6 +122,7 @@ func monitorNetwork() {
 			// Network is not synced completely
 			logrus.Error(err)
 		}
+
 		logrus.WithField("tip", networkTip).Info("Network status")
 
 		// Check if race conditions reported for any of the network nodes
@@ -125,9 +135,10 @@ func monitorNetwork() {
 
 // TestSendBidTransaction ensures that a valid bid transaction has been accepted
 // by all nodes in the network within a particular time frame and within the
-// same block
+// same block.
 func TestSendBidTransaction(t *testing.T) {
 	t.Log("Send request to node 0 to generate and process a Bid transaction")
+
 	txidBytes, err := localNet.SendBidCmd(0, 10, 10)
 	if err != nil {
 		t.Fatal(err)
@@ -135,16 +146,19 @@ func TestSendBidTransaction(t *testing.T) {
 
 	for i := 0; i < localNet.Size(); i++ {
 		t.Logf("Send request to node %d to generate and process a Bid transaction", i)
+
 		if _, err := localNet.SendBidCmd(uint(i), 10, 10); err != nil {
 			t.Error(err)
 		}
 	}
 
 	txID := hex.EncodeToString(txidBytes)
-	t.Logf("Bid transaction id: %s", txID)
 
+	t.Logf("Bid transaction id: %s", txID)
 	t.Log("Ensure all nodes have accepted this transaction at the same height")
+
 	blockhash := ""
+
 	for i := 0; i < localNet.Size(); i++ {
 		bh := localNet.WaitUntilTx(t, uint(i), txID)
 
@@ -168,10 +182,13 @@ func TestSendBidTransaction(t *testing.T) {
 // properly catch up and re-join the consensus execution trace.
 func TestCatchup(t *testing.T) {
 	t.Log("Wait till we are at height 3")
+
 	localNet.WaitUntil(t, 0, 3, 3*time.Minute, 5*time.Second)
 
 	t.Log("Start a new node. This node falls behind during consensus")
+
 	ind := localNetSize
+
 	node := engine.NewDuskNode(9500+ind, 9000+ind, "default", localNet.IsSessionRequired())
 	localNet.AddNode(node)
 
@@ -188,6 +205,7 @@ func TestCatchup(t *testing.T) {
 
 func TestSendStakeTransaction(t *testing.T) {
 	t.Log("Send request to node 1 to generate and process a Stake transaction")
+
 	txidBytes, err := localNet.SendStakeCmd(0, 10, 10)
 	if err != nil {
 		t.Fatal(err)
@@ -197,7 +215,9 @@ func TestSendStakeTransaction(t *testing.T) {
 	t.Logf("Stake transaction id: %s", txID)
 
 	t.Log("Ensure all nodes have accepted stake transaction at the same height")
+
 	blockhash := ""
+
 	for i := 0; i < localNet.Size(); i++ {
 		bh := localNet.WaitUntilTx(t, uint(i), txID)
 
@@ -219,7 +239,7 @@ func TestSendStakeTransaction(t *testing.T) {
 
 // TestMultipleBiddersProvisioners should be helpful on long-run testing. It
 // should ensure that in a network of multiple Bidders and Provisioners
-// consensus is stable and consistent
+// consensus is stable and consistent.
 func TestMultipleBiddersProvisioners(t *testing.T) {
 	if !*engine.KeepAlive {
 		// Runnable in keepalive mode only
@@ -233,13 +253,16 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 	// Load Bidders and Provisioners
 	for i := 0; i < localNet.Size(); i++ {
 		time.Sleep(100 * time.Millisecond)
+
 		if i%2 == 0 {
 			t.Logf("Send request to node %d to generate and process a Bid transaction", i)
+
 			if _, err := localNet.SendBidCmd(uint(i), 10, defaultLocktime); err != nil {
 				t.Error(err)
 			}
 		} else {
 			t.Logf("Send request to node %d to generate and process a Stake transaction", i)
+
 			if _, err := localNet.SendStakeCmd(uint(i), 10, defaultLocktime); err != nil {
 				t.Error(err)
 			}
@@ -262,9 +285,8 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 }
 
 // TestMeasureNetworkTPS is a placeholder for a simple test definition on top of
-// which network TPS metric should be collected
+// which network TPS metric should be collected.
 func TestMeasureNetworkTPS(t *testing.T) {
-
 	// Disabled by default not to messup the CI
 	_, presented := os.LookupEnv("DUSK_ENABLE_TPS_TEST")
 	if !presented {
@@ -293,6 +315,7 @@ func TestMeasureNetworkTPS(t *testing.T) {
 		if err != nil {
 			continue
 		}
+
 		txID := hex.EncodeToString(txidBytes)
 		t.Logf("Bid transaction id: %s", txID)
 

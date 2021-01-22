@@ -59,11 +59,13 @@ func (m *MockHandler) Verify(ev message.Agreement) error {
 
 func TestAccumulatorStop(t *testing.T) {
 	hdlr := &MockHandler{true, true, user.VotingCommittee{}, 2, true}
+
 	accumulator := newAccumulator(hdlr, 100)
 	go accumulator.Accumulate()
 
 	time.Sleep(3 * time.Second)
 	accumulator.Stop()
+
 	time.Sleep(time.Second)
 	assert.True(t, runtime.NumGoroutine() <= 15)
 }
@@ -73,6 +75,7 @@ func TestAccumulatorStop(t *testing.T) {
 func TestAccumulation(t *testing.T) {
 	// Make an accumulator that has a quorum of 2
 	hdlr := &MockHandler{true, true, user.VotingCommittee{}, 2, true}
+
 	accumulator := newAccumulator(hdlr, 4)
 	go accumulator.Accumulate()
 
@@ -90,6 +93,7 @@ func TestAccumulation(t *testing.T) {
 func TestStop(t *testing.T) {
 	// Make an accumulator that has a quorum of 3
 	hdlr := &MockHandler{true, true, user.VotingCommittee{}, 3, true}
+
 	accumulator := newAccumulator(hdlr, 4)
 	go accumulator.Accumulate()
 
@@ -105,8 +109,8 @@ func TestStop(t *testing.T) {
 	select {
 	case <-accumulator.CollectedVotesChan:
 		assert.FailNow(t, "accumulator should not have collected votes")
+	// all good
 	case <-time.After(50 * time.Millisecond):
-		// all good
 	}
 }
 
@@ -115,6 +119,7 @@ func TestFailedVerification(t *testing.T) {
 	logrus.SetLevel(logrus.FatalLevel)
 	// Make an accumulator that has a quorum of 2 and fails verification
 	hdlr := &MockHandler{true, true, user.VotingCommittee{}, 3, false}
+
 	accumulator := newAccumulator(hdlr, 4)
 	go accumulator.Accumulate()
 
@@ -137,6 +142,7 @@ func TestNotInCommittee(t *testing.T) {
 	logrus.SetLevel(logrus.FatalLevel)
 	// Make an accumulator that has a quorum of 2 and is not in the committee
 	hdlr := &MockHandler{true, false, user.VotingCommittee{}, 1, false}
+
 	accumulator := newAccumulator(hdlr, 4)
 	go accumulator.Accumulate()
 
@@ -157,17 +163,19 @@ func TestSafeStop(t *testing.T) {
 	logrus.SetLevel(logrus.FatalLevel)
 	// Make an accumulator that has a quorum of 2 and fails verification
 	hdlr := &MockHandler{true, false, user.VotingCommittee{}, 3, false}
+
 	accumulator := newAccumulator(hdlr, 4)
 	go accumulator.Accumulate()
 
 	createAgreement := newAggroFactory(20)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
+
 	go func() {
 		for i := 1; i < 2; i++ {
 			accumulator.Process(createAgreement(1, 1, i))
 		}
-
 	}()
 
 	go func() {

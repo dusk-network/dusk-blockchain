@@ -37,27 +37,29 @@ func (t mempool) getQuery() *graphql.Field {
 }
 
 func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
-
 	txid, ok := p.Args[txidArg].(string)
 	if ok {
-
 		payload := bytes.Buffer{}
+
 		if txid != "" {
 			txidBytes, err := hex.DecodeString(txid)
 			if err != nil {
 				return nil, errors.New("invalid txid")
 			}
+
 			_, _ = payload.Write(txidBytes)
 		}
 
 		timeoutGetMempoolTXs := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXs) * time.Second
+
 		resp, err := t.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(payload), timeoutGetMempoolTXs)
 		if err != nil {
 			return "", err
 		}
-		r := resp.([]txs.ContractCall)
 
+		r := resp.([]txs.ContractCall)
 		txs := make([]queryTx, 0)
+
 		for i := 0; i < len(r); i++ {
 			d, err := newQueryTx(r[i], nil)
 			if err == nil {

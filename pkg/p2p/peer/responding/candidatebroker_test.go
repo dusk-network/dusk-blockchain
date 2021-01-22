@@ -23,6 +23,7 @@ import (
 func TestCandidateBroker(t *testing.T) {
 	// Set up db
 	_, db := lite.CreateDBConnection()
+
 	defer func() {
 		_ = db.Close()
 	}()
@@ -36,13 +37,15 @@ func TestCandidateBroker(t *testing.T) {
 	// First, ask for the wrong candidate.
 	wrongHash, _ := crypto.RandEntropy(32)
 	_, err := c.ProvideCandidate(message.New(topics.GetCandidate, message.GetCandidate{
-		Hash: wrongHash},
+		Hash: wrongHash,
+	},
 	))
 	assert.Error(t, err)
 
 	// Now, ask for the correct one.
 	buf, err := c.ProvideCandidate(message.New(topics.GetCandidate, message.GetCandidate{
-		Hash: hashes[0]},
+		Hash: hashes[0],
+	},
 	))
 	assert.NoError(t, err)
 

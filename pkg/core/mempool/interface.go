@@ -14,47 +14,44 @@ import (
 
 type txHash [32]byte
 
-// TxDesc encapsulates both tx raw and meta data
+// TxDesc encapsulates both tx raw and meta data.
 type TxDesc struct {
 	tx transactions.ContractCall
 
-	// the point in time, tx was received in pending queue
+	// the point in time, tx was received in pending queue.
 	received time.Time
-	// the point in time, tx was moved into verified pool
+	// the point in time, tx was moved into verified pool.
 	verified time.Time
-	// the point in time, tx was accepted by this node
-	// accepted time.Time
-	size uint
+	size     uint
 
-	// Kadcast transport-specific field
+	// Kadcast transport-specific field.
 	kadHeight byte
 }
 
 // Pool represents a transaction pool of the verified txs only.
 type Pool interface {
-
 	// Put sets the value for the given key. It overwrites any previous value
-	// for that key;
+	// for that key.
 	Put(t TxDesc) error
 	// Get retrieves a transaction for a given txID, if it exists.
 	Get(txID []byte) transactions.ContractCall
 	// Contains returns true if the given key is in the pool.
 	Contains(key []byte) bool
-	// Clone the entire pool
+	// Clone the entire pool.
 	Clone() []transactions.ContractCall
 
 	// FilterByType returns all verified transactions for a specific type.
 	FilterByType(transactions.TxType) []transactions.ContractCall
 
-	// Size is total number of bytes of all txs marshaling size
+	// Size is total number of bytes of all txs marshaling size.
 	Size() uint32
-	// Len returns the number of tx entries
+	// Len returns the number of tx entries.
 	Len() int
 
-	// Range iterates through all tx entries
+	// Range iterates through all tx entries.
 	Range(fn func(k txHash, t TxDesc) error) error
 
 	// RangeSort iterates through all tx entries sorted by Fee
-	// in a descending order
+	// in a descending order.
 	RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error
 }

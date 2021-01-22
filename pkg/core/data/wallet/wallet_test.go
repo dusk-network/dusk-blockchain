@@ -27,13 +27,15 @@ import (
 
 const dbPath = "testDb"
 
-const seedFile = "seed.dat"
-const secretFile = "key.dat"
+const (
+	seedFile   = "seed.dat"
+	secretFile = "key.dat"
+)
 
 const address = "127.0.0.1:5051"
 
 func TestMain(m *testing.M) {
-	//start rusk mock rpc server
+	// start rusk mock rpc server
 	tests.StartMockServer(address)
 
 	// Start all tests
@@ -44,12 +46,14 @@ func TestMain(m *testing.M) {
 
 func createRPCConn(t *testing.T) (client rusk.KeysClient, conn *grpc.ClientConn) {
 	assert := assert.New(t)
+
 	dialCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	var err error
 	conn, err = grpc.DialContext(dialCtx, address, grpc.WithInsecure())
 	assert.NoError(err)
+
 	return rusk.NewKeysClient(conn), conn
 }
 
@@ -59,6 +63,7 @@ func TestNewWallet(t *testing.T) {
 
 	db, err := database.New(dbPath)
 	assert.NoError(err)
+
 	defer os.RemoveAll(dbPath)
 	defer os.Remove(seedFile)
 	defer os.Remove(secretFile)
@@ -110,8 +115,8 @@ func TestCatchEOF(t *testing.T) {
 
 	db, err := database.New(dbPath)
 	assert.Nil(t, err)
-	defer os.RemoveAll(dbPath)
 
+	defer os.RemoveAll(dbPath)
 	defer os.Remove(seedFile)
 	defer os.Remove(secretFile)
 
@@ -125,6 +130,7 @@ func TestCatchEOF(t *testing.T) {
 		require.Nil(t, err)
 
 		require.Nil(t, fillSecretKey(secretKey.Sk))
+
 		sk := keys.NewSecretKey()
 		keys.USecretKey(secretKey.Sk, sk)
 
@@ -143,6 +149,7 @@ func fillSecretKey(sk *rusk.SecretKey) error {
 
 	sk.A.Data = bs
 	bs2 := make([]byte, 32)
+
 	if _, err := rand.Read(bs); err != nil {
 		return err
 	}

@@ -17,9 +17,11 @@ func GetOutboundIP() (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer func() {
 		_ = conn.Close()
 	}()
+
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP, nil
 }

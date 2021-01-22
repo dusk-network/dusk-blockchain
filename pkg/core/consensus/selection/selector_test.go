@@ -30,7 +30,6 @@ type tparm struct {
 func TestSelection(t *testing.T) {
 	hlp := selection.NewHelper(10)
 	consensusTimeOut := 300 * time.Millisecond
-
 	table := map[string]tparm{
 		"ExternalWinningScore": {
 			bg:   blockgenerator.Mock(hlp.Emitter, true),
@@ -42,8 +41,8 @@ func TestSelection(t *testing.T) {
 			msgs: []message.Score{},
 		},
 	}
-
 	_, db := lite.CreateDBConnection()
+
 	for name, ttest := range table {
 		t.Run(name, func(t *testing.T) {
 			ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) {
@@ -67,5 +66,4 @@ func TestSelection(t *testing.T) {
 			_ = testCallbackPhase.Run(context.Background(), nil, nil, hlp.RoundUpdate(), hlp.Step+1)
 		})
 	}
-
 }

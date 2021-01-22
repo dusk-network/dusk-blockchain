@@ -27,11 +27,13 @@ func TestStandardTxIntegrity(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	c, _ := client.CreateTransferClient(ctx, "localhost:10000")
 
 	sa := new(rusk.StealthAddress)
 	sa.RG = &rusk.JubJubCompressed{}
 	sa.PkR = &rusk.JubJubCompressed{}
+
 	resp, err := c.NewTransfer(ctx, &rusk.TransferTransactionRequest{
 		Value:     100,
 		Recipient: sa,
@@ -44,6 +46,7 @@ func TestStandardTxIntegrity(t *testing.T) {
 	// Check conversion integrity
 	legacyTx, err := legacy.RuskTxToTx(resp)
 	assert.NoError(t, err)
+
 	resp2, err := legacy.TxToRuskTx(legacyTx)
 	assert.NoError(t, err)
 
@@ -59,6 +62,7 @@ func TestBidTxIntegrity(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	c, _ := client.CreateBidServiceClient(ctx, "localhost:10000")
 
 	// Generate a K
@@ -77,6 +81,7 @@ func TestBidTxIntegrity(t *testing.T) {
 	// Check conversion integrity
 	legacyTx, err := legacy.RuskBidToBid(resp.Tx)
 	assert.NoError(t, err)
+
 	resp2, err := legacy.BidToRuskBid(legacyTx)
 	assert.NoError(t, err)
 
@@ -92,6 +97,7 @@ func TestStakeTxIntegrity(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	c, _ := client.CreateStakeClient(ctx, "localhost:10000")
 
 	resp, err := c.NewStake(ctx, &rusk.StakeTransactionRequest{
@@ -138,6 +144,7 @@ func TestBlockIntegrity(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	c, _ := client.CreateStakeClient(ctx, "localhost:10000")
 
 	// Create a valid stake to put in the block.
@@ -176,6 +183,7 @@ func setupRuskMock(t *testing.T) *ruskmock.Server {
 
 func cleanup(s *ruskmock.Server) {
 	_ = s.Stop()
+
 	if err := os.RemoveAll("walletDB_2"); err != nil {
 		panic(err)
 	}

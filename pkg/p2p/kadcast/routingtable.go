@@ -27,15 +27,13 @@ const InitHeight byte = 128
 // RoutingTable holds all of the data needed to interact with
 // the routing data and also the networking utils.
 type RoutingTable struct {
-
-	// number of delegates per bucket
+	// Number of delegates per bucket.
 	beta uint8
 
 	// Tree represents the routing structure.
 	tree Tree
 
-	// Local peer fields
-
+	// Local peer fields.
 	lpeerUDPAddr net.UDPAddr
 	LpeerInfo    encoding.PeerInfo
 	// Holds the Nonce that satisfies: `H(ID || Nonce) < Tdiff`.
@@ -70,7 +68,9 @@ func makeRoutingTableFromPeer(peer encoding.PeerInfo) RoutingTable {
 // as they have the xor distance in respec to a Peer as a parameter.
 func (rt *RoutingTable) getPeerSortDist(refPeer encoding.PeerInfo) []PeerSort {
 	var peerList []encoding.PeerInfo
+
 	rt.tree.mu.RLock()
+
 	for buckIdx, bucket := range rt.tree.buckets {
 		if buckIdx == 0 {
 			// Look for neighbor peer in spanning tree
@@ -84,8 +84,11 @@ func (rt *RoutingTable) getPeerSortDist(refPeer encoding.PeerInfo) []PeerSort {
 			peerList = append(peerList, bucket.entries[:]...)
 		}
 	}
+
 	rt.tree.mu.RUnlock()
+
 	var peerListSort []PeerSort
+
 	for _, peer := range peerList {
 		// We don't want to return the Peer struct of the Peer
 		// that is the reference.
@@ -99,10 +102,11 @@ func (rt *RoutingTable) getPeerSortDist(refPeer encoding.PeerInfo) []PeerSort {
 				})
 		}
 	}
+
 	return peerListSort
 }
 
-// PeerSort is a helper type to sort `Peers`
+// PeerSort is a helper type to sort `Peers`.
 type PeerSort struct {
 	ip        [4]byte
 	port      uint16
@@ -123,22 +127,24 @@ func (a ByXORDist) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 // Returns a list of the selected number of closest peers
 // in respect to a certain `Peer`.
 func (rt *RoutingTable) getXClosestPeersTo(peerNum int, refPeer encoding.PeerInfo) []encoding.PeerInfo {
-	var xPeers []encoding.PeerInfo
 	peerList := rt.getPeerSortDist(refPeer)
+	xPeers := make([]encoding.PeerInfo, len(peerList))
+
 	sort.Sort(ByXORDist(peerList))
 
 	// Get the `peerNum` closest ones.
-	for _, peer := range peerList {
-		xPeers = append(xPeers[:],
-			encoding.PeerInfo{
-				IP:   peer.ip,
-				Port: peer.port,
-				ID:   peer.id,
-			})
+	for i, peer := range peerList {
+		xPeers[i] = encoding.PeerInfo{
+			IP:   peer.ip,
+			Port: peer.port,
+			ID:   peer.id,
+		}
+
 		if len(xPeers) >= peerNum {
 			break
 		}
 	}
+
 	return xPeers
 }
 
@@ -154,6 +160,7 @@ func (rt *RoutingTable) pollClosestPeer(t time.Duration) encoding.PeerInfo {
 	rt.sendFindNodes()
 
 	var p encoding.PeerInfo
+
 	timer := time.AfterFunc(t, func() {
 		ps := rt.getXClosestPeersTo(DefaultAlphaClosestNodes, rt.LpeerInfo)
 		if len(ps) > 0 {
@@ -178,7 +185,6 @@ func (rt *RoutingTable) pollBootstrappingNodes(bootNodes []encoding.PeerInfo, t 
 	wg.Add(1)
 
 	for _, peer := range bootNodes {
-
 		h := makeHeader(encoding.PingMsg, rt)
 
 		var buf bytes.Buffer
@@ -205,10 +211,9 @@ func (rt *RoutingTable) sendFindNodes() {
 	destPeers := rt.getXClosestPeersTo(Alpha, rt.LpeerInfo)
 	// Fill the headers with the type, ID, Nonce and destPort.
 	for _, peer := range destPeers {
+		var buf bytes.Buffer
 
 		h := makeHeader(encoding.FindNodesMsg, rt)
-
-		var buf bytes.Buffer
 		if err := encoding.MarshalBinary(h, nil, &buf); err != nil {
 			return
 		}
@@ -217,7 +222,7 @@ func (rt *RoutingTable) sendFindNodes() {
 	}
 }
 
-// GetTotalPeers the total amount of peers that a `Peer` is connected to
+// GetTotalPeers the total amount of peers that a `Peer` is connected to.
 func (rt *RoutingTable) GetTotalPeers() uint64 {
 	return rt.tree.getTotalPeers()
 }

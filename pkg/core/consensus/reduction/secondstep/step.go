@@ -29,7 +29,7 @@ func getLog(r uint64, s uint8) *log.Entry {
 	})
 }
 
-// Phase is the implementation of the Selection step component
+// Phase is the implementation of the Selection step component.
 type Phase struct {
 	*reduction.Reduction
 	handler    *reduction.Handler
@@ -42,36 +42,37 @@ type Phase struct {
 
 // New creates and launches the component which responsibility is to reduce the
 // candidates gathered as winner of the selection of all nodes in the committee
-// and reduce them to just one candidate obtaining 64% of the committee vote
+// and reduce them to just one candidate obtaining 64% of the committee vote.
 // NB: we cannot push the agreement directly within the agreementChannel
 // until we have a way to deduplicate it from the peer (the dupemap will not be
-// notified of duplicates)
+// notified of duplicates).
 func New(e *consensus.Emitter, timeOut time.Duration) *Phase {
 	return &Phase{
 		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
 	}
 }
 
-// SetNext sets the next step to be returned at the end of this one
+// SetNext sets the next step to be returned at the end of this one.
 func (p *Phase) SetNext(next consensus.Phase) {
 	p.next = next
 }
 
-// String representation of this Phase
+// String representation of this Phase.
 func (p *Phase) String() string {
 	return "reduction-second-step"
 }
 
-// Initialize passes to this reduction step the best score collected during selection
+// Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.firstStepVotesMsg = re.(message.StepVotesMsg)
 	return p
 }
 
 // Run the first reduction step until either there is a timeout, we reach 64%
-// of votes, or we experience an unrecoverable error
+// of votes, or we experience an unrecoverable error.
 func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	tlog := getLog(r.Round, step)
+
 	tlog.Traceln("starting second reduction step")
 
 	defer func() {
@@ -86,12 +87,14 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	timeoutChan := time.After(p.TimeOut)
 	p.aggregator = reduction.NewAggregator(p.handler)
+
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Reduction {
 			rMsg := ev.Payload().(message.Reduction)
 			if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
 				continue
 			}
+
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
 			svm := p.collectReduction(rMsg, r.Round, step)
@@ -102,6 +105,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			if stepVotesAreValid(&p.firstStepVotesMsg, svm) && p.handler.AmMember(r.Round, step) {
 				p.sendAgreement(r.Round, step, svm)
 			}
+
 			return p.next.Initialize(nil)
 		}
 	}
@@ -114,8 +118,8 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
 					continue
 				}
-				svm := p.collectReduction(rMsg, r.Round, step)
 
+				svm := p.collectReduction(rMsg, r.Round, step)
 				if svm == nil {
 					continue
 				}
@@ -127,6 +131,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 				if stepVotesAreValid(&p.firstStepVotesMsg, svm) && p.handler.AmMember(r.Round, step) {
 					p.sendAgreement(r.Round, step, svm)
 				}
+
 				return p.next.Initialize(nil)
 			}
 
@@ -140,6 +145,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			go func() {
 				<-timeoutChan
 			}()
+
 			return nil
 		}
 	}
@@ -147,6 +153,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
 	hdr := r.State()
+
 	if err := p.handler.VerifySignature(r.Copy().(message.Reduction)); err != nil {
 		lg.
 			WithError(err).
@@ -171,7 +178,9 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		//"sender": hex.EncodeToString(hdr.Sender()),
 		//"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received_2nd_step_reduction")
+
 	result := p.aggregator.CollectVote(r)
+
 	return p.createStepVoteMessage(result, round, step)
 }
 
@@ -226,16 +235,18 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 	// This exposes the Agreement to some malleability attack. Double check
 	// this!!
 	ev := message.NewAgreement(hdr)
-	ev.SetSignature(sig)
 	ev.VotesPerStep = []*message.StepVotes{
 		&p.firstStepVotesMsg.StepVotes,
 		&svm.StepVotes,
 	}
 
+	ev.SetSignature(sig)
+
 	lg.WithFields(log.Fields{
 		"round": round,
 		"step":  step,
 	}).Traceln("gossiping_agreement")
+
 	if err := p.Gossip(message.New(topics.Agreement, *ev)); err != nil {
 		lg.
 			WithError(err).

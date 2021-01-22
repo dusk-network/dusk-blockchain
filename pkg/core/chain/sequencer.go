@@ -36,6 +36,7 @@ func (s *sequencer) add(blk block.Block) {
 func (s *sequencer) get(height uint64) (block.Block, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
+
 	blk, ok := s.blockPool[height]
 	if !ok {
 		return block.Block{}, errors.New("block not found")
@@ -50,10 +51,11 @@ func (s *sequencer) remove(height uint64) {
 	delete(s.blockPool, height)
 }
 
-// cleanup removes all blocks that are lower than currentHeight
+// cleanup removes all blocks that are lower than currentHeight.
 func (s *sequencer) cleanup(currentHeight uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
 	for height := range s.blockPool {
 		if height < currentHeight {
 			delete(s.blockPool, height)
@@ -65,6 +67,7 @@ func (s *sequencer) cleanup(currentHeight uint64) {
 // quits and returns a set of blocks.
 func (s *sequencer) provideSuccessors(blk block.Block) []block.Block {
 	blks := []block.Block{blk}
+
 	for i := blk.Header.Height + 1; ; i++ {
 		blk, err := s.get(i)
 		if err != nil {
@@ -72,6 +75,7 @@ func (s *sequencer) provideSuccessors(blk block.Block) []block.Block {
 		}
 
 		blks = append(blks, blk)
+
 		s.remove(i)
 	}
 }

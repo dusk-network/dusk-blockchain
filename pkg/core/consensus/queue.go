@@ -14,7 +14,7 @@ import (
 
 // Queue is a Queue of Events grouped by rounds and steps. It is thread-safe
 // through a sync.RWMutex.
-//TODO: entries should become buntdb instead
+// TODO: entries should become buntdb instead.
 type Queue struct {
 	lock    sync.RWMutex
 	entries map[uint64]map[uint8][]message.Message
@@ -33,6 +33,7 @@ func NewQueue() *Queue {
 func (eq *Queue) GetEvents(round uint64, step uint8) []message.Message {
 	eq.lock.Lock()
 	defer eq.lock.Unlock()
+
 	if eq.entries[round][step] != nil {
 		messages := eq.entries[round][step]
 		eq.entries[round][step] = nil
@@ -71,13 +72,16 @@ func (eq *Queue) Clear(round uint64) {
 func (eq *Queue) Flush(round uint64) []message.Message {
 	eq.lock.Lock()
 	defer eq.lock.Unlock()
+
 	if eq.entries[round] != nil {
 		events := make([]message.Message, 0)
 		for step, evs := range eq.entries[round] {
 			events = append(events, evs...)
 			eq.entries[round][step] = nil
 		}
+
 		return events
 	}
+
 	return nil
 }

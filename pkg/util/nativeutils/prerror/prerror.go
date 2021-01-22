@@ -6,7 +6,7 @@
 
 package prerror
 
-// Priority is the priority High,Medium,Low
+// Priority is the priority High,Medium,Low.
 type Priority int
 
 //nolint:golint

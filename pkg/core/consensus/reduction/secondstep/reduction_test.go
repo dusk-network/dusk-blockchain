@@ -22,8 +22,8 @@ import (
 )
 
 // TestSendReduction tests that the reduction step completes without problems
-// and produces a StepVotesMsg in case it receives enough valid Reduction messages
-// It uses the recution common test preparation
+// and produces a StepVotesMsg in case it receives enough valid Reduction messages.
+// It uses the recution common test preparation.
 func TestSendReduction(t *testing.T) {
 	round := uint64(1)
 	messageToSpawn := 50
@@ -53,7 +53,6 @@ type reductionTest struct {
 }
 
 func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step uint8) map[string]reductionTest {
-
 	return map[string]reductionTest{
 		"HappyPath": {
 			batchEvents: func(hlp *reduction.Helper) chan message.Message {
@@ -139,13 +138,14 @@ func TestSecondStepReduction(t *testing.T) {
 	step := uint8(2)
 	round := uint64(1)
 	messageToSpawn := 50
+
 	hash, err := crypto.RandEntropy(32)
 	require.NoError(t, err)
+
 	timeout := time.Second
 
 	table := initiateTableTest(timeout, hash, round, step)
 	for name, ttest := range table {
-
 		streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 		streamListener := eventbus.NewStreamListener(streamer)
 

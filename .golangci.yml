@@ -180,6 +180,10 @@ linters:
     - depguard
     - gocyclo
     - unparam
+    - wsl
+    - gofumpt
+    - godot
+    - prealloc
   enable-all: false
   disable:
 
@@ -235,6 +239,22 @@ issues:
         - lll
       source: "^//go:generate "
       text: "long-lines"
+    
+    - linters:
+        - wsl
+      text: "return statements should not be cuddled if block has more than two lines"
+
+    - linters:
+        - wsl
+      text: "branch statements should not be cuddled if block has more than two lines"
+
+    - linters:
+        - wsl
+      text: "declarations should never be cuddled"
+
+    - linters:
+        - wsl
+      text: "expressions should not be cuddled with declarations or returns"
 
   # Independently from option `exclude` we use default exclude patterns,
   # it can be disabled by this option. To list all

@@ -19,7 +19,7 @@ import (
 
 // NodeClient is a wrapper for the grpc node service client. It takes care of
 // handling the session on behalf of the caller by maintaining a grpc
-// interceptor
+// interceptor.
 type NodeClient struct {
 	pk ed25519.PublicKey
 	sk ed25519.PrivateKey
@@ -36,9 +36,8 @@ type NodeClient struct {
 	sessionHandler *AuthClientInterceptor
 }
 
-// New creates a new NodeClient which takes care of maintaining the session
+// New creates a new NodeClient which takes care of maintaining the session.
 func New(proto, addr string) *NodeClient {
-
 	// create the client
 	pk, sk, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -59,6 +58,7 @@ func New(proto, addr string) *NodeClient {
 	}
 
 	go nc.monitorError()
+
 	log.WithFields(logger.Fields{
 		"network": proto,
 		"address": addr,
@@ -67,14 +67,14 @@ func New(proto, addr string) *NodeClient {
 }
 
 // PublicKey returns the serialized binary array of the public key of this node
-// client
+// client.
 func (n *NodeClient) PublicKey() []byte {
 	return []byte(n.pk)
 }
 
 // GetSessionConn triggers a CreateSession through the auth client and
 // implicitly populates the interceptor with the session token.
-// It returns a new connection or an error
+// It returns a new connection or an error.
 func (n *NodeClient) GetSessionConn(options ...grpc.DialOption) (*grpc.ClientConn, error) {
 	if n.IsSessionActive() {
 		if n.persistentConn != nil {
@@ -95,11 +95,10 @@ func (n *NodeClient) GetSessionConn(options ...grpc.DialOption) (*grpc.ClientCon
 
 	n.authClient = NewClient(n.persistentConn, n.pk, n.sk)
 	_, err := n.authClient.CreateSession()
-
 	return n.persistentConn, err
 }
 
-// ScheduleSessionRefresh refreshes the session with the specified cadence
+// ScheduleSessionRefresh refreshes the session with the specified cadence.
 func (n *NodeClient) ScheduleSessionRefresh(cadence time.Time, options ...grpc.DialOption) error {
 	// GetSessionConn refreshes the authclient if needed
 	if _, err := n.GetSessionConn(options...); err != nil {
@@ -111,9 +110,10 @@ func (n *NodeClient) ScheduleSessionRefresh(cadence time.Time, options ...grpc.D
 }
 
 // DropSession closes a session, invalidate the session token and closes the
-// persistent connection gracefully
+// persistent connection gracefully.
 func (n *NodeClient) DropSession(options ...grpc.DialOption) error {
 	var err error
+
 	defer n.Close()
 
 	if !n.isConnActive() {
@@ -124,6 +124,7 @@ func (n *NodeClient) DropSession(options ...grpc.DialOption) error {
 
 	authClient := NewClient(n.persistentConn, n.pk, n.sk)
 	err = authClient.DropSession()
+
 	n.sessionHandler.invalidateToken()
 	return err
 }
@@ -134,7 +135,7 @@ func (n *NodeClient) monitorError() {
 	n.Close()
 }
 
-// GracefulClose cancels the session refresh and actively drops the session
+// GracefulClose cancels the session refresh and actively drops the session.
 func (n *NodeClient) GracefulClose(opts ...grpc.DialOption) {
 	if n.IsSessionActive() {
 		// DropSession includes a Close
@@ -146,7 +147,7 @@ func (n *NodeClient) GracefulClose(opts ...grpc.DialOption) {
 	n.Close()
 }
 
-// Close the client without notifying the server to close the session
+// Close the client without notifying the server to close the session.
 func (n *NodeClient) Close() {
 	n.cancel()
 	n.invalidateConn()
@@ -156,7 +157,7 @@ func (n *NodeClient) isConnActive() bool {
 	return n.persistentConn != nil
 }
 
-// IsSessionActive returns whether the session is active or otherwise
+// IsSessionActive returns whether the session is active or otherwise.
 func (n *NodeClient) IsSessionActive() bool {
 	return n.sessionHandler != nil && n.sessionHandler.isSessionActive()
 }
@@ -171,12 +172,12 @@ func (n *NodeClient) resetConn(options ...grpc.DialOption) error {
 		grpc.WithContextDialer(getDialer(n.proto)),
 		grpc.WithUnaryInterceptor(n.sessionHandler.Unary()),
 	)
+
 	// create the GRPC connection
 	conn, err := grpc.Dial(
 		n.addr,
 		options...,
 	)
-
 	if err != nil {
 		return err
 	}

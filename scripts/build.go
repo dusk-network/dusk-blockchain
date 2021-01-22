@@ -18,28 +18,30 @@ import (
 )
 
 const (
-	// GOLANGCI_VERSION to be used for linting
+	// GOLANGCI_VERSION to be used for linting.
 	GOLANGCI_VERSION = "github.com/golangci/golangci-lint/cmd/golangci-lint@v1.31.0"
 )
 
-// GOBIN environment variable
+// GOBIN environment variable.
 func GOBIN() string {
 	if os.Getenv("GOBIN") == "" {
 		log.Fatal("GOBIN not set")
 	}
+
 	return os.Getenv("GOBIN")
 }
 
 func main() {
-
 	log.SetFlags(log.Lshortfile)
 
 	if _, err := os.Stat(filepath.Join("scripts", "build.go")); os.IsNotExist(err) {
 		log.Fatal("should run build from root dir")
 	}
+
 	if len(os.Args) < 2 {
 		log.Fatal("cmd required, eg: install")
 	}
+
 	switch os.Args[1] {
 	case "install":
 		install(os.Args[2:])
@@ -50,7 +52,7 @@ func main() {
 	}
 }
 
-// #nosec
+//nolint:gosec
 func install(cmdline []string) {
 	var (
 		race  = flag.Bool("race", false, "build Dusk exec with Race enabled")
@@ -62,11 +64,14 @@ func install(cmdline []string) {
 	argsList := append([]string{"list"}, []string{"./..."}...)
 
 	cmd := exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), argsList...)
+
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("could not list packages: %v\n%s", err, string(out))
 	}
+
 	var packages []string
+
 	for _, line := range strings.Split(string(out), "\n") {
 		if strings.Contains(line, "/dusk-blockchain/") && !strings.Contains(line, "/harness") {
 			packages = append(packages, strings.TrimSpace(line))
@@ -77,9 +82,11 @@ func install(cmdline []string) {
 	if *race {
 		argsInstall = append(argsInstall, "-race")
 	}
+
 	if *debug {
 		argsInstall = append(argsInstall, "-gcflags=\"all=-N -l\"")
 	}
+
 	cmd = exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), argsInstall...)
 	cmd.Args = append(cmd.Args, "-v")
 	cmd.Args = append(cmd.Args, packages...)
@@ -90,17 +97,16 @@ func install(cmdline []string) {
 	if err := cmd.Run(); err != nil {
 		log.Fatal("Error: Could not build Dusk. ", "error: ", err, ", cmd: ", cmd)
 	}
-
 }
 
-// #nosec
+//nolint:gosec
 func lint() {
-
 	v := flag.Bool("v", false, "log verbosely")
 
-	// Make sure GOLANGCI is downloaded and available
+	// Make sure GOLANGCI is downloaded and available.
 	argsGet := []string{"get", GOLANGCI_VERSION}
 	cmd := exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), argsGet...)
+
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("could not list pkgs: %v\n%s", err, string(out))

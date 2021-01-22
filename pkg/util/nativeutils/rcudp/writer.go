@@ -14,9 +14,8 @@ import (
 	"github.com/dusk-network/dusk-crypto/hash"
 )
 
-// sendRaptorRFC5053 performs raptor RFC 5053 encoding and writes to the udp socket each of the blocks
+// sendRaptorRFC5053 performs raptor RFC 5053 encoding and writes to the udp socket each of the blocks.
 func sendRaptorRFC5053(conn *net.UDPConn, message []byte, redundancyFactor uint8) error {
-
 	msgID, err := hash.Xxhash(message)
 	if err != nil {
 		return err
@@ -26,10 +25,10 @@ func sendRaptorRFC5053(conn *net.UDPConn, message []byte, redundancyFactor uint8
 	if err != nil {
 		return err
 	}
+
 	blocks := w.GenerateBlocks()
 
 	for _, b := range blocks {
-
 		p := newPacket(
 			msgID, uint16(w.NumSourceSymbols),
 			w.PaddingSize, uint32(w.TransferLength()),
@@ -55,9 +54,8 @@ func sendRaptorRFC5053(conn *net.UDPConn, message []byte, redundancyFactor uint8
 	return err
 }
 
-// Write writes a message to UDP receiver in form of fountain codes
+// Write writes a message to UDP receiver in form of fountain codes.
 func Write(laddr, raddr *net.UDPAddr, message []byte, redundancyFactor uint8) error {
-
 	defer func() {
 		if r := recover(); r != nil {
 			log.WithField("err", r).Warn("Send failed")
@@ -66,6 +64,7 @@ func Write(laddr, raddr *net.UDPAddr, message []byte, redundancyFactor uint8) er
 
 	// Send from same IP that the UDP listener is bound on but choose random port
 	laddr.Port = 0
+
 	conn, err := net.DialUDP("udp4", laddr, raddr)
 	if err != nil {
 		return err

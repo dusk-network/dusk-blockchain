@@ -22,15 +22,13 @@ import (
 )
 
 const (
-	// MaxFrameSize is set based on max block size expected
+	// MaxFrameSize is set based on max block size expected.
 	MaxFrameSize = 500000
 )
 
-var (
-	//ErrExceedMaxLen is the error thrown if the message size exceeds the max
-	//frame length
-	ErrExceedMaxLen = errors.New("message size exceeds max frame length")
-)
+// ErrExceedMaxLen is the error thrown if the message size exceeds the max
+// frame length.
+var ErrExceedMaxLen = errors.New("message size exceeds max frame length")
 
 // Computes the XOR between two [16]byte arrays.
 func xor(a [16]byte, b [16]byte) [16]byte {
@@ -49,10 +47,9 @@ func idXor(a [16]byte, b [16]byte) (uint16, [16]byte) {
 	return classifyDistance(distance), distance
 }
 
-// classifyDistance calculates floor of log2 of the distance between two nodes
-// As per that, classifyDistance returns rank of most significant bit in LE format
+// classifyDistance calculates floor of log2 of the distance between two nodes.
+// As per that, classifyDistance returns rank of most significant bit in LE format.
 func classifyDistance(distance [16]byte) uint16 {
-
 	for i := len(distance) - 1; i >= 0; i-- {
 		if distance[i] == 0 {
 			continue
@@ -73,7 +70,7 @@ func ComputeDistance(peer1, peer2 encoding.PeerInfo) (uint16, [16]byte) {
 	return idXor(peer1.ID, peer2.ID)
 }
 
-// computePeerDummyID is helpful on simplifying ID on local net
+// computePeerDummyID is helpful on simplifying ID on local net.
 /* func computePeerDummyID(ip [4]byte, port uint16) [16]byte {
 	var id [16]byte
 	port -= 10000
@@ -97,12 +94,13 @@ func xorIsBigger(a [16]byte, b [16]byte) bool {
 
 // ------------------ NET UTILS ------------------ //
 
-// GetOutboundIP returns local address
+// GetOutboundIP returns local address.
 func GetOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer func() {
 		_ = conn.Close()
 	}()
@@ -113,7 +111,7 @@ func GetOutboundIP() net.IP {
 	return localAddr.IP
 }
 
-// Format the UDP address, the UDP listener binds on
+// Format the UDP address, the UDP listener binds on.
 func getLocalUDPAddress(port int) net.UDPAddr {
 	laddr := net.UDPAddr{IP: GetOutboundIP()}
 	laddr.Port = port
@@ -121,9 +119,9 @@ func getLocalUDPAddress(port int) net.UDPAddr {
 }
 
 func readTCPFrame(r io.Reader) ([]byte, error) {
-
 	// Read frame length.
 	ln := make([]byte, 4)
+
 	_, err := io.ReadFull(r, ln)
 	if err != nil {
 		return nil, err
@@ -144,7 +142,6 @@ func readTCPFrame(r io.Reader) ([]byte, error) {
 }
 
 func writeTCPFrame(w io.Writer, data []byte) error {
-
 	frameLength := uint32(len(data))
 	if frameLength > MaxFrameSize {
 		return ErrExceedMaxLen
@@ -154,7 +151,9 @@ func writeTCPFrame(w io.Writer, data []byte) error {
 	frame := new(bytes.Buffer)
 
 	var b [4]byte
+
 	binary.LittleEndian.PutUint32(b[:], frameLength)
+
 	if _, err := frame.Write(b[:]); err != nil {
 		return err
 	}
@@ -175,8 +174,8 @@ func writeTCPFrame(w io.Writer, data []byte) error {
 // tcpSend Opens a TCP connection with the peer sent on the params and transmits
 // a stream of bytes. Once transmitted, closes the connection.
 func tcpSend(raddr net.UDPAddr, data []byte) {
-
 	address := raddr.IP.String() + ":" + strconv.Itoa(raddr.Port)
+
 	conn, err := net.Dial("tcp4", address)
 	if err != nil {
 		log.WithError(err).Warnf("Could not establish a peer connection %s.", raddr.String())
@@ -199,11 +198,11 @@ func tcpSend(raddr net.UDPAddr, data []byte) {
 // Gets the local address of the sender `Peer` and the UDPAddress of the
 // receiver `Peer` and sends to it a UDP Packet with the payload inside.
 func sendUDPPacket(laddr, raddr net.UDPAddr, payload []byte) {
-
 	log.WithField("dest", raddr.String()).Tracef("Dialing udp")
 
 	// Send from same IP that the UDP listener is bound on but choose random port
 	laddr.Port = 0
+
 	conn, err := net.DialUDP("udp", &laddr, &raddr)
 	if err != nil {
 		log.WithError(err).Warn("Could not establish a connection with the dest Peer.")
@@ -223,9 +222,8 @@ func sendUDPPacket(laddr, raddr net.UDPAddr, payload []byte) {
 }
 
 // generateRandomDelegates selects n random and distinct items from `in` and
-// copy them into `out` slice (no duplicates)
+// copy them into `out` slice (no duplicates).
 func generateRandomDelegates(beta uint8, in []encoding.PeerInfo, out *[]encoding.PeerInfo) error {
-
 	if in == nil || out == nil {
 		return errors.New("invalid in/out params")
 	}
@@ -235,11 +233,12 @@ func generateRandomDelegates(beta uint8, in []encoding.PeerInfo, out *[]encoding
 	}
 
 	maxval := int64(len(in))
-	// #654
+
 	nBig, err := rand.Int(rand.Reader, big.NewInt(maxval))
 	if err != nil {
 		panic(err)
 	}
+
 	n := nBig.Int64()
 	ind := uint32(n)
 

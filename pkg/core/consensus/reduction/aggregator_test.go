@@ -14,8 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var round = uint64(1)
-var step = uint8(2)
+var (
+	round = uint64(1)
+	step  = uint8(2)
+)
 
 var ttest = map[string]struct {
 	setup func(*Helper)
@@ -52,11 +54,11 @@ var ttest = map[string]struct {
 	*/
 }
 
-// TestAggregation tests that upon collection of a quorum of events, a valid StepVotes get produced
+// TestAggregation tests that upon collection of a quorum of events, a valid StepVotes get produced.
 func TestAggregation(t *testing.T) {
-
 	hash, _ := crypto.RandEntropy(32)
 	messageToSpawn := 3
+
 	for testName, tt := range ttest {
 		t.Run(testName, func(t *testing.T) {
 			// making sure that parallelism does not interfere with the test
@@ -75,6 +77,7 @@ func TestAggregation(t *testing.T) {
 
 			// sending Reduction messages to the aggregator
 			var res *Result
+
 			for _, ev := range evs {
 				// if the aggregator returns a result, the quorum has been
 				// reached. Otherwise it returns nil

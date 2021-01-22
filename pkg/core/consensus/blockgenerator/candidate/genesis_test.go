@@ -66,10 +66,10 @@ func TestGenerateGenesis(t *testing.T) {
 	if err := message.UnmarshalBlock(&buf, b); err != nil {
 		t.Fatalf("expecting decodable hex %s", err.Error())
 	}
-
-	// Print blob
-	// t.Logf("genesis: %s", genesisHex)
 }
+
+// Print blob
+// t.Logf("genesis: %s", genesisHex)
 
 func TestGenesisBlock(t *testing.T) {
 	// read the hard-coded genesis blob for testnet

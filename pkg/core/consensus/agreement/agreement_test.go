@@ -25,7 +25,7 @@ import (
 )
 
 // TestMockValidity ensures that we don't go into a wild goose chase if our
-// mock system gets screwed up
+// mock system gets screwed up.
 func TestMockValidity(t *testing.T) {
 	nr := 50
 	hlp := agreement.NewHelper(nr)
@@ -41,7 +41,7 @@ func TestMockValidity(t *testing.T) {
 }
 
 // Test the accumulation of agreement events. It should result in the agreement
-// component sending a valid certificate
+// component sending a valid certificate.
 func TestAgreement(t *testing.T) {
 	nr := 50
 	hlp := agreement.NewHelper(nr)
@@ -67,7 +67,7 @@ func TestAgreement(t *testing.T) {
 	assert.Equal(t, blk.Header.Hash, results.Blk.Header.Hash)
 }
 
-// Test the usage of the candidate requestor in case of a missing candidate block
+// Test the usage of the candidate requestor in case of a missing candidate block.
 func TestRequestor(t *testing.T) {
 	nr := 50
 	hlp := agreement.NewHelper(nr)
@@ -91,10 +91,14 @@ func TestRequestor(t *testing.T) {
 
 	ctx := context.Background()
 	resChan := make(chan consensus.Results, 1)
+
 	var wg sync.WaitGroup
+
 	wg.Add(1)
+
 	go func() {
 		results := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(blk.Header.Hash))
+
 		wg.Done()
 		resChan <- results
 	}()
@@ -104,8 +108,10 @@ func TestRequestor(t *testing.T) {
 	for {
 		m := <-c
 		b := m.Payload().(message.SafeBuffer).Buffer
+
 		request, err := message.Unmarshal(&b)
 		assert.NoError(t, err)
+
 		if request.Category() == topics.GetCandidate {
 			assert.Equal(t, request.Payload().(message.GetCandidate).Hash, blk.Header.Hash)
 

@@ -67,10 +67,12 @@ func (s *Synchronizer) inSync(currentHeight uint64, blk block.Block) (syncState,
 }
 
 func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState, []bytes.Buffer, error) {
+	var err error
+
 	if blk.Header.Height > currentHeight+1 {
 		// if there is a gap we add the future block to the sequencer
 		s.sequencer.add(blk)
-		var err error
+
 		blk, err = s.sequencer.get(currentHeight + 1)
 		if err != nil {
 			return s.outSync, nil, nil
@@ -82,7 +84,7 @@ func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState
 
 	for _, blk := range blks {
 		// append them all to the ledger
-		if err := s.chain.ProcessSyncBlock(blk); err != nil {
+		if err = s.chain.ProcessSyncBlock(blk); err != nil {
 			log.WithError(err).Debug("could not AcceptBlock")
 			return s.outSync, nil, err
 		}
@@ -91,7 +93,7 @@ func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState
 			// if we reach the target we get into sync mode
 			// and trigger the consensus again
 			go func() {
-				if err := s.chain.ProduceBlock(); err != nil {
+				if err = s.chain.ProduceBlock(); err != nil {
 					// TODO we need to have a recovery procedure rather than
 					// just log and forget
 					log.WithError(err).Error("crunchBlocks exited with error")
@@ -134,10 +136,13 @@ func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err 
 	}
 
 	s.lock.Lock()
+
 	currState := s.state
+
 	if blk.Header.Height > s.highestSeenHeight {
 		s.highestSeenHeight = blk.Header.Height
 	}
+
 	s.lock.Unlock()
 
 	var newState syncState
@@ -151,6 +156,7 @@ func (s *Synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffe
 	s.setSyncTarget(tipHeight, currentHeight+config.MaxInvBlocks)
 
 	var hash []byte
+
 	if err := s.db.View(func(t database.Transaction) error {
 		var err error
 		hash, err = t.FetchBlockHashByHeight(currentHeight)
@@ -183,7 +189,7 @@ func (s *Synchronizer) GetSyncProgress(ctx context.Context, e *node.EmptyRequest
 	return &node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil
 }
 
-// highestSeen gets highestSeenHeight safely
+// highestSeen gets highestSeenHeight safely.
 func (s *Synchronizer) highestSeen() uint64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -196,15 +202,17 @@ func (s *Synchronizer) setState(newState syncState) {
 	s.state = newState
 }
 
-// syncTarget gets syncTargetHeight safely
+// syncTarget gets syncTargetHeight safely.
 func (s *Synchronizer) syncTarget() uint64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.syncTargetHeight
 }
+
 func (s *Synchronizer) setSyncTarget(tipHeight, maxHeight uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
 	s.syncTargetHeight = tipHeight
 	if s.syncTargetHeight > maxHeight {
 		s.syncTargetHeight = maxHeight
@@ -221,8 +229,8 @@ func createGetBlocksMsg(latestHash []byte) *message.GetBlocks {
 func marshalGetBlocks(msg *message.GetBlocks) ([]bytes.Buffer, error) {
 	buf := topics.GetBlocks.ToBuffer()
 	if err := msg.Encode(&buf); err != nil {
-		//FIXME: shall this panic here ?  result 1 (error) is always nil (unparam)
-		//log.Panic(err)
+		// FIXME: shall this panic here ?  result 1 (error) is always nil (unparam)
+		// log.Panic(err)
 		return nil, err
 	}
 

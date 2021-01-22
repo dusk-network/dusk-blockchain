@@ -11,7 +11,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"math"
+	"os"
 	"sync/atomic"
+	"testing"
 
 	"github.com/stretchr/testify/require"
 
@@ -25,11 +29,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	// Import here any supported drivers to verify if they are fully compliant
-	// to the blockchain database layer requirements
-	"io/ioutil"
-	"math"
-	"os"
-	"testing"
+	// to the blockchain database layer requirements.
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -37,12 +37,12 @@ import (
 )
 
 var (
-	// A Driver context
+	// A Driver context.
 	drvr     database.Driver
 	drvrName string
 	db       database.DB
 	storeDir string
-	// Sample chain data to populate DB
+	// Sample chain data to populate DB.
 	blocks []*block.Block
 )
 
@@ -52,7 +52,7 @@ var (
 // An additional role of TestMain (and the entire package) is to provide a
 // simplified and working guideline of database driver usage.
 //
-// Note TestMain must clean up all resources on completion
+// Note TestMain must clean up all resources on completion.
 func TestMain(m *testing.M) {
 	var code int
 
@@ -69,19 +69,21 @@ func TestMain(m *testing.M) {
 }
 
 // _TestDriver executes all tests (declared in this file) in the context of a
-// driver specified by driverName
+// driver specified by driverName.
 func _TestDriver(m *testing.M, driverName string) int {
-	// Cleanup TestMain iteration context
+	// Cleanup TestMain iteration context.
 	defer func() {
 		blocks = make([]*block.Block, 0)
 		db = nil
 		drvr = nil
 		storeDir = ""
+
 		atomic.StoreUint64(&heightCounter, 0)
 	}()
 
 	// Create a temp folder with random name
 	var err error
+
 	storeDir, err = ioutil.TempDir(os.TempDir(), driverName+"_temp_store_")
 	if err != nil {
 		fmt.Println(err)
@@ -190,6 +192,7 @@ func TestStoreBlock(test *testing.T) {
 		test.Fatal(err.Error())
 	}
 }
+
 func TestFetchBlockExists(test *testing.T) {
 	test.Parallel()
 
@@ -226,11 +229,11 @@ func TestFetchBlockExists(test *testing.T) {
 		return nil
 	})
 }
-func TestFetchBlockHeader(test *testing.T) {
 
+func TestFetchBlockHeader(test *testing.T) {
 	test.Parallel()
 
-	// Verify all blocks headers can be fetched by Header.Hash
+	// Verify all blocks headers can be fetched by Header.Hash.
 	err := db.View(func(t database.Transaction) error {
 		for _, b := range blocks {
 			fheader, err := t.FetchBlockHeader(b.Header.Hash)
@@ -253,12 +256,11 @@ func TestFetchBlockHeader(test *testing.T) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		test.Fatal(err.Error())
 	}
 
-	// Block lookup by hash with error
+	// Block lookup by hash with error.
 	_ = db.View(func(t database.Transaction) error {
 		randHash, _ := crypto.RandEntropy(64)
 		_, err := t.FetchBlockHeader(randHash)
@@ -270,14 +272,15 @@ func TestFetchBlockHeader(test *testing.T) {
 		return nil
 	})
 }
+
 func TestFetchBlockTxs(test *testing.T) {
 	test.Parallel()
 
-	// Verify all blocks transactions can be fetched by Header.Hash
+	// Verify all blocks transactions can be fetched by Header.Hash.
 	err := db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
 
-			// Fetch all transactions that belong to this block
+			// Fetch all transactions that belong to this block.
 			fblockTxs, err := t.FetchBlockTxs(block.Header.Hash)
 			if err != nil {
 				test.Fatalf(err.Error())
@@ -288,14 +291,14 @@ func TestFetchBlockTxs(test *testing.T) {
 			}
 
 			// Ensure all retrieved transactions are equal to the original Block.Txs
-			// and the transactions order is the same too
+			// and the transactions order is the same too.
 			for index, oBlockTx := range block.Txs {
 
 				if index >= len(fblockTxs) {
 					return errors.New("missing instance of transactions.Transaction")
 				}
 
-				// Get bytes of the fetched transactions.Transaction
+				// Get bytes of the fetched transactions.Transaction.
 				fblockTx := fblockTxs[index]
 				fetchedBuf := new(bytes.Buffer)
 				_ = transactions.Marshal(fetchedBuf, fblockTx)
@@ -304,7 +307,7 @@ func TestFetchBlockTxs(test *testing.T) {
 					test.Fatal("Empty tx fetched")
 				}
 
-				// Get bytes of the origin transactions.Transaction to compare with
+				// Get bytes of the origin transactions.Transaction to compare with.
 				originBuf := new(bytes.Buffer)
 				_ = transactions.Marshal(originBuf, oBlockTx)
 
@@ -315,16 +318,15 @@ func TestFetchBlockTxs(test *testing.T) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		test.Fatal(err.Error())
 	}
 }
-func TestFetchBlockHashByHeight(test *testing.T) {
 
+func TestFetchBlockHashByHeight(test *testing.T) {
 	test.Parallel()
 
-	// Blocks lookup by Height
+	// Blocks lookup by Height.
 	_ = db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
 			headerHash, err := t.FetchBlockHashByHeight(block.Header.Height)
@@ -341,7 +343,7 @@ func TestFetchBlockHashByHeight(test *testing.T) {
 		return nil
 	})
 
-	// Blocks lookup by Height with error
+	// Blocks lookup by Height with error.
 	_ = db.View(func(t database.Transaction) error {
 		heightEntropy, _ := crypto.RandEntropy(64)
 		randHeight := binary.LittleEndian.Uint64(heightEntropy)
@@ -357,13 +359,9 @@ func TestFetchBlockHashByHeight(test *testing.T) {
 }
 
 // TestAtomicUpdates ensures no change is applied into storage state when DB
-// writable tx does fail
+// writable tx does fail.
+// That said, no parallelism should be applied.
 func TestAtomicUpdates(test *testing.T) {
-
-	// This test ensures that the underlying storage state does not change.
-	// That said, no parallelism should be applied.
-	// test.Parallel()
-
 	genBlocks := generateRandomBlocks(2)
 
 	// Save current storage state to compare later
@@ -378,7 +376,6 @@ func TestAtomicUpdates(test *testing.T) {
 	// read-write Tx
 	forcedError := errors.New("force majeure situation")
 	err := db.Update(func(t database.Transaction) error {
-
 		for height, block := range genBlocks {
 			err := t.StoreBlock(block)
 			if err != nil {
@@ -412,9 +409,8 @@ func TestAtomicUpdates(test *testing.T) {
 	}
 }
 
-// TestReadOnlyTx ensures that a read-only DB tx cannot touch the storage state
+// TestReadOnlyTx ensures that a read-only DB tx cannot touch the storage state.
 func TestReadOnlyTx(test *testing.T) {
-
 	test.Parallel()
 
 	// Save current storage state to compare later
@@ -454,9 +450,8 @@ func TestReadOnlyTx(test *testing.T) {
 	}
 }
 
-// TestReadOnlyDB_Mode ensures a DB in read-only mode can only run read-only Tx
+// TestReadOnlyDB_Mode ensures a DB in read-only mode can only run read-only Tx.
 func TestReadOnlyDB_Mode(test *testing.T) {
-
 	// Skip it for lite driver. Readonly DB mode will be reconsidered with
 	// another issue
 	if drvrName == lite.DriverName {
@@ -465,6 +460,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 
 	// Create database in read-write mode
 	readonly := false
+
 	dbReadWrite, err := drvr.Open(storeDir, protocol.DevNet, readonly)
 	if err != nil {
 		test.Fatal(err.Error())
@@ -480,6 +476,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 
 	// Re-open the storage in read-only mode
 	readonly = true
+
 	dbReadOnly, err := drvr.Open(storeDir, protocol.DevNet, readonly)
 	if err != nil {
 		test.Fatal(err.Error())
@@ -550,6 +547,7 @@ func TestFetchBlockTxByHash(test *testing.T) {
 	test.Parallel()
 
 	var maxTxToFetch uint16 = 30
+
 	done := false
 
 	// Ensure we can fetch one by one each transaction by its TxID without
@@ -600,7 +598,6 @@ func TestFetchBlockTxByHash(test *testing.T) {
 
 		return nil
 	})
-
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -637,7 +634,6 @@ func TestClearDatabase(test *testing.T) {
 	err := db.Update(func(t database.Transaction) error {
 		return t.ClearDatabase()
 	})
-
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -699,6 +695,7 @@ func TestStoreFetchBidValues(test *testing.T) {
 
 	// Update state to after 1000
 	blk := helper.RandomBlock(1200, 1)
+
 	assert.NoError(test, db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(blk)
 	}))
@@ -725,7 +722,6 @@ func TestStoreFetchBidValues(test *testing.T) {
 // This can be called only if all tests have completed.
 // It returns result code 0 if all checks pass.
 func _TestPersistence() int {
-
 	// Closing the driver should release all allocated resources
 	func() {
 		_ = drvr.Close()

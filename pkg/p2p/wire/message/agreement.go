@@ -31,7 +31,7 @@ type (
 	// Normally an Agreement event includes two of these structures. They need to
 	// be kept separated since the BitSet representation of the Signees does not
 	// admit duplicates, whereas the same provisioner may very well be included in
-	// the committee for both Reduction steps
+	// the committee for both Reduction steps.
 	StepVotes struct {
 		Apk       *bls.Apk
 		BitSet    uint64
@@ -42,14 +42,14 @@ type (
 	// StepVotesMsg is the internal message exchanged by the consensus
 	// components (through the signer.SendInternally method). It is not meant for
 	// external communications and therefore it does not have a
-	// Marshal/Unmarshal methods associated
+	// Marshal/Unmarshal methods associated.
 	StepVotesMsg struct {
 		header.Header
 		StepVotes
 	}
 
 	// Agreement is the Event created at the end of the Reduction process. It includes
-	// the aggregated compressed signatures of all voters
+	// the aggregated compressed signatures of all voters.
 	Agreement struct {
 		hdr          header.Header
 		signedVotes  []byte
@@ -58,7 +58,7 @@ type (
 	}
 )
 
-// Copy deeply the StepVotes
+// Copy deeply the StepVotes.
 func (s *StepVotes) Copy() *StepVotes {
 	return &StepVotes{
 		BitSet:    s.BitSet,
@@ -68,25 +68,28 @@ func (s *StepVotes) Copy() *StepVotes {
 	}
 }
 
-// String representation of the Agreement
+// String representation of the Agreement.
 func (a Agreement) String() string {
 	var sb strings.Builder
+
 	_, _ = sb.WriteString(a.hdr.String())
 	_, _ = sb.WriteString(" signature='")
 	_, _ = sb.WriteString(util.StringifyBytes(a.signedVotes))
 	_, _ = sb.WriteString(" repr='")
 	_, _ = sb.WriteString(util.StringifyBytes(a.Repr.Bytes()))
+
 	return sb.String()
 }
 
 // Copy the Agreement is somewhat more expensive than the other structures
 // since it involves Marshaling and Unmarshaling. This is necessary since we do
-// not have access to the underlying BLS structs
+// not have access to the underlying BLS structs.
 func (a Agreement) Copy() payload.Safe {
 	// NOTE: we ignore the error here. Since we deal with a well formed agreement we
-	// assume that the marshaling cannot fail
+	// assume that the marshaling cannot fail.
 	cpy := new(Agreement)
 	cpy.hdr = a.hdr.Copy().(header.Header)
+
 	if a.signedVotes != nil {
 		cpy.signedVotes = make([]byte, len(a.signedVotes))
 		copy(cpy.signedVotes, a.signedVotes)
@@ -98,15 +101,17 @@ func (a Agreement) Copy() payload.Safe {
 	if a.VotesPerStep != nil {
 		// Un-Marshaling the StepVotes for equality
 		cpy.VotesPerStep = make([]*StepVotes, len(a.VotesPerStep))
+
 		for i, vps := range a.VotesPerStep {
 			cpy.VotesPerStep[i] = vps.Copy()
 		}
 	}
+
 	return *cpy
 }
 
-// NewStepVotesMsg creates a StepVotesMsg
-// Deprecated
+// NewStepVotesMsg creates a StepVotesMsg.
+// Deprecated.
 func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) StepVotesMsg {
 	return StepVotesMsg{
 		Header: header.Header{
@@ -119,20 +124,20 @@ func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) Ste
 	}
 }
 
-// Copy deeply the StepVotesMsg
+// Copy deeply the StepVotesMsg.
 func (s StepVotesMsg) Copy() payload.Safe {
 	b := new(bytes.Buffer)
 
-	// #612
 	err := MarshalStepVotes(b, &s.StepVotes)
 	if err != nil {
 		log.WithError(err).Error("StepVotesMsg.Copy, could not MarshalStepVotes")
-		//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
+		// FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
 		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes())
 	}
+
 	sv, err := UnmarshalStepVotes(b)
 	if err != nil {
-		//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
+		// FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
 		log.WithError(err).Error("StepVotesMsg.Copy, could not UnmarshalStepVotes")
 		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes())
 	}
@@ -140,7 +145,7 @@ func (s StepVotesMsg) Copy() payload.Safe {
 	hdrCopy := s.Header.Copy()
 	if hdrCopy == nil {
 		return StepVotesMsg{
-			//FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
+			// FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
 			Header:    NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes()).Header,
 			StepVotes: *sv,
 		}
@@ -155,18 +160,18 @@ func (s StepVotesMsg) Copy() payload.Safe {
 }
 
 // State returns the Header without information about Sender (as this is only
-// for internal communications)
+// for internal communications).
 func (s StepVotesMsg) State() header.Header {
 	return s.Header
 }
 
 // IsEmpty returns whether the StepVotesMsg represents a failed convergence
-// attempt at consensus over a Reduction message
+// attempt at consensus over a Reduction message.
 func (s StepVotes) IsEmpty() bool {
 	return s.Apk == nil
 }
 
-// String representation
+// String representation.
 func (s StepVotes) String() string {
 	var sb strings.Builder
 	_, _ = sb.WriteString(fmt.Sprintf("BitSet: %d Step: %d\n Sig: %v\n Apk: %v\n", s.BitSet, s.Step, s.Signature, s.Apk))
@@ -174,38 +179,38 @@ func (s StepVotes) String() string {
 }
 
 // State returns the message header. This is to comply to the
-// consensus.Message interface
+// consensus.Message interface.
 func (a Agreement) State() header.Header {
 	return a.hdr
 }
 
-// Sender returns the BLS public key of the Sender
+// Sender returns the BLS public key of the Sender.
 func (a Agreement) Sender() []byte {
 	return a.hdr.Sender()
 }
 
-// Cmp compares the big.Int representation of two agreement messages
+// Cmp compares the big.Int representation of two agreement messages.
 func (a Agreement) Cmp(other Agreement) int {
 	return a.Repr.Cmp(other.Repr)
 }
 
-//SetSignature set a signature to the Agreement
+// SetSignature set a signature to the Agreement.
 func (a *Agreement) SetSignature(signedVotes []byte) {
 	a.Repr = new(big.Int).SetBytes(signedVotes)
 	a.signedVotes = signedVotes
 }
 
-// SignedVotes returns the signed vote
+// SignedVotes returns the signed vote.
 func (a Agreement) SignedVotes() []byte {
 	return a.signedVotes
 }
 
-// Equal checks if two agreement messages are the same
+// Equal checks if two agreement messages are the same.
 func (a Agreement) Equal(aev Agreement) bool {
 	return a.Repr.Cmp(aev.Repr) == 0
 }
 
-// GenerateCertificate is used by the Chain component
+// GenerateCertificate is used by the Chain component.
 func (a Agreement) GenerateCertificate() *block.Certificate {
 	return &block.Certificate{
 		StepOneBatchedSig: a.VotesPerStep[0].Signature.Compress(),
@@ -216,7 +221,7 @@ func (a Agreement) GenerateCertificate() *block.Certificate {
 	}
 }
 
-// UnmarshalAgreementMessage unmarshal a network inbound Agreement
+// UnmarshalAgreementMessage unmarshal a network inbound Agreement.
 func UnmarshalAgreementMessage(r *bytes.Buffer, m SerializableMessage) error {
 	aggro := newAgreement()
 	if err := header.Unmarshal(r, &aggro.hdr); err != nil {
@@ -231,7 +236,7 @@ func UnmarshalAgreementMessage(r *bytes.Buffer, m SerializableMessage) error {
 	return nil
 }
 
-// NewStepVotes returns a new StepVotes structure for a given round, step and block hash
+// NewStepVotes returns a new StepVotes structure for a given round, step and block hash.
 func NewStepVotes() *StepVotes {
 	return &StepVotes{
 		Apk:       nil,
@@ -254,8 +259,10 @@ func (s *StepVotes) Add(signature, sender []byte, step uint8) error {
 		if err != nil {
 			return err
 		}
+
 		s.Step = step
 		s.Apk = bls.NewApk(pk)
+
 		s.Signature, err = bls.UnmarshalSignature(signature)
 		if err != nil {
 			return err
@@ -271,6 +278,7 @@ func (s *StepVotes) Add(signature, sender []byte, step uint8) error {
 	if err := s.Apk.AggregateBytes(sender); err != nil {
 		return err
 	}
+
 	if err := s.Signature.AggregateBytes(signature); err != nil {
 		return err
 	}
@@ -297,15 +305,16 @@ func MarshalAgreement(r *bytes.Buffer, a Agreement) error {
 	return nil
 }
 
-// UnmarshalAgreement unmarshals the buffer into an Agreement
+// UnmarshalAgreement unmarshals the buffer into an Agreement.
 // Field order is the following:
 // * Header [BLS Public Key; Round; Step]
-// * Agreement [Signed Vote Set; Vote Set; BlockHash]
+// * Agreement [Signed Vote Set; Vote Set; BlockHash].
 func UnmarshalAgreement(r *bytes.Buffer, a *Agreement) error {
 	signedVotes := make([]byte, 33)
 	if err := encoding.ReadBLS(r, signedVotes); err != nil {
 		return err
 	}
+
 	a.SetSignature(signedVotes)
 
 	votesPerStep := make([]*StepVotes, 2)
@@ -318,7 +327,7 @@ func UnmarshalAgreement(r *bytes.Buffer, a *Agreement) error {
 }
 
 // NewAgreement returns an empty Agreement event. It is supposed to be used by
-// the (secondstep reducer) for creating Agreement messages
+// the (secondstep reducer) for creating Agreement messages.
 func NewAgreement(hdr header.Header) *Agreement {
 	aggro := newAgreement()
 	aggro.hdr = hdr
@@ -326,8 +335,8 @@ func NewAgreement(hdr header.Header) *Agreement {
 }
 
 // newAgreement returns an empty Agreement event. It is used within the
-// UnmarshalAgreement function
-// TODO: interface - []*StepVotes should not be references, but values
+// UnmarshalAgreement function.
+// TODO: interface - []*StepVotes should not be references, but values.
 func newAgreement() *Agreement {
 	return &Agreement{
 		hdr:          header.Header{},
@@ -337,8 +346,8 @@ func newAgreement() *Agreement {
 	}
 }
 
-// SignAgreement signs an aggregated agreement event
-// XXX: either use this function or delete it!! Right now it is not used
+// SignAgreement signs an aggregated agreement event.
+// XXX: either use this function or delete it!! Right now it is not used.
 func SignAgreement(a *Agreement, keys key.Keys) error {
 	buffer := new(bytes.Buffer)
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {
@@ -354,7 +363,7 @@ func SignAgreement(a *Agreement, keys key.Keys) error {
 	return nil
 }
 
-// UnmarshalVotes unmarshals the array of StepVotes for a single Agreement
+// UnmarshalVotes unmarshals the array of StepVotes for a single Agreement.
 func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
@@ -379,16 +388,18 @@ func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	return nil
 }
 
-// UnmarshalStepVotes unmarshals a single StepVote
+// UnmarshalStepVotes unmarshals a single StepVote.
 func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 	sv := NewStepVotes()
+
 	// APK
 	var apk []byte
-	if err := encoding.ReadVarBytes(r, &apk); err != nil {
+
+	err := encoding.ReadVarBytes(r, &apk)
+	if err != nil {
 		return nil, err
 	}
 
-	var err error
 	sv.Apk, err = bls.UnmarshalApk(apk)
 	if err != nil {
 		return nil, err
@@ -413,7 +424,7 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 	return sv, nil
 }
 
-// MarshalVotes marshals an array of StepVotes
+// MarshalVotes marshals an array of StepVotes.
 func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	if err := encoding.WriteVarInt(r, uint64(len(votes))); err != nil {
 		return err
@@ -429,14 +440,14 @@ func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 }
 
 // MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature
-// for an ordered set of votes
+// for an ordered set of votes.
 func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
-
 	// #611
 	if vote == nil || vote.Apk == nil || vote.Signature == nil {
 		log.
 			WithField("vote", vote).
 			Error("could not MarshalStepVotes")
+
 		return errors.New("invalid stepVotes")
 	}
 
@@ -454,11 +465,12 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	if err := encoding.WriteBLS(r, vote.Signature.Compress()); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // MockAgreement returns a mocked Agreement Event, to be used for testing purposes.
-// It includes a vararg iterativeIdx to help avoiding duplicates when testing
+// It includes a vararg iterativeIdx to help avoiding duplicates when testing.
 func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners, iterativeIdx ...int) Agreement {
 	// Make sure we create an event made by an actual voting committee member
 	c := p.CreateVotingCommittee(round, step, len(keys))
@@ -482,31 +494,33 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *us
 
 	whole := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(whole, a.State()); err != nil {
-		//FIXME: shall this panic ?
+		// FIXME: shall this panic ?
 		panic(err)
 	}
 
 	sig, _ := bls.Sign(cKeys[idx].BLSSecretKey, cKeys[idx].BLSPubKey, whole.Bytes())
+
 	a.VotesPerStep = steps
 	a.SetSignature(sig.Compress())
 	return *a
 }
 
-//MockCommitteeVoteSet mocks a VoteSet
+// MockCommitteeVoteSet mocks a VoteSet.
 func MockCommitteeVoteSet(p *user.Provisioners, k []key.Keys, hash []byte, committeeSize int, round uint64, step uint8) []Reduction {
 	c1 := p.CreateVotingCommittee(round, step-2, len(k))
 	c2 := p.CreateVotingCommittee(round, step-1, len(k))
 	cKeys1 := createCommitteeKeySet(c1, k)
 	cKeys2 := createCommitteeKeySet(c2, k)
 	events := createVoteSet(cKeys1, cKeys2, hash, len(cKeys1), round, step)
+
 	return events
 }
 
 // GenVotes randomly generates a slice of StepVotes with the indicated length.
-// Albeit random, the generation is consistent with the rules of Votes
+// Albeit random, the generation is consistent with the rules of Votes.
 func GenVotes(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners) []*StepVotes {
 	if len(keys) < 2 {
-		//FIXME: shall this panic ?
+		// FIXME: shall this panic ?
 		panic("At least two votes are required to mock an Agreement")
 	}
 
@@ -548,8 +562,8 @@ func createCommitteeKeySet(c user.VotingCommittee, k []key.Keys) (keys []key.Key
 func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Keys) (*StepVotes, sortedset.Set) {
 	set := sortedset.New()
 	stepVotes := NewStepVotes()
-	for _, k := range keys {
 
+	for _, k := range keys {
 		// We should not aggregate any given key more than once.
 		_, inserted := set.IndexOf(k.BLSPubKeyBytes)
 		if !inserted {
@@ -562,13 +576,13 @@ func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Key
 
 			r := new(bytes.Buffer)
 			if err := header.MarshalSignableVote(r, h); err != nil {
-				//FIXME: shall this panic ?
+				// FIXME: shall this panic ?
 				panic(err)
 			}
 
 			sigma, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, r.Bytes())
 			if err := stepVotes.Add(sigma.Compress(), k.BLSPubKeyBytes, step); err != nil {
-				//FIXME: shall this panic ?
+				// FIXME: shall this panic ?
 				panic(err)
 			}
 		}

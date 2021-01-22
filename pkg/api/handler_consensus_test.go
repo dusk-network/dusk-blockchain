@@ -22,13 +22,12 @@ import (
 )
 
 func TestConsensusAPISmokeTest(t *testing.T) {
-
 	apiServer, err := NewHTTPServer(nil, nil)
 	if err != nil {
 		t.Errorf("API http server error: %v", err)
 	}
 
-	var tt = []struct {
+	tt := []struct {
 		targetURL string
 		name      string
 		Data      string
@@ -56,23 +55,17 @@ func TestConsensusAPISmokeTest(t *testing.T) {
 	}
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
-
 		for _, tc := range tt {
-
 			t.Run(tc.name, func(t *testing.T) {
-
 				response := r.Get(tc.targetURL)
 				require.NotNil(t, response)
-
 			})
 		}
-
 	})
 }
 
 func TestConsensusAPIProvisioners(t *testing.T) {
-
-	//setup viper timeout
+	// setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
 
@@ -84,8 +77,9 @@ func TestConsensusAPIProvisioners(t *testing.T) {
 	require.Nil(t, err)
 
 	provisioners, _ := consensus.MockProvisioners(5)
+	members := make([]*capi.Member, len(provisioners.Members))
+	i := 0
 
-	var members []*capi.Member
 	for _, v := range provisioners.Members {
 		var stakes []capi.Stake
 
@@ -103,7 +97,8 @@ func TestConsensusAPIProvisioners(t *testing.T) {
 			Stakes:       stakes,
 		}
 
-		members = append(members, &member)
+		members[i] = &member
+		i++
 	}
 
 	provisioner := capi.ProvisionerJSON{
@@ -121,7 +116,6 @@ func TestConsensusAPIProvisioners(t *testing.T) {
 	require.NotNil(t, provisioners)
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
-
 		targetURL := "/consensus/provisioners?height=1"
 		response := r.Get(targetURL)
 		require.NotNil(t, response)
@@ -131,8 +125,7 @@ func TestConsensusAPIProvisioners(t *testing.T) {
 }
 
 func TestConsensusAPIRoundInfo(t *testing.T) {
-
-	//setup viper timeout
+	// setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
 
@@ -144,7 +137,6 @@ func TestConsensusAPIRoundInfo(t *testing.T) {
 	require.Nil(t, err)
 
 	for i := 1; i < 6; i++ {
-
 		// steps array
 		for j := 0; j < 5; j++ {
 			roundInfo := capi.RoundInfoJSON{
@@ -164,7 +156,6 @@ func TestConsensusAPIRoundInfo(t *testing.T) {
 	}
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
-
 		for i := 0; i < 5; i++ {
 			targetURL := fmt.Sprintf("/consensus/roundinfo?height_begin=%d&height_end=6", i)
 			response := r.Get(targetURL)
@@ -181,8 +172,7 @@ func TestConsensusAPIRoundInfo(t *testing.T) {
 }
 
 func TestConsensusAPIEventStatus(t *testing.T) {
-
-	//setup viper timeout
+	// setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
 
@@ -194,7 +184,6 @@ func TestConsensusAPIEventStatus(t *testing.T) {
 	require.Nil(t, err)
 
 	for i := 1; i < 6; i++ {
-
 		// steps array
 		for j := 0; j < 5; j++ {
 			eventQueue := capi.EventQueueJSON{
@@ -210,11 +199,9 @@ func TestConsensusAPIEventStatus(t *testing.T) {
 			require.Nil(t, err)
 			require.NotNil(t, eventQueueList)
 		}
-
 	}
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
-
 		for i := 1; i < 6; i++ {
 			targetURL := fmt.Sprintf("/consensus/eventqueuestatus?height=%d", i)
 			response := r.Get(targetURL)
@@ -225,13 +212,11 @@ func TestConsensusAPIEventStatus(t *testing.T) {
 			body := response.Body
 			fmt.Println(body)
 		}
-
 	})
 }
 
 func TestP2PLogsReader(t *testing.T) {
-
-	//setup viper timeout
+	// setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
 
@@ -260,7 +245,6 @@ func TestP2PLogsReader(t *testing.T) {
 	}
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
-
 		targetURL := "/p2p/logs?type=Reader"
 		response := r.Get(targetURL)
 		require.NotNil(t, response)
@@ -270,13 +254,11 @@ func TestP2PLogsReader(t *testing.T) {
 		fmt.Println(body)
 
 		require.True(t, len(body) > 100)
-
 	})
 }
 
 func TestP2PLogsWriter(t *testing.T) {
-
-	//setup viper timeout
+	// setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
 
@@ -305,7 +287,6 @@ func TestP2PLogsWriter(t *testing.T) {
 	}
 
 	testflight.WithServer(apiServer.Server.Handler, func(r *testflight.Requester) {
-
 		targetURL := "/p2p/logs?type=Writer"
 		response := r.Get(targetURL)
 		require.NotNil(t, response)
@@ -315,6 +296,5 @@ func TestP2PLogsWriter(t *testing.T) {
 		fmt.Println(body)
 
 		require.True(t, len(body) > 100)
-
 	})
 }

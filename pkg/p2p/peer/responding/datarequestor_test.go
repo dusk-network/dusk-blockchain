@@ -8,7 +8,6 @@ package responding_test
 
 import (
 	"bytes"
-
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -21,8 +20,8 @@ import (
 
 func TestRequestData(t *testing.T) {
 	bus := eventbus.New()
-
 	_, db := lite.CreateDBConnection()
+
 	defer func() {
 		_ = db.Close()
 	}()

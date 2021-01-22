@@ -18,7 +18,7 @@ import (
 
 // baseReader implements the common part between both TCPReader and
 // RaptorCodeReader Both readers are capable of processing Broadcast-type
-// messages in kadcast but in different transport
+// messages in kadcast but in different transport.
 type baseReader struct {
 	publisher     eventbus.Publisher
 	gossip        *protocol.Gossip
@@ -30,7 +30,6 @@ type baseReader struct {
 
 func newBaseReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher,
 	gossip *protocol.Gossip, dupeMap *dupemap.DupeMap) *baseReader {
-
 	return &baseReader{
 		lpeer:         lpeerInfo,
 		messageRouter: messageRouter{publisher: publisher, dupeMap: dupeMap},
@@ -40,10 +39,10 @@ func newBaseReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher,
 }
 
 func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
+	var header encoding.Header
 
 	// Unmarshal message header
 	buf := bytes.NewBuffer(b)
-	var header encoding.Header
 	if err := header.UnmarshalBinary(buf); err != nil {
 		log.WithError(err).Warn("reader rejects a packet")
 		return err
@@ -64,6 +63,7 @@ func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
 
 	// Read `message` from gossip frame
 	buf = bytes.NewBuffer(p.GossipFrame)
+
 	message, err := r.gossip.ReadFrame(buf)
 	if err != nil {
 		log.WithError(err).Warnln("could not read the gossip frame")
@@ -94,7 +94,6 @@ func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
 }
 
 func isValidMessage(remotePeerIP string, header encoding.Header) error {
-
 	// Reader handles only broadcast-type messages
 	if header.MsgType != encoding.BroadcastMsg {
 		return errors.New("message type not supported")

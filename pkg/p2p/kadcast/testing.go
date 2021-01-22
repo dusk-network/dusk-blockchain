@@ -22,22 +22,25 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
-// TraceRoutingState logs the routing table of a peer
+// TraceRoutingState logs the routing table of a peer.
 func TraceRoutingState(r *RoutingTable) {
 	peer := r.LpeerInfo
+
 	log.Tracef("this_peer: %s, bucket peers num %d", peer.String(), r.tree.getTotalPeers())
+
 	for _, b := range r.tree.buckets {
 		for _, p := range b.entries {
 			_, dist := ComputeDistance(peer, p)
+
 			log.Tracef("bucket: %d, peer: %s, distance: %s", b.idLength, p.String(), hex.EncodeToString(dist[:]))
 		}
 	}
 }
 
-// testPeerInfo creates a peer with local IP
+// testPeerInfo creates a peer with local IP.
 func testPeerInfo(port uint16) encoding.PeerInfo {
-
 	lAddr := getLocalUDPAddress(int(port))
+
 	var ip [4]byte
 	copy(ip[:], lAddr.IP)
 
@@ -45,22 +48,24 @@ func testPeerInfo(port uint16) encoding.PeerInfo {
 	return peer
 }
 
-// TestRouter creates a peer router with a fixed id
+// TestRouter creates a peer router with a fixed id.
 func TestRouter(port uint16, id [16]byte) *RoutingTable {
-
 	lAddr := getLocalUDPAddress(int(port))
+
 	var ip [4]byte
 	copy(ip[:], lAddr.IP)
 
-	peer := encoding.PeerInfo{IP: ip,
+	peer := encoding.PeerInfo{
+		IP:   ip,
 		Port: port,
-		ID:   id}
+		ID:   id,
+	}
 
 	r := makeRoutingTableFromPeer(peer)
 	return &r
 }
 
-// Node a very limited instance of a node running kadcast peer only
+// Node a very limited instance of a node running kadcast peer only.
 type Node struct {
 	Router   *RoutingTable
 	EventBus *eventbus.EventBus
@@ -97,7 +102,6 @@ func (n *Node) onAcceptBlock(m message.Message) {
 }
 
 func newKadcastNode(r *RoutingTable, eb *eventbus.EventBus) *Node {
-
 	n := &Node{
 		Router:   r,
 		EventBus: eb,
@@ -113,9 +117,8 @@ func newKadcastNode(r *RoutingTable, eb *eventbus.EventBus) *Node {
 }
 
 // TestNode starts a node for testing purposes. A node is represented by a
-// routing state, TCP listener and UDP listener
+// routing state, TCP listener and UDP listener.
 func TestNode(port int) *Node {
-
 	eb := eventbus.New()
 	g := protocol.NewGossip(protocol.TestNet)
 	d := dupemap.NewDupeMap(1)
@@ -160,18 +163,19 @@ func TestNode(port int) *Node {
 
 // TestNetwork initiates kadcast network bootstraping of N nodes. This will run
 // a set of nodes bound on local addresses (port per node), execute
-// bootstrapping and network discovery
+// bootstrapping and network discovery.
 func TestNetwork(num int, basePort int) ([]*Node, error) {
-
 	// List of all peer routers
 	nodes := make([]*Node, 0)
 	bootstrapNodes := make([]encoding.PeerInfo, 0)
 
 	for i := 0; i < num; i++ {
 		n := TestNode(basePort + i)
+
 		if i != 0 {
 			bootstrapNodes = append(bootstrapNodes, n.Router.LpeerInfo)
 		}
+
 		nodes = append(nodes, n)
 	}
 
@@ -195,12 +199,11 @@ func TestNetwork(num int, basePort int) ([]*Node, error) {
 }
 
 // DidNetworkReceivedMsg checks if all network nodes have received the
-// msgPayload only once
+// msgPayload only once.
 func DidNetworkReceivedMsg(nodes []*Node, senderIndex int, sentBlock *block.Block) bool {
-
 	failed := false
-	for i, n := range nodes {
 
+	for i, n := range nodes {
 		// Sender of CHUNK message not needed to be tested
 		if senderIndex == i {
 			continue
@@ -208,40 +211,45 @@ func DidNetworkReceivedMsg(nodes []*Node, senderIndex int, sentBlock *block.Bloc
 
 		received := false
 		duplicated := false
+
 		n.Lock.RLock()
+
 		for _, b := range n.Blocks {
 			if b.Equals(sentBlock) {
 				if received {
 					duplicated = true
 				}
+
 				received = true
 			}
 		}
+
 		n.Lock.RUnlock()
 
 		if !received {
 			failed = true
+			// t.Logf("Peer %s did not receive CHUNK message", n.Router.LpeerInfo.String())
 			break
-			//t.Logf("Peer %s did not receive CHUNK message", n.Router.LpeerInfo.String())
 		}
 
 		if duplicated {
 			failed = true
-			break
 			// t.Logf("Peer %s receive same CHUNK message more than once", n.Router.LpeerInfo.String())
+			break
 		}
 	}
 
 	return !failed
 }
 
-// TestReceivedMsgOnce check periodically (up to 7 sec) if network has received the message
+// TestReceivedMsgOnce check periodically (up to 7 sec) if network has received the message.
 func TestReceivedMsgOnce(t *testing.T, nodes []*Node, i int, blk *block.Block) {
-
 	passed := false
+
 	for y := 0; y < 200; y++ {
 		// Wait a bit so all nodes receives the broadcast message
 		time.Sleep(100 * time.Millisecond)
+
 		if DidNetworkReceivedMsg(nodes, i, blk) {
 			passed = true
 			break

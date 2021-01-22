@@ -33,9 +33,11 @@ var dupeTests = []struct {
 func TestDupeFilter(t *testing.T) {
 	dupeMap := dupemap.NewDupeMap(1)
 	test := bytes.NewBufferString("This is a test")
+
 	for _, tt := range dupeTests {
 		dupeMap.UpdateHeight(tt.height)
 		dupeMap.SetTolerance(tt.tolerance)
+
 		res := dupeMap.CanFwd(test)
 		if !assert.Equal(t, tt.canFwd, res) {
 			assert.FailNowf(t, "failure", "DupeMap.CanFwd: expected %t, got %t with height %d and tolerance %d", res, tt.canFwd, tt.height, tt.tolerance)

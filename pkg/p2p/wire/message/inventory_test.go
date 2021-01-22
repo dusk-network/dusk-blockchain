@@ -21,7 +21,9 @@ import (
 func TestEncodeDecodeInventory(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
 	inv := &message.Inv{}
+
 	inv.AddItem(message.InvTypeBlock, hash)
+
 	buf := new(bytes.Buffer)
 	if err := inv.Encode(buf); err != nil {
 		t.Fatal(err)
@@ -39,6 +41,7 @@ func TestSizeLimit(t *testing.T) {
 	// Encoding
 	hash, _ := crypto.RandEntropy(32)
 	inv := &message.Inv{}
+
 	for i := 0; uint32(i) < config.Get().Mempool.MaxInvItems+1; i++ {
 		inv.AddItem(message.InvTypeBlock, hash)
 	}

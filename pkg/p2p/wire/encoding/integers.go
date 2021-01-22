@@ -16,9 +16,11 @@ import (
 // ReadUint8 will read a single byte into v.
 func ReadUint8(r *bytes.Buffer, v *uint8) error {
 	var b [1]byte
+
 	if _, err := r.Read(b[:]); err != nil {
 		return err
 	}
+
 	*v = b[0]
 	return nil
 }
@@ -27,9 +29,11 @@ func ReadUint8(r *bytes.Buffer, v *uint8) error {
 // assuming little-endian byte order. The result is put into v.
 func ReadUint16LE(r *bytes.Buffer, v *uint16) error {
 	var b [2]byte
+
 	if _, err := r.Read(b[:]); err != nil {
 		return err
 	}
+
 	*v = binary.LittleEndian.Uint16(b[:])
 	return nil
 }
@@ -38,9 +42,11 @@ func ReadUint16LE(r *bytes.Buffer, v *uint16) error {
 // assuming little-endian byte order. The result is put into v.
 func ReadUint32LE(r *bytes.Buffer, v *uint32) error {
 	var b [4]byte
+
 	if _, err := r.Read(b[:]); err != nil {
 		return err
 	}
+
 	*v = binary.LittleEndian.Uint32(b[:])
 	return nil
 }
@@ -49,9 +55,11 @@ func ReadUint32LE(r *bytes.Buffer, v *uint32) error {
 // assuming little-endian byte order. The result is put into v.
 func ReadUint64LE(r *bytes.Buffer, v *uint64) error {
 	var b [8]byte
+
 	if _, err := r.Read(b[:]); err != nil {
 		return err
 	}
+
 	*v = binary.LittleEndian.Uint64(b[:])
 	return nil
 }
@@ -65,7 +73,9 @@ func WriteUint8(w *bytes.Buffer, v uint8) error {
 // WriteUint16LE will write two bytes in little-endian byte order.
 func WriteUint16LE(w *bytes.Buffer, v uint16) error {
 	var b [2]byte
+
 	binary.LittleEndian.PutUint16(b[:], v)
+
 	_, err := w.Write(b[:])
 	return err
 }
@@ -73,7 +83,9 @@ func WriteUint16LE(w *bytes.Buffer, v uint16) error {
 // WriteUint32LE will write four bytes in little-endian byte order.
 func WriteUint32LE(w *bytes.Buffer, v uint32) error {
 	var b [4]byte
+
 	binary.LittleEndian.PutUint32(b[:], v)
+
 	_, err := w.Write(b[:])
 	return err
 }
@@ -81,7 +93,9 @@ func WriteUint32LE(w *bytes.Buffer, v uint32) error {
 // WriteUint64LE will write eight bytes in little-endian byte order.
 func WriteUint64LE(w *bytes.Buffer, v uint64) error {
 	var b [8]byte
+
 	binary.LittleEndian.PutUint64(b[:], v)
+
 	_, err := w.Write(b[:])
 	return err
 }

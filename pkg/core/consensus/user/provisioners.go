@@ -29,7 +29,7 @@ type (
 		Members map[string]*Member `json:"members"`
 	}
 
-	// Stake represents the Provisioner's stake
+	// Stake represents the Provisioner's stake.
 	Stake struct {
 		Amount      uint64 `json:"amount"`
 		StartHeight uint64 `json:"start_height"`
@@ -37,24 +37,26 @@ type (
 	}
 )
 
-// Copy deeply a set of Provisioners
+// Copy deeply a set of Provisioners.
 func (p Provisioners) Copy() Provisioners {
 	cpy := Provisioners{
 		Set:     p.Set.Copy(),
 		Members: make(map[string]*Member),
 	}
+
 	for k, v := range p.Members {
 		cpy.Members[k] = v
 	}
+
 	return cpy
 }
 
-// AddStake appends a stake to the stake set
+// AddStake appends a stake to the stake set.
 func (m *Member) AddStake(stake Stake) {
 	m.Stakes = append(m.Stakes, stake)
 }
 
-// Copy deep a Member
+// Copy deep a Member.
 func (m *Member) Copy() *Member {
 	cpy := &Member{
 		PublicKeyBLS: make([]byte, len(m.PublicKeyBLS)),
@@ -62,6 +64,7 @@ func (m *Member) Copy() *Member {
 	}
 
 	copy(cpy.PublicKeyBLS, m.PublicKeyBLS)
+
 	for i, s := range m.Stakes {
 		cpy.Stakes[i] = Stake{
 			Amount:      s.Amount,
@@ -73,21 +76,23 @@ func (m *Member) Copy() *Member {
 	return cpy
 }
 
-// RemoveStake removes a Stake (most likely because it expired)
+// RemoveStake removes a Stake (most likely because it expired).
 func (m *Member) RemoveStake(idx int) {
 	m.Stakes[idx] = m.Stakes[len(m.Stakes)-1]
 	m.Stakes = m.Stakes[:len(m.Stakes)-1]
 }
 
-// SubtractFromStake detracts an amount from the Stake of a Provisioner
+// SubtractFromStake detracts an amount from the Stake of a Provisioner.
 func (m *Member) SubtractFromStake(amount uint64) uint64 {
 	for i := 0; i < len(m.Stakes); i++ {
 		if m.Stakes[i].Amount > 0 {
 			if m.Stakes[i].Amount < amount {
 				subtracted := m.Stakes[i].Amount
 				m.Stakes[i].Amount = 0
+
 				return subtracted
 			}
+
 			m.Stakes[i].Amount -= amount
 			return amount
 		}
@@ -96,7 +101,7 @@ func (m *Member) SubtractFromStake(amount uint64) uint64 {
 	return 0
 }
 
-// NewProvisioners instantiates the Provisioners sortedset of members
+// NewProvisioners instantiates the Provisioners sortedset of members.
 func NewProvisioners() *Provisioners {
 	return &Provisioners{
 		Set:     sortedset.New(),
@@ -123,9 +128,10 @@ func (p *Provisioners) Add(pubKeyBLS []byte, amount, startHeight, endHeight uint
 
 	// This is a new provisioner, so let's initialize the Member struct and add them to the list
 	p.Set.Insert(pubKeyBLS)
-	m := &Member{}
 
+	m := &Member{}
 	m.PublicKeyBLS = pubKeyBLS
+
 	m.AddStake(stake)
 
 	p.Members[i] = m
@@ -141,6 +147,7 @@ func (p *Provisioners) Add(pubKeyBLS []byte, amount, startHeight, endHeight uint
 // after they expire.
 func (p Provisioners) SubsetSizeAt(round uint64) int {
 	var size int
+
 	for _, member := range p.Members {
 		for _, stake := range member.Stakes {
 			if stake.StartHeight <= round && round <= stake.EndHeight {
@@ -158,6 +165,7 @@ func (p Provisioners) MemberAt(i int) (*Member, error) {
 	if i > len(p.Set)-1 {
 		return nil, errors.New("index out of bound")
 	}
+
 	bigI := p.Set[i]
 	return p.Members[string(bigI.Bytes())], nil
 }
@@ -187,7 +195,7 @@ func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 	return totalStake, nil
 }
 
-// TotalWeight is the sum of all stakes of the provisioners
+// TotalWeight is the sum of all stakes of the provisioners.
 func (p *Provisioners) TotalWeight() (totalWeight uint64) {
 	for _, member := range p.Members {
 		for _, stake := range member.Stakes {
@@ -247,7 +255,7 @@ func marshalStake(r *bytes.Buffer, stake Stake) error {
 	return nil
 }
 
-// UnmarshalProvisioners unmarshal provisioner set from a buffer
+// UnmarshalProvisioners unmarshal provisioner set from a buffer.
 func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 	lMembers, err := encoding.ReadVarInt(r)
 	if err != nil {
@@ -265,6 +273,7 @@ func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 	// Reconstruct sorted set and member map
 	set := sortedset.New()
 	memberMap := make(map[string]*Member)
+
 	for _, member := range members {
 		set.Insert(member.PublicKeyBLS)
 		memberMap[string(member.PublicKeyBLS)] = member

@@ -21,9 +21,8 @@ const (
 
 var initialArgs = os.Args
 
-// Changes in default.dusk.toml might break this test
+// Changes in default.dusk.toml might break this test.
 func TestDefaultConfigTOML(t *testing.T) {
-
 	Reset()
 
 	// This relies on default.dusk.toml
@@ -44,9 +43,8 @@ func TestDefaultConfigTOML(t *testing.T) {
 }
 
 // TestSupportedFlags to ensure all supported flags are properly bound and they
-// overwrite the values loaded from the config file
+// overwrite the values loaded from the config file.
 func TestSupportedFlags(t *testing.T) {
-
 	Reset()
 
 	// Mock command line arguments
@@ -81,12 +79,11 @@ func TestSupportedFlags(t *testing.T) {
 
 // TestSupportedEnv
 //
-// ensures all supported ENV variables are properly bound and they overwrite the
-// values loaded from the config file
+// Ensures all supported ENV variables are properly bound and they overwrite the
+// values loaded from the config file.
 //
-// ensures all supported EVN have lower priority than CLI flags
+// Ensures all supported EVN have lower priority than CLI flags.
 func TestSupportedEnv(t *testing.T) {
-
 	Reset()
 
 	// Mock command line arguments
@@ -111,7 +108,6 @@ func TestSupportedEnv(t *testing.T) {
 }
 
 func TestReadOnly(t *testing.T) {
-
 	Reset()
 
 	// Mock command line arguments
@@ -135,7 +131,6 @@ func TestReadOnly(t *testing.T) {
 }
 
 func TestSecondaryRegistry(t *testing.T) {
-
 	Reset()
 
 	// Mock command line arguments
@@ -144,6 +139,7 @@ func TestSecondaryRegistry(t *testing.T) {
 	type customConfiguration struct {
 		Key string
 	}
+
 	type SecondaryRegistry struct {
 		Custom customConfiguration
 	}
@@ -170,12 +166,12 @@ func TestSecondaryRegistry(t *testing.T) {
 	if Get().Profile[1].Name != "cpu" {
 		t.Errorf("Invalid Profile [1]: %s", Get().Profile[1].Name)
 	}
-
 }
 
 func Reset() {
 	pflag.CommandLine = &pflag.FlagSet{}
 	pflag.Usage = func() {}
+
 	viper.Reset()
 
 	os.Args = initialArgs

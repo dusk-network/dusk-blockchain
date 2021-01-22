@@ -12,13 +12,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	// DriverName is the unique identifier for the lite driver
-	DriverName = "lite_v0.1.0"
-)
+// DriverName is the unique identifier for the lite driver.
+var DriverName = "lite_v0.1.0"
 
-type driver struct {
-}
+type driver struct{}
 
 func (d *driver) Open(path string, network protocol.Magic, readonly bool) (database.DB, error) {
 	return NewDatabase(path, network, readonly)
@@ -39,7 +36,7 @@ func init() {
 	}
 }
 
-// CreateDBConnection creates a connection to the DB
+// CreateDBConnection creates a connection to the DB.
 func CreateDBConnection() (database.Driver, database.DB) {
 	drvr, err := database.From(DriverName)
 	if err != nil {

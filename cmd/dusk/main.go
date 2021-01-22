@@ -59,5 +59,6 @@ func handlePanic() {
 	if r := recover(); r != nil {
 		log.WithError(fmt.Errorf("%+v", r)).Errorln("Application panic")
 	}
+
 	time.Sleep(time.Second * 1)
 }

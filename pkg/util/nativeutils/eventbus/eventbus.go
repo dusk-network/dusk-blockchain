@@ -14,9 +14,9 @@ var _ Broker = (*EventBus)(nil)
 
 var logEB = lg.WithField("process", "eventbus")
 
-// TopicProcessor is the interface for preprocessing events belonging to a specific topic
+// TopicProcessor is the interface for preprocessing events belonging to a specific topic.
 type (
-	// Broker is an Publisher and an Subscriber
+	// Broker is an Publisher and an Subscriber.
 	Broker interface {
 		Subscriber
 		Publisher

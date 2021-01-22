@@ -17,12 +17,14 @@ import (
 
 func TestEncodeDecodeGetBlocks(t *testing.T) {
 	var hashes [][]byte
+
 	for i := 0; i < 5; i++ {
 		hash, _ := crypto.RandEntropy(32)
 		hashes = append(hashes, hash)
 	}
 
 	getBlocks := &message.GetBlocks{hashes}
+
 	buf := new(bytes.Buffer)
 	if err := getBlocks.Encode(buf); err != nil {
 		t.Fatal(err)

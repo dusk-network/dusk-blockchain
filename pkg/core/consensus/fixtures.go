@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockEmitter is a utility to quickly wire up an emitter in tests
+// MockEmitter is a utility to quickly wire up an emitter in tests.
 func MockEmitter(consTimeout time.Duration, proxy transactions.Proxy) *Emitter {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
@@ -49,20 +49,23 @@ func StupidEmitter() (*Emitter, *user.Provisioners) {
 		P:  transactions.PermissiveProvisioner{},
 		BG: transactions.MockBlockGenerator{},
 	}
+
 	emitter := MockEmitter(time.Second, mockProxy)
 	emitter.Keys = provisionersKeys[0]
+
 	return emitter, p
 }
 
-// MockRoundUpdate mocks a round update
+// MockRoundUpdate mocks a round update.
 func MockRoundUpdate(round uint64, p *user.Provisioners) RoundUpdate {
-	var provisioners = p
+	provisioners := p
 	if p == nil {
 		provisioners, _ = MockProvisioners(1)
 	}
 
 	seed, _ := crypto.RandEntropy(33)
 	hash, _ := crypto.RandEntropy(32)
+
 	return RoundUpdate{
 		Round:           round,
 		P:               *provisioners,
@@ -72,11 +75,11 @@ func MockRoundUpdate(round uint64, p *user.Provisioners) RoundUpdate {
 	}
 }
 
-// MockProvisioners mock a Provisioner set
+// MockProvisioners mock a Provisioner set.
 func MockProvisioners(amount int) (*user.Provisioners, []key.Keys) {
 	p := user.NewProvisioners()
-
 	k := make([]key.Keys, amount)
+
 	for i := 0; i < amount; i++ {
 		keys, _ := key.NewRandKeys()
 		member := MockMember(keys)
@@ -85,16 +88,18 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.Keys) {
 		p.Set.Insert(keys.BLSPubKeyBytes)
 		k[i] = keys
 	}
+
 	return p, k
 }
 
-// MockMember mocks a Provisioner
+// MockMember mocks a Provisioner.
 func MockMember(keys key.Keys) *user.Member {
 	member := &user.Member{}
 	member.PublicKeyBLS = keys.BLSPubKeyBytes
 	member.Stakes = make([]user.Stake, 1)
 	member.Stakes[0].Amount = 500
 	member.Stakes[0].EndHeight = 10000
+
 	return member
 }
 
@@ -118,28 +123,30 @@ func (m *mockPhase) Run(ctx context.Context, queue *Queue, evChan chan message.M
 	if stop := m.callback(ctx); stop {
 		return nil
 	}
+
 	return m
 }
 
 // MockPhase mocks up a consensus phase. It accepts a (recursive) function which returns a
 // boolean indicating whether the consensus loop needs to return, or an error.
 // If function returns true, it halts the consensus loop. An error indicates
-// unrecoverable situation
+// unrecoverable situation.
 func MockPhase(cb func(ctx context.Context) bool) Phase {
 	if cb == nil {
 		cb = func(ctx context.Context) bool {
 			return true
 		}
 	}
+
 	return &mockPhase{cb, nil}
 }
 
-// TestCallback is a callback to allow for table testing based on step results
+// TestCallback is a callback to allow for table testing based on step results.
 type TestCallback func(*require.Assertions, InternalPacket, *eventbus.GossipStreamer)
 
 // TestPhase is the phase to inject in the step under test to allow for table
 // testing. It treats the packet injected through the Fn method as the result
-// to test
+// to test.
 type TestPhase struct {
 	callback TestCallback
 	packet   InternalPacket
@@ -147,7 +154,7 @@ type TestPhase struct {
 	streamer *eventbus.GossipStreamer
 }
 
-// NewTestPhase returns a Phase implementation suitable for testing steps
+// NewTestPhase returns a Phase implementation suitable for testing steps.
 func NewTestPhase(t *testing.T, callback TestCallback, streamer *eventbus.GossipStreamer) *TestPhase {
 	return &TestPhase{
 		req:      require.New(t),
@@ -155,17 +162,18 @@ func NewTestPhase(t *testing.T, callback TestCallback, streamer *eventbus.Gossip
 		streamer: streamer,
 	}
 }
+
 func (t *TestPhase) String() string {
 	return "test"
 }
 
-// Initialize is used by the step under test to provide its result
+// Initialize is used by the step under test to provide its result.
 func (t *TestPhase) Initialize(sv InternalPacket) PhaseFn {
 	t.packet = sv
 	return t
 }
 
-// Run does nothing else than delegating to the specified callback
+// Run does nothing else than delegating to the specified callback.
 func (t *TestPhase) Run(_ context.Context, queue *Queue, _ chan message.Message, _ RoundUpdate, step uint8) PhaseFn {
 	t.callback(t.req, t.packet, t.streamer)
 	return nil
@@ -183,9 +191,10 @@ func MockScoreMsg(t *testing.T, hdr *header.Header) message.Message {
 		h = *hdr
 	}
 
-	// mock candidate
+	// Mock candidate
 	genesis := config.DecodeGenesis()
 	genesis.Header.Hash = h.BlockHash
 	se := message.MockScore(h, *genesis)
+
 	return message.New(topics.Score, se)
 }

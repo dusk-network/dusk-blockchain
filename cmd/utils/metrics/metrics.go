@@ -30,10 +30,9 @@ var (
 	node               *engine.DuskNode
 	pendingTx          int
 	currentBlockNumber uint64
-	//rpcClient       *Client
 )
 
-// DuskInfo is the placeholder for exporter metrics
+// DuskInfo is the placeholder for exporter metrics.
 type DuskInfo struct {
 	ContractsCreated   int64
 	TokenTransfers     int64
@@ -48,7 +47,7 @@ type DuskInfo struct {
 	NodeAPIPort        int
 }
 
-// RunMetrics will run the metrics collection endpoint
+// RunMetrics will run the metrics collection endpoint.
 func RunMetrics(gqlPort, nodePort, nodeAPIPort, port int, hostname string) {
 	duskInfo = new(DuskInfo)
 	duskInfo.TotalDusk = big.NewInt(0)
@@ -58,7 +57,9 @@ func RunMetrics(gqlPort, nodePort, nodeAPIPort, port int, hostname string) {
 	localNet.AddNode(node)
 
 	duskInfo.GQLEndpoint = "http://" + node.Cfg.Gql.Address + "/graphql"
+
 	fmt.Printf("Instantiate graphQL client\n")
+
 	duskInfo.GQLClient = graphql.NewClient(duskInfo.GQLEndpoint)
 
 	// Instantiate gRPC client
@@ -67,29 +68,29 @@ func RunMetrics(gqlPort, nodePort, nodeAPIPort, port int, hostname string) {
 	go Routine()
 
 	http.HandleFunc("/metrics", HandlerMetrics)
+
 	err := http.ListenAndServe(hostname+":"+strconv.Itoa(port), nil)
 	if err != nil {
 		panic(err)
 	}
-
 }
 
-// Routine its a infinite loop that collects metrics
+// Routine its a infinite loop that collects metrics.
 func Routine() {
-
 	for {
-
 		t1 := time.Now()
+
 		var err error
+
 		pendingTx, err = pendingTransactionCount(duskInfo)
 		if err != nil {
 			fmt.Printf("ERROR: pendingTransactionCount: %+v\n", err)
 		}
 
-		//newBlock, err := getBlockByNumber(duskInfo, map[string]interface{}{"height": currentBlockNumber + 1})
+		// newBlock, err := getBlockByNumber(duskInfo, map[string]interface{}{"height": currentBlockNumber + 1})
 		newBlock, err := getLatestBlock(duskInfo, currentBlockNumber+1)
 		if err != nil {
-			//fmt.Printf("ERROR: getBlockByNumber: %+v\n", err)
+			// fmt.Printf("ERROR: getBlockByNumber: %+v\n", err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -97,10 +98,10 @@ func Routine() {
 		currentBlockNumber = newBlock.Header.Height
 
 		if currentBlock == nil {
-
 			lastBlockUpdate = time.Now()
 			currentBlock = newBlock
 			diff := lastBlockUpdate.Sub(t1)
+
 			fmt.Printf("Received first block #%v\n", currentBlock.Header.Height)
 
 			previousBlockNum := currentBlock.Header.Height - 1
@@ -116,9 +117,9 @@ func Routine() {
 
 			duskInfo.EffectiveBlockTime = int64(time.Unix(newTimestamp.Unix(), 0).Sub(time.Unix(lastTimestamp.Unix(), 0)).Seconds())
 			duskInfo.LoadTime = diff.Seconds()
-
 			continue
 		}
+
 		if newBlock.Header.Height > currentBlock.Header.Height {
 			fmt.Printf("Received a new block #%v\n", newBlock.Header.Height)
 			currentBlock = newBlock
@@ -145,7 +146,7 @@ func Routine() {
 	}
 }
 
-// HandlerMetrics is a HTTP response handler for /metrics
+// HandlerMetrics is a HTTP response handler for /metrics.
 func HandlerMetrics(w http.ResponseWriter, r *http.Request) {
 	var allOut []string
 
@@ -180,7 +181,8 @@ func HandlerMetrics(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintln(w, strings.Join(allOut, "\n"))
 }
 
-// CalculateTotals will calculate totals for a block
+//nolint
+// CalculateTotals will calculate totals for a block.
 func CalculateTotals(block *Block) {
 	duskInfo.TotalDusk = big.NewInt(0)
 	duskInfo.ContractsCreated = 0
@@ -188,11 +190,10 @@ func CalculateTotals(block *Block) {
 	duskInfo.DuskTransfers = 0
 
 	for _, b := range block.Txs {
+		// TODO: calculate contracts created
+		// duskInfo.ContractsCreated++
 
-		//TODO: calculate contracts created
-		//duskInfo.ContractsCreated++
-
-		//TODO: implement other types ?
+		// TODO: implement other types ?
 		if len(b.Data) > 0 {
 			duskInfo.TokenTransfers++
 		}
@@ -205,9 +206,9 @@ func CalculateTotals(block *Block) {
 		//	totalDusk = totalDusk + int64(v.Value())
 		//}
 
-		//duskInfo.TotalDusk.Add(duskInfo.TotalDusk, big.NewInt(totalDusk))
+		// duskInfo.TotalDusk.Add(duskInfo.TotalDusk, big.NewInt(totalDusk))
 	}
 
-	//size := strings.Split(currentBlock.Size().String(), " ")
-	//duskInfo.BlockSize = stringToFloat(size[0]) * 1000
+	// size := strings.Split(currentBlock.Size().String(), " ")
+	// duskInfo.BlockSize = stringToFloat(size[0]) * 1000
 }

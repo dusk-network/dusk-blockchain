@@ -45,6 +45,7 @@ func TestBitIntersect(t *testing.T) {
 		k, _ := crypto.RandEntropy(32)
 		bk := (&big.Int{}).SetBytes(k)
 		set = append(set, bk)
+
 		if rand.Intn(100) < 30 {
 			subset = append(subset, bk)
 		}
@@ -62,11 +63,13 @@ func TestBitIntersect(t *testing.T) {
 func TestRemove(t *testing.T) {
 	nr := 5
 	set := New()
+
 	for i := 0; i < nr; i++ {
 		k, _ := crypto.RandEntropy(32)
 		bk := (&big.Int{}).SetBytes(k)
 		set = append(set, bk)
 	}
+
 	sort.Sort(set)
 
 	lastElem := set[nr-1].Bytes()
@@ -103,7 +106,9 @@ func BenchmarkInsert(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
+
 		bytes := big.NewInt(int64(rand.Uint64())).Bytes()
+
 		b.StartTimer()
 		v.Insert(bytes)
 	}

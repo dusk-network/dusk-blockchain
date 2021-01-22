@@ -15,7 +15,7 @@ import (
 
 var defaultTolerance uint64 = 3
 
-// TODO: DupeMap should deal with value bytes.Buffer rather than pointers as it is not supposed to mutate the struct
+// TODO: DupeMap should deal with value bytes.Buffer rather than pointers as it is not supposed to mutate the struct.
 //nolint:golint
 type DupeMap struct {
 	round     uint64
@@ -28,6 +28,7 @@ type DupeMap struct {
 func Launch(eventBus eventbus.Broker) *DupeMap {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 	dupeBlacklist := NewDupeMap(1)
+
 	go func() {
 		for {
 			blk := <-acceptedBlockChan
@@ -35,12 +36,14 @@ func Launch(eventBus eventbus.Broker) *DupeMap {
 			dupeBlacklist.UpdateHeight(blk.Header.Height)
 		}
 	}()
+
 	return dupeBlacklist
 }
 
-// NewDupeMap returns a DupeMap
+// NewDupeMap returns a DupeMap.
 func NewDupeMap(round uint64) *DupeMap {
 	tmpMap := NewTmpMap(defaultTolerance)
+
 	return &DupeMap{
 		round,
 		tmpMap,
@@ -48,23 +51,24 @@ func NewDupeMap(round uint64) *DupeMap {
 	}
 }
 
-// UpdateHeight for a round
+// UpdateHeight for a round.
 func (d *DupeMap) UpdateHeight(round uint64) {
 	d.tmpMap.UpdateHeight(round)
 }
 
-// SetTolerance for a round
+// SetTolerance for a round.
 func (d *DupeMap) SetTolerance(roundNr uint64) {
 	threshold := d.tmpMap.Height() - roundNr
 	d.tmpMap.DeleteBefore(threshold)
 	d.tmpMap.SetTolerance(roundNr)
 }
 
-// CanFwd payload
+// CanFwd payload.
 func (d *DupeMap) CanFwd(payload *bytes.Buffer) bool {
 	found := d.tmpMap.HasAnywhere(payload)
 	if found {
 		return false
 	}
+
 	return !d.tmpMap.Add(payload)
 }

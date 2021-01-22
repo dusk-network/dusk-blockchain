@@ -18,7 +18,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Helper for reducing test boilerplate
+// Helper for reducing test boilerplate.
 type Helper struct {
 	*consensus.Emitter
 	ThisSender       []byte
@@ -27,7 +27,7 @@ type Helper struct {
 	Nr               int
 }
 
-// NewHelper creates a Helper
+// NewHelper creates a Helper.
 func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	p, provisionersKeys := consensus.MockProvisioners(provisioners)
 
@@ -39,7 +39,6 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	emitter.Keys = provisionersKeys[0]
 
 	hlp := &Helper{
-
 		ThisSender:       emitter.Keys.BLSPubKeyBytes,
 		ProvisionersKeys: provisionersKeys,
 		P:                p,
@@ -52,7 +51,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	return hlp
 }
 
-// MockRPCCalls makes sure that the RPCBus methods are registered
+// MockRPCCalls makes sure that the RPCBus methods are registered.
 func (hlp *Helper) MockRPCCalls(provisionersKeys []key.Keys) {
 	hlp.processMempoolTxsBySize()
 }
@@ -66,7 +65,9 @@ func (hlp *Helper) processMempoolTxsBySize() {
 	go func() {
 		for {
 			r := <-v
+
 			log.Debug("sending mocked topics.GetMempoolTxsBySize back")
+
 			r.RespChan <- rpcbus.NewResponse([]transactions.ContractCall{}, nil)
 		}
 	}()

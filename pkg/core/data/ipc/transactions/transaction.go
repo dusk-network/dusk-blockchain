@@ -21,24 +21,24 @@ import (
 type TxType uint32
 
 const (
-	// Tx indicates the phoenix transaction type
+	// Tx indicates the phoenix transaction type.
 	Tx TxType = iota
-	// Distribute indicates the coinbase and reward distribution contract call
+	// Distribute indicates the coinbase and reward distribution contract call.
 	Distribute
-	// WithdrawFees indicates the Provisioners' withdraw contract call
+	// WithdrawFees indicates the Provisioners' withdraw contract call.
 	WithdrawFees
-	// Bid transaction propagated by the Block Generator
+	// Bid transaction propagated by the Block Generator.
 	Bid
-	// Stake transaction propagated by the Provisioners
+	// Stake transaction propagated by the Provisioners.
 	Stake
 	// Slash transaction propagated by the consensus to punish the Committee
-	// members when they turn byzantine
+	// members when they turn byzantine.
 	Slash
 	// WithdrawStake transaction propagated by the Provisioners to withdraw
-	// their stake
+	// their stake.
 	WithdrawStake
 	// WithdrawBid transaction propagated by the Block Generator to withdraw
-	// their bids
+	// their bids.
 	WithdrawBid
 )
 
@@ -75,6 +75,7 @@ func MTransaction(r *rusk.Transaction, f *Transaction) {
 	r.TxPayload.SpendingProof = new(rusk.Proof)
 	r.Version = f.Version
 	r.Type = uint32(f.TxType)
+
 	MTransactionPayload(r.TxPayload, f.TxPayload)
 }
 
@@ -82,6 +83,7 @@ func MTransaction(r *rusk.Transaction, f *Transaction) {
 func UTransaction(r *rusk.Transaction, f *Transaction) {
 	f.Version = r.Version
 	f.TxType = TxType(r.Type)
+
 	UTransactionPayload(r.TxPayload, f.TxPayload)
 }
 
@@ -108,29 +110,29 @@ func UnmarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 	if err := encoding.ReadUint32LE(r, &t); err != nil {
 		return err
 	}
-	f.TxType = TxType(t)
 
+	f.TxType = TxType(t)
 	return UnmarshalTransactionPayload(r, f.TxPayload)
 }
 
 // ContractCall is the transaction that embodies the execution parameter for a
-// smart contract method invocation
+// smart contract method invocation.
 type ContractCall interface {
 	payload.Safe
 	merkletree.Payload
 
-	// StandardTx returns the payload
+	// StandardTx returns the payload.
 	StandardTx() *TransactionPayload
 
-	// Type indicates the transaction
+	// Type indicates the transaction.
 	Type() TxType
 
 	// Obfuscated returns true if the TransactionOutputs consists of Obfuscated
-	// Notes, false if they are transparent
+	// Notes, false if they are transparent.
 	Obfuscated() bool
 
 	// Values returns a tuple where the first element is the sum of all transparent
-	// outputs' note values and the second is the fee
+	// outputs' note values and the second is the fee.
 	Values() (amount uint64, fee uint64)
 }
 
@@ -177,19 +179,19 @@ func (t Transaction) Type() TxType {
 
 // Obfuscated returns whether or not the outputs of this transaction
 // are obfuscated.
-// TODO: implement
+// TODO: implement.
 func (t Transaction) Obfuscated() bool {
 	return true
 }
 
 // Values returns the amount and fee spent in this transaction.
-// TODO: implement
+// TODO: implement.
 func (t Transaction) Values() (amount uint64, fee uint64) {
 	return
 }
 
 // Equal checks equality between two transactions.
-// TODO: implement
+// TODO: implement.
 func Equal(t, other ContractCall) bool {
 	if t.Type() != other.Type() {
 		return false
@@ -223,12 +225,14 @@ func (b *BidTransaction) Copy() *BidTransaction {
 // MBidTransaction copies the BidTransaction structure into the Rusk equivalent.
 func MBidTransaction(r *rusk.BidTransaction, f *BidTransaction) {
 	r.BidTreeStorageIndex = f.BidTreeStorageIndex
+
 	MTransaction(r.Tx, f.Tx)
 }
 
 // UBidTransaction copies the Rusk BidTransaction structure into the native equivalent.
 func UBidTransaction(r *rusk.BidTransaction, f *BidTransaction) {
 	f.BidTreeStorageIndex = r.BidTreeStorageIndex
+
 	UTransaction(r.Tx, f.Tx)
 }
 

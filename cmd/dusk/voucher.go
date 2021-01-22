@@ -18,7 +18,7 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
-// ConnectToVoucher initializes the connection with the Voucher Seeder
+// ConnectToVoucher initializes the connection with the Voucher Seeder.
 func ConnectToVoucher() []string {
 	if cfg.Get().General.Network == "testnet" {
 		fixedNetwork := cfg.Get().Network.Seeder.Fixed
@@ -38,11 +38,13 @@ func ConnectToVoucher() []string {
 	if err != nil {
 		log.WithError(err).Panic("Could not connect to voucher")
 	}
+
 	log.Debugln("connected to voucher seeder")
 
 	if err := completeChallenge(conn); err != nil {
 		log.Panic(err)
 	}
+
 	log.Debugln("voucher seeder challenge completed")
 
 	// get IP list
@@ -57,6 +59,7 @@ func ConnectToVoucher() []string {
 	go func() {
 		for {
 			time.Sleep(4 * time.Second)
+
 			_, err := conn.Write([]byte{1})
 			if err != nil {
 				log.WithError(err).Warnln("error pinging voucher seeder")

@@ -61,11 +61,13 @@ func TestEqual(t *testing.T) {
 
 func createTestCluster() Cluster {
 	v := NewCluster()
+
 	v.Insert(big.NewInt(45).Bytes())
 	v.Insert(big.NewInt(34).Bytes())
 	v.Insert(big.NewInt(34).Bytes())
 	v.Insert(big.NewInt(34).Bytes())
 	v.Insert(big.NewInt(63).Bytes())
+
 	return v
 }
 
@@ -74,7 +76,9 @@ func BenchmarkClusterInsert(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
+
 		bytes := big.NewInt(int64(rand.Uint64())).Bytes()
+
 		b.StartTimer()
 		v.Insert(bytes)
 	}

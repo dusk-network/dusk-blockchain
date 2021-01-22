@@ -19,9 +19,11 @@ import (
 // and return it.
 func ReadBool(r *bytes.Buffer, b *bool) error {
 	var v uint8
+
 	if err := ReadUint8(r, &v); err != nil {
 		return err
 	}
+
 	*b = v != 0
 	return nil
 }
@@ -29,9 +31,11 @@ func ReadBool(r *bytes.Buffer, b *bool) error {
 // WriteBool will write a boolean value as a single byte into w.
 func WriteBool(w *bytes.Buffer, b bool) error {
 	v := uint8(0)
+
 	if b {
 		v = 1
 	}
+
 	return WriteUint8(w, v)
 }
 
@@ -40,9 +44,11 @@ func Read256(r *bytes.Buffer, b []byte) error {
 	if len(b) != 32 {
 		return errors.New("buffer for Read256 should be 32 bytes")
 	}
+
 	if _, err := r.Read(b); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -51,6 +57,7 @@ func Write256(w *bytes.Buffer, b []byte) error {
 	if len(b) != 32 {
 		return fmt.Errorf("b is not proper size - expected 32 bytes, is actually %d bytes", len(b))
 	}
+
 	_, err := w.Write(b)
 	return err
 }
@@ -60,9 +67,11 @@ func Read512(r *bytes.Buffer, b []byte) error {
 	if len(b) != 64 {
 		return errors.New("buffer for Read512 should be 64 bytes")
 	}
+
 	if _, err := r.Read(b); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -71,6 +80,7 @@ func Write512(w *bytes.Buffer, b []byte) error {
 	if len(b) != 64 {
 		return fmt.Errorf("b is not proper size - expected 64 bytes, is actually %d bytes", len(b))
 	}
+
 	_, err := w.Write(b)
 	return err
 }
@@ -80,9 +90,11 @@ func ReadBLS(r *bytes.Buffer, b []byte) error {
 	if len(b) != 33 {
 		return errors.New("buffer for ReadBLS should be 33 bytes")
 	}
+
 	if _, err := r.Read(b); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -91,6 +103,7 @@ func WriteBLS(w *bytes.Buffer, b []byte) error {
 	if len(b) != 33 {
 		return fmt.Errorf("b is not proper size - expected 33 bytes, is actually %d bytes", len(b))
 	}
+
 	_, err := w.Write(b)
 	return err
 }

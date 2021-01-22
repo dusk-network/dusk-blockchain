@@ -56,6 +56,7 @@ func TestStableSortedKeys(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		bf := transactions.RandBlind()
 		tx := transactions.MockTx(false, bf, true)
+
 		td := TxDesc{tx: tx, received: time.Now()}
 		if err := pool.Put(td); err != nil {
 			t.Fatal(err.Error())
@@ -65,8 +66,8 @@ func TestStableSortedKeys(t *testing.T) {
 	// Iterate through all tx expecting order of receiving is kept when
 	// tx has same fee
 	var prevReceived time.Time
-	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
 
+	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
 		val := t.received
 		if prevReceived.After(val) {
 			return false, errors.New("order of receiving should be kept")
@@ -75,7 +76,6 @@ func TestStableSortedKeys(t *testing.T) {
 		prevReceived = val
 		return false, nil
 	})
-
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -88,6 +88,7 @@ func TestGet(t *testing.T) {
 
 	// Generate 10 random txs
 	hashes := make([][]byte, txsCount)
+
 	for i := 0; i < txsCount; i++ {
 		bf := transactions.RandBlind()
 		tx := transactions.MockTx(false, bf, true)
@@ -108,15 +109,15 @@ func TestGet(t *testing.T) {
 }
 
 func BenchmarkPut(b *testing.B) {
-
 	txs := transactions.RandContractCalls(50000, 0, false)
+
 	b.ResetTimer()
 
 	// Put all transactions
 	for tN := 0; tN < b.N; tN++ {
 		pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(len(txs))}
-		for i := 0; i < len(txs); i++ {
 
+		for i := 0; i < len(txs); i++ {
 			td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
 			if err := pool.Put(td); err != nil {
 				b.Fatalf(err.Error())
@@ -128,13 +129,12 @@ func BenchmarkPut(b *testing.B) {
 }
 
 func BenchmarkContains(b *testing.B) {
-
 	txs := transactions.RandContractCalls(50000, 0, false)
 
 	// Put all transactions
 	pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(len(txs))}
-	for i := 0; i < len(txs); i++ {
 
+	for i := 0; i < len(txs); i++ {
 		td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
 		if err := pool.Put(td); err != nil {
 			b.Fatalf(err.Error())
@@ -156,13 +156,12 @@ func BenchmarkContains(b *testing.B) {
 }
 
 func BenchmarkRangeSort(b *testing.B) {
-
 	txs := transactions.RandContractCalls(10000, 0, false)
 
 	// Put all transactions
 	pool := HashMap{lock: &sync.RWMutex{}, Capacity: uint32(len(txs))}
-	for i := 0; i < len(txs); i++ {
 
+	for i := 0; i < len(txs); i++ {
 		td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
 		if err := pool.Put(td); err != nil {
 			b.Fatalf(err.Error())
@@ -175,7 +174,6 @@ func BenchmarkRangeSort(b *testing.B) {
 		err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
 			return false, nil
 		})
-
 		if err != nil {
 			b.Fatalf(err.Error())
 		}

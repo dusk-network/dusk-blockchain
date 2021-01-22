@@ -20,11 +20,11 @@ import (
 
 const (
 	blockProfileRate = 1000000000
-	//TODO: Find the optimal fraction value for mutex profiling
+	// TODO: Find the optimal fraction value for mutex profiling.
 	mutexProfileRate = 1
 )
 
-// Profile represents the cpu or memory profile sampled at regular intervals
+// Profile represents the cpu or memory profile sampled at regular intervals.
 type Profile struct {
 	name  string
 	n, d  uint
@@ -32,7 +32,7 @@ type Profile struct {
 	quit  chan struct{}
 }
 
-// NewProfile returns a new instance of a Profile
+// NewProfile returns a new instance of a Profile.
 func NewProfile(name string, n, d uint, start bool) Profile {
 	return Profile{
 		name:  name,
@@ -83,8 +83,8 @@ func NewProfile(name string, n, d uint, start bool) Profile {
 // (suitable in development)
 // output: mutex_$timestamp.prof file
 func (p *Profile) loop() {
-
 	var err error
+
 	t := time.NewTicker(time.Duration(p.n) * time.Second)
 
 	// Trigger sampling at startup
@@ -96,15 +96,16 @@ func (p *Profile) loop() {
 			return
 		}
 	}
+
 	defer stopProfiling(f, p.name)
 
 	// Restart the sampling each #interval minutes
 	for {
 		select {
 		case <-t.C:
-
-			/// Close previous sampling and start a new one
+			// Close previous sampling and start a new one
 			stopProfiling(f, p.name)
+
 			f, err = startProfiling(p.name)
 			if err != nil {
 				return
@@ -131,7 +132,6 @@ func (p *Profile) loop() {
 // fetching
 //nolint:goconst
 func startProfiling(name string) (*os.File, error) {
-
 	createFile := func(name string) *os.File {
 		pprofFile, err := os.Create(profFile(name))
 		if err != nil {
@@ -165,19 +165,20 @@ func startProfiling(name string) (*os.File, error) {
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Error("Could not start CPU profile: ", err)
 		}
+
 		return f, nil
 	default:
 		err := fmt.Errorf("Unsupported profile name %s", name)
 		log.Error(err)
+
 		return nil, err
 	}
 
 	return nil, nil
 }
 
-// stopProfiling stores profile sampling and resets any profile-related state
+// stopProfiling stores profile sampling and resets any profile-related state.
 func stopProfiling(f *os.File, name string) {
-
 	saveFile := func(f *os.File, name string) {
 		p := pprof.Lookup(name)
 		if p != nil && f != nil {
@@ -229,14 +230,14 @@ func profFile(prefix string) string {
 	name := prefix
 	name += "_"
 	name += strconv.Itoa(int(time.Now().Unix()))
+
 	return name + ".prof"
 }
 
 // Custom profile samples
 
-// logMemstatsSample records memory/GC statistics as log entries
+// logMemstatsSample records memory/GC statistics as log entries.
 func logMemstatsSample() {
-
 	l := log.WithField("process", "memstats")
 
 	runtime.GC() // get up-to-date statistics
@@ -248,6 +249,7 @@ func logMemstatsSample() {
 	debug.ReadGCStats(&gcStats)
 
 	s := memStats
+
 	l.Infof("# runtime.MemStats")
 	l.Infof("# Alloc = %d\n", s.Alloc)
 	l.Infof("# TotalAlloc = %d\n", s.TotalAlloc)
@@ -265,13 +267,14 @@ func logMemstatsSample() {
 
 	// Record GC pause history, most recent 5 entries
 	l.Infof("# Stop-the-world Pause time")
+
 	for i, v := range gcStats.Pause {
 		l.Infof("# gcStats.Pause[%d] = %d ns", i, v)
+
 		if i == 5 {
 			break
 		}
 	}
-
 }
 
 func isSupported(name string) error {
@@ -279,5 +282,6 @@ func isSupported(name string) error {
 	case "mutex", "block", "heap", "goroutine", "memstats", "cpu":
 		return nil
 	}
+
 	return fmt.Errorf("unsupported profile name %s", name)
 }

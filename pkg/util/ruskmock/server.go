@@ -90,6 +90,7 @@ func (s *Server) setupWallet(c config.Registry) error {
 
 func (s *Server) bootstrapBlockchain() error {
 	var genesis *block.Block
+
 	g := config.DecodeGenesis()
 
 	var err error
@@ -164,6 +165,7 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 	if err != nil {
 		return nil, err
 	}
+
 	blk := block.NewBlock()
 	blk.Txs = txs
 	blk.Header.Height = req.Height
@@ -246,9 +248,12 @@ func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) 
 // The response will contain Ristretto points under the hood.
 func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest) (*rusk.GenerateKeysResponse, error) {
 	var r ristretto.Scalar
+
 	r.Rand()
+
 	pk := s.w.PublicKey()
 	addr := pk.StealthAddress(r, 0)
+
 	pSpend, err := s.w.PrivateSpend()
 	if err != nil {
 		return nil, err
@@ -286,9 +291,12 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 // wallet public key.
 func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey) (*rusk.StealthAddress, error) {
 	var r ristretto.Scalar
+
 	r.Rand()
+
 	pk := s.w.PublicKey()
 	addr := pk.StealthAddress(r, 0)
+
 	return &rusk.StealthAddress{
 		RG: &rusk.JubJubCompressed{
 			Data: addr.P.Bytes(),
@@ -307,8 +315,9 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 	}
 
 	var spend ristretto.Point
-	_ = spend.UnmarshalBinary(req.Recipient.RG.Data)
 	var view ristretto.Point
+
+	_ = spend.UnmarshalBinary(req.Recipient.RG.Data)
 	_ = view.UnmarshalBinary(req.Recipient.PkR.Data)
 	sp := key.PublicSpend(spend)
 	v := key.PublicView(view)
@@ -325,6 +334,7 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 
 	var value ristretto.Scalar
 	value.SetBigInt(big.NewInt(int64(req.Value)))
+
 	if err := tx.AddOutput(*addr, value); err != nil {
 		return nil, err
 	}
@@ -339,6 +349,7 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 // NewStake creates a staking transaction and returns it to the caller.
 func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.Transaction, error) {
 	var value ristretto.Scalar
+
 	value.SetBigInt(big.NewInt(0).SetUint64(req.Value))
 
 	stake, err := s.w.NewStakeTx(int64(0), 250000, value)
@@ -356,8 +367,10 @@ func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest
 // NewBid creates a bidding transaction and returns it to the caller.
 func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*rusk.BidTransaction, error) {
 	var k ristretto.Scalar
+
 	_ = k.UnmarshalBinary(req.K.Data)
 	m := zkproof.CalculateM(k)
+
 	bid, err := transactions.NewBid(0, byte(2), int64(0), 250000, m.Bytes())
 	if err != nil {
 		return nil, err
@@ -371,7 +384,7 @@ func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*
 }
 
 // FindBid will return all of the bids for a given stealth address.
-// TODO: implement
+// TODO: implement.
 func (s *Server) FindBid(ctx context.Context, req *rusk.FindBidRequest) (*rusk.BidList, error) {
 	return nil, nil
 }
@@ -383,6 +396,7 @@ func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Ke
 	if err != nil {
 		return nil, 0, err
 	}
+
 	return db.FetchInputs(privSpend.Bytes(), totalAmount)
 }
 
@@ -390,24 +404,28 @@ func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Ke
 // this should be updated accordingly.
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
 	var decoys []ristretto.Point
+
 	for i := 0; i < numMixins; i++ {
 		decoy := ristretto.Point{}
+
 		decoy.Rand()
 
 		decoys = append(decoys, decoy)
 	}
 
 	var pubKeys []mlsag.PubKeys
+
 	for i := 0; i < numMixins; i++ {
 		var keyVector mlsag.PubKeys
-		keyVector.AddPubKey(decoys[i])
-
 		var secondaryKey ristretto.Point
+
+		keyVector.AddPubKey(decoys[i])
 		secondaryKey.Rand()
 		keyVector.AddPubKey(secondaryKey)
 
 		pubKeys = append(pubKeys, keyVector)
 	}
+
 	return pubKeys
 }
 

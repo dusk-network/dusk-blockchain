@@ -44,11 +44,12 @@ func NewAggregator(handler *Handler) *Aggregator {
 // CollectVote collects a Reduction message, and add its sender public key and signature to the
 // StepVotes/Set kept under the corresponding block hash. If the Set reaches or exceeds
 // quorum, a result is created with the voted hash and the related StepVotes
-// added. The validation of the candidate block is left to the caller
+// added. The validation of the candidate block is left to the caller.
 func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 	hdr := ev.State()
 	hash := string(hdr.BlockHash)
 	sv, found := a.voteSets[hash]
+
 	if !found {
 		sv.StepVotes = message.NewStepVotes()
 		sv.Cluster = sortedset.NewCluster()
@@ -63,6 +64,7 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 	for i := 0; i < votes; i++ {
 		sv.Cluster.Insert(hdr.PubKeyBLS)
 	}
+
 	a.voteSets[hash] = sv
 	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum(hdr.Round) {
 		// quorum reached

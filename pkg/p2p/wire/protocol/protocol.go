@@ -22,11 +22,11 @@ import (
 type ServiceFlag uint64
 
 const (
-	// FullNode indicates that a user is running the full node implementation of Dusk
+	// FullNode indicates that a user is running the full node implementation of Dusk.
 	FullNode ServiceFlag = 1
 
-	// LightNode indicates that a user is running a Dusk light node
-	// LightNode ServiceFlag = 2 // Not implemented
+	// LightNode indicates that a user is running a Dusk light node.
+	// LightNode ServiceFlag = 2 // Not implemented.
 )
 
 // NodeVer is the current node version.
@@ -36,22 +36,23 @@ var NodeVer = &Version{
 	Patch: 0,
 }
 
-// Magic is the network that Dusk is running on
+// Magic is the network that Dusk is running on.
 type Magic uint8
 
 const (
-	// MainNet identifies the production network of the Dusk blockchain
+	// MainNet identifies the production network of the Dusk blockchain.
 	MainNet Magic = iota
-	// TestNet identifies the test network of the Dusk blockchain
+	// TestNet identifies the test network of the Dusk blockchain.
 	TestNet
-	// DevNet identifies the development network of the Dusk blockchain
+	// DevNet identifies the development network of the Dusk blockchain.
 	DevNet
 )
 
 const (
 	mainnetUint32 uint32 = 0x7630401f
 	testnetUint32 uint32 = 0x74746e41
-	//devnetUint32  uint32 = 0x74736e40
+	//nolint
+	devnetUint32 uint32 = 0x74736e40
 )
 
 type magicObj struct {
@@ -66,17 +67,17 @@ var magics = [...]magicObj{
 	{DevNet, asBuffer(0x74736e40), "devnet"},
 }
 
-// Len returns the amount of bytes of the Magic sequence
+// Len returns the amount of bytes of the Magic sequence.
 func (m Magic) Len() int {
 	return magics[m].buf.Len()
 }
 
-// String representation of Magic
+// String representation of Magic.
 func (m Magic) String() string {
 	return magics[m].str
 }
 
-// ToBuffer returns the buffer representation of the Magic
+// ToBuffer returns the buffer representation of the Magic.
 func (m Magic) ToBuffer() bytes.Buffer {
 	return magics[m].buf
 }
@@ -103,21 +104,21 @@ func asBuffer(magic uint32) bytes.Buffer {
 // MagicFromConfig reads the loaded magic config and tries to map it to magic
 // identifier. Panic, if no match found.
 func MagicFromConfig() Magic {
-
 	magic := cfg.Get().General.Network
 	mstr := strings.ToLower(magic)
+
 	for _, m := range magics {
 		if mstr == m.str {
 			return m.Magic
 		}
 	}
 
-	// An invalid network identifier might cause node unexpected behavior
+	// An invalid network identifier might cause node unexpected behavior.
 	log.Panic(fmt.Sprintf("not a valid network: %s", magic))
 	return 0
 }
 
-// Extract the magic from io.Reader. In case of unknown Magic, it returns DevNet
+// Extract the magic from io.Reader. In case of unknown Magic, it returns DevNet.
 func Extract(r io.Reader) (Magic, error) {
 	buffer := make([]byte, 4)
 	// `ReadFull` is used here, as using a plain `Read` call from a net.Conn could

@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// RunMock will run a grpc mock for rusk wallet and transactor
+// RunMock will run a grpc mock for rusk wallet and transactor.
 func RunMock(grpcMockHost string) error {
 	s := grpc.NewServer()
 	rusk.RegisterStateServer(s, &rusk.StateMock{})
@@ -36,7 +36,7 @@ func RunMock(grpcMockHost string) error {
 	return nil
 }
 
-// RunRUSKMock will run a RUSK mock
+// RunRUSKMock will run a RUSK mock.
 func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile string) error {
 	r := new(config.Registry)
 
@@ -54,5 +54,4 @@ func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile string) error
 	}
 
 	select {}
-
 }

@@ -31,7 +31,6 @@ var (
 )
 
 func action(ctx *cli.Context) error {
-
 	// check arguments
 	if arguments := ctx.Args(); len(arguments) > 0 {
 		return fmt.Errorf("failed to read command argument: %q", arguments[0])
@@ -39,7 +38,6 @@ func action(ctx *cli.Context) error {
 
 	if datadir = ctx.GlobalString(DataDirFlag.Name); datadir != "" {
 		datadir = "~/./dusk"
-		//TODO:
 	}
 
 	if config = ctx.GlobalString(ConfigFlag.Name); config != "" {
@@ -56,6 +54,7 @@ func action(ctx *cli.Context) error {
 	if err != nil {
 		log.WithError(err).Fatal("Could not load config ")
 	}
+
 	log.WithFields(logrus.Fields{
 		"config.timeout.timeoutsendbidtx":            cfg.Get().Timeout.TimeoutSendBidTX,
 		"config.timeout.timeoutgetlastcommittee":     cfg.Get().Timeout.TimeoutGetLastCommittee,
@@ -75,17 +74,20 @@ func action(ctx *cli.Context) error {
 		Info("Timeout config...")
 
 	port := cfg.Get().Network.Port
+
 	rand.Seed(time.Now().UnixNano())
 
 	// Set up logging.
 	// Any subsystem should be initialized after config and logger loading
-	output := cfg.Get().Logger.Output
 	var logFile *os.File
-	if cfg.Get().Logger.Output != "stdout" {
+
+	output := cfg.Get().Logger.Output
+	if output != "stdout" {
 		logFile, err = os.Create(output + port + ".log")
 		if err != nil {
 			log.Panic(err)
 		}
+
 		defer func() {
 			_ = logFile.Close()
 		}()
@@ -111,7 +113,7 @@ func action(ctx *cli.Context) error {
 	s := setupProfiles(srv.rpcBus)
 	defer s.Close()
 
-	//start the connection manager
+	// start the connection manager
 	connMgr := newConnMgr(CmgrConfig{
 		Port:     port,
 		OnAccept: srv.OnAccept,
@@ -146,15 +148,13 @@ func action(ctx *cli.Context) error {
 }
 
 func setupProfiles(r *rpcbus.RPCBus) *diagnostics.ProfileSet {
-
 	s := diagnostics.NewProfileSet()
 	profiles := cfg.Get().Profile
+
 	// Expecting an array of profiles.
 	// Add empty [[profile]] to enable the listener
 	if len(profiles) > 0 {
-
 		for _, i := range profiles {
-
 			if len(i.Name) == 0 {
 				continue
 			}

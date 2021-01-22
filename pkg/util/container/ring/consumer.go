@@ -29,8 +29,8 @@ func NewConsumer(ring *Buffer, callback func(items [][]byte, w io.WriteCloser) b
 }
 
 func (c *Consumer) run() {
-
 	defer c.close()
+
 	for {
 		items, closed := c.ring.GetAll()
 		if len(items) > 0 {

@@ -17,13 +17,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/cmd/wallet/prompt"
 )
 
-var (
-	configPathFlag = cli.StringFlag{
-		Name:  "configpath",
-		Usage: "dusk toml path , eg: --configpath=/tmp/localnet-317173610/node-9000",
-		Value: "",
-	}
-)
+var configPathFlag = cli.StringFlag{
+	Name:  "configpath",
+	Usage: "dusk toml path , eg: --configpath=/tmp/localnet-317173610/node-9000",
+	Value: "",
+}
 
 func main() {
 	app := cli.NewApp()
@@ -68,5 +66,6 @@ func handlePanic() {
 	if r := recover(); r != nil {
 		_, _ = fmt.Fprintln(os.Stderr, fmt.Errorf("%+v", r), "Application Wallet panic")
 	}
+
 	time.Sleep(time.Second * 1)
 }

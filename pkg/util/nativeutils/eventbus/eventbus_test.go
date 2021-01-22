@@ -21,6 +21,7 @@ import (
 //*****************
 // EVENTBUS TESTS
 //*****************
+
 func TestNewEventBus(t *testing.T) {
 	eb := New()
 	assert.NotNil(t, eb)
@@ -29,6 +30,7 @@ func TestNewEventBus(t *testing.T) {
 //******************
 // SUBSCRIBER TESTS
 //******************
+
 func TestListenerMap(t *testing.T) {
 	lm := newListenerMap()
 	_, ss := CreateGossipStreamer()
@@ -57,14 +59,15 @@ func TestUnsubscribe(t *testing.T) {
 	select {
 	case <-myChan:
 		assert.FailNow(t, "We should have not received message")
+	// success
 	case <-time.After(50 * time.Millisecond):
-		// success
 	}
 }
 
 //*********************
 // STREAMER TESTS
 //*********************
+
 func TestStreamer(t *testing.T) {
 	topic := topics.Gossip
 	bus, streamer := CreateFrameStreamer(topic)
@@ -81,6 +84,7 @@ func TestStreamer(t *testing.T) {
 //******************
 // MULTICASTER TESTS
 //******************
+
 func TestDefaultListener(t *testing.T) {
 	eb := New()
 	msgChan := make(chan message.Message, 100)
@@ -115,14 +119,15 @@ func TestDefaultListener(t *testing.T) {
 	select {
 	case <-msgChan:
 		t.FailNow()
+	// all good
 	case <-time.After(100 * time.Millisecond):
-		//all good
 	}
 }
 
 //****************
 // SETUP FUNCTIONS
 //****************
+
 //nolint
 func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 	eb := New()
@@ -146,8 +151,8 @@ func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 	return eb, myChan, id
 }
 
-// Test that a streaming goroutine is killed when the exit signal is sent
-// nolint
+// Test that a streaming goroutine is killed when the exit signal is sent.
+//nolint
 func TestExitChan(t *testing.T) {
 	// suppressing annoying logging of expected errors
 	logrus.SetLevel(logrus.FatalLevel)
@@ -178,8 +183,7 @@ func TestExitChan(t *testing.T) {
 	assert.FailNow(t, "stream listener not found")
 }
 
-type mockWriteCloser struct {
-}
+type mockWriteCloser struct{}
 
 func (m *mockWriteCloser) Write(data []byte) (int, error) {
 	return 0, errors.New("failed")

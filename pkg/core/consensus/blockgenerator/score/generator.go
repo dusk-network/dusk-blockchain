@@ -21,10 +21,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var emptyHash [32]byte
-var lg = log.WithField("process", "score blockGenerator")
+var (
+	emptyHash [32]byte
+	lg        = log.WithField("process", "score blockGenerator")
+)
 
-// Generator provides the operation of calcularing a score for the candidate
+// Generator provides the operation of calcularing a score for the candidate.
 type Generator interface {
 	// Generator
 	Generate(ctx context.Context, r consensus.RoundUpdate, step uint8) message.ScoreProposal
@@ -36,14 +38,14 @@ type generator struct {
 	k              *common.BlsScalar
 	indexStoredBid uint64
 
-	//d, edPk []byte
+	// d, edPk []byte
 	scoreGenerator transactions.BlockGenerator
 
 	lock      sync.Mutex
 	threshold *consensus.Threshold
 }
 
-// New creates a new score generation step
+// New creates a new score generation step.
 func New(e *consensus.Emitter, db database.DB) (Generator, error) {
 	var d, k []byte
 	var indexStoredBid uint64
@@ -71,12 +73,13 @@ func (p *generator) sign(seed []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	compSeed := signedSeed.Compress()
 	return compSeed, nil
 }
 
 // Generate the score and if it is above the treshold pass it to the block
-// generator for propagating it to the network
+// generator for propagating it to the network.
 func (p *generator) Generate(ctx context.Context, r consensus.RoundUpdate, step uint8) message.ScoreProposal {
 	// TODO: check if we are in the BidList from RUSK. If we are not, we should
 	// return immediately
@@ -89,7 +92,7 @@ func (p *generator) Generate(ctx context.Context, r consensus.RoundUpdate, step 
 
 	seed, err := p.sign(r.Seed)
 	if err != nil {
-		//TODO: this probably deserves a panic
+		// TODO: this probably deserves a panic
 		lg.WithError(err).Errorln("problem in signing the seed during the generation")
 		return message.EmptyScoreProposal(hdr)
 	}
@@ -116,8 +119,8 @@ func (p *generator) Generate(ctx context.Context, r consensus.RoundUpdate, step 
 	// cannot guarantee it. Hence the locking
 	p.lock.Lock()
 	if p.threshold.Exceeds(scoreTx.Score) {
-		//TODO: log the error
-		//return errors.New("proof score is below threshold")
+		// TODO: log the error
+		// return errors.New("proof score is below threshold")
 		p.lock.Unlock()
 		return message.EmptyScoreProposal(hdr)
 	}

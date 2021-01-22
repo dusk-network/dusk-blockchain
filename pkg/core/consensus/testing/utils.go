@@ -41,6 +41,7 @@ func catchGetMempoolTxsBySize(assert *assert.Assertions, rb *rpcbus.RPCBus) {
 func setupProvisioners(assert *assert.Assertions, amount int) (user.Provisioners, []key.Keys) {
 	p := user.NewProvisioners()
 	keys := make([]key.Keys, amount)
+
 	for i := 0; i < amount; i++ {
 		var err error
 		keys[i], err = key.NewRandKeys()

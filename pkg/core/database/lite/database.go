@@ -13,12 +13,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
-type key [64]byte
-type table map[key][]byte
-type memdb [maxInd]table
+type (
+	key   [64]byte
+	table map[key][]byte
+	memdb [maxInd]table
+)
 
 const (
-	// block table index
+	// Block table index.
 	blocksInd = iota
 	txsInd
 	txHashInd
@@ -31,11 +33,9 @@ const (
 	maxInd
 )
 
-var (
-	stateKey = []byte{1}
-)
+var stateKey = []byte{1}
 
-// DB represents the db struct
+// DB represents the db struct.
 type DB struct {
 	storage  memdb
 	mu       sync.RWMutex
@@ -43,13 +43,14 @@ type DB struct {
 	path     string
 }
 
-// NewDatabase returns a DB instance
-// This should be the ideal situation with lowest latency on storing or fetching data
-// In-memory only (as result autoDeleted)
-// multi-instances (no singleton)
+// NewDatabase returns a DB instance.
+// This should be the ideal situation with lowest latency on storing or fetching data.
+// In-memory only (as result autoDeleted).
+// multi-instances (no singleton).
 func NewDatabase(path string, network protocol.Magic, readonly bool) (database.DB, error) {
 	var db *DB
 	var tables [maxInd]table
+
 	for i := 0; i < len(tables); i++ {
 		tables[i] = make(table)
 	}
@@ -59,25 +60,26 @@ func NewDatabase(path string, network protocol.Magic, readonly bool) (database.D
 	return db, nil
 }
 
-// Begin builds read-only or read-write Transaction
+// Begin builds read-only or read-write Transaction.
 func (db *DB) Begin(writable bool) (database.Transaction, error) {
-
 	var batch memdb
+
 	if writable && !db.readOnly {
 		for i := range batch {
 			batch[i] = make(table)
 		}
 	}
 
-	t := &transaction{writable: writable,
-		db: db, batch: batch}
+	t := &transaction{
+		writable: writable,
+		db:       db, batch: batch,
+	}
 
 	return t, nil
 }
 
-// Update the DB within a transaction
+// Update the DB within a transaction.
 func (db *DB) Update(fn func(database.Transaction) error) error {
-
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -103,9 +105,8 @@ func (db *DB) Update(fn func(database.Transaction) error) error {
 	return t.Commit()
 }
 
-// View performs the equivalent of a Select SQL statement
+// View performs the equivalent of a Select SQL statement.
 func (db *DB) View(fn func(database.Transaction) error) error {
-
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
@@ -118,7 +119,7 @@ func (db *DB) View(fn func(database.Transaction) error) error {
 	return fn(t)
 }
 
-// Close is actually a dummy method on a lite driver
+// Close is actually a dummy method on a lite driver.
 func (db *DB) Close() error {
 	return nil
 }

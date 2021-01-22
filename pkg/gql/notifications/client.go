@@ -24,10 +24,8 @@ type wsClient struct {
 }
 
 func (c *wsClient) writeLoop() {
-
 	// Teardown procedure for wsClient
 	defer func() {
-
 		// rfc6455#section-5.3
 		// The closing handshake is intended to complement the TCP closing
 		// handshake (FIN/ACK), on the basis that the TCP closing handshake is not

@@ -18,12 +18,12 @@ import (
 
 // DUSK is one whole unit of DUSK. This is duplicated from wallet since
 // otherwise we get into an import cycle including the transactions and users
-// packages
+// packages.
 const DUSK = uint64(100000000)
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain
 // point in the consensus. The set is sorted by the int value of the public key in
-// increasing order (higher last)
+// increasing order (higher last).
 type VotingCommittee struct {
 	sortedset.Cluster
 }
@@ -58,13 +58,16 @@ func (v VotingCommittee) IsMember(pubKeyBLS []byte) bool {
 // createSortitionMessage will return the hash of the passed sortition information.
 func createSortitionHash(round uint64, step uint8, i int) ([]byte, error) {
 	msg := make([]byte, 12)
+
 	binary.LittleEndian.PutUint64(msg[:8], round)
 	binary.LittleEndian.PutUint32(msg[8:12], uint32(i))
+
 	msg = append(msg, step)
+
 	return hash.Sha3256(msg)
 }
 
-// generate a score from the given hash and total stake weight
+// Generate a score from the given hash and total stake weight.
 func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 	hashNum := new(big.Int).SetBytes(hash)
 	return new(big.Int).Mod(hashNum, W).Uint64()
@@ -72,10 +75,11 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 
 // CreateVotingCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step and round.
-// TODO: running this with weird setup causes infinite looping (to reproduce, hardcode `3` on MockProvisioners when calling agreement.NewHelper in the agreement tests)
+// TODO: running this with weird setup causes infinite looping (to reproduce, hardcode `3` on MockProvisioners when calling agreement.NewHelper in the agreement tests).
 func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) VotingCommittee {
 	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(p.TotalWeight())
+
 	// Deep copy the Members map, to avoid mutating the original set.
 	members := copyMembers(p.Members)
 	p.Members = members
@@ -83,6 +87,7 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 	// Remove stakes which have not yet become active, or have expired
 	for _, m := range p.Members {
 		i := 0
+
 		for {
 			if i == len(m.Stakes) {
 				break
@@ -110,6 +115,7 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 		}
 
 		score := generateSortitionScore(hashSort, W)
+
 		blsPk := p.extractCommitteeMember(score)
 		votingCommittee.Insert(blsPk)
 
@@ -131,15 +137,17 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	var m *Member
 	var e error
+
 	for i := 0; ; i++ {
 		if m, e = p.MemberAt(i); e != nil {
 			// handling the eventuality of an out of bound error
 			m, e = p.MemberAt(0)
-			i = 0
 			if e != nil {
-				//FIXME: shall this panic ?
+				// FIXME: shall this panic ?
 				log.Panic(e)
 			}
+
+			i = 0
 		}
 
 		stake, err := p.GetStake(m.PublicKeyBLS)
@@ -158,13 +166,14 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	}
 }
 
-// GenerateCommittees pre-generates an `amount` of VotingCommittee of a specified `size` from a given `step`
+// GenerateCommittees pre-generates an `amount` of VotingCommittee of a specified `size` from a given `step`.
 func (p Provisioners) GenerateCommittees(round uint64, amount, step uint8, size int) []VotingCommittee {
 	if step >= math.MaxUint8-amount {
 		amount = math.MaxUint8 - step
 	}
 
 	committees := make([]VotingCommittee, amount)
+
 	for i := 0; i < int(amount); i++ {
 		votingCommittee := p.CreateVotingCommittee(round, step+uint8(i), size)
 		committees[i] = votingCommittee
@@ -187,6 +196,7 @@ func subtractFromTotalWeight(W *big.Int, amount uint64) {
 // to avoid mutating the original set.
 func copyMembers(members map[string]*Member) map[string]*Member {
 	m := make(map[string]*Member)
+
 	for k, v := range members {
 		member := &Member{
 			PublicKeyBLS: v.PublicKeyBLS,

@@ -24,9 +24,8 @@ type data struct {
 	Variables map[string]interface{} `json:"variables,omitempty"`
 }
 
-// handleQuery to process graphQL query
+// handleQuery to process graphQL query.
 func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r *http.Request, db database.DB) {
-
 	if r.Body == nil {
 		http.Error(w, "Must provide graphql query in request body", 400)
 		return
@@ -34,9 +33,11 @@ func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r *http.Request,
 
 	// Read and close JSON request body
 	body, err := ioutil.ReadAll(r.Body)
+
 	defer func() {
 		_ = r.Body.Close()
 	}()
+
 	if err != nil {
 		msg := fmt.Sprintf("%d error request: %v", http.StatusBadRequest, err)
 		log.Error(msg)

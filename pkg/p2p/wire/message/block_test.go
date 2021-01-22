@@ -39,8 +39,10 @@ func TestEncodeDecodeBlock(t *testing.T) {
 	for i := range blk.Txs {
 		hash1, err := blk.Txs[i].CalculateHash()
 		assert.NoError(err)
+
 		hash2, err := decBlk.Txs[i].CalculateHash()
 		assert.NoError(err)
+
 		assert.True(bytes.Equal(hash1, hash2))
 		assert.True(transactions.Equal(blk.Txs[i], decBlk.Txs[i]))
 	}
@@ -54,36 +56,40 @@ func TestEncodeDecodeCert(t *testing.T) {
 
 	// Encode certificate into a buffer
 	buf := new(bytes.Buffer)
+
 	err := message.MarshalCertificate(buf, cert)
 	assert.Nil(err)
 
 	// Decode buffer into a certificate struct
 	decCert := &block.Certificate{}
+
 	err = message.UnmarshalCertificate(buf, decCert)
 	assert.Nil(err)
 
 	// Check both structs are equal
 	assert.True(cert.Equals(decCert))
-
 }
 
 func TestEncodeDecodeHeader(t *testing.T) {
-
 	assert := assert.New(t)
 
 	// Create a random header
 	hdr := helper.RandomHeader(200)
+
 	hash, err := hdr.CalculateHash()
-	hdr.Hash = hash
 	assert.Nil(err)
+
+	hdr.Hash = hash
 
 	// Encode header into a buffer
 	buf := new(bytes.Buffer)
+
 	err = message.MarshalHeader(buf, hdr)
 	assert.Nil(err)
 
 	// Decode buffer into a header struct
 	decHdr := block.NewHeader()
+
 	err = message.UnmarshalHeader(buf, decHdr)
 	assert.Nil(err)
 

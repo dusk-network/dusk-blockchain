@@ -21,7 +21,7 @@ import (
 type (
 	// Reduction is one of the messages used in the consensus algorithms. As
 	// such it encapsulates a header.Header to allow the Coordinator to
-	// correctly enforce the sequence of state changes expressed through the algorithm
+	// correctly enforce the sequence of state changes expressed through the algorithm.
 	Reduction struct {
 		hdr        header.Header
 		SignedHash []byte
@@ -36,43 +36,47 @@ func NewReduction(hdr header.Header) *Reduction {
 	}
 }
 
-// Copy complies with the Safe interface
+// Copy complies with the Safe interface.
 func (r Reduction) Copy() payload.Safe {
 	cpy := Reduction{}
+
 	cpy.hdr = r.hdr.Copy().(header.Header)
 	if r.SignedHash != nil {
 		cpy.SignedHash = make([]byte, 33)
 		copy(cpy.SignedHash, r.SignedHash)
 	}
+
 	return cpy
 }
 
 func (r Reduction) String() string {
 	var sb strings.Builder
+
 	_, _ = sb.WriteString(r.hdr.String())
 	_, _ = sb.WriteString(" signature' ")
 	_, _ = sb.WriteString(util.StringifyBytes(r.SignedHash))
 	_, _ = sb.WriteString("'")
+
 	return sb.String()
 }
 
-// State is used to comply to consensus.Message
+// State is used to comply to consensus.Message.
 func (r Reduction) State() header.Header {
 	return r.hdr
 }
 
-// Sender is used to comply to consensus.Message
+// Sender is used to comply to consensus.Message.
 func (r Reduction) Sender() []byte {
 	return r.hdr.Sender()
 }
 
-// Equal is used to comply to consensus.Message
+// Equal is used to comply to consensus.Message.
 func (r Reduction) Equal(msg Message) bool {
 	m, ok := msg.Payload().(Reduction)
 	return ok && r.hdr.Equal(m.hdr) && bytes.Equal(r.SignedHash, m.SignedHash)
 }
 
-//UnmarshalReductionMessage unmarshals a serializzation from a buffer
+// UnmarshalReductionMessage unmarshals a serialization from a buffer.
 func UnmarshalReductionMessage(r *bytes.Buffer, m SerializableMessage) error {
 	bev := NewReduction(header.Header{})
 	if err := UnmarshalReduction(r, bev); err != nil {
@@ -106,7 +110,7 @@ func MarshalReduction(r *bytes.Buffer, bev Reduction) error {
 	return nil
 }
 
-// UnmarshalVoteSet unmarshals a Reduction slice from a buffer
+// UnmarshalVoteSet unmarshals a Reduction slice from a buffer.
 func UnmarshalVoteSet(r *bytes.Buffer) ([]Reduction, error) {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
@@ -114,6 +118,7 @@ func UnmarshalVoteSet(r *bytes.Buffer) ([]Reduction, error) {
 	}
 
 	evs := make([]Reduction, length)
+
 	for i := uint64(0); i < length; i++ {
 		rev := NewReduction(header.Header{})
 		if err := UnmarshalReduction(r, rev); err != nil {
@@ -146,7 +151,7 @@ func MarshalVoteSet(r *bytes.Buffer, evs []Reduction) error {
 /********************/
 
 // MockReduction mocks a Reduction event and returns it.
-// It includes a vararg iterativeIdx to help avoiding duplicates when testing
+// It includes a vararg iterativeIdx to help avoiding duplicates when testing.
 func MockReduction(hash []byte, round uint64, step uint8, keys []key.Keys, iterativeIdx ...int) Reduction {
 	idx := 0
 	if len(iterativeIdx) != 0 {
@@ -161,6 +166,7 @@ func MockReduction(hash []byte, round uint64, step uint8, keys []key.Keys, itera
 	r := new(bytes.Buffer)
 	_ = header.MarshalSignableVote(r, hdr)
 	sigma, _ := bls.Sign(keys[idx].BLSSecretKey, keys[idx].BLSPubKey, r.Bytes())
+
 	return Reduction{
 		hdr:        hdr,
 		SignedHash: sigma.Compress(),
@@ -170,6 +176,7 @@ func MockReduction(hash []byte, round uint64, step uint8, keys []key.Keys, itera
 // MockVotes mocks a slice of Reduction events and returns it.
 func MockVotes(hash []byte, round uint64, step uint8, keys []key.Keys, amount int) []Reduction {
 	var voteSet []Reduction
+
 	for i := 0; i < amount; i++ {
 		r := MockReduction(hash, round, step, keys, i)
 		voteSet = append(voteSet, r)
@@ -187,7 +194,6 @@ func MockVoteSet(hash []byte, round uint64, step uint8, keys []key.Keys, amount 
 
 	votes1 := MockVotes(hash, round, step-1, keys, amount)
 	votes2 := MockVotes(hash, round, step, keys, amount)
-
 	return append(votes1, votes2...)
 }
 

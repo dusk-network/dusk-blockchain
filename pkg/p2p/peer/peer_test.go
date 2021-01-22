@@ -62,13 +62,16 @@ func TestReader(t *testing.T) {
 	errChan := make(chan error, 1)
 	go func(eChan chan error) {
 		msg := makeAgreementGossip(10)
+
 		buf, err := message.Marshal(msg)
 		if err != nil {
 			eChan <- err
 		}
+
 		if err := g.Process(&buf); err != nil {
 			eChan <- err
 		}
+
 		_, _ = client.Write(buf.Bytes())
 	}(errChan)
 
@@ -105,6 +108,7 @@ func TestWriteLoop(t *testing.T) {
 
 	g := protocol.NewGossip(protocol.TestNet)
 	msg := makeAgreementGossip(10)
+
 	buf, err := message.Marshal(msg)
 	if err != nil {
 		t.Fatal(err)
@@ -112,6 +116,7 @@ func TestWriteLoop(t *testing.T) {
 
 	go func(g *protocol.Gossip) {
 		responseChan := make(chan bytes.Buffer)
+
 		writer := NewWriter(client, g, bus, 30*time.Millisecond)
 		go writer.Serve(context.Background(), responseChan, make(chan error, 1))
 
@@ -144,6 +149,7 @@ func BenchmarkWriter(t *testing.B) {
 	msg := makeAgreementGossip(10)
 
 	t.ResetTimer()
+
 	for i := 0; i < t.N; i++ {
 		errList := bus.Publish(topics.Gossip, msg)
 		require.Empty(t, errList)
@@ -161,6 +167,7 @@ func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *Writer {
 	client, srv := net.Pipe()
 	g := protocol.NewGossip(protocol.TestNet)
 	pw := NewWriter(client, g, bus)
+
 	go receiveFunc(srv)
 	return pw
 }

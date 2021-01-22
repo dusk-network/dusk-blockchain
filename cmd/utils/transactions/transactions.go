@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Transaction is the struct that holds common transaction fields
+// Transaction is the struct that holds common transaction fields.
 type Transaction struct {
 	Amount   uint64
 	LockTime uint64
@@ -25,30 +25,35 @@ type Transaction struct {
 	Address  string
 }
 
-// RunTransactions will
+// RunTransactions will...
 func RunTransactions(grpcHost string, transaction Transaction) (*node.TransactionResponse, error) {
-
 	log.WithField("transaction", transaction).Info("Set up a connection to the grpc server")
+
 	conn, err := grpc.Dial(grpcHost, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
+
 	defer func() {
 		_ = conn.Close()
 	}()
 
 	client := node.NewTransactorClient(conn)
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	var resp *node.TransactionResponse
+
 	switch transaction.TXtype {
 	case "consensus":
 		log.WithField("transaction", transaction).Info("Sending consensus tx")
+
 		req := node.BidRequest{Amount: transaction.Amount}
 		resp, err = client.Bid(ctx, &req)
 	case "stake":
 		log.WithField("transaction", transaction).Info("Sending stake tx")
+
 		req := node.StakeRequest{Amount: transaction.Amount}
 		resp, err = client.Stake(ctx, &req)
 	case "transfer":
@@ -56,14 +61,19 @@ func RunTransactions(grpcHost string, transaction Transaction) (*node.Transactio
 
 		if transaction.Address == "self" {
 			wclient := node.NewWalletClient(conn)
+
 			_, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
+
 			log.WithField("transaction", transaction).Debug("Address defined as self, will go get node self address via grpc ...")
+
 			resp, err1 := wclient.GetAddress(context.Background(), &node.EmptyRequest{})
 			if err1 != nil {
 				return nil, err1
 			}
+
 			log.WithField("address", string(resp.Key.PublicKey)).Info("Sending transfer tx to self address")
+
 			transaction.Address = string(resp.Key.PublicKey)
 		}
 
@@ -71,6 +81,7 @@ func RunTransactions(grpcHost string, transaction Transaction) (*node.Transactio
 		resp, err = client.Transfer(ctx, &req)
 	default:
 		log.Info("")
+
 		err = errors.New("invalid TXtype")
 	}
 

@@ -34,7 +34,6 @@ type sortedKeys []key.Keys
 func (s sortedKeys) Len() int      { return len(s) }
 func (s sortedKeys) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s sortedKeys) Less(i, j int) bool {
-
 	return btoi(s[i]).Cmp(btoi(s[j])) < 0
 }
 
@@ -45,8 +44,10 @@ func btoi(k key.Keys) *big.Int {
 
 // Test that provisioners are sorted properly.
 func TestMemberAt(t *testing.T) {
-	nr := 50
 	var ks sortedKeys
+
+	nr := 50
+
 	p, k := consensus.MockProvisioners(nr)
 	ks = append(ks, k...)
 
@@ -57,6 +58,7 @@ func TestMemberAt(t *testing.T) {
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
+
 		assert.True(t, bytes.Equal(m.PublicKeyBLS, ks[i].BLSPubKeyBytes))
 	}
 }
@@ -65,6 +67,7 @@ func TestMemberAt(t *testing.T) {
 func TestGetMember(t *testing.T) {
 	// Set up a committee set with a stakes map
 	tKeys := make([][]byte, 0)
+
 	p, k := consensus.MockProvisioners(50)
 	for _, keys := range k {
 		tKeys = append(tKeys, keys.BLSPubKeyBytes)
@@ -72,9 +75,11 @@ func TestGetMember(t *testing.T) {
 
 	_, err := p.GetStake([]byte("Fake Public Key"))
 	assert.Error(t, err)
+
 	for _, tk := range tKeys {
 		m := p.GetMember(tk)
 		s, _ := p.GetStake(tk)
+
 		assert.Equal(t, uint64(500), s)
 		assert.Equal(t, m.PublicKeyBLS, tk)
 	}

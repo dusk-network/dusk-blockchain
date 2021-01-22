@@ -83,8 +83,10 @@ func TestSyncConcurrency(t *testing.T) {
 	s, _, _ := setupSynchronizerTest()
 
 	var wg sync.WaitGroup
+
 	for h := uint64(0); h < 100; h++ {
 		wg.Add(1)
+
 		go func(height uint64) {
 			blk := helper.RandomBlock(height, 1)
 			s.ProcessBlock(message.New(topics.Block, *blk))
@@ -103,6 +105,7 @@ func setupSynchronizerTest() (*Synchronizer, chan consensus.Results, *mockChain)
 	_, db := lite.CreateDBConnection()
 	// Give DB a genesis to avoid errors
 	genesis := config.DecodeGenesis()
+
 	if err := db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(genesis)
 	}); err != nil {

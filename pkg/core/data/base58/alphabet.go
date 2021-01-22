@@ -21,16 +21,20 @@ func NewAlphabet(s string) (*Alphabet, error) {
 	if len(s) != 58 {
 		return nil, errors.New("base58 alphabets must be 58 bytes long")
 	}
+
 	ret := new(Alphabet)
 	copy(ret.encode[:], s)
+
 	for i := range ret.decode {
 		ret.decode[i] = -1
 	}
+
 	for i, b := range ret.encode {
 		ret.decode[b] = int8(i)
 	}
+
 	return ret, nil
 }
 
-// base alphabet
+// Base alphabet.
 var ab = ("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")

@@ -14,9 +14,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var score = &common.BlsScalar{Data: []byte{120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120,
+var score = &common.BlsScalar{Data: []byte{
+	120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120,
 	120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120,
-	120, 120, 120, 120, 120, 120}}
+	120, 120, 120, 120, 120, 120,
+}}
 
 func TestThresholdCheck(t *testing.T) {
 	threshold := consensus.NewThreshold()

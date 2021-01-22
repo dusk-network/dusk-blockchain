@@ -16,7 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
-// Helper is a struct that facilitates sending semi-real Events with minimum effort
+// Helper is a struct that facilitates sending semi-real Events with minimum effort.
 type Helper struct {
 	*consensus.Emitter
 	P                *user.Provisioners
@@ -25,7 +25,7 @@ type Helper struct {
 	Round            uint64
 }
 
-// NewHelper creates a Helper
+// NewHelper creates a Helper.
 func NewHelper(provisioners int) *Helper {
 	p, provisionersKeys := consensus.MockProvisioners(provisioners)
 	mockProxy := transactions.MockProxy{
@@ -44,7 +44,7 @@ func NewHelper(provisioners int) *Helper {
 }
 
 // RoundUpdate creates a valid RoundUpdate for the current round, based on the information
-// passed to this Helper (i.e. round, Provisioners)
+// passed to this Helper (i.e. round, Provisioners).
 func (hlp *Helper) RoundUpdate(hash []byte) consensus.RoundUpdate {
 	return consensus.RoundUpdate{
 		Round: hlp.Round,
@@ -54,7 +54,7 @@ func (hlp *Helper) RoundUpdate(hash []byte) consensus.RoundUpdate {
 	}
 }
 
-// Spawn a number of different valid events to the Agreement component bypassing the EventBus
+// Spawn a number of different valid events to the Agreement component bypassing the EventBus.
 func (hlp *Helper) Spawn(hash []byte) []message.Agreement {
 	evs := make([]message.Agreement, hlp.Nr)
 	for i := 0; i < hlp.Nr; i++ {

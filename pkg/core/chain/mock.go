@@ -10,63 +10,62 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 )
 
-// MockVerifier is a mock for the chain.Verifier interface
-type MockVerifier struct {
-}
+// MockVerifier is a mock for the chain.Verifier interface.
+type MockVerifier struct{}
 
-// PerformSanityCheck on first N blocks and M last blocks
+// PerformSanityCheck on first N blocks and M last blocks.
 func (v *MockVerifier) PerformSanityCheck(uint64, uint64, uint64) error {
 	return nil
 }
 
-// SanityCheckBlock will verify whether a block is valid according to the rules of the consensus
+// SanityCheckBlock will verify whether a block is valid according to the rules of the consensus.
 func (v *MockVerifier) SanityCheckBlock(prevBlock block.Block, blk block.Block) error {
 	return nil
 }
 
-// MockLoader is the mock of the DB loader to help testing the chain
+// MockLoader is the mock of the DB loader to help testing the chain.
 type MockLoader struct {
 	blockchain []block.Block
 }
 
-// NewMockLoader creates a Mockup of the Loader interface
+// NewMockLoader creates a Mockup of the Loader interface.
 func NewMockLoader() Loader {
 	mockchain := make([]block.Block, 0)
 	return &MockLoader{mockchain}
 }
 
-// Height returns the height currently known by the Loader
+// Height returns the height currently known by the Loader.
 func (m *MockLoader) Height() (uint64, error) {
 	return uint64(len(m.blockchain)), nil
 }
 
-// LoadTip of the chain
+// LoadTip of the chain.
 func (m *MockLoader) LoadTip() (*block.Block, error) {
 	return &m.blockchain[len(m.blockchain)], nil
 }
 
-// PerformSanityCheck on first N blocks and M last blocks
+// PerformSanityCheck on first N blocks and M last blocks.
 func (m *MockLoader) PerformSanityCheck(uint64, uint64, uint64) error {
 	return nil
 }
 
-// Clear the mock
+// Clear the mock.
 func (m *MockLoader) Clear() error {
 	return nil
 }
 
-// Close the mock
+// Close the mock.
 func (m *MockLoader) Close(driver string) error {
 	return nil
 }
 
-// Append the block to the internal blockchain representation
+// Append the block to the internal blockchain representation.
 func (m *MockLoader) Append(blk *block.Block) error {
 	m.blockchain = append(m.blockchain, *blk)
 	return nil
 }
 
-// BlockAt the block to the internal blockchain representation
+// BlockAt the block to the internal blockchain representation.
 func (m *MockLoader) BlockAt(index uint64) (block.Block, error) {
 	return m.blockchain[index], nil
 }

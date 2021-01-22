@@ -37,7 +37,7 @@ import (
 )
 
 // TestConcurrentAcceptBlock tests that there is no race condition triggered on
-// publishing an AcceptedBlock
+// publishing an AcceptedBlock.
 func TestConcurrentAcceptBlock(t *testing.T) {
 	assert := assert.New(t)
 	startingHeight := uint64(1)
@@ -98,12 +98,14 @@ func mutateFirstChan(propagatedHeight uint64, eb eventbus.Publisher, acceptedBlo
 // accepting a block from a peer.
 func TestAcceptFromPeer(t *testing.T) {
 	logrus.SetLevel(logrus.InfoLevel)
+
 	assert := assert.New(t)
+
 	startingHeight := uint64(1)
 	eb, c := setupChainTest(t, startingHeight)
-
 	d, _ := crypto.RandEntropy(32)
 	k, _ := crypto.RandEntropy(32)
+
 	if err := c.db.Update(func(t database.Transaction) error {
 		return t.StoreBidValues(d, k, 0, 100000)
 	}); err != nil {
@@ -125,11 +127,10 @@ func TestAcceptFromPeer(t *testing.T) {
 		assert.NoError(err)
 
 		if streamer.SeenTopics()[i] == topics.Inv {
-
 			// Read hash of the advertised block
 			var decoder message.Inv
-			decoder.Decode(bytes.NewBuffer(m))
 
+			decoder.Decode(bytes.NewBuffer(m))
 			assert.Equal(decoder.InvList[0].Type, message.InvTypeBlock)
 			assert.True(bytes.Equal(decoder.InvList[0].Hash, blk.Header.Hash))
 			return
@@ -177,7 +178,7 @@ func TestAcceptBlock(t *testing.T) {
 
 func createLoader(db database.DB) *DBLoader {
 	genesis := config.DecodeGenesis()
-	//genesis := helper.RandomBlock(0, 12)
+	// genesis := helper.RandomBlock(0, 12)
 	return NewDBLoader(db, genesis)
 }
 
@@ -187,13 +188,14 @@ func TestFetchTip(t *testing.T) {
 
 	// on a modern chain, state(tip) must point at genesis
 	var s *database.State
+
 	err := chain.db.View(func(t database.Transaction) error {
 		var err error
 		s, err = t.FetchState()
 		return err
 	})
-
 	assert.NoError(err)
+
 	assert.Equal(chain.tip.Header.Hash, s.TipHash)
 }
 
@@ -207,7 +209,6 @@ func mockAcceptableBlock(prevBlock block.Block) *block.Block {
 	// Add cert and prev hash
 	blk.Header.Certificate = block.EmptyCertificate()
 	blk.Header.PrevBlockHash = prevBlock.Header.Hash
-
 	return blk
 }
 
@@ -245,6 +246,5 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 	}))
 
 	go c.ProduceBlock()
-
 	return eb, c
 }

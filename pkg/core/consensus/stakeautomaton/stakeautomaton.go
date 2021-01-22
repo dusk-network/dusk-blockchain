@@ -44,7 +44,7 @@ const renewalOffset = 100
 
 // New creates a new instance of StakeAutomaton that is used to automate the
 // resending of stakes and alleviate the burden for a user to having to
-// manually manage restaking
+// manually manage restaking.
 func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, srv *grpc.Server) *StakeAutomaton {
 	a := &StakeAutomaton{
 		eventBroker:    eventBroker,
@@ -66,13 +66,14 @@ func (m *StakeAutomaton) AutomateStakes(ctx context.Context, e *node.EmptyReques
 		// blocks while the maintainer is not actually running yet.
 		m.blockChan, _ = consensus.InitAcceptedBlockUpdate(m.eventBroker)
 		m.running = true
+
 		go m.Listen()
 	}
 
 	return &node.GenericResponse{Response: "stake transactions are now being automated"}, nil
 }
 
-// Listen to round updates and takes the proper decision Stake-wise
+// Listen to round updates and takes the proper decision Stake-wise.
 func (m *StakeAutomaton) Listen() {
 	for blk := range m.blockChan {
 		m.height = blk.Header.Height + 1
@@ -102,7 +103,9 @@ func (m *StakeAutomaton) sendStake() error {
 		Fee:      config.MinFee,
 		Locktime: lockTime,
 	}
+
 	timeoutSendStakeTX := time.Duration(config.Get().Timeout.TimeoutSendStakeTX) * time.Second
+
 	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(req), timeoutSendStakeTX)
 	if err != nil {
 		return err

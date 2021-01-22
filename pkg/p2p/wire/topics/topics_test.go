@@ -31,17 +31,22 @@ func TestTopicRepr(t *testing.T) {
 		if !assert.Equal(t, tt.tstring, tt.topic.String()) {
 			assert.FailNowf(t, "errors on topic String()", "idx: %d", tt.idx)
 		}
+
 		topic := StringToTopic(tt.tstring)
 		if int(topic) > len(Topics) && !assert.Equal(t, tt.topic, topic) {
 			assert.FailNowf(t, "errors on string representation of topic", "idx: %d", tt.idx)
 		}
+
 		buf := bytes.NewBufferString("pippo")
 		assert.NoError(t, Prepend(buf, tt.topic))
+
 		if !assert.Equal(t, buf.Bytes()[0], tt.tbyte) {
 			assert.FailNowf(t, "error on prepending", "idx: %d", tt.idx)
 		}
+
 		topic, err := Extract(buf)
 		assert.NoError(t, err)
+
 		assert.Equal(t, tt.topic, topic)
 	}
 }
@@ -57,5 +62,6 @@ func TestCheckConsistency(t *testing.T) {
 
 	// skipping an index will result in a panic
 	tpcs = append(tpcs, Topics[3])
+
 	assert.Panics(t, func() { checkConsistency(tpcs) })
 }

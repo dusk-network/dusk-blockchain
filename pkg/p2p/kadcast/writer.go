@@ -43,13 +43,11 @@ func NewWriter(router *RoutingTable, subscriber eventbus.Subscriber, gossip *pro
 	}
 }
 
-// Serve processes any kadcast messaging to the wire
+// Serve processes any kadcast messaging to the wire.
 func (w *Writer) Serve() {
-
 	// NewChanListener is preferred here as it passes message.Message to the
 	// Write, where NewStreamListener works with bytes.Buffer only.
-	// Later this could be change if perf issue noticed
-
+	// Later this could be change if perf issue noticed.
 	w.writeQueue = make(chan message.Message, 1000)
 	w.subscriptionID = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(w.writeQueue))
 
@@ -62,9 +60,8 @@ func (w *Writer) Serve() {
 	}()
 }
 
-// Write expects the actual payload in a marshaled form
+// Write expects the actual payload in a marshaled form.
 func (w *Writer) Write(m message.Message) error {
-
 	header := m.Header()
 	buf := m.Payload().(message.SafeBuffer)
 
@@ -72,7 +69,7 @@ func (w *Writer) Write(m message.Message) error {
 		return errors.New("invalid message height")
 	}
 
-	// Constuct gossip frame
+	// Constuct gossip frame.
 	if err := w.gossip.Process(&buf.Buffer); err != nil {
 		log.WithError(err).Error("reading gossip frame failed")
 		return err
@@ -85,7 +82,6 @@ func (w *Writer) Write(m message.Message) error {
 // BroadcastPacket sends a `CHUNKS` message across the network
 // following the Kadcast broadcasting rules with the specified height.
 func (w *Writer) broadcastPacket(height byte, payload []byte) {
-
 	router := w.router
 	myPeer := router.LpeerInfo
 
@@ -98,7 +94,6 @@ func (w *Writer) broadcastPacket(height byte, payload []byte) {
 
 	var h byte
 	for h = 0; h <= height-1; h++ {
-
 		// Fetch delegating nodes based on height value
 		delegates := w.fetchDelegates(h)
 
@@ -111,12 +106,12 @@ func (w *Writer) broadcastPacket(height byte, payload []byte) {
 }
 
 func (w *Writer) fetchDelegates(H byte) []encoding.PeerInfo {
-
 	router := w.router
 	myPeer := w.router.LpeerInfo
 
 	// this should be always a deep copy of a bucket from the tree
 	var b bucket
+
 	router.tree.mu.RLock()
 	b = router.tree.buckets[H]
 	router.tree.mu.RUnlock()
@@ -137,12 +132,10 @@ func (w *Writer) fetchDelegates(H byte) []encoding.PeerInfo {
 			}
 		}
 	} else {
-
 		// As per spec:
 		//	Instead of having a single delegate per bucket, we select β
 		//	delegates. This severely increases the probability that at least one
 		//	out of the multiple selected nodes is honest and reachable.
-
 		in := make([]encoding.PeerInfo, len(b.entries))
 		copy(in, b.entries)
 
@@ -155,7 +148,6 @@ func (w *Writer) fetchDelegates(H byte) []encoding.PeerInfo {
 }
 
 func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []byte) {
-
 	if len(delegates) == 0 {
 		return
 	}
@@ -178,7 +170,6 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []b
 	// For each of the delegates found from this bucket, make an attempt to
 	// repropagate Broadcast message
 	for _, destPeer := range delegates {
-
 		if localPeer.IsEqual(destPeer) {
 			log.Error("Destination peer must be different from the source peer")
 			continue
@@ -199,6 +190,7 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []b
 				messageCopy = make([]byte, buf.Len())
 				copy(messageCopy, buf.Bytes())
 			}
+
 			go rcudpWrite(w.router.lpeerUDPAddr, destPeer.GetUDPAddr(), messageCopy)
 		} else {
 			go tcpSend(destPeer.GetUDPAddr(), buf.Bytes())
@@ -206,7 +198,7 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []b
 	}
 }
 
-// Close unsubscribes from eventbus events
+// Close unsubscribes from eventbus events.
 func (w *Writer) Close() error {
 	w.subscriber.Unsubscribe(topics.Kadcast, w.subscriptionID)
 	return nil

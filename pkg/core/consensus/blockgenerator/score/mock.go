@@ -37,7 +37,7 @@ func (m *mock) Generate(ctx context.Context, r consensus.RoundUpdate, step uint8
 	return message.MockScoreProposal(hdr)
 }
 
-// Mock a score generator
+// Mock a score generator.
 func Mock(e *consensus.Emitter, inert bool) Generator {
 	return &mock{e, inert}
 }

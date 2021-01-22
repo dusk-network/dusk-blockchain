@@ -21,6 +21,7 @@ import (
 func TestValidatorValidBlock(t *testing.T) {
 	// Send it over to the validator
 	cm := config.DecodeGenesis()
+
 	msg := message.New(topics.Candidate, *cm)
 	assert.NoError(t, Validate(msg))
 }
@@ -30,6 +31,7 @@ func TestValidatorValidBlock(t *testing.T) {
 func TestValidatorInvalidBlock(t *testing.T) {
 	// preventing unnecessary logging on expected errors
 	logrus.SetLevel(logrus.FatalLevel)
+
 	cm := config.DecodeGenesis()
 	// Remove one of the transactions to remove the integrity of
 	// the merkle root

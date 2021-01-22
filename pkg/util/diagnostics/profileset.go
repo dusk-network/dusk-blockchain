@@ -12,25 +12,21 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
-var (
-	errAlreadyStarted = errors.New("profile already exits")
-)
+var errAlreadyStarted = errors.New("profile already exits")
 
 // ProfileSet allows fetching program samples of different types.
 // It could be handful if node user observes problematic situation or any type of inefficiency.
 // In most cases, it will allow a developer to catch a perf issue (Memory, CPU or concurrency inefficiency) at development phase.
 // As support for periodical sample fetching is added, the tool could enable 'continuous profiling' with negligible overhead.
 //
-// See also func profile.loop() for a few examples of use
-//
+// See also func profile.loop() for a few examples of use.
 type ProfileSet struct {
 	profiles map[string]Profile
 	quit     chan struct{}
 }
 
-// NewProfileSet creates and starts ProfileSet from a set of settings strings
+// NewProfileSet creates and starts ProfileSet from a set of settings strings.
 func NewProfileSet() ProfileSet {
-
 	return ProfileSet{
 		profiles: make(map[string]Profile),
 		quit:     make(chan struct{}),
@@ -45,9 +41,8 @@ func NewProfileSet() ProfileSet {
 //	}
 //}
 
-// Spawn a ProfileSet from a Profile
+// Spawn a ProfileSet from a Profile.
 func (ps *ProfileSet) Spawn(p Profile) error {
-
 	if err := isSupported(p.name); err != nil {
 		return err
 	}
@@ -107,9 +102,8 @@ var stopProfile = func(s *Server, params []string) (string, error) {
 */
 
 // Listen listens rpcbus commands to allow enabling/disabling
-// any profile in runtime (e.g via rpc)
+// any profile in runtime (e.g via rpc).
 func (ps *ProfileSet) Listen(rpc *rpcbus.RPCBus) {
-
 	/*
 		startCmdChan := make(chan rpcbus.Request, 1)
 		if err := rpc.Register(topics.StartProfile, startCmdChan); err != nil {
@@ -160,7 +154,7 @@ func (ps *ProfileSet) Listen(rpc *rpcbus.RPCBus) {
 	*/
 }
 
-// Close the internal quit channel
+// Close the internal quit channel.
 func (ps ProfileSet) Close() {
 	close(ps.quit)
 }

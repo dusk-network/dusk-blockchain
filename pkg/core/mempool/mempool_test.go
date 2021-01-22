@@ -42,12 +42,12 @@ func TestMain(m *testing.M) {
 }
 
 func startMempoolTest(ctx context.Context) (*Mempool, *eventbus.EventBus, *rpcbus.RPCBus, *eventbus.GossipStreamer) {
-	var streamer *eventbus.GossipStreamer
 	bus, streamer := eventbus.CreateGossipStreamer()
 
 	rpcBus := rpcbus.New()
 	v := &transactions.MockProxy{}
 	m := NewMempool(bus, rpcBus, v.Prober(), nil)
+
 	m.Run(ctx)
 	return m, bus, rpcBus, streamer
 }
@@ -55,9 +55,11 @@ func startMempoolTest(ctx context.Context) (*Mempool, *eventbus.EventBus, *rpcbu
 func TestTxAdvertising(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	m, _, _, streamer := startMempoolTest(ctx)
 
 	tx := transactions.RandTx()
+
 	go func() {
 		_, err := m.ProcessTx(message.New(topics.Tx, tx))
 		assert.NoError(t, err)
@@ -80,6 +82,7 @@ func TestTxAdvertising(t *testing.T) {
 func TestProcessPendingTxs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	m, _, _, _ := startMempoolTest(ctx)
 
 	cc := transactions.RandContractCalls(10, 0, false)
@@ -101,6 +104,7 @@ func TestProcessPendingTxs(t *testing.T) {
 	}
 
 	assert.Equal(t, m.verified.Len(), 5)
+
 	for i := 0; i < 5; i++ {
 		hash, err := cc[i].CalculateHash()
 		assert.NoError(t, err)
@@ -111,6 +115,7 @@ func TestProcessPendingTxs(t *testing.T) {
 func TestProcessPendingTxsAsync(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	m, _, _, _ := startMempoolTest(ctx)
 
 	// A batch consists of all 4 types of Dusk transactions (excluding coinbase)
@@ -119,8 +124,11 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	// step we store here all txs that are expected to be in mempool later after
 	// go-routines publishing
 	batchCount := 8
+
 	const numOfTxsPerBatch = 4
+
 	txs := make([]transactions.ContractCall, 0)
+
 	// generate and store txs that are expected to be valid
 	for i := 0; i <= batchCount; i++ {
 		// Generate a single batch of txs and added to the expected list of verified
@@ -137,11 +145,13 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		to := from + numOfTxsPerBatch
 
 		wg.Add(1)
+
 		go func(txs []transactions.ContractCall) {
 			for _, tx := range txs {
 				_, errList := m.ProcessTx(message.New(topics.Tx, tx))
 				assert.Empty(t, errList)
 			}
+
 			wg.Done()
 		}(txs[from:to])
 	}
@@ -173,6 +183,7 @@ func TestRemoveAccepted(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	m, bus, rb, _ := startMempoolTest(ctx)
 
 	// Create a random block
@@ -190,9 +201,9 @@ func TestRemoveAccepted(t *testing.T) {
 		// Simulate a situation where the block has accepted each 2nd tx
 		if math.Mod(float64(i), 2) == 0 {
 			t := tx.(*transactions.Transaction)
-			b.AddTx(t)
 			// If tx is accepted, it is expected to be removed from mempool on
 			// onAcceptBlock event
+			b.AddTx(t)
 		}
 	}
 
@@ -206,13 +217,14 @@ func TestRemoveAccepted(t *testing.T) {
 
 	resp, err := rb.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
 	assert.NoError(err)
-	memTxs := resp.([]transactions.ContractCall)
 
+	memTxs := resp.([]transactions.ContractCall)
 	assert.Equal(len(memTxs), 6)
 
 	for i, tx := range txs {
 		hash, err := tx.CalculateHash()
 		assert.NoError(err)
+
 		if math.Mod(float64(i), 2) == 0 {
 			assert.False(m.verified.Contains(hash))
 		} else {
@@ -224,6 +236,7 @@ func TestRemoveAccepted(t *testing.T) {
 func TestCoinbaseTxsNotAllowed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	m, _, rb, _ := startMempoolTest(ctx)
 
 	// Publish a set of valid txs and a Coinbase one
@@ -231,6 +244,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 
 	for _, tx := range txs {
 		_, errList := m.ProcessTx(message.New(topics.Tx, tx))
+
 		if tx.Type() == transactions.Distribute {
 			assert.NotEmpty(t, errList)
 		}
@@ -239,6 +253,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 	// Assert that all non-coinbase txs have been verified
 	resp, err := rb.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
 	assert.NoError(t, err)
+
 	memTxs := resp.([]transactions.ContractCall)
 	for _, tx := range memTxs {
 		assert.False(t, tx.Type() == transactions.Distribute)
@@ -250,11 +265,12 @@ func TestSendMempoolTx(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	m, _, rb, _ := startMempoolTest(ctx)
 
+	m, _, rb, _ := startMempoolTest(ctx)
 	txs := transactions.RandContractCalls(4, 0, false)
 
 	var totalSize uint32
+
 	for _, tx := range txs {
 		buf := new(bytes.Buffer)
 		assert.NoError(transactions.Marshal(buf, tx))
@@ -263,6 +279,7 @@ func TestSendMempoolTx(t *testing.T) {
 
 		resp, err := rb.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 0)
 		assert.NoError(err)
+
 		txidBytes := resp.([]byte)
 
 		txid, err := tx.CalculateHash()

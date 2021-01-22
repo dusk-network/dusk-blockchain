@@ -23,7 +23,7 @@ var _ Handler = (*ScoreHandler)(nil)
 
 type (
 	// ScoreHandler manages the score threshold, performs verification of
-	// message.Score, keeps tab of the highest score so far
+	// message.Score, keeps tab of the highest score so far.
 	ScoreHandler struct {
 		// Threshold number that a score needs to be greater than in order to be considered
 		// for selection. Messages with scores lower than this threshold should not be
@@ -44,7 +44,7 @@ type (
 	}
 )
 
-// NewScoreHandler returns a new instance if ScoreHandler
+// NewScoreHandler returns a new instance if ScoreHandler.
 func NewScoreHandler(scoreVerifier transactions.Provisioner) *ScoreHandler {
 	return &ScoreHandler{
 		threshold:     consensus.NewThreshold(),
@@ -53,7 +53,7 @@ func NewScoreHandler(scoreVerifier transactions.Provisioner) *ScoreHandler {
 }
 
 // ResetThreshold resets the score threshold that sets the absolute minimum for
-// a score to be eligible for sending
+// a score to be eligible for sending.
 func (sh *ScoreHandler) ResetThreshold() {
 	sh.lock.Lock()
 	defer sh.lock.Unlock()
@@ -61,23 +61,24 @@ func (sh *ScoreHandler) ResetThreshold() {
 }
 
 // LowerThreshold lowers the threshold after a timespan when no BlockGenerator
-// could send a valid score
+// could send a valid score.
 func (sh *ScoreHandler) LowerThreshold() {
 	sh.lock.Lock()
 	defer sh.lock.Unlock()
 	sh.threshold.Lower()
 }
 
-// Priority returns true if the first element has priority over the second, false otherwise
+// Priority returns true if the first element has priority over the second, false otherwise.
 func (sh *ScoreHandler) Priority(first, second message.Score) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }
 
-// Verify a score by delegating the ZK library to validate the proof
+// Verify a score by delegating the ZK library to validate the proof.
 func (sh *ScoreHandler) Verify(ctx context.Context, round uint64, step uint8, m message.Score) error {
 	// Check threshold
 	sh.lock.RLock()
 	defer sh.lock.RUnlock()
+
 	score := &common.BlsScalar{Data: m.Score}
 	if sh.threshold.Exceeds(score) {
 		return errors.New("threshold exceeds score")

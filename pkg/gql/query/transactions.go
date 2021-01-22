@@ -26,8 +26,6 @@ const (
 	txlastArg = "last"
 )
 
-// queryTx is a data-wrapper for all core.transaction relevant fields that
-// can be fetched via grapqhql
 type (
 	queryOutput struct {
 		PubKey []byte
@@ -37,22 +35,23 @@ type (
 		KeyImage []byte
 	}
 
+	// queryTx is a data-wrapper for all core.transaction relevant fields that
+	// can be fetched via grapqhql.
 	queryTx struct {
 		TxID    []byte
 		TxType  core.TxType
 		Outputs []queryOutput `json:"output"`
 		Inputs  []queryInput  `json:"input"`
 
-		// non-StandardTx data fields
+		// Non-StandardTx data fields.
 		BlockHash []byte
 		Size      int
 	}
 )
 
-type transactions struct {
-}
+type transactions struct{}
 
-// newQueryTx constructs query tx data from core tx and block hash
+// newQueryTx constructs query tx data from core tx and block hash.
 //nolint
 func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	txID, err := tx.CalculateHash()
@@ -93,7 +92,7 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	return qd, nil
 }
 
-// IsNil will check for nil in a output
+// IsNil will check for nil in a output.
 func IsNil(output *core.Note) bool {
 	return output.PkR.Data == nil
 }
@@ -117,7 +116,6 @@ func (t transactions) getQuery() *graphql.Field {
 }
 
 func (t transactions) resolve(p graphql.ResolveParams) (interface{}, error) {
-
 	// Retrieve DB conn from context
 	db, ok := p.Context.Value("database").(database.DB)
 	if !ok {
@@ -149,10 +147,8 @@ func (t transactions) resolve(p graphql.ResolveParams) (interface{}, error) {
 }
 
 func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]queryTx, error) {
-
 	txs := make([]queryTx, 0)
 	err := db.View(func(t database.Transaction) error {
-
 		for _, v := range txids {
 			encVal, ok := v.(string)
 			if !ok {
@@ -181,9 +177,8 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]que
 	return txs, err
 }
 
-// Fetch #count# number of txs from lastly accepted blocks
+// Fetch `count` number of txs from lastly accepted blocks.
 func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error) {
-
 	txs := make([]queryTx, 0)
 
 	if count <= 0 {
@@ -198,7 +193,6 @@ func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error)
 	}
 
 	err := db.View(func(t database.Transaction) error {
-
 		var tip uint64
 		tip, err := t.FetchCurrentHeight()
 		if err != nil {

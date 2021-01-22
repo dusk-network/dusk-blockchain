@@ -26,7 +26,6 @@ func transferDusk(client node.TransactorClient) (*node.TransactionResponse, erro
 		//if _, err := address.ToKey(2); err != nil {
 		//	return err
 		//}
-
 		return nil
 	}
 

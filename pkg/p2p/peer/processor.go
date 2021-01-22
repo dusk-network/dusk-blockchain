@@ -46,6 +46,7 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 // to the processing function.
 func (m *MessageProcessor) Collect(packet []byte, respChan chan<- bytes.Buffer) error {
 	b := bytes.NewBuffer(packet)
+
 	msg, err := message.Unmarshal(b)
 	if err != nil {
 		return err
@@ -55,7 +56,7 @@ func (m *MessageProcessor) Collect(packet []byte, respChan chan<- bytes.Buffer) 
 
 // CanRoute determines whether or not a message needs to be filtered by the
 // dupemap.
-// TODO: rename
+// TODO: rename.
 func (m *MessageProcessor) CanRoute(topic topics.Topic) bool {
 	switch topic {
 	case topics.Tx,

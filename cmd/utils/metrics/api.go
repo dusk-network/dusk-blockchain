@@ -39,7 +39,6 @@ func executeQuery(client *graphql.Client, query string, target interface{}, valu
 }
 
 func executeQueryHTTP(endpoint string, query string, target interface{}) error {
-
 	buf := bytes.Buffer{}
 	if _, err := buf.Write([]byte(query)); err != nil {
 		return errors.New("invalid query")
@@ -50,6 +49,7 @@ func executeQueryHTTP(endpoint string, query string, target interface{}) error {
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		_ = resp.Body.Close()
 	}()
@@ -68,10 +68,9 @@ func executeQueryHTTP(endpoint string, query string, target interface{}) error {
 
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
 		body, _ := ioutil.ReadAll(resp.Body)
+
 		fmt.Println("ERROR executeQueryHTTP,  ", err, string(body))
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	return nil
@@ -87,7 +86,7 @@ func getLatestTransactions(client *graphql.Client, values map[string]interface{}
 		}
 	  }
 	`
-	//TODO: replace it with correct schema
+	// TODO: replace it with correct schema
 	var target interface{}
 
 	return executeQuery(client, query, target, values)
@@ -106,7 +105,7 @@ func getLatestBlocks(client *graphql.Client, values map[string]interface{}) (int
 		}
 	  }
 	`
-	//TODO: replace it with correct schema
+	// TODO: replace it with correct schema
 	var target interface{}
 
 	return executeQuery(client, query, target, values)
@@ -150,7 +149,7 @@ func getBlockTransactionsByHash(client *graphql.Client, values map[string]interf
 		}
 	  }
 	`
-	//TODO: replace it with correct schema
+	// TODO: replace it with correct schema
 	var target interface{}
 
 	return executeQuery(client, query, target, values)
@@ -173,7 +172,7 @@ func getBlockByHash(client *graphql.Client, values map[string]interface{}) (inte
 		}
 	  }
 	`
-	//TODO: replace it with correct schema
+	// TODO: replace it with correct schema
 	var target interface{}
 
 	return executeQuery(client, query, target, values)
@@ -196,21 +195,21 @@ func getBlockByNumber(duskInfo *DuskInfo, values map[string]interface{}) (*Block
 		}
 	  }
 	`
-	//TODO: replace it with correct schema
+	// TODO: replace it with correct schema
 
 	blk, err := executeQuery(duskInfo.GQLClient, query, new(Blocks), values)
 	if err != nil {
 		return nil, err
 	}
 
-	//log.Info("Got BlockByNumber", blk)
+	// log.Info("Got BlockByNumber", blk)
 
 	return &blk.(*Blocks).Blocks[0], nil
 }
 
 func pendingTransactionCount(duskInfo *DuskInfo) (int, error) {
 	query := "{\"query\" : \"{ mempool (txid: \\\"\\\") { txid txtype } }\"}"
-	//TODO: replace it with correct schema
+	// TODO: replace it with correct schema
 	var resp map[string]map[string][]map[string]string
 
 	err := executeQueryHTTP(duskInfo.GQLEndpoint, query, &resp)
@@ -218,11 +217,13 @@ func pendingTransactionCount(duskInfo *DuskInfo) (int, error) {
 		return 0, err
 	}
 
-	result, ok := resp["data"]
 	count := 0
+
+	result, ok := resp["data"]
 	if ok {
 		count = len(result["mempool"])
 	}
+
 	return count, nil
 }
 
@@ -244,7 +245,7 @@ func getTransactionByID(client *graphql.Client, values map[string]interface{}) (
 		}
 	  }
 	`
-	//TODO: replace it with correct schema
+	// TODO: replace it with correct schema
 	var target interface{}
 
 	return executeQuery(client, query, target, values)
@@ -266,7 +267,7 @@ func getBlocksCountQuery(client *graphql.Client, values map[string]interface{}) 
 		}
 	  }
 	`
-	//TODO: replace it with correct schema
+	// TODO: replace it with correct schema
 	var target interface{}
 
 	return executeQuery(client, query, target, values)

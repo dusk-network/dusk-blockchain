@@ -69,10 +69,13 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 func writeArbitraryBidValues(assert *assert.Assertions, db database.DB) {
 	d, err := crypto.RandEntropy(32)
 	assert.NoError(err)
+
 	k, err := crypto.RandEntropy(32)
 	assert.NoError(err)
+
 	index := uint64(0)
 	lockTime := uint64(250000)
+
 	assert.NoError(db.Update(func(t database.Transaction) error {
 		return t.StoreBidValues(d, k, index, lockTime)
 	}))

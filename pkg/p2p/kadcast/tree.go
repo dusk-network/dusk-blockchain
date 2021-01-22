@@ -34,7 +34,6 @@ func makeTree() Tree {
 
 // Classifies and adds a Peer to the routing storage tree.
 func (tree *Tree) addPeer(myPeer encoding.PeerInfo, otherPeer encoding.PeerInfo) {
-
 	// routing state should not include myPeer
 	if myPeer.IsEqual(otherPeer) {
 		return
@@ -53,18 +52,21 @@ func (tree *Tree) addPeer(myPeer encoding.PeerInfo, otherPeer encoding.PeerInfo)
 
 // Returns the total amount of peers that a `Peer` is connected to.
 func (tree *Tree) getTotalPeers() uint64 {
-	tree.mu.RLock()
 	var count uint64 = 0
+
+	tree.mu.RLock()
+	defer tree.mu.RUnlock()
+
 	for _, bucket := range tree.buckets {
 		count += uint64(len(bucket.entries))
 	}
-	tree.mu.RUnlock()
+
 	return count
 }
 
 func (tree *Tree) trace(myPeer encoding.PeerInfo) string {
-
 	logMsg := fmt.Sprintf("this_peer: %s, bucket peers num %d\n", myPeer.String(), tree.getTotalPeers())
+
 	for _, b := range tree.buckets {
 		for _, p := range b.entries {
 			_, dist := ComputeDistance(myPeer, p)

@@ -25,11 +25,11 @@ type messageRouter struct {
 }
 
 func (m *messageRouter) Collect(packet []byte, height byte) error {
-
 	// Register message in the global message registry for stats collecting
 	diagnostics.RegisterWireMsg(topics.Kadcast.String(), packet)
 
 	b := bytes.NewBuffer(packet)
+
 	msg, err := message.Unmarshal(b)
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func (m *messageRouter) Collect(packet []byte, height byte) error {
 }
 
 // CanRoute allows only a few wire message that are of broadcast-type.
-// For now, request-response wire messages are not introduced in kadcast network
+// For now, request-response wire messages are not introduced in kadcast network.
 func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 	switch topic {
 	case topics.Tx,
@@ -56,7 +56,6 @@ func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 }
 
 func (m *messageRouter) route(msg message.Message) error {
-
 	category := msg.Category()
 
 	log.WithField("topic", category.String()).

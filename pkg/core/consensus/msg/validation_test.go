@@ -21,8 +21,10 @@ func TestVerifyBLSSignature(t *testing.T) {
 
 	sig, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, payload)
 	s := sig.Compress()
+
 	orig := make([]byte, 33)
 	copy(orig, s)
+
 	if !assert.NoError(t, VerifyBLSSignature(k.BLSPubKeyBytes, payload, s)) {
 		t.FailNow()
 	}

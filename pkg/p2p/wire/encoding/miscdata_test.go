@@ -19,9 +19,10 @@ import (
 
 //// Unit tests
 
-// Test bool functions
+// Test bool functions.
 func TestBoolEncodeDecode(t *testing.T) {
 	b := true
+
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteBool(buf, b); err != nil {
 		t.Fatal(err)
@@ -89,7 +90,7 @@ func Test512EncodeDecode(t *testing.T) {
 	assert.Equal(t, hash, byte64)
 }
 
-// Test to make sure it only takes byte slices of length 32
+// Test to make sure it only takes byte slices of length 32.
 func Test256Length(t *testing.T) {
 	byte16, err := crypto.RandEntropy(16)
 	if err != nil {
@@ -98,12 +99,14 @@ func Test256Length(t *testing.T) {
 
 	// Serialize
 	buf := new(bytes.Buffer)
+
 	err = encoding.Write256(buf, byte16) // This should fail
 	if err == nil {
 		t.Fatal("did not throw error when serializing byte slice of improper length")
 	}
 
 	buf.Reset()
+
 	byte40, err := crypto.RandEntropy(40)
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +119,7 @@ func Test256Length(t *testing.T) {
 	}
 }
 
-// Test to make sure it only takes byte slices of length 64
+// Test to make sure it only takes byte slices of length 64.
 func Test512Length(t *testing.T) {
 	byte16, err := crypto.RandEntropy(16)
 	if err != nil {
@@ -125,12 +128,14 @@ func Test512Length(t *testing.T) {
 
 	// Serialize
 	buf := new(bytes.Buffer)
+
 	err = encoding.Write512(buf, byte16) // This should fail
 	if err == nil {
 		t.Fatal("did not throw error when serializing byte slice of improper length")
 	}
 
 	buf.Reset()
+
 	byte80, err := crypto.RandEntropy(80)
 	if err != nil {
 		t.Fatal(err)
@@ -177,12 +182,14 @@ func TestBLSLength(t *testing.T) {
 
 	// Serialize
 	buf := new(bytes.Buffer)
+
 	err = encoding.WriteBLS(buf, byte16) // This should fail
 	if err == nil {
 		t.Fatal("did not throw error when serializing byte slice of improper length")
 	}
 
 	buf.Reset()
+
 	byte80, err := crypto.RandEntropy(80)
 	if err != nil {
 		t.Fatal(err)
@@ -199,6 +206,7 @@ func TestBLSLength(t *testing.T) {
 
 func BenchmarkReadBoolInterface(b *testing.B) {
 	var t bool
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer([]byte{1})
 		if err := ReadBool(buf, &t); err != nil {
@@ -209,6 +217,7 @@ func BenchmarkReadBoolInterface(b *testing.B) {
 
 func BenchmarkReadBoolNoInterface(b *testing.B) {
 	var t bool
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer([]byte{1})
 		if err := encoding.ReadBool(buf, &t); err != nil {
@@ -235,6 +244,7 @@ func BenchmarkWriteBoolNoInterface(b *testing.B) {
 
 func BenchmarkRead256Interface(b *testing.B) {
 	var bs []byte
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer(make([]byte, 32))
 		if err := Read256(buf, &bs); err != nil {
@@ -245,6 +255,7 @@ func BenchmarkRead256Interface(b *testing.B) {
 
 func BenchmarkRead256NoInterface(b *testing.B) {
 	bs := make([]byte, 32)
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer(make([]byte, 32))
 		if err := encoding.Read256(buf, bs); err != nil {
@@ -255,6 +266,7 @@ func BenchmarkRead256NoInterface(b *testing.B) {
 
 func BenchmarkWrite256Interface(b *testing.B) {
 	bs := make([]byte, 32)
+
 	for i := 0; i < b.N; i++ {
 		if err := Write256(new(bytes.Buffer), bs); err != nil {
 			b.Fatal(err)
@@ -264,6 +276,7 @@ func BenchmarkWrite256Interface(b *testing.B) {
 
 func BenchmarkWrite256NoInterface(b *testing.B) {
 	bs := make([]byte, 32)
+
 	for i := 0; i < b.N; i++ {
 		if err := encoding.Write256(new(bytes.Buffer), bs); err != nil {
 			b.Fatal(err)
@@ -273,6 +286,7 @@ func BenchmarkWrite256NoInterface(b *testing.B) {
 
 func BenchmarkRead512Interface(b *testing.B) {
 	var bs []byte
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer(make([]byte, 64))
 		if err := Read512(buf, &bs); err != nil {
@@ -283,6 +297,7 @@ func BenchmarkRead512Interface(b *testing.B) {
 
 func BenchmarkRead512NoInterface(b *testing.B) {
 	bs := make([]byte, 64)
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer(make([]byte, 64))
 		if err := encoding.Read512(buf, bs); err != nil {
@@ -293,6 +308,7 @@ func BenchmarkRead512NoInterface(b *testing.B) {
 
 func BenchmarkWrite512Interface(b *testing.B) {
 	bs := make([]byte, 64)
+
 	for i := 0; i < b.N; i++ {
 		if err := Write512(new(bytes.Buffer), bs); err != nil {
 			b.Fatal(err)
@@ -302,6 +318,7 @@ func BenchmarkWrite512Interface(b *testing.B) {
 
 func BenchmarkWrite512NoInterface(b *testing.B) {
 	bs := make([]byte, 64)
+
 	for i := 0; i < b.N; i++ {
 		if err := encoding.Write512(new(bytes.Buffer), bs); err != nil {
 			b.Fatal(err)
@@ -311,6 +328,7 @@ func BenchmarkWrite512NoInterface(b *testing.B) {
 
 func BenchmarkReadBLSInterface(b *testing.B) {
 	var bs []byte
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer(make([]byte, 33))
 		if err := ReadBLS(buf, &bs); err != nil {
@@ -321,6 +339,7 @@ func BenchmarkReadBLSInterface(b *testing.B) {
 
 func BenchmarkReadBLSNoInterface(b *testing.B) {
 	bs := make([]byte, 33)
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer(make([]byte, 33))
 		if err := encoding.ReadBLS(buf, bs); err != nil {
@@ -331,6 +350,7 @@ func BenchmarkReadBLSNoInterface(b *testing.B) {
 
 func BenchmarkWriteBLSInterface(b *testing.B) {
 	bs := make([]byte, 33)
+
 	for i := 0; i < b.N; i++ {
 		if err := WriteBLS(new(bytes.Buffer), bs); err != nil {
 			b.Fatal(err)
@@ -340,6 +360,7 @@ func BenchmarkWriteBLSInterface(b *testing.B) {
 
 func BenchmarkWriteBLSNoInterface(b *testing.B) {
 	bs := make([]byte, 33)
+
 	for i := 0; i < b.N; i++ {
 		if err := encoding.WriteBLS(new(bytes.Buffer), bs); err != nil {
 			b.Fatal(err)
@@ -359,6 +380,7 @@ func ReadBool(r io.Reader, b *bool) error {
 	if err := ReadUint8(r, &v); err != nil {
 		return err
 	}
+
 	*b = v != 0
 	return nil
 }
@@ -369,16 +391,19 @@ func WriteBool(w io.Writer, b bool) error {
 	if b {
 		v = 1
 	}
+
 	return WriteUint8(w, v)
 }
 
 // Read256 will read 32 bytes from r into b.
 func Read256(r io.Reader, b *[]byte) error {
 	*b = make([]byte, 32)
+
 	n, err := r.Read(*b)
 	if err != nil || n != len(*b) {
 		return fmt.Errorf("encoding: Read256 read %v/32 bytes - %v", n, err)
 	}
+
 	return nil
 }
 
@@ -387,19 +412,23 @@ func Write256(w io.Writer, b []byte) error {
 	if len(b) != 32 {
 		return fmt.Errorf("b is not proper size - expected 32 bytes, is actually %d bytes", len(b))
 	}
+
 	if _, err := w.Write(b); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // Read512 will read 64 bytes from r into b.
 func Read512(r io.Reader, b *[]byte) error {
 	*b = make([]byte, 64)
+
 	n, err := r.Read(*b)
 	if err != nil || n != len(*b) {
 		return fmt.Errorf("encoding: Read512 read %v/64 bytes - %v", n, err)
 	}
+
 	return nil
 }
 
@@ -408,19 +437,23 @@ func Write512(w io.Writer, b []byte) error {
 	if len(b) != 64 {
 		return fmt.Errorf("b is not proper size - expected 64 bytes, is actually %d bytes", len(b))
 	}
+
 	if _, err := w.Write(b); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // ReadBLS will read a compressed bls signature (33 bytes) from r into b.
 func ReadBLS(r io.Reader, b *[]byte) error {
 	*b = make([]byte, 33)
+
 	n, err := r.Read(*b)
 	if err != nil || n != len(*b) {
 		return fmt.Errorf("encoding: ReadBLS read %v/33 bytes - %v", n, err)
 	}
+
 	return nil
 }
 
@@ -429,8 +462,10 @@ func WriteBLS(w io.Writer, b []byte) error {
 	if len(b) != 33 {
 		return fmt.Errorf("b is not proper size - expected 33 bytes, is actually %d bytes", len(b))
 	}
+
 	if _, err := w.Write(b); err != nil {
 		return err
 	}
+
 	return nil
 }

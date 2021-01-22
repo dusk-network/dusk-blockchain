@@ -52,6 +52,7 @@ func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, roun
 	size := committeeSize(provisioners.SubsetSizeAt(round))
 	committee := provisioners.CreateVotingCommittee(round, step, size)
 	subcommittee := committee.IntersectCluster(bitSet)
+
 	apk, err := agreement.ReconstructApk(subcommittee.Set)
 	if err != nil {
 		return err
@@ -68,9 +69,9 @@ func committeeSize(memberAmount int) int {
 	return memberAmount
 }
 
-// CheckBlockHeader checks whether a block header is malformed,
-// These are stateless and stateful checks
-// returns nil, if all checks pass
+// CheckBlockHeader checks whether a block header is malformed.
+// These are stateless and stateful checks.
+// Returns nil, if all checks pass.
 func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 	// Version
 	if blk.Header.Version > 0 {
@@ -106,16 +107,19 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 }
 
 // CheckMultiCoinbases returns an error if there is more than one coinbase transaction
-//  in the list or if there are none
+// in the list or if there are none.
 func CheckMultiCoinbases(txs []transactions.ContractCall) error {
 	var seen bool
+
 	for _, tx := range txs {
 		if tx.Type() != transactions.Distribute {
 			continue
 		}
+
 		if seen {
 			return errors.New("multiple coinbase transactions present")
 		}
+
 		seen = true
 	}
 

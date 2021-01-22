@@ -16,9 +16,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
-// Peer is a wrapper of all 2 kadcast processing routing
+// Peer is a wrapper of all 2 kadcast processing routing.
 type Peer struct {
-
 	// dusk node components
 	eventBus *eventbus.EventBus
 	gossip   *protocol.Gossip
@@ -32,14 +31,13 @@ type Peer struct {
 	raptorCodeEnabled bool
 }
 
-// NewPeer makes a kadcast peer instance
+// NewPeer makes a kadcast peer instance.
 func NewPeer(eventBus *eventbus.EventBus, g *protocol.Gossip, dp *dupemap.DupeMap, raptorCodeEnabled bool) *Peer {
 	return &Peer{eventBus: eventBus, gossip: g, dupemap: dp, raptorCodeEnabled: raptorCodeEnabled}
 }
 
-// Launch starts kadcast service
+// Launch starts kadcast service.
 func (p *Peer) Launch(addr string, bootstrapAddrs []string, beta uint8) {
-
 	// Instantiate Kadcast Router
 	router := MakeRoutingTable(addr)
 	peerInfo := router.LpeerInfo
@@ -76,9 +74,8 @@ func (p *Peer) Launch(addr string, bootstrapAddrs []string, beta uint8) {
 	go JoinNetwork(&router, bootstrapAddrs)
 }
 
-// Close terminates peer service
+// Close terminates peer service.
 func (p *Peer) Close() {
-
 	if p.w != nil {
 		_ = p.w.Close()
 	}
@@ -92,10 +89,10 @@ func (p *Peer) Close() {
 	}
 }
 
-// JoinNetwork makes attempts to join the network based on the configured bootstrapping nodes
+// JoinNetwork makes attempts to join the network based on the configured bootstrapping nodes.
 func JoinNetwork(router *RoutingTable, bootstrapAddrs []string) {
-
 	bootstrapNodes := make([]encoding.PeerInfo, 0)
+
 	for _, addr := range bootstrapAddrs {
 		p, _ := encoding.MakePeerFromAddr(addr)
 		bootstrapNodes = append(bootstrapNodes, p)
@@ -118,21 +115,24 @@ func JoinNetwork(router *RoutingTable, bootstrapAddrs []string) {
 // the node is connected to at the end of the process.
 func InitBootstrap(router *RoutingTable, bootNodes []encoding.PeerInfo) error {
 	log.Info("Bootstrapping process started.")
+
 	// Get PeerList ordered by distance so we can compare it
 	// after the `PONG` arrivals.
 	initPeerNum := router.tree.getTotalPeers()
-	for i := 0; i <= 5; i++ {
 
+	for i := 0; i <= 5; i++ {
 		actualPeers := router.pollBootstrappingNodes(bootNodes, time.Second*5)
 		if actualPeers <= initPeerNum {
 			if i == 5 {
 				return errors.New("Maximum number of attempts achieved. Please review yor connection settings")
 			}
+
 			log.WithField("Retries", i).Warn("Bootstrapping nodes were not added.Trying again..")
 		} else {
 			break
 		}
 	}
+
 	log.WithField("connected_nodes", router.tree.getTotalPeers()).Info("Bootstrapping process finished")
 	return nil
 }

@@ -18,14 +18,13 @@ import (
 	"github.com/urfave/cli"
 )
 
-// amount of times to retry connecting to a disconnected node
+// amount of times to retry connecting to a disconnected node.
 var retries = 3
 
-// amount of time to wait between retries
+// amount of time to wait between retries.
 var retryTime = 4 * time.Second
 
 func action(ctx *cli.Context) error {
-
 	// check arguments
 	if arguments := ctx.Args(); len(arguments) > 0 {
 		return fmt.Errorf("failed to read command argument: %q", arguments[0])
@@ -35,6 +34,7 @@ func action(ctx *cli.Context) error {
 		log.WithField("logLevel", logLevel).Info("will configure log level")
 
 		var err error
+
 		log.Level, err = logger.ParseLevel(logLevel)
 		if err != nil {
 			log.WithError(err).Fatal("could not parse logLevel")
@@ -53,17 +53,15 @@ func action(ctx *cli.Context) error {
 		WithField("port", port).
 		WithField("hostname", hostname).
 		Info("Voucher seeder up & accepting connections")
+
 	nodes := New()
 
 	for {
-
 		conn, ip := connectToNode(nodes, ln)
 		if conn != nil {
 			handleConnection(nodes, conn, ip)
 		}
-
 	}
-
 }
 
 func sendChallenge(conn net.Conn) (string, error) {
@@ -92,6 +90,7 @@ func handleConnection(duskNode *DuskNodes, conn net.Conn, ip string) {
 	challenge, err := sendChallenge(conn)
 	if err != nil {
 		log.WithError(err).Error("could not process sendChallenge")
+
 		_ = conn.Close()
 		return
 	}
@@ -100,6 +99,7 @@ func handleConnection(duskNode *DuskNodes, conn net.Conn, ip string) {
 	buf := make([]byte, 256)
 	if _, err := conn.Read(buf); err != nil {
 		log.WithError(err).Error("could not read response")
+
 		_ = conn.Close()
 		return
 	}
@@ -109,21 +109,26 @@ func handleConnection(duskNode *DuskNodes, conn net.Conn, ip string) {
 	rep := strings.Split(string(buf), ",")
 	port := getPort(rep)
 	ipPort := ip + ":" + port
+
 	if HashesMatch(strings.TrimSpace(rep[0]), challenge) {
 		// He's a good guy, add him to the node list and provide a list of connected nodes
 		duskNode.Update(ipPort)
+
 		ret := duskNode.DumpNodes(ipPort)
 		if ret == "" {
 			ret = "noip"
 		}
+
 		if _, err := conn.Write([]byte(ret)); err != nil {
 			log.WithError(err).Error("could not write back to node")
+
 			_ = conn.Close()
 			return
 		}
 	} else {
 		// Response fail, blacklist the node's ip
 		duskNode.BlackList(ipPort, true)
+
 		_ = conn.Close()
 		return
 	}
@@ -133,14 +138,17 @@ func handleConnection(duskNode *DuskNodes, conn net.Conn, ip string) {
 		for {
 			buf = make([]byte, 1)
 			_ = conn.SetReadDeadline(time.Now().Add(retryTime))
+
 			if _, err := conn.Read(buf); err == io.EOF {
 				newConn := retryConnection(ipPort, retries)
 				if newConn == nil {
 					log.WithField("ipPort", ipPort).Warn("has disconnected")
 					duskNode.SetInactive(ipPort)
+
 					_ = conn.Close()
 					return
 				}
+
 				_ = conn.Close()
 				conn = newConn
 			}
@@ -148,16 +156,19 @@ func handleConnection(duskNode *DuskNodes, conn net.Conn, ip string) {
 	}()
 }
 
-// attempt to reconnect to a disconnected node
+// attempt to reconnect to a disconnected node.
 func retryConnection(ip string, retries int) net.Conn {
 	for i := 0; i < retries; i++ {
 		time.Sleep(retryTime)
+
 		conn, err := net.Dial("tcp", ip)
 		if err != nil {
 			continue
 		}
+
 		return conn
 	}
+
 	return nil
 }
 
@@ -166,10 +177,12 @@ func connectToNode(nodes *DuskNodes, ln net.Listener) (net.Conn, string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	ip, _, err := net.SplitHostPort(conn.RemoteAddr().String())
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.WithField("ip", ip).Info("Incoming Connection")
 
 	// Check that the node is not blacklisted, if it is then drop the connection

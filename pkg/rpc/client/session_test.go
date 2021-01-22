@@ -30,7 +30,7 @@ func TestCreateDropSession(t *testing.T) {
 }
 
 // TestPersistentSession tests that the client can exploit the session injected
-// through the AuthClientInterceptor and perform authenticated calls
+// through the AuthClientInterceptor and perform authenticated calls.
 func TestPersistentSession(t *testing.T) {
 	assert := assert.New(t)
 	conn, err := nodeClient.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
@@ -49,6 +49,7 @@ func createDumbWallet(conn *grpc.ClientConn) error {
 	// spawn an authenticated RPC call
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
+
 	in := &node.CreateRequest{}
 
 	// the mock always returns success, so if there is an error it is likely to

@@ -11,14 +11,13 @@ import (
 	"github.com/graphql-go/graphql"
 )
 
-// Root represents the root of the graphql object
+// Root represents the root of the graphql object.
 type Root struct {
 	Query *graphql.Object
 }
 
-// NewRoot returns a Root with blocks, transactions and mempool setup
+// NewRoot returns a Root with blocks, transactions and mempool setup.
 func NewRoot(rpcBus *rpcbus.RPCBus) *Root {
-
 	m := mempool{rpcBus: rpcBus}
 
 	root := Root{

@@ -25,7 +25,7 @@ func NewInitialization(pk *keys.PublicKey, blsKeys *key.Keys) Initialization {
 
 // Copy an Initialization message.
 // Implements the payload.Safe interface.
-// TODO: implement
+// TODO: implement.
 func (i Initialization) Copy() payload.Safe {
 	return i
 }

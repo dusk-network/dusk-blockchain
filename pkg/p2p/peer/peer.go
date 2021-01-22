@@ -39,7 +39,7 @@ type Connection struct {
 }
 
 // GossipConnector calls Gossip.Process on the message stream incoming from the
-// ringbuffer
+// ringbuffer.
 // It absolves the function previously carried over by the Gossip preprocessor.
 type GossipConnector struct {
 	gossip *protocol.Gossip
@@ -76,12 +76,13 @@ type Reader struct {
 
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
-// in a goroutine..
+// in a goroutine.
 func NewWriter(conn net.Conn, gossip *protocol.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
 	kas := 30 * time.Second
 	if len(keepAlive) > 0 {
 		kas = keepAlive[0]
 	}
+
 	pw := &Writer{
 		Connection: &Connection{
 			Conn:   conn,
@@ -94,7 +95,7 @@ func NewWriter(conn net.Conn, gossip *protocol.Gossip, subscriber eventbus.Subsc
 	return pw
 }
 
-// ReadMessage reads from the connection
+// ReadMessage reads from the connection.
 func (c *Connection) ReadMessage() ([]byte, error) {
 	length, err := c.gossip.UnpackLength(c.Conn)
 	if err != nil {
@@ -103,6 +104,7 @@ func (c *Connection) ReadMessage() ([]byte, error) {
 
 	// read a [length]byte from connection
 	buf := make([]byte, int(length))
+
 	_, err = io.ReadFull(c.Conn, buf)
 	if err != nil {
 		return nil, err
@@ -111,7 +113,7 @@ func (c *Connection) ReadMessage() ([]byte, error) {
 	return buf, err
 }
 
-// Connect will perform the protocol handshake with the peer. If successful
+// Connect will perform the protocol handshake with the peer. If successful...
 func (w *Writer) Connect() error {
 	if err := w.Handshake(); err != nil {
 		_ = w.Conn.Close()
@@ -128,6 +130,7 @@ func (w *Writer) Connect() error {
 				Method:   "Connect",
 				LastSeen: time.Now(),
 			}
+
 			err := store.Save(&peerJSON)
 			if err != nil {
 				log.Error("failed to save peerJSON into StormDB")
@@ -138,6 +141,7 @@ func (w *Writer) Connect() error {
 				ID:       addr,
 				LastSeen: time.Now(),
 			}
+
 			err = store.Save(&peerCount)
 			if err != nil {
 				log.Error("failed to save peerCount into StormDB")
@@ -165,6 +169,7 @@ func (p *Reader) Accept() error {
 				Method:   "Accept",
 				LastSeen: time.Now(),
 			}
+
 			err := store.Save(&peerJSON)
 			if err != nil {
 				log.Error("failed to save peer into StormDB")
@@ -175,11 +180,11 @@ func (p *Reader) Accept() error {
 				ID:       addr,
 				LastSeen: time.Now(),
 			}
+
 			err = store.Save(&peerCount)
 			if err != nil {
 				log.Error("failed to save peerCount into StormDB")
 			}
-
 		}()
 	}
 
@@ -208,7 +213,7 @@ func sendError(errChan chan error, err error) {
 	}
 }
 
-// Serve utilizes two different methods for writing to the open connection
+// Serve utilizes two different methods for writing to the open connection.
 func (w *Writer) Serve(ctx context.Context, writeQueueChan <-chan bytes.Buffer, errChan chan error) {
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
@@ -223,7 +228,9 @@ func (w *Writer) Serve(ctx context.Context, writeQueueChan <-chan bytes.Buffer, 
 
 func (w *Writer) onDisconnect() {
 	log.WithField("address", w.Connection.RemoteAddr().String()).Infof("Connection terminated")
+
 	_ = w.Conn.Close()
+
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
 
 	if config.Get().API.Enabled {
@@ -236,6 +243,7 @@ func (w *Writer) onDisconnect() {
 				Method:   "onDisconnect",
 				LastSeen: time.Now(),
 			}
+
 			err := store.Save(&peerJSON)
 			if err != nil {
 				log.Error("failed to save peer into StormDB")
@@ -245,6 +253,7 @@ func (w *Writer) onDisconnect() {
 			peerCount := capi.PeerCount{
 				ID: addr,
 			}
+
 			err = store.Delete(&peerCount)
 			if err != nil {
 				log.Error("failed to Delete peerCount into StormDB")
@@ -261,7 +270,9 @@ func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buff
 				peerCount := capi.PeerCount{
 					ID: addr,
 				}
+
 				store := capi.GetStormDBInstance()
+
 				// delete count
 				err := store.Delete(&peerCount)
 				if err != nil {
@@ -282,6 +293,7 @@ func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buff
 			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
 				l.WithField("process", "writeloop").WithError(err).Warnln("error writing message")
 				sendError(errChan, err)
+
 				return
 			}
 		case <-ctx.Done():
@@ -303,7 +315,6 @@ func (p *Reader) ReadLoop(ctx context.Context, errChan chan error) {
 	// 		log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
 	// 	}
 	// }()
-
 	p.readLoop(ctx, errChan)
 }
 
@@ -361,12 +372,14 @@ func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
 			// TODO: error here should be checked in order to decrease reputation
 			// or blacklist spammers
 			startTime := time.Now().UnixNano()
+
 			if err = p.processor.Collect(message, p.responseChan); err != nil {
 				l.WithField("process", "readloop").
 					WithError(err).Error("failed to process message")
 			}
 
 			duration := float64(time.Now().UnixNano()-startTime) / 1000000
+
 			l.WithField("cs", hex.EncodeToString(cs)).
 				WithField("len", len(message)).
 				WithField("ms", duration).Trace("message routing")
@@ -384,6 +397,7 @@ func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
 					ID:       addr,
 					LastSeen: time.Now(),
 				}
+
 				err = store.Save(&peerCount)
 				if err != nil {
 					log.Error("failed to save peerCount into StormDB")
@@ -401,13 +415,16 @@ func (p *Reader) keepAliveLoop(ctx context.Context, timer *time.Timer) {
 			err := p.Connection.keepAlive()
 			if err != nil {
 				log.WithError(err).WithField("process", "keepaliveloop").Error("got error back from keepAlive")
+
 				if config.Get().API.Enabled {
 					go func() {
 						addr := p.Addr()
 						peerCount := capi.PeerCount{
 							ID: addr,
 						}
+
 						store := capi.GetStormDBInstance()
+
 						// delete count
 						err = store.Delete(&peerCount)
 						if err != nil {
@@ -415,7 +432,6 @@ func (p *Reader) keepAliveLoop(ctx context.Context, timer *time.Timer) {
 						}
 					}()
 				}
-
 			}
 
 		case <-ctx.Done():
@@ -449,6 +465,7 @@ func (c *Connection) Write(b []byte) (int, error) {
 	_ = c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	n, err := c.Conn.Write(b)
 	c.lock.Unlock()
+
 	return n, err
 }
 

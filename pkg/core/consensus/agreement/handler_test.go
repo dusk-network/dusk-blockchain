@@ -16,7 +16,7 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
-// TestMockAgreementEvent tests the general layout of a mock Agreement (i.e. the BitSet)
+// TestMockAgreementEvent tests the general layout of a mock Agreement (i.e. the BitSet).
 func TestMockAgreementEvent(t *testing.T) {
 	p, keys := consensus.MockProvisioners(50)
 	hash, _ := crypto.RandEntropy(32)
@@ -46,6 +46,7 @@ func TestGetVoterKeys(t *testing.T) {
 	// Ensure voterKeys only contains keys from `keys`
 	for _, key := range voterKeys {
 		found := false
+
 		for _, k := range keys {
 			if bytes.Equal(k.BLSPubKeyBytes, key) {
 				found = true

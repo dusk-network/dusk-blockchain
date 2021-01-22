@@ -14,15 +14,16 @@ import (
 )
 
 func TestPeerMarshaling(t *testing.T) {
-
 	var id [16]byte
+
 	seed, _ := crypto.RandEntropy(16)
 	copy(id[:], seed[:])
 
 	p := PeerInfo{
 		[4]byte{127, 0, 0, 1},
 		1234,
-		id}
+		id,
+	}
 
 	var buf bytes.Buffer
 	if err := p.MarshalBinary(&buf); err != nil {
@@ -40,7 +41,6 @@ func TestPeerMarshaling(t *testing.T) {
 }
 
 func TestPeerIsEqual(t *testing.T) {
-
 	ip := [4]byte{127, 0, 0, 1}
 	id := [16]byte{1, 2, 3, 4}
 	var port uint16 = 9876

@@ -23,6 +23,7 @@ func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) bl
 	}
 
 	hdr := sev.State()
+
 	b, err := m.GenerateBlock(hdr.Round, sev.Seed, sev.Proof, sev.Score, previousBlock, [][]byte{hdr.PubKeyBLS})
 	if err != nil {
 		panic(err)
@@ -40,7 +41,7 @@ func (m *mock) GenerateCandidateMessage(ctx context.Context, sev message.ScorePr
 	return &mockScore, nil
 }
 
-// Mock the candidate generator
+// Mock the candidate generator.
 func Mock(e *consensus.Emitter) Generator {
 	key := keys.NewPublicKey()
 	return &mock{

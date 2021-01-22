@@ -27,12 +27,14 @@ import (
 
 func TestWebsocketEndpoint(t *testing.T) {
 	logrus.SetLevel(logrus.FatalLevel)
+
 	assert := assert.New(t)
 
 	// Set up HTTP server with notifications enabled
 	// config
 	s, eb, err := setupServer("127.0.0.1:22222")
 	assert.NoError(err)
+
 	defer s.Stop()
 
 	dialCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -42,11 +44,13 @@ func TestWebsocketEndpoint(t *testing.T) {
 	u := url.URL{Scheme: "ws", Host: "127.0.0.1:22222", Path: "/ws"}
 	c, _, e := websocket.DefaultDialer.DialContext(dialCtx, u.String(), nil)
 	assert.NoError(e)
+
 	defer func() {
 		_ = c.Close()
 	}()
 
 	response := make(chan string)
+
 	go func() {
 		_, msg, readErr := c.ReadMessage()
 		if readErr != nil {
@@ -69,6 +73,7 @@ func TestWebsocketEndpoint(t *testing.T) {
 	hash, _ := blk.CalculateHash()
 	blk.Header.Hash = hash
 	msg := message.New(topics.AcceptedBlock, *blk)
+
 	errList := eb.Publish(topics.AcceptedBlock, msg)
 	assert.Empty(errList)
 
@@ -78,6 +83,7 @@ func TestWebsocketEndpoint(t *testing.T) {
 
 	expMsg, err := notifications.MarshalBlockMsg(*blk)
 	assert.NoError(err)
+
 	assert.NotEqual("no response", expMsg)
 	assert.NotEqual("malformed message received", expMsg)
 }
@@ -97,6 +103,7 @@ func setupServer(addr string) (*Server, *eventbus.EventBus, error) {
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
+
 	s, err := NewHTTPServer(eb, rpcBus)
 	if err != nil {
 		return nil, nil, err

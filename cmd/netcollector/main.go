@@ -9,18 +9,14 @@ package main
 import (
 	"os"
 	"os/signal"
-
 	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	jsonRPCAddr = ":1337"
-)
+var jsonRPCAddr = ":1337"
 
 func main() {
-
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 

@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// StartMockServer will start a mock server
+// StartMockServer will start a mock server.
 func StartMockServer(address string) {
 	s := grpc.NewServer()
 	rusk.RegisterStateServer(s, &rusk.StateMock{})
@@ -24,6 +24,7 @@ func StartMockServer(address string) {
 	node.RegisterTransactorServer(s, &node.TransactorMock{})
 
 	lis, _ := net.Listen("tcp", address)
+
 	go func() {
 		if err := s.Serve(lis); err != nil {
 			panic(fmt.Sprintf("Server exited with error: %v", err))

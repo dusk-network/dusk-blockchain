@@ -29,6 +29,7 @@ func WalletMenu(client *conf.NodeClient) error {
 		if err != nil {
 			return err
 		}
+
 		_, _ = fmt.Fprintf(os.Stdout, "sync progress: %.2f ", resp.Progress)
 
 		prompt := promptui.Select{
@@ -43,6 +44,7 @@ func WalletMenu(client *conf.NodeClient) error {
 		}
 
 		var res string
+
 		switch result {
 		case "Transfer DUSK":
 			resp, err := transferDusk(client.TransactorClient)
@@ -111,6 +113,7 @@ func WalletMenu(client *conf.NodeClient) error {
 
 func formatRecords(resp *node.TxHistoryResponse) strings.Builder {
 	s := strings.Builder{}
+
 	for _, record := range resp.Records {
 		// Type
 		_, _ = s.WriteString(node.TxType_name[int32(record.Type)])

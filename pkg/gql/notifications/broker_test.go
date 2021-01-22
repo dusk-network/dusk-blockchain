@@ -13,7 +13,6 @@ import (
 )
 
 func TestReapClients(t *testing.T) {
-
 	b := Broker{}
 	b.clients = list.New()
 

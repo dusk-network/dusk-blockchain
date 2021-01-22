@@ -22,8 +22,8 @@ import (
 // Test the behavior of the block hash broker, upon receiving a GetBlocks message.
 func TestAdvertiseBlocks(t *testing.T) {
 	assert := assert.New(t)
-	// Set up db
 	_, db := lite.CreateDBConnection()
+
 	defer func() {
 		_ = db.Close()
 	}()
@@ -58,6 +58,7 @@ func TestAdvertiseBlocks(t *testing.T) {
 func generateBlocks(amount int) ([][]byte, []*block.Block) {
 	var hashes [][]byte
 	var blocks []*block.Block
+
 	for i := 0; i < amount; i++ {
 		blk := helper.RandomBlock(uint64(i), 2)
 		hashes = append(hashes, blk.Header.Hash)
@@ -78,7 +79,6 @@ func storeBlocks(db database.DB, blocks []*block.Block) error {
 		err := db.Update(func(t database.Transaction) error {
 			return t.StoreBlock(blk)
 		})
-
 		if err != nil {
 			return err
 		}

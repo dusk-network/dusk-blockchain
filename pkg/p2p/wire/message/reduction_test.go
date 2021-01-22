@@ -42,6 +42,7 @@ func TestReductionUnMarshal(t *testing.T) {
 func TestVoteSetUnMarshal(t *testing.T) {
 	// Mock a slice of Reduction events
 	var evs []message.Reduction
+
 	for i := 0; i < 5; i++ {
 		ev := newReductionEvent(1, 1)
 		evs = append(evs, ev)
@@ -71,10 +72,12 @@ func TestReductionCopy(t *testing.T) {
 func newReductionEvent(round uint64, step uint8) message.Reduction {
 	k, _ := key.NewRandKeys()
 	blockHash, _ := crypto.RandEntropy(32)
+
 	sig, err := bls.Sign(k.BLSSecretKey, k.BLSPubKey, blockHash)
 	if err != nil {
 		panic(err)
 	}
+
 	hdr := header.Header{
 		Round:     round,
 		Step:      step,

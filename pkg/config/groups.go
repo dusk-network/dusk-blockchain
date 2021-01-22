@@ -37,7 +37,7 @@ type loggerConfiguration struct {
 	Monitor logMonitorConfiguration
 }
 
-// log based monitoring defined in pkg/eventmon/logger
+// Log based monitoring defined in pkg/eventmon/logger.
 type logMonitorConfiguration struct {
 	Enabled      bool
 	Rpc          string //nolint
@@ -56,13 +56,13 @@ type kadcastConfiguration struct {
 	Enabled bool
 	Network string
 
-	// IP nature
+	// IP nature.
 	Address string
 
-	// a set of network addresses of bootstrapping nodes
+	// A set of network addresses of bootstrapping nodes.
 	Bootstrappers []string
 
-	// Kadcast protocol configs
+	// Kadcast protocol configs.
 	MaxDelegatesNum byte
 
 	Raptor bool
@@ -78,20 +78,20 @@ type seedersConfiguration struct {
 	Fixed     []string
 }
 
-// pkg/core/database package configs
+// pkg/core/database package configs.
 type databaseConfiguration struct {
 	Driver string
 	Dir    string
 }
 
-// wallet configs
+// wallet configs.
 type walletConfiguration struct {
 	File  string
 	Store string
 }
 
-// pprof configs
-// See also utils/diagnostics/ProfileSet
+// pprof configs.
+// See also utils/diagnostics/ProfileSet.
 type profileConfiguration struct {
 	Name     string
 	Interval uint
@@ -99,7 +99,7 @@ type profileConfiguration struct {
 	Start    bool
 }
 
-// pkg/rpc package configs
+// pkg/rpc package configs.
 type rpcConfiguration struct {
 	Network             string
 	Address             string
@@ -116,12 +116,12 @@ type rpcConfiguration struct {
 	Rusk ruskConfiguration
 }
 
-// rpc/rusk related configurations
+// rpc/rusk related configurations.
 type ruskConfiguration struct {
 	Network string
 	Address string
 
-	// timeout for rusk calls
+	// timeout for rusk calls.
 	ContractTimeout   uint
 	DefaultTimeout    uint
 	ConnectionTimeout uint
@@ -157,7 +157,7 @@ type notificationConfiguration struct {
 	ClientsPerBroker uint
 }
 
-// Performance parameters
+// Performance parameters.
 type performanceConfiguration struct {
 	AccumulatorWorkers int
 }

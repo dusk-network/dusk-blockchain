@@ -20,7 +20,7 @@ import (
 
 var log = logrus.WithField("process", "grpc-server")
 
-// Setup is a configuration struct to setup the GRPC with
+// Setup is a configuration struct to setup the GRPC with.
 type Setup struct {
 	SessionDurationMins uint
 	RequireSession      bool
@@ -32,7 +32,7 @@ type Setup struct {
 }
 
 // FromCfg creates a Setup from the configuration. This is handy when a
-// configuration should be used (i.e. outside of tests)
+// configuration should be used (i.e. outside of tests).
 func FromCfg() Setup {
 	rpc := config.Get().RPC
 	return Setup{
@@ -58,11 +58,13 @@ func SetupGRPC(conf Setup) (*grpc.Server, error) {
 	// Add default interceptors to provide jwt-based session authentication and error logging
 	// for both unary and stream RPC calls
 	serverOpt := make([]grpc.ServerOption, 0)
+
 	// Enable TLS if configured
 	opt, tlsVer := loadTLSFiles(conf.EnableTLS, conf.CertFile, conf.KeyFile, conf.Network)
 	if opt != nil {
 		serverOpt = append(serverOpt, opt)
 	}
+
 	log.WithField("tls", tlsVer).Infof("gRPC HTTP server TLS configured")
 
 	grpc.EnableTracing = false
@@ -71,14 +73,13 @@ func SetupGRPC(conf Setup) (*grpc.Server, error) {
 		// instantiate the auth service and the interceptor
 		auth, authInterceptor := NewAuth(jwtMan)
 
-		//serverOpt = append(serverOpt, grpc.StreamInterceptor(streamInterceptor))
+		// serverOpt = append(serverOpt, grpc.StreamInterceptor(streamInterceptor))
 		serverOpt = append(serverOpt, grpc.UnaryInterceptor(authInterceptor.Unary()))
 		grpcServer := grpc.NewServer(serverOpt...)
 
 		// hooking up the Auth service
 		node.RegisterAuthServer(grpcServer, auth)
 		return grpcServer, nil
-
 	}
 
 	return grpc.NewServer(serverOpt...), nil
@@ -86,6 +87,7 @@ func SetupGRPC(conf Setup) (*grpc.Server, error) {
 
 func loadTLSFiles(enable bool, certFile, keyFile, network string) (grpc.ServerOption, string) {
 	tlsVersion := "disabled"
+
 	if !enable {
 		if network != "unix" {
 			// Running gRPC over tcp would require TLS

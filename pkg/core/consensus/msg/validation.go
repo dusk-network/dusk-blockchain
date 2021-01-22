@@ -10,7 +10,7 @@ import (
 	"github.com/dusk-network/dusk-crypto/bls"
 )
 
-// VerifyBLSSignature returns err if signature is invalid
+// VerifyBLSSignature returns err if signature is invalid.
 func VerifyBLSSignature(pubKeyBytes, message, signature []byte) error {
 	pubKeyBLS := &bls.PublicKey{}
 	if err := pubKeyBLS.Unmarshal(pubKeyBytes); err != nil {
