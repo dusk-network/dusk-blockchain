@@ -8,7 +8,9 @@ package responding
 
 import (
 	"bytes"
+	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -33,9 +35,8 @@ func NewDataBroker(db database.DB, rpcBus *rpcbus.RPCBus) *DataBroker {
 	}
 }
 
-// SendItems takes a GetData message from the wire, and iterates through the list,
-// sending back each item's complete data to the requesting peer.
-func (d *DataBroker) SendItems(m message.Message) ([]bytes.Buffer, error) {
+// MarshalObjects marshals requested objects by a message of type message.Inv
+func (d *DataBroker) MarshalObjects(m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.Inv)
 
 	bufs := make([]bytes.Buffer, 0, len(msg.InvList))
@@ -85,7 +86,42 @@ func (d *DataBroker) SendItems(m message.Message) ([]bytes.Buffer, error) {
 			// - The node has recently accepted a block that includes this Tx
 			// No action to run in these cases.
 		}
+	}
 
+	return bufs, nil
+}
+
+// MarshalMempoolTxs marshals all or subset of pending Mempool transactions
+func (d *DataBroker) MarshalMempoolTxs(m message.Message) ([]bytes.Buffer, error) {
+	var maxItemsSent = config.Get().Mempool.MaxInvItems
+	if maxItemsSent == 0 {
+		// responding to topics.Mempool disabled
+		return nil, errors.New("responding to topics.Mempool is disabled")
+	}
+
+	txs, err := GetMempoolTxs(d.rpcBus, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	bufs := make([]bytes.Buffer, 0, len(txs))
+	msg := &message.Inv{}
+	for _, tx := range txs {
+		hash, calcErr := tx.CalculateHash()
+		if calcErr != nil {
+			continue
+		}
+
+		msg.AddItem(message.InvTypeMempoolTx, hash)
+		maxItemsSent--
+		if maxItemsSent == 0 {
+			break
+		}
+	}
+
+	buf, err := marshalInv(msg)
+	if err == nil {
+		bufs = append(bufs, buf)
 	}
 
 	return bufs, nil

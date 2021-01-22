@@ -346,8 +346,10 @@ func (s *Server) Close() {
 
 func registerPeerServices(processor *peer.MessageProcessor, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) {
 	processor.Register(topics.Ping, responding.ProcessPing)
+	processor.Register(topics.Pong, responding.ProcessPong)
 	dataBroker := responding.NewDataBroker(db, rpcBus)
-	processor.Register(topics.GetData, dataBroker.SendItems)
+	processor.Register(topics.GetData, dataBroker.MarshalObjects)
+	processor.Register(topics.MemPool, dataBroker.MarshalMempoolTxs)
 	dataRequestor := responding.NewDataRequestor(db, rpcBus, eventBus)
 	processor.Register(topics.Inv, dataRequestor.RequestMissingItems)
 	bhb := responding.NewBlockHashBroker(db)

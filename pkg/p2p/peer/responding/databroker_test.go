@@ -34,7 +34,7 @@ func TestSendData(t *testing.T) {
 
 	// Make a GetData and give it to the dataBroker
 	msg := createGetData(hashes...)
-	bufs, err := dataBroker.SendItems(msg)
+	bufs, err := dataBroker.MarshalObjects(msg)
 	if err != nil {
 		t.Fatal(err)
 	}
