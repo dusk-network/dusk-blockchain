@@ -47,19 +47,18 @@ func (s *Synchronizer) inSync(currentHeight uint64, blk block.Block) (syncState,
 	if blk.Header.Height > currentHeight+1 {
 		// If this block is from far in the future, we should start syncing mode.
 		s.sequencer.add(blk)
-		s.chain.StopBlockProduction()
+		s.chain.StopBlockProduction(blk)
 		b, err := s.startSync(blk.Header.Height, currentHeight)
 		return s.outSync, b, err
 	}
 
-	// otherwise notify the chain (and the consensus loop)
+	// Otherwise notify the chain (and the consensus loop).
 	if err := s.chain.ProcessSucceedingBlock(blk); err != nil {
 		// Add successive block to sequencer, if block was discarded.
 		// Usually this happens due to consensus loop not running.
 		//
 		// If block is not kept in sequencer, Synchronizer does not reach
 		// syncTarget and as a result consensus loop is never restarted
-		//
 		s.sequencer.add(blk)
 	}
 

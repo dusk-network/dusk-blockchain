@@ -64,7 +64,7 @@ type Ledger interface {
 	ProcessSucceedingBlock(block.Block) error
 	ProcessSyncBlock(block.Block) error
 	ProduceBlock() error
-	StopBlockProduction()
+	StopBlockProduction(block.Block)
 }
 
 // Chain represents the nodes blockchain.
@@ -110,7 +110,7 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		proxy:          proxy,
 		ctx:            ctx,
 		loop:           loop,
-		CatchBlockChan: make(chan consensus.Results),
+		CatchBlockChan: make(chan consensus.Results, 1),
 	}
 
 	provisioners, err := proxy.Executor().GetProvisioners(ctx)
@@ -159,10 +159,10 @@ func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
 
 // StopBlockProduction notifies the loop that it must return immediately. It
 // does that by pushing an error through the Block Result channel.
-func (c *Chain) StopBlockProduction() {
+func (c *Chain) StopBlockProduction(blk block.Block) {
 	// Kill the `ProduceBlock` goroutine.
 	select {
-	case c.CatchBlockChan <- consensus.Results{Blk: block.Block{}, Err: errors.New("syncing mode started")}:
+	case c.CatchBlockChan <- consensus.Results{Blk: blk, Err: errors.New("syncing mode started")}:
 	default:
 	}
 }
@@ -181,7 +181,7 @@ func (c *Chain) ProduceBlock() error {
 		}
 
 		// Otherwise, accept the block directly.
-		if !block.IsEmpty() {
+		if !block.IsEmpty() && block.Header.Height == c.CurrentHeight()+1 {
 			if err = c.AcceptSuccessiveBlock(block); err != nil {
 				return err
 			}
