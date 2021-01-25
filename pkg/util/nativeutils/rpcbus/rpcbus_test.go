@@ -29,10 +29,12 @@ func TestRPCall(t *testing.T) {
 	_, _ = buf.WriteString("input params")
 
 	d := NewRequest(buf)
+
 	resp, err := bus.Call(m, d, 10*time.Second)
 	if err != nil {
 		t.Error(err.Error())
 	}
+
 	result := resp.(bytes.Buffer)
 
 	if result.String() != "output params" {
@@ -50,10 +52,12 @@ func TestRPCallWithError(t *testing.T) {
 	_, _ = buf.WriteString("")
 
 	d := NewRequest(buf)
+
 	resp, err := bus.Call(m, d, 10*time.Second)
 	if err != errInvalidParams {
 		t.Errorf("expecting a specific error here but get %v", err)
 	}
+
 	result := resp.(bytes.Buffer)
 
 	if result.String() != "" {
@@ -71,10 +75,12 @@ func TestTimeoutCalls(t *testing.T) {
 	_, _ = buf.WriteString("input params")
 
 	d := NewRequest(buf)
+
 	resp, err := bus.Call(m, d, 1*time.Second)
 	if err != ErrRequestTimeout {
 		t.Errorf("expecting timeout error but get %v", err)
 	}
+
 	result := resp.(bytes.Buffer)
 
 	if result.Len() > 0 {
@@ -105,10 +111,12 @@ func TestNonExistingMethod(t *testing.T) {
 	_, _ = buf.WriteString("input params")
 
 	d := NewRequest(buf)
+
 	resp, err := bus.Call(0xff, d, 2*time.Second)
 	if _, ok := err.(*ErrMethodNotExists); !ok {
 		t.Error("expecting methodNotExists error")
 	}
+
 	responseResult := resp.(bytes.Buffer)
 
 	if responseResult.Len() > 0 {
@@ -131,6 +139,7 @@ func setupConsumer(rpcBus *RPCBus, respond bool) {
 
 	if respond {
 		r := <-reqChan
+
 		params := r.Params.(bytes.Buffer)
 		if params.Len() == 0 {
 			r.RespChan <- Response{bytes.Buffer{}, errInvalidParams}
@@ -153,10 +162,12 @@ func TestRPCallNoTimeout(t *testing.T) {
 	// Request with no timeout.
 	// This should not block or panic
 	d := NewRequest(buf)
+
 	resp, err := bus.Call(m, d, 0)
 	if err != nil {
 		t.Error(err.Error())
 	}
+
 	result := resp.(bytes.Buffer)
 
 	if result.String() != "output params" {

@@ -40,7 +40,6 @@ func (t *Transactor) handleAddress() (*node.LoadResponse, error) {
 			return nil, errors.New("SecretKey is not set")
 		}
 	*/
-
 	return loadResponseFromPub(t.w.PublicKey), nil
 }
 
@@ -111,9 +110,11 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 			Data: make([]byte, 32),
 		},
 	}
+
 	if _, err := rand.Read(pkR.RG.Data); err != nil {
 		return nil, err
 	}
+
 	if _, err := rand.Read(pkR.PkR.Data); err != nil {
 		return nil, err
 	}
@@ -253,13 +254,13 @@ func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
 	// NOTE: maybe we will separate the locked and unlocked balances
 	// This call should be updated in that case
 	ctx := context.Background()
+
 	balance, err := t.proxy.Provider().GetBalance(ctx, t.w.ViewKey)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Tracef("wallet balance: %d, mempool balance: %d", balance, 0)
-
 	return &node.BalanceResponse{UnlockedBalance: balance, LockedBalance: 0}, nil
 }
 
@@ -273,6 +274,7 @@ func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) 
 	if err := t.w.ClearDatabase(); err != nil {
 		return nil, err
 	}
+
 	return &node.GenericResponse{Response: "Wallet database deleted."}, nil
 }
 
@@ -307,7 +309,6 @@ func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.Tran
 			return nil, err
 		}
 	*/
-
 	return nil, nil
 }
 
@@ -323,7 +324,6 @@ func (t *Transactor) writeBidValues(tx *node.TransactionResponse) error {
 	// 	if err != nil {
 	// 		return err
 	// 	}
-
 	// 	return tr.StoreBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes(), tx.LockTime())
 	// })
 	return nil

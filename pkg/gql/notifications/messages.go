@@ -13,20 +13,19 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 )
 
-// BlockMsg represents the data need by Explorer UI on each new block accepted
+// BlockMsg represents the data need by Explorer UI on each new block accepted.
 type BlockMsg struct {
 	Height    uint64
 	Hash      string
 	Timestamp int64
 	Txs       []string
 
-	// BlocksGeneratedCount is number of blocks generated last 24 hours
+	// BlocksGeneratedCount is number of blocks generated last 24 hours.
 	BlocksGeneratedCount uint
 }
 
-// MarshalBlockMsg builds the JSON from a subset of block fields
+// MarshalBlockMsg builds the JSON from a subset of block fields.
 func MarshalBlockMsg(blk block.Block) (string, error) {
-
 	hash, err := blk.CalculateHash()
 	if err != nil {
 		return "", err

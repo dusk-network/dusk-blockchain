@@ -36,7 +36,7 @@ type (
 	CandidateVerificationFunc func(block.Block) error
 
 	// Emitter is a simple struct to pass the communication channels that the steps should be
-	// able to emit onto
+	// able to emit onto.
 	Emitter struct {
 		EventBus    *eventbus.EventBus
 		RPCBus      *rpcbus.RPCBus
@@ -46,7 +46,7 @@ type (
 	}
 
 	// RoundUpdate carries the data about the new Round, such as the active
-	// Provisioners, the BidList, the Seed and the Hash
+	// Provisioners, the BidList, the Seed and the Hash.
 	RoundUpdate struct {
 		Round           uint64
 		P               user.Provisioners
@@ -57,7 +57,7 @@ type (
 
 	// InternalPacket is a specialization of the Payload of message.Message. It is used to
 	// unify messages used by the consensus, which need to carry the header.Header
-	// for consensus specific operations
+	// for consensus specific operations.
 	InternalPacket interface {
 		payload.Safe
 		State() header.Header
@@ -65,7 +65,7 @@ type (
 )
 
 // Copy complies with message.Safe interface. It returns a deep copy of
-// the message safe to publish to multiple subscribers
+// the message safe to publish to multiple subscribers.
 func (r RoundUpdate) Copy() payload.Safe {
 	ru := RoundUpdate{
 		Round:           r.Round,
@@ -77,6 +77,7 @@ func (r RoundUpdate) Copy() payload.Safe {
 
 	copy(ru.Seed, r.Seed)
 	copy(ru.Hash, r.Hash)
+
 	return ru
 }
 
@@ -86,21 +87,22 @@ type (
 	}
 )
 
-// InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
+// InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain.
 func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, uint32) {
 	acceptedBlockChan := make(chan block.Block, cfg.MaxInvBlocks)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
 	collectListener := eventbus.NewSafeCallbackListener(collector.Collect)
 	id := subscriber.Subscribe(topics.AcceptedBlock, collectListener)
+
 	return acceptedBlockChan, id
 }
 
-// Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
+// Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it.
 func (c *acceptedBlockCollector) Collect(m message.Message) {
 	c.blockChan <- m.Payload().(block.Block)
 }
 
-// Sign a header
+// Sign a header.
 func (e *Emitter) Sign(h header.Header) ([]byte, error) {
 	preimage := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(preimage, h); err != nil {

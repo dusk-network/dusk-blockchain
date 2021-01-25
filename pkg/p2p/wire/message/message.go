@@ -18,20 +18,21 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-// EMPTY represents a empty message, used by the StopConsensus call
+// EMPTY represents a empty message, used by the StopConsensus call.
 const EMPTY = "EMPTY"
 
 // SafeBuffer is a byte.Buffer wrapper that let the Buffer implement
-// Safe
+// Safe.
 type SafeBuffer struct {
 	bytes.Buffer
 }
 
 // Copy complies with payload.Safe interface. It returns a deep copy of
-// the buffer safe to publish to multiple subscribers
+// the buffer safe to publish to multiple subscribers.
 func (s SafeBuffer) Copy() payload.Safe {
 	bin := make([]byte, s.Len())
 	copy(bin, s.Bytes())
+
 	b := bytes.NewBuffer(bin)
 	return SafeBuffer{*b}
 }
@@ -40,7 +41,7 @@ func (s SafeBuffer) Copy() payload.Safe {
 // particularly important within the consensus, but in practice any component
 // ends up dealing with it. It encapsulates the data exchanged by different
 // nodes as well as internal components. The Message transits inside of the
-// eventbus and is de- serialized through the Gossip procedure
+// eventbus and is de- serialized through the Gossip procedure.
 type Message interface {
 	Category() topics.Topic
 	Payload() payload.Safe
@@ -49,18 +50,18 @@ type Message interface {
 
 	// CachedBinary returns the marshaled form of this Payload as cached during
 	// the unmarshaling of incoming messages. In case the message has been
-	// created internally and never serialized, this should return an empty buffer
+	// created internally and never serialized, this should return an empty buffer.
 	CachedBinary() bytes.Buffer
 
 	Header() []byte
 }
 
-// Serializable allows to set a payload
+// Serializable allows to set a payload.
 type Serializable interface {
 	SetPayload(payload.Safe)
 }
 
-// SerializableMessage is a Serializable and a Message
+// SerializableMessage is a Serializable and a Message.
 type SerializableMessage interface {
 	Message
 	Serializable
@@ -69,27 +70,29 @@ type SerializableMessage interface {
 // simple is a utility struct that encapsulates the data received by another
 // peer and provides protocol-level unmarshaling. It is intended to be
 // immutable but also lazy, and therefore it includes the capability to cache the
-// Marshaled form
+// Marshaled form.
 type simple struct {
 	// category is normally equivalent to the topic, but can sometimes differ
 	// since it actually describes the type of the Payload rather than the
-	// subject of the pubsub queue it would be published to (i.e. Gossip)
+	// subject of the pubsub queue it would be published to (i.e. Gossip).
 	category topics.Topic
 	// Payload carries the payload of the message, if it can be parsed at
-	// protocol level
+	// protocol level.
 	payload payload.Safe
-	// cached marshaled form with Category
+	// cached marshaled form with Category.
 	marshaled *bytes.Buffer
-	// header used as metadata (e.g kadcast.height)
+	// header used as metadata (e.g kadcast.height).
 	header []byte
 }
 
-// Clone creates a new Message which carries a copy of the payload
+// Clone creates a new Message which carries a copy of the payload.
 func Clone(m Message) (Message, error) {
 	b := m.CachedBinary()
+
 	if m.Payload() == nil {
 		return nil, fmt.Errorf("could not clone message, topic: %s", m.Category())
 	}
+
 	return simple{
 		category:  m.Category(),
 		marshaled: &b,
@@ -98,7 +101,7 @@ func Clone(m Message) (Message, error) {
 }
 
 // CachedBinary complies with the Message method for returning the
-// marshaled form of the message if available
+// marshaled form of the message if available.
 func (m simple) CachedBinary() bytes.Buffer {
 	if m.marshaled != nil {
 		return *m.marshaled
@@ -109,10 +112,12 @@ func (m simple) CachedBinary() bytes.Buffer {
 
 func (m simple) String() string {
 	var sb strings.Builder
+
 	_, _ = sb.WriteString("category: ")
 	_, _ = sb.WriteString(m.category.String())
 	_, _ = sb.WriteString("\n")
 	_, _ = sb.WriteString("payload: [\n")
+
 	if m.payload == nil {
 		_, _ = sb.WriteString("<payload is nil>")
 	} else {
@@ -123,17 +128,17 @@ func (m simple) String() string {
 			_, _ = sb.WriteString("<payload is non-empty but not a Stringer>")
 		}
 	}
+
 	_, _ = sb.WriteString("\n]\n")
 	_, _ = sb.WriteString("\n")
 	return sb.String()
-
 }
 
 func (m simple) Header() []byte {
 	return m.header
 }
 
-// Id is the Id the Message
+// Id is the Id the Message.
 // nolint:golint
 func (m simple) Id() []byte {
 	if m.marshaled == nil {
@@ -141,8 +146,10 @@ func (m simple) Id() []byte {
 		if err != nil {
 			panic(err)
 		}
+
 		m.marshaled = &buf
 	}
+
 	return m.marshaled.Bytes()
 }
 
@@ -201,13 +208,13 @@ func convertToSafePayload(p interface{}) payload.Safe {
 	return safePayload
 }
 
-// New creates a new Message
+// New creates a new Message.
 func New(top topics.Topic, p interface{}) Message {
 	safePayload := convertToSafePayload(p)
 	return &simple{category: top, payload: safePayload}
 }
 
-// NewWithHeader creates a new Message with non-nil header
+// NewWithHeader creates a new Message with non-nil header.
 func NewWithHeader(t topics.Topic, payload interface{}, header []byte) Message {
 	safePayload := convertToSafePayload(payload)
 	return &simple{category: t, payload: safePayload, header: header}
@@ -221,9 +228,10 @@ func (m *simple) initPayloadBuffer(b bytes.Buffer) {
 
 // Unmarshal mutates the buffer by extracting the topic. It create the Message
 // by setting the topic and unmarshaling the payload into the proper structure
-// It also caches the serialized form within the message
+// It also caches the serialized form within the message.
 func Unmarshal(b *bytes.Buffer) (Message, error) {
 	var err error
+
 	msg := &simple{}
 	msg.initPayloadBuffer(*b)
 
@@ -231,6 +239,7 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	msg.category = topic
 
 	switch topic {
@@ -263,9 +272,9 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 
 // Marshal a Message into a buffer. The buffer *does* include its Category (so
 // if this is undesired, the client of this call needs to explicitly call
-// topics.Extract on the resulting buffer
+// topics.Extract on the resulting buffer.
 // TODO: interface - once the Gossip preprocessing is removed from the
-// Coordinator, there won't be a need for marshalBuffer
+// Coordinator, there won't be a need for marshalBuffer.
 func Marshal(s Message) (bytes.Buffer, error) {
 	var buf bytes.Buffer
 	// if it is a simple message, first we check if this message carries a
@@ -276,6 +285,7 @@ func Marshal(s Message) (bytes.Buffer, error) {
 		if err := marshal(s, &buf); err != nil {
 			return bytes.Buffer{}, err
 		}
+
 		return buf, nil
 	}
 
@@ -295,7 +305,7 @@ func Marshal(s Message) (bytes.Buffer, error) {
 	return buf, nil
 }
 
-// marshal forces the serialization of a Message regardless of its cache
+// marshal forces the serialization of a Message regardless of its cache.
 func marshal(s Message, b *bytes.Buffer) error {
 	payload := s.Payload()
 	if payload == nil {
@@ -316,9 +326,10 @@ func marshal(s Message, b *bytes.Buffer) error {
 	return topics.Prepend(b, s.Category())
 }
 
-// marshalMessage marshals a Message carrying a payload different than a Buffer
+// marshalMessage marshals a Message carrying a payload different than a Buffer.
 func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) error {
 	var err error
+
 	switch topic {
 	case topics.Block:
 		blk := payload.(block.Block)
@@ -351,82 +362,93 @@ func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) 
 
 type uwrap uint
 
-// ConvU converts a Safe into a uint
+// ConvU converts a Safe into a uint.
 func ConvU(p payload.Safe) (uint, error) {
 	s, ok := p.(uwrap)
 	if !ok {
 		return 0, errors.New("payload is not uint")
 	}
+
 	return uint(s), nil
 }
+
 func (u uwrap) Copy() payload.Safe {
 	return u
 }
 
 type uwrap8 uint8
 
-// ConvU8 converts a Safe into a uint8
+// ConvU8 converts a Safe into a uint8.
 func ConvU8(p payload.Safe) (uint8, error) {
 	s, ok := p.(uwrap8)
 	if !ok {
 		return 0, errors.New("payload is not a uint8")
 	}
+
 	return uint8(s), nil
 }
+
 func (u uwrap8) Copy() payload.Safe {
 	return u
 }
 
 type uwrap16 uint16
 
-// ConvU16 converts a Safe into a uint16
+// ConvU16 converts a Safe into a uint16.
 func ConvU16(p payload.Safe) (uint16, error) {
 	s, ok := p.(uwrap16)
 	if !ok {
 		return 0, errors.New("payload is not a uint16")
 	}
+
 	return uint16(s), nil
 }
+
 func (u uwrap16) Copy() payload.Safe {
 	return u
 }
 
 type uwrap32 uint32
 
-// ConvU32 converts a Safe into a uint32
+// ConvU32 converts a Safe into a uint32.
 func ConvU32(p payload.Safe) (uint32, error) {
 	s, ok := p.(uwrap32)
 	if !ok {
 		return 0, errors.New("payload is not a uint32")
 	}
+
 	return uint32(s), nil
 }
+
 func (u uwrap32) Copy() payload.Safe {
 	return u
 }
 
 type uwrap64 uint64
 
-// ConvU64 converts a Safe into a uint64
+// ConvU64 converts a Safe into a uint64.
 func ConvU64(p payload.Safe) (uint64, error) {
 	s, ok := p.(uwrap64)
 	if !ok {
 		return 0, errors.New("payload is not a uint64")
 	}
+
 	return uint64(s), nil
 }
+
 func (u uwrap64) Copy() payload.Safe {
 	return u
 }
 
 type iwrap int
 
-// ConvI converts a Safe into an int
+// ConvI converts a Safe into an int.
 func ConvI(p payload.Safe) (int, error) {
 	s, ok := p.(iwrap)
 	if !ok {
 		return 0, errors.New("payload is not a int")
 	}
+
 	return int(s), nil
 }
 
@@ -436,82 +458,93 @@ func (u iwrap) Copy() payload.Safe {
 
 type iwrap8 int8
 
-// ConvI8 converts a Safe into an int8
+// ConvI8 converts a Safe into an int8.
 func ConvI8(p payload.Safe) (int8, error) {
 	s, ok := p.(iwrap8)
 	if !ok {
 		return 0, errors.New("payload is not a int8")
 	}
+
 	return int8(s), nil
 }
+
 func (u iwrap8) Copy() payload.Safe {
 	return u
 }
 
 type iwrap16 int16
 
-// ConvI16 converts a Safe into an int16
+// ConvI16 converts a Safe into an int16.
 func ConvI16(p payload.Safe) (int16, error) {
 	s, ok := p.(iwrap16)
 	if !ok {
 		return 0, errors.New("payload is not a int16")
 	}
+
 	return int16(s), nil
 }
+
 func (u iwrap16) Copy() payload.Safe {
 	return u
 }
 
 type iwrap32 int32
 
-// ConvI32 converts a Safe into an int32
+// ConvI32 converts a Safe into an int32.
 func ConvI32(p payload.Safe) (int32, error) {
 	s, ok := p.(iwrap32)
 	if !ok {
 		return 0, errors.New("payload is not a int32")
 	}
+
 	return int32(s), nil
 }
+
 func (u iwrap32) Copy() payload.Safe {
 	return u
 }
 
 type iwrap64 int64
 
-// ConvI64 converts a Safe into an int64
+// ConvI64 converts a Safe into an int64.
 func ConvI64(p payload.Safe) (int64, error) {
 	s, ok := p.(iwrap64)
 	if !ok {
 		return 0, errors.New("payload is not a int64")
 	}
+
 	return int64(s), nil
 }
+
 func (u iwrap64) Copy() payload.Safe {
 	return u
 }
 
 type bwrap bool
 
-// ConvBool converts a Safe into a bool
+// ConvBool converts a Safe into a bool.
 func ConvBool(p payload.Safe) (bool, error) {
 	s, ok := p.(bwrap)
 	if !ok {
 		return false, errors.New("payload is not a string")
 	}
+
 	return bool(s), nil
 }
+
 func (u bwrap) Copy() payload.Safe {
 	return u
 }
 
 type swrap string
 
-// ConvStr converts a Safe into an int8
+// ConvStr converts a Safe into a string.
 func ConvStr(p payload.Safe) (string, error) {
 	s, ok := p.(swrap)
 	if !ok {
 		return "", errors.New("payload is not a string")
 	}
+
 	return string(s), nil
 }
 

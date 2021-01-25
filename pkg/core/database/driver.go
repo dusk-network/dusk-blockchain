@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-// Replicated from "database/sql" pkg
+// Replicated from "database/sql" pkg.
 var (
 	driversMu sync.RWMutex
 	drivers   = make(map[string]Driver)
@@ -33,6 +33,7 @@ func Register(driver Driver) error {
 	if _, dup := drivers[name]; dup {
 		return errors.New("duplicated driver name: " + name)
 	}
+
 	drivers[name] = driver
 	return nil
 }
@@ -41,20 +42,25 @@ func Register(driver Driver) error {
 func Drivers() []string {
 	driversMu.RLock()
 	defer driversMu.RUnlock()
-	var list []string
+
+	var list []string //nolint
+
 	for name := range drivers {
 		list = append(list, name)
 	}
+
 	sort.Strings(list)
 	return list
 }
 
-// From returns a registered Driver by name
+// From returns a registered Driver by name.
 func From(name string) (Driver, error) {
 	driversMu.RLock()
 	defer driversMu.RUnlock()
+
 	if _, dup := drivers[name]; dup {
 		return drivers[name], nil
 	}
+
 	return nil, errors.New("Cannot find driver with name " + name)
 }

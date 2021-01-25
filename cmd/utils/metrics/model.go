@@ -6,7 +6,7 @@
 
 package metrics
 
-// Blocks is the placeholder for blocks
+// Blocks is the placeholder for blocks.
 type Blocks struct {
 	Blocks []Block `json:"blocks"`
 }
@@ -17,12 +17,12 @@ type Block struct {
 	Txs    []Transaction `json:"transactions"`
 }
 
-// Transaction according to the Phoenix model
+// Transaction according to the Phoenix model.
 type Transaction struct {
-	//Inputs  []byte `json:"inputs,omitempty"`
-	//Outputs []byte `json:"outputs"`
-	//Fee     *byte  `json:"fee,omitempty"`
-	//Proof   []byte `json:"proof,omitempty"`
+	// Inputs  []byte `json:"inputs,omitempty"`
+	// Outputs []byte `json:"outputs"`
+	// Fee     *byte  `json:"fee,omitempty"`
+	// Proof   []byte `json:"proof,omitempty"`
 	Data []byte `json:"data,omitempty"`
 }
 

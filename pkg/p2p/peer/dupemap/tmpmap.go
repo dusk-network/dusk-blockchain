@@ -23,9 +23,10 @@ type (
 	}
 )
 
-// NewTmpMap creates a TmpMap instance
+// NewTmpMap creates a TmpMap instance.
 func NewTmpMap(tolerance uint64) *TmpMap {
 	msgSets := make(map[uint64]*hashset.Set)
+
 	return &TmpMap{
 		msgSets:   msgSets,
 		height:    0,
@@ -33,13 +34,15 @@ func NewTmpMap(tolerance uint64) *TmpMap {
 	}
 }
 
-// UpdateHeight for a round
+// UpdateHeight for a round.
 func (t *TmpMap) UpdateHeight(round uint64) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
 	if t.height > round {
 		return
 	}
+
 	_, found := t.msgSets[round]
 	if !found {
 		t.msgSets[round] = hashset.New()
@@ -66,11 +69,13 @@ func (t *TmpMap) Has(b *bytes.Buffer) bool {
 func (t *TmpMap) HasAnywhere(b *bytes.Buffer) bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
+
 	for k := range t.msgSets {
 		if t.has(b, k) {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -81,7 +86,7 @@ func (t *TmpMap) HasAt(b *bytes.Buffer, heigth uint64) bool {
 	return t.has(b, heigth)
 }
 
-// DeleteBefore clears a Map of
+// DeleteBefore clears a Map of items stored before the given height.
 func (t *TmpMap) DeleteBefore(height uint64) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -105,7 +110,9 @@ func (t *TmpMap) deleteBefore(height uint64) {
 func (t *TmpMap) SetTolerance(tolerance uint64) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
 	threshold := t.height - tolerance
+
 	t.deleteBefore(threshold)
 }
 
@@ -114,11 +121,12 @@ func (t *TmpMap) has(b *bytes.Buffer, heigth uint64) bool {
 	if set == nil {
 		return false
 	}
+
 	return set.Has(b.Bytes())
 }
 
 // Add the hash of a buffer to the blacklist.
-// Returns true if the element was added. False otherwise
+// Returns true if the element was added. False otherwise.
 func (t *TmpMap) Add(b *bytes.Buffer) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -132,7 +140,7 @@ func (t *TmpMap) AddAt(b *bytes.Buffer, height uint64) bool {
 	return t.add(b, height)
 }
 
-// clean the TmpMap up to the upto argument
+// clean the TmpMap up to the upto argument.
 func (t *TmpMap) clean() {
 	if t.height <= t.tolerance {
 		// don't clean
@@ -146,7 +154,7 @@ func (t *TmpMap) clean() {
 	}
 }
 
-// add an entry to the set at the current height. Returns false if the element has not been added (due to being a duplicate)
+// add an entry to the set at the current height. Returns false if the element has not been added (due to being a duplicate).
 func (t *TmpMap) add(b *bytes.Buffer, round uint64) bool {
 	set, found := t.msgSets[round]
 	if !found {

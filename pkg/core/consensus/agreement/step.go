@@ -22,11 +22,11 @@ import (
 var lg = log.WithField("process", "agreement")
 
 // WorkerAmount sets the number of concurrent workers to concurrently verify
-// Agreement messages
+// Agreement messages.
 var WorkerAmount = 4
 
 // Loop is the struct holding the state of the Agreement phase which does not
-// change during the consensus loop
+// change during the consensus loop.
 type Loop struct {
 	*consensus.Emitter
 	db           database.DB
@@ -34,7 +34,7 @@ type Loop struct {
 	requestor    *candidate.Requestor
 }
 
-// New creates a round-specific agreement step
+// New creates a round-specific agreement step.
 func New(e *consensus.Emitter, db database.DB, newBlockChan chan consensus.Results, requestor *candidate.Requestor) *Loop {
 	return &Loop{
 		Emitter:      e,
@@ -45,12 +45,12 @@ func New(e *consensus.Emitter, db database.DB, newBlockChan chan consensus.Resul
 }
 
 // GetControlFn is a factory method for the ControlFn. It makes it possible for
-// the consensus loop to mock the agreement
+// the consensus loop to mock the agreement.
 func (s *Loop) GetControlFn() consensus.ControlFn {
 	return s.Run
 }
 
-// Run the agreement step loop
+// Run the agreement step loop.
 func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) consensus.Results {
 	// creating accumulator and handler
 	h := NewHandler(s.Keys, r.P)
@@ -87,6 +87,7 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 			if newBlockResult.Blk.Header != nil && newBlockResult.Blk.Header.Height != r.Round {
 				continue
 			}
+
 			return newBlockResult
 		case <-ctx.Done():
 			// finalize the worker pool
@@ -95,9 +96,9 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 	}
 }
 
-// TODO: consider adding a deadline for the Agreements collection and monitor
-// if we get many future events (in which case we might want to return an error
-// to trigger a synchronization)
+// TODO: consider adding a deadline for the Agreements collection and monitor.
+// If we get many future events (in which case we might want to return an error
+// to trigger a synchronization).
 func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensus.Queue) bool {
 	hdr := a.Payload().(message.Agreement).State()
 	if hdr.Round < round {
@@ -128,12 +129,12 @@ func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensu
 
 func (s *Loop) createWinningBlock(ctx context.Context, hash []byte, cert *block.Certificate) (block.Block, error) {
 	var cm block.Block
+
 	err := s.db.View(func(t database.Transaction) error {
 		var err error
 		cm, err = t.FetchCandidateMessage(hash)
 		return err
 	})
-
 	if err != nil {
 		cm, err = s.requestCandidate(ctx, hash)
 		if err != nil {

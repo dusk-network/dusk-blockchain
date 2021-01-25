@@ -14,12 +14,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 )
 
-// PregenerationAmount is the size of a pregenerated committee
+// PregenerationAmount is the size of a pregenerated committee.
 var PregenerationAmount uint8 = 8
 
 // Handler is injected in the consensus components that work with the various
 // committee. It generates and maintains a list of active and valid committee members and
-// handle the votes
+// handle the votes.
 type Handler struct {
 	key.Keys
 	Provisioners user.Provisioners
@@ -28,7 +28,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new committee.Handler by instantiating the committee
-// slice, setting the keys and setting the Provisioner set
+// slice, setting the keys and setting the Provisioner set.
 func NewHandler(keys key.Keys, p user.Provisioners) *Handler {
 	return &Handler{
 		Keys:         keys,
@@ -58,9 +58,11 @@ func (b *Handler) Committee(round uint64, step uint8, maxSize int) user.VotingCo
 	if b.membersAt(step) == 0 {
 		b.generateCommittees(round, step, maxSize)
 	}
+
 	b.lock.RLock()
 	committee := b.Committees[step]
 	b.lock.RUnlock()
+
 	return committee
 }
 
@@ -69,11 +71,13 @@ func (b *Handler) generateCommittees(round uint64, step uint8, maxSize int) {
 
 	b.lock.Lock()
 	defer b.lock.Unlock()
+
 	committees := b.Provisioners.GenerateCommittees(round, PregenerationAmount, step, size)
 	for i, committee := range committees {
 		if step == math.MaxUint8 {
 			panic("Consensus reached max steps")
 		}
+
 		b.Committees[int(step)+i] = committee
 	}
 }
@@ -84,6 +88,7 @@ func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 	b.lock.RLock()
 	size := b.Provisioners.SubsetSizeAt(round)
 	b.lock.RUnlock()
+
 	if size > maxSize {
 		return maxSize
 	}
@@ -98,5 +103,6 @@ func (b *Handler) membersAt(idx uint8) int {
 	if idx == math.MaxUint8 {
 		panic("Consensus reached max steps")
 	}
+
 	return b.Committees[idx].Set.Len()
 }

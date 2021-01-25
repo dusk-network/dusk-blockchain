@@ -14,7 +14,6 @@ import (
 )
 
 func TestPacketMarshalBinary(t *testing.T) {
-
 	block, err := crypto.RandEntropy(11111)
 	if err != nil {
 		t.Fatal(err)
@@ -44,5 +43,4 @@ func TestPacketMarshalBinary(t *testing.T) {
 	if !bytes.Equal(p.messageID[:], p2.messageID[:]) {
 		t.Fatal("objectID not equal")
 	}
-
 }

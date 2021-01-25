@@ -15,20 +15,22 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-// CandidateBroker holds instances to RPCBus and responseChan
+// CandidateBroker holds instances to RPCBus and responseChan.
 type CandidateBroker struct {
 	db database.DB
 }
 
-// NewCandidateBroker will create new CandidateBroker
+// NewCandidateBroker will create new CandidateBroker.
 func NewCandidateBroker(db database.DB) *CandidateBroker {
 	return &CandidateBroker{db}
 }
 
-// ProvideCandidate for a given (m *bytes.Buffer)
+// ProvideCandidate for a given (m *bytes.Buffer).
 func (c *CandidateBroker) ProvideCandidate(m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.GetCandidate)
+
 	var cm block.Block
+
 	if err := c.db.View(func(t database.Transaction) error {
 		var err error
 		cm, err = t.FetchCandidateMessage(msg.Hash)

@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Test that NewRandKeys does not ever return an EOF error
+// Test that NewRandKeys does not ever return an EOF error.
 func TestNewRandKeys(t *testing.T) {
 	keys, err := NewRandKeys()
 	if err == io.EOF {
@@ -27,6 +27,7 @@ func TestNewRandKeys(t *testing.T) {
 
 func TestDeterministicKeyGen(t *testing.T) {
 	var firstKeyPair, secondKeyPair Keys
+
 	for {
 		seed, err := crypto.RandEntropy(128)
 		assert.Nil(t, err)
@@ -35,12 +36,14 @@ func TestDeterministicKeyGen(t *testing.T) {
 		if err == io.EOF {
 			continue
 		}
+
 		assert.Nil(t, err)
 
 		secondKeyPair, err = NewKeysFromBytes(seed)
 		if err == io.EOF {
 			continue
 		}
+
 		assert.Nil(t, err)
 
 		break
@@ -48,5 +51,4 @@ func TestDeterministicKeyGen(t *testing.T) {
 
 	assert.Equal(t, firstKeyPair.BLSPubKeyBytes, secondKeyPair.BLSPubKeyBytes)
 	assert.Equal(t, firstKeyPair.BLSSecretKey, secondKeyPair.BLSSecretKey)
-
 }

@@ -29,7 +29,7 @@ func NewCertificate(ag Agreement, keys [][]byte) Certificate {
 	}
 }
 
-// Copy deeply a Certificate
+// Copy deeply a Certificate.
 func (c Certificate) Copy() payload.Safe {
 	cpy := Certificate{
 		Ag:   c.Ag.Copy().(Agreement),
@@ -41,7 +41,6 @@ func (c Certificate) Copy() payload.Safe {
 		copy(cpy.Keys[i], k)
 	}
 	return cpy
-
 }
 
 // String returns a string representation of a Certificate message.

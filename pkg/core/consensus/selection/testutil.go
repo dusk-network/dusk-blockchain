@@ -23,10 +23,10 @@ import (
 
 // ProvisionerNr is the default amount of Provisioners utilized in the
 // selection tests. This nr is just used to create the RoundUpdate and bares no
-// importance in the selection step
+// importance in the selection step.
 var ProvisionerNr = 10
 
-// Helper for reducing selection test boilerplate
+// Helper for reducing selection test boilerplate.
 type Helper struct {
 	*consensus.Emitter
 	Round        uint64
@@ -35,7 +35,7 @@ type Helper struct {
 	P            *user.Provisioners
 }
 
-// NewHelper creates a Helper
+// NewHelper creates a Helper.
 func NewHelper(scoreToSpawn int) *Helper {
 	p, provisionersKeys := consensus.MockProvisioners(ProvisionerNr)
 	mockProxy := transactions.MockProxy{
@@ -64,7 +64,7 @@ func NewHelper(scoreToSpawn int) *Helper {
 }
 
 // RoundUpdate mocks a round update with the Round and Step embedded in the
-// Helper
+// Helper.
 func (h *Helper) RoundUpdate() consensus.RoundUpdate {
 	hash, _ := crypto.RandEntropy(32)
 	seed, _ := crypto.RandEntropy(32)
@@ -80,6 +80,7 @@ func (h *Helper) RoundUpdate() consensus.RoundUpdate {
 // Spawn a number of score events.
 func (h *Helper) Spawn() []message.Score {
 	evs := make([]message.Score, 0, h.scoreToSpawn)
+
 	for i := 0; i < h.scoreToSpawn; i++ {
 		hash, _ := crypto.RandEntropy(32)
 		keys, _ := key.NewRandKeys()
@@ -92,5 +93,6 @@ func (h *Helper) Spawn() []message.Score {
 		genesis := config.DecodeGenesis()
 		evs = append(evs, message.MockScore(hdr, *genesis))
 	}
+
 	return evs
 }

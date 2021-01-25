@@ -25,15 +25,15 @@ import (
 // DUSK is one whole unit of DUSK.
 const DUSK = uint64(10000000000)
 
-// ErrSeedFileExists is returned if the seed file already exists
+// ErrSeedFileExists is returned if the seed file already exists.
 var ErrSeedFileExists = fmt.Errorf("wallet seed file already exists")
 
-// Wallet encapsulates the wallet
+// Wallet encapsulates the wallet.
 type Wallet struct {
 	db        *database.DB
 	netPrefix byte
 
-	//keyPair       *key.Key
+	// keyPair       *key.Key
 	consensusKeys *consensuskey.Keys
 
 	PublicKey keys.PublicKey
@@ -41,7 +41,7 @@ type Wallet struct {
 	SecretKey keys.SecretKey
 }
 
-// KeysJSON is a struct used to marshal / unmarshal fields to a encrypted file
+// KeysJSON is a struct used to marshal / unmarshal fields to a encrypted file.
 type KeysJSON struct {
 	Seed      []byte         `json:"seed"`
 	SecretKey []byte         `json:"secret_key"`
@@ -49,11 +49,12 @@ type KeysJSON struct {
 	ViewKey   keys.ViewKey   `json:"view_key"`
 }
 
-// New creates a wallet instance
+// New creates a wallet instance.
 func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, db *database.DB, password, seedFile string, secretKey *keys.SecretKey) (*Wallet, error) {
-	//create new seed if seed comes empty
+	// create new seed if seed comes empty
 	if len(seed) == 0 {
 		var err error
+
 		seed, err = GenerateNewSeed(Read)
 		if err != nil {
 			return nil, err
@@ -69,16 +70,18 @@ func New(Read func(buf []byte) (n int, err error), seed []byte, netPrefix byte, 
 		Seed:      seed,
 		SecretKey: skBuf.Bytes(),
 	}
+
 	return LoadFromSeed(netPrefix, db, password, seedFile, keysJSON)
 }
 
-// LoadFromSeed loads a wallet from the seed
+// LoadFromSeed loads a wallet from the seed.
 func LoadFromSeed(netPrefix byte, db *database.DB, password, seedFile string, keysJSON KeysJSON) (*Wallet, error) {
 	if len(keysJSON.Seed) < 64 {
 		return nil, errors.New("seed must be at least 64 bytes in size")
 	}
 
 	secretKey := keys.NewSecretKey()
+
 	err := keys.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
 	if err != nil {
 		return nil, err
@@ -116,9 +119,8 @@ func LoadFromSeed(netPrefix byte, db *database.DB, password, seedFile string, ke
 	return w, nil
 }
 
-// LoadFromFile loads a wallet from a .dat file
+// LoadFromFile loads a wallet from a .dat file.
 func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile string) (*Wallet, error) {
-
 	keysJSONArr, err := fetchEncrypted(password, seedFile)
 	if err != nil {
 		return nil, err
@@ -126,6 +128,7 @@ func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile str
 
 	// transform []byte to keysJSON
 	keysJSON := new(KeysJSON)
+
 	err = json.Unmarshal(keysJSONArr, keysJSON)
 	if err != nil {
 		return nil, err
@@ -138,6 +141,7 @@ func LoadFromFile(netPrefix byte, db *database.DB, password string, seedFile str
 
 	// secretKey manipulation
 	secretKey := keys.NewSecretKey()
+
 	err = keys.UnmarshalSecretKey(bytes.NewBuffer(keysJSON.SecretKey), secretKey)
 	if err != nil {
 		return nil, err
@@ -159,7 +163,7 @@ func (w *Wallet) FetchTxHistory() ([]txrecords.TxRecord, error) {
 	return w.db.FetchTxRecords()
 }
 
-// Keys returns the BLS keys
+// Keys returns the BLS keys.
 func (w *Wallet) Keys() consensuskey.Keys {
 	return *w.consensusKeys
 }
@@ -173,7 +177,7 @@ func (w *Wallet) ClearDatabase() error {
 // FIXME: this is used within the cmd/wallet transferDusk function. Not clear
 // if still needed.
 // Old implementation can be find here
-// (https://github.com/dusk-network/dusk-wallet/blob/master/v2/key/publickey.go#L26)
+// (https://github.com/dusk-network/dusk-wallet/blob/master/v2/key/publickey.go#L26).
 func (w *Wallet) ToKey(address string) (keys.PublicKey, error) {
 	return keys.PublicKey{}, nil
 }
@@ -181,7 +185,6 @@ func (w *Wallet) ToKey(address string) (keys.PublicKey, error) {
 func generateKeys(seed []byte) (consensuskey.Keys, error) {
 	// Consensus keys require >80 bytes of seed, so we will hash seed twice and concatenate
 	// both hashes to get 128 bytes
-
 	seedHash := sha3.Sum512(seed)
 	secondSeedHash := sha3.Sum512(seedHash[:])
 
@@ -190,9 +193,10 @@ func generateKeys(seed []byte) (consensuskey.Keys, error) {
 	return consensuskey.NewKeysFromBytes(consensusSeed)
 }
 
-// GenerateNewSeed a new seed
+// GenerateNewSeed a new seed.
 func GenerateNewSeed(Read func(buf []byte) (n int, err error)) ([]byte, error) {
 	var seed []byte
+
 	if Read == nil {
 		Read = rand.Read
 	}
@@ -200,12 +204,14 @@ func GenerateNewSeed(Read func(buf []byte) (n int, err error)) ([]byte, error) {
 	for {
 		// random seed
 		seed = make([]byte, 64)
+
 		_, err := Read(seed)
 		if err != nil {
 			return nil, err
 		}
 
 		// Ensure the seed can be used for generating a BLS keypair.
+		// If not, we retry.
 		_, err = generateKeys(seed)
 		if err == nil {
 			break
@@ -214,7 +220,7 @@ func GenerateNewSeed(Read func(buf []byte) (n int, err error)) ([]byte, error) {
 		if err != io.EOF {
 			return nil, err
 		}
-		// If not, we retry.
 	}
+
 	return seed, nil
 }

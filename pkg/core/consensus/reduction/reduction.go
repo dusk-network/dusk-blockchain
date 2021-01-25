@@ -32,27 +32,26 @@ func init() {
 	}
 }
 
-// Result of the Reduction steps
+// Result of the Reduction steps.
 type Result struct {
 	Hash []byte
 	SV   message.StepVotes
 }
 
-// IsEmpty tests if the result of the aggregation is empty
+// IsEmpty tests if the result of the aggregation is empty.
 func (r *Result) IsEmpty() bool {
 	return r == EmptyResult
 }
 
-// Reduction is a struct to be embedded in the reduction steps
+// Reduction is a struct to be embedded in the reduction steps.
 type Reduction struct {
 	*consensus.Emitter
 	TimeOut time.Duration
 }
 
 // IncreaseTimeout is used when reduction does not reach the quorum or
-// converges over an empty block
+// converges over an empty block.
 func (r *Reduction) IncreaseTimeout(round uint64) {
-
 	// if we converged on an empty block hash, we increase the timeout
 	r.TimeOut = r.TimeOut * 2
 	if r.TimeOut > 60*time.Second {
@@ -60,11 +59,12 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 			WithField("timeout", r.TimeOut).
 			WithField("round", round).
 			Error("max_timeout_reached")
+
 		r.TimeOut = 60 * time.Second
 	}
 }
 
-// SendReduction to the other peers
+// SendReduction to the other peers.
 func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
 	hdr := header.Header{
 		Round:     round,
@@ -80,6 +80,7 @@ func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
 
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
+
 	if err := r.Gossip(message.New(topics.Reduction, *red)); err != nil {
 		panic(err)
 	}
@@ -87,7 +88,7 @@ func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
 
 // ShouldProcess checks whether a message is consistent with the current round
 // and step. If it is not, it either discards it or stores it for later. The
-// function potentially mutates the consensus.Queue
+// function potentially mutates the consensus.Queue.
 func ShouldProcess(m message.Message, round uint64, step uint8, queue *consensus.Queue) bool {
 	msg := m.Payload().(consensus.InternalPacket)
 	hdr := msg.State()

@@ -26,9 +26,11 @@ import (
 	"google.golang.org/grpc"
 )
 
+//nolint
 // PublishTopic publishes an event bus topic to the specified node via
-// rpc call
+// rpc call.
 func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
+	return nil
 	/*
 		if nodeIndex >= uint(len(n.Nodes)) {
 			return errors.New("invalid node index")
@@ -52,10 +54,9 @@ func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
 		_, err = http.Post(addr, "application/json", &buf)
 		return err
 	*/
-	return nil
 }
 
-// SendQuery sends a graphql query to the specified network node
+// SendQuery sends a graphql query to the specified network node.
 func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) error {
 	if nodeIndex >= uint(len(n.nodes)) {
 		return errors.New("invalid node index")
@@ -74,6 +75,7 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		_ = resp.Body.Close()
 	}()
@@ -85,21 +87,24 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 	return nil
 }
 
-// SendBidCmd sends gRPC command SendBid and returns tx hash
+// SendBidCmd sends gRPC command SendBid and returns tx hash.
 func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
 	// session has been setup already in the TestMain, so here the client is
 	// returning the permanent connection
 	c := n.grpcClients[n.nodes[ind].Id]
+
 	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
 
 	client := pb.NewTransactorClient(conn)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	req := pb.BidRequest{Amount: amount}
+
 	resp, err := client.Bid(ctx, &req)
 	if err != nil {
 		return nil, err
@@ -109,7 +114,7 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 }
 
 // SendWireMsg sends a P2P message to the specified network node
-// NB: Handshaking procedure must be performed prior to the message sending
+// NB: Handshaking procedure must be performed prior to the message sending.
 func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 	if ind >= uint(len(n.nodes)) {
 		return errors.New("invalid node index")
@@ -127,11 +132,10 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 	writeTimeoutDuration := time.Duration(writeTimeout) * time.Second
 	_ = conn.SetWriteDeadline(time.Now().Add(writeTimeoutDuration))
 	_, err = conn.Write(msg)
-
 	return err
 }
 
-// ConstructWireFrame creates a frame according to the wire protocol
+// ConstructWireFrame creates a frame according to the wire protocol.
 func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.Buffer) ([]byte, error) {
 	// Write magic
 	buf := magic.ToBuffer()
@@ -154,8 +158,8 @@ func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.B
 	return frame.Bytes(), nil
 }
 
-// WriteFrame writes a frame to a buffer
-// TODO: remove *bytes.Buffer from the returned parameters
+// WriteFrame writes a frame to a buffer.
+// TODO: remove *bytes.Buffer from the returned parameters.
 func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	msg := new(bytes.Buffer)
 	// Append prefix(header)
@@ -174,7 +178,7 @@ func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	return msg, nil
 }
 
-// WaitUntil blocks until the node at index ind reaches the target height
+// WaitUntil blocks until the node at index ind reaches the target height.
 func (n *Network) WaitUntil(t *testing.T, ind uint, targetHeight uint64, waitFor time.Duration, tick time.Duration) {
 	condition := func() bool {
 		// Construct query to fetch block height
@@ -196,9 +200,10 @@ func (n *Network) WaitUntil(t *testing.T, ind uint, targetHeight uint64, waitFor
 }
 
 // WaitUntilTx blocks until the node at index ind accepts the specified Tx
-// Returns hash of the block that includes this tx
+// Returns hash of the block that includes this tx.
 func (n *Network) WaitUntilTx(t *testing.T, ind uint, txID string) string {
 	var blockhash string
+
 	condition := func() bool {
 		// Construct query to fetch txid
 		query := fmt.Sprintf(
@@ -227,25 +232,27 @@ func (n *Network) WaitUntilTx(t *testing.T, ind uint, txID string) string {
 	// asserts that given condition will be met in 2 minutes, by checking
 	// condition function each second.
 	assert.Eventuallyf(t, condition, 2*time.Minute, time.Second, "failed node %s", ind)
-
 	return blockhash
 }
 
-// SendStakeCmd sends gRPC command SendStake and returns tx hash
+// SendStakeCmd sends gRPC command SendStake and returns tx hash.
 func (n *Network) SendStakeCmd(ind uint, amount, locktime uint64) ([]byte, error) {
 	// session has been setup already in the TestMain, so here the client is
 	// returning the permanent connection
 	c := n.grpcClients[n.nodes[ind].Id]
+
 	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
 
 	client := pb.NewTransactorClient(conn)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	req := pb.StakeRequest{Amount: amount, Locktime: locktime}
+
 	resp, err := client.Stake(ctx, &req)
 	if err != nil {
 		return nil, err
@@ -254,22 +261,25 @@ func (n *Network) SendStakeCmd(ind uint, amount, locktime uint64) ([]byte, error
 	return resp.Hash, nil
 }
 
-// GetLastBlockHeight makes an attempt to fetch last block height of a specified node
+// GetLastBlockHeight makes an attempt to fetch last block height of a specified node.
 func (n *Network) GetLastBlockHeight(ind uint) (uint64, error) {
 	// Construct query to fetch block height
 	query := "{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}"
+
 	var result map[string]map[string][]map[string]map[string]int
 	if err := n.SendQuery(ind, query, &result); err != nil {
 		return 0, err
 	}
+
 	return uint64(result["data"]["blocks"][0]["header"]["height"]), nil
 }
 
-//IsSynced checks if each node blockchain tip is close to the blockchain tip of node 0.
-// threshold param is the number of blocks the last block can differ
+// IsSynced checks if each node blockchain tip is close to the blockchain tip of node 0.
+// threshold param is the number of blocks the last block can differ.
 func (n *Network) IsSynced(threshold uint64) (uint64, error) {
 	forks := make(map[uint64][]int)
 	primaryHeight := uint64(0)
+
 	for nodeID := 0; nodeID < n.Size(); nodeID++ {
 		h, err := n.GetLastBlockHeight(uint(nodeID))
 		if err != nil {
@@ -286,11 +296,13 @@ func (n *Network) IsSynced(threshold uint64) (uint64, error) {
 
 		// Check if this node tip is close to the network tip
 		var nofork bool
+
 		for tip := range forks {
 			lowerBound := tip - threshold
 			if lowerBound > tip {
 				lowerBound = 0
 			}
+
 			upperBound := tip + threshold
 
 			if h >= lowerBound && h < upperBound {
@@ -320,9 +332,11 @@ func (n *Network) IsSynced(threshold uint64) (uint64, error) {
 			for _, nodeID := range forks[tip] {
 				logMsg += fmt.Sprintf(" %d,", nodeID)
 			}
+
 			logMsg += "]"
 			logrus.WithField("process", "monitor").Info(logMsg)
 		}
+
 		return 0, errors.New("network inconsistency detected")
 	}
 

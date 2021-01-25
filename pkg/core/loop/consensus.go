@@ -32,14 +32,14 @@ var lg = log.WithField("process", "consensus loop")
 
 // ErrMaxStepsReached is triggered when the consensus loop reaches the maximum
 // amount of steps without reaching an Agreement. This means that the network
-// is highly asynchronous or we are under attack
+// is highly asynchronous or we are under attack.
 var ErrMaxStepsReached = errors.New("consensus reached max number of steps without moving forward")
 
 // Consensus is the state machine that runs the steps of consensus. Rather than
 // trying to coordinate the various steps, it lets them execute and indicate
 // which should be the following status, until completion.
 // Each round is run separately and in a synchronous, blocking fashion (except
-// the Agreement which should be run asynchronously by design)
+// the Agreement which should be run asynchronously by design).
 type Consensus struct {
 	*consensus.Emitter
 	*candidate.Requestor
@@ -54,7 +54,7 @@ type Consensus struct {
 }
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
-// consensus.New so to ease mocking the consensus up when testing
+// consensus.New so to ease mocking the consensus up when testing.
 func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc, requestor *candidate.Requestor, newBlockChan chan consensus.Results) (consensus.Phase, consensus.Controller, error) {
 	generator, err := blockgenerator.New(e, pubKey, db)
 	if err != nil {
@@ -70,18 +70,19 @@ func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut t
 }
 
 // CreateInitialStep creates the selection step by injecting a BlockGenerator
-// interface to it
+// interface to it.
 func CreateInitialStep(e *consensus.Emitter, consensusTimeOut time.Duration, bg blockgenerator.BlockGenerator, verifyFn consensus.CandidateVerificationFunc, db database.DB, requestor *candidate.Requestor) consensus.Phase {
 	redu2 := secondstep.New(e, consensusTimeOut)
 	redu1 := firststep.New(redu2, e, verifyFn, consensusTimeOut, db, requestor)
 	selectionStep := selection.New(redu1, bg, e, consensusTimeOut, db)
+
 	redu2.SetNext(selectionStep)
 	return selectionStep
 }
 
 // New creates a new Consensus struct. The legacy StopConsensus and RoundUpdate
 // are now replaced with context cancellation and direct function call operated
-// by the chain component
+// by the chain component.
 func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 	// TODO: channel size should be configurable
 	agreementChan := make(chan message.Message, 1000)
@@ -93,6 +94,7 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 
 	// subscribe topics to eventChan
 	evSub := eventbus.NewChanListener(eventChan)
+
 	e.EventBus.AddDefaultTopic(topics.Reduction, topics.Score)
 	e.EventBus.SubscribeDefault(evSub)
 
@@ -110,16 +112,17 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 }
 
 // CreateStateMachine uses Consensus parameters as a shorthand for the static
-// CreateStateMachine
+// CreateStateMachine.
 func (c *Consensus) CreateStateMachine(db database.DB, consensusTimeOut time.Duration, verifyFn consensus.CandidateVerificationFunc, newBlockChan chan consensus.Results) (consensus.Phase, consensus.Controller, error) {
 	return CreateStateMachine(c.Emitter, db, consensusTimeOut, c.pubKey.Copy(), verifyFn, c.Requestor, newBlockChan)
 }
 
+//nolint:wsl
 // Spin the consensus state machine. The consensus runs for the whole round
 // until either a new round is produced or the node needs to re-sync. The
 // Agreement loop (acting roundwise) runs concurrently with the generation-selection-reduction
-// loop (acting step-wise)
-// TODO: consider stopping the phase loop with a Done phase, instead of nil
+// loop (acting step-wise).
+// TODO: consider stopping the phase loop with a Done phase, instead of nil.
 func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.Controller, round consensus.RoundUpdate) consensus.Results {
 	// we create two context cancelation from the same parent context. This way
 	// we can let the agreement interrupt the stateMachine's loop cycle.
@@ -129,6 +132,7 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	// small redundancy is not likely to be problematic and is an acceptable
 	// overhead
 	stepCtx, finalizeStep := context.WithCancel(ctx)
+
 	agrCtx, cancelAgreement := context.WithCancel(stepCtx)
 	defer cancelAgreement()
 
@@ -142,8 +146,10 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 		// canceling the consensus phase loop when Agreement is done (either
 		// because the parent canceled or because a consensus has been reached)
 		defer finalizeStep()
+
 		agreementLoop := ag.GetControlFn()
 		results := agreementLoop(agrCtx, c.roundQueue, c.agreementChan, round)
+
 		resultsChan <- results
 	}()
 
@@ -193,7 +199,6 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 			return consensus.Results{Blk: block.Block{}, Err: ErrMaxStepsReached}
 		}
 	}
-
 	// if we are here, either:
 	// - agreement completed normally and we can move on to the next block
 	// - agreement completed with an error and a re-synchronization needs to
@@ -223,7 +228,7 @@ func report(round uint64, step uint8) {
 	*/
 }
 
-//phase should start by
+// phase should start by
 // - cleaning the events from the previous round
 // - cleaning the events from the previous steps
 // - pulling from EventQueue the events it is interested in (current

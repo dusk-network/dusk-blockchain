@@ -13,18 +13,18 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Registry holds General and RPC
+// Registry holds General and RPC.
 type Registry struct {
 	General generalConfiguration
 	RPC     rpcConfiguration
 }
 
-// Node general configs
+// Node general configs.
 type generalConfiguration struct {
 	Network string
 }
 
-// rpc client configs
+// rpc client configs.
 type rpcConfiguration struct {
 	Network string
 	Address string
@@ -38,9 +38,10 @@ type rpcConfiguration struct {
 	Pass string
 }
 
-// InitConfig will init the config vars from viper
+// InitConfig will init the config vars from viper.
 func InitConfig(cfg string) Registry {
 	viper.SetConfigName("dusk")
+
 	if cfg == "" {
 		viper.AddConfigPath(".")
 		viper.AddConfigPath("$HOME/.dusk/")

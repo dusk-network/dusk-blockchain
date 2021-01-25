@@ -29,7 +29,7 @@ type transaction struct {
 // NB: More optimal data structure can be used to speed up fetching. E.g instead
 // map lookup operation on block per height, one can utilize a height as index
 // in a slice.
-// NB: A single slice of all blocks to be used to avoid all duplications
+// NB: A single slice of all blocks to be used to avoid all duplications.
 func (t *transaction) StoreBlock(b *block.Block) error {
 	if !t.writable {
 		return errors.New("read-only transaction")
@@ -76,6 +76,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 	if err := utils.WriteUint64(buf, b.Header.Height); err != nil {
 		return err
 	}
+
 	t.batch[heightInd][toKey(buf.Bytes())] = blockBytes
 
 	// Map stateKey to chain state (tip)
@@ -84,6 +85,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 	// Remove expired bid values
 	for k := range t.db.storage[bidValuesInd] {
 		heightBytes := k[9:]
+
 		height := binary.LittleEndian.Uint64(heightBytes)
 		if height < b.Header.Height {
 			delete(t.db.storage[bidValuesInd], k)
@@ -93,7 +95,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 	return nil
 }
 
-// Commit writes a batch to LevelDB storage. See also fsyncEnabled variable
+// Commit writes a batch to LevelDB storage. See also fsyncEnabled variable.
 func (t *transaction) Commit() error {
 	if !t.writable {
 		return errors.New("read-only transaction cannot commit changes")
@@ -119,6 +121,7 @@ func (t transaction) FetchBlockExists(hash []byte) (bool, error) {
 func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	var data []byte
 	var exists bool
+
 	if data, exists = t.db.storage[blocksInd][toKey(hash)]; !exists {
 		return nil, database.ErrBlockNotFound
 	}
@@ -134,6 +137,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.ContractCall, error) {
 	var data []byte
 	var exists bool
+
 	if data, exists = t.db.storage[blocksInd][toKey(hash)]; !exists {
 		return nil, database.ErrBlockNotFound
 	}
@@ -156,6 +160,7 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 
 	var data []byte
 	var exists bool
+
 	if data, exists = t.db.storage[heightInd][toKey(heightBuf.Bytes())]; !exists {
 		return nil, database.ErrBlockNotFound
 	}
@@ -171,6 +176,7 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall, uint32, []byte, error) {
 	var data []byte
 	var exists bool
+
 	if data, exists = t.db.storage[txsInd][toKey(txID)]; !exists {
 		return nil, math.MaxUint32, nil, database.ErrTxNotFound
 	}
@@ -181,6 +187,7 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 	}
 
 	var hash []byte
+
 	if hash, exists = t.db.storage[txHashInd][toKey(txID)]; !exists {
 		return nil, math.MaxUint32, nil, database.ErrTxNotFound
 	}
@@ -189,9 +196,9 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 }
 
 func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) {
-
 	var txID []byte
 	var exists bool
+
 	if txID, exists = t.db.storage[keyImagesInd][toKey(keyImage)]; !exists {
 		return false, nil, database.ErrKeyImageNotFound
 	}
@@ -214,9 +221,9 @@ func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
 }
 
 func (t transaction) FetchState() (*database.State, error) {
-
 	var hash []byte
 	var exists bool
+
 	if hash, exists = t.db.storage[stateInd][toKey(stateKey)]; !exists {
 		return nil, database.ErrStateNotFound
 	}
@@ -237,7 +244,7 @@ func toKey(d []byte) key {
 	return k
 }
 
-// Rollback is not used by database layer
+// Rollback is not used by database layer.
 func (t transaction) Rollback() error {
 	return nil
 }
@@ -292,25 +299,30 @@ func (t *transaction) StoreBidValues(d, k []byte, index uint64, lockTime uint64)
 
 	key := append([]byte("bidvalues"), heightBytes...)
 	bidKey := toKey(key)
+
 	t.batch[bidValuesInd][bidKey] = append(d, append(k, idxBytes...)...)
 	return nil
 }
 
-// BidEncodingSize is the expected size of the serialized encoding of the bid
+// BidEncodingSize is the expected size of the serialized encoding of the bid.
 var BidEncodingSize = 72
 
 func (t *transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
 	// Get bid values with lowest expiry height
 	lowestSeen := uint64(1<<64 - 1)
+
 	var values []byte
+
 	for k, v := range t.db.storage[bidValuesInd] {
 		heightBytes := k[9:]
+
 		height := binary.LittleEndian.Uint64(heightBytes)
 		if height < lowestSeen {
 			lowestSeen = height
 			values = v
 		}
 	}
+
 	if values == nil {
 		return nil, nil, uint64(0), errors.New("could not fetch bid values")
 	}
@@ -319,10 +331,9 @@ func (t *transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
 	return values[0:32], values[32:64], index, nil
 }
 
-// FetchBlockHeightSince uses binary search to find a block height
-// NB: Duplicates FetchBlockHeightSince heavy driver
+// FetchBlockHeightSince uses binary search to find a block height.
+// NB: Duplicates FetchBlockHeightSince heavy driver.
 func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error) {
-
 	tip, err := t.FetchCurrentHeight()
 	if err != nil {
 		return 0, err
@@ -350,7 +361,6 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 	}
 
 	return tip - n + pos, nil
-
 }
 
 func (t *transaction) StoreCandidateMessage(cm block.Block) error {

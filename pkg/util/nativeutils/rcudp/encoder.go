@@ -13,25 +13,23 @@ import (
 	fountain "github.com/google/gofountain"
 )
 
-// Encoder is wrapper around Raptor RFC5053 from gofountain.EncodeLTBlocks
+// Encoder is wrapper around Raptor RFC5053 from gofountain.EncodeLTBlocks.
 type Encoder struct {
-
-	// Raptor codes configuration
+	// Raptor codes configuration.
 	maxPacketSize       uint16
 	redundancyFactor    uint8
 	SymbolAlignmentSize uint16
 
-	// message to be encoded
+	// message to be encoded.
 	message []byte
 
-	// output parameters
+	// output parameters.
 	PaddingSize      uint16
 	NumSourceSymbols int
 }
 
-// NewEncoder creates  Raptor RFC5053 wrapper
+// NewEncoder creates a Raptor RFC5053 wrapper.
 func NewEncoder(message []byte, maxPacketSize uint16, redundancyFactor uint8, symbolAlignmentSize uint16) (*Encoder, error) {
-
 	if maxPacketSize%symbolAlignmentSize != 0 {
 		return nil, errors.New("the symbol size MUST be a multiple of Al")
 	}
@@ -49,13 +47,13 @@ func NewEncoder(message []byte, maxPacketSize uint16, redundancyFactor uint8, sy
 		message:             message,
 		maxPacketSize:       maxPacketSize,
 		redundancyFactor:    redundancyFactor,
-		SymbolAlignmentSize: symbolAlignmentSize}, nil
+		SymbolAlignmentSize: symbolAlignmentSize,
+	}, nil
 }
 
-// GenerateBlocks encodes raptor codes
+// GenerateBlocks encodes raptor codes.
 // NB: This method is destructive to the w.message array.
 func (e *Encoder) GenerateBlocks() []fountain.LTBlock {
-
 	// Add padding
 	e.PaddingSize = e.calcPadding()
 	paddingBytes := make([]byte, int(e.PaddingSize))
@@ -66,15 +64,15 @@ func (e *Encoder) GenerateBlocks() []fountain.LTBlock {
 	if err != nil {
 		panic(err)
 	}
+
 	e.NumSourceSymbols = int(numSourceSymbols)
 
 	c := fountain.NewRaptorCodec(e.NumSourceSymbols, int(e.SymbolAlignmentSize))
 	ids := generate2IDs(e.NumSourceSymbols * int(e.redundancyFactor))
-
 	return fountain.EncodeLTBlocks(messageWithPadding, ids, c)
 }
 
-// TransferLength is the number of message plus calculated padding
+// TransferLength is the number of message plus calculated padding.
 func (e *Encoder) TransferLength() int {
 	return len(e.message) + int(e.PaddingSize)
 }
@@ -84,7 +82,6 @@ func (e *Encoder) calcPadding() uint16 {
 }
 
 func (e *Encoder) sourceBlockCount() (uint16, error) {
-
 	alignedSize := float64(e.alignedSourceBlockSize())
 	blockCount := math.Ceil(alignedSize / float64(e.maxPacketSize))
 
@@ -107,5 +104,6 @@ func generate2IDs(numIDs int) []int64 {
 	for i := range ids {
 		ids[i] = int64(i)
 	}
+
 	return ids
 }

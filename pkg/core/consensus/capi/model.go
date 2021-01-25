@@ -14,7 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
-// EventQueueJSON is used as JSON rapper for eventQueue fields
+// EventQueueJSON is used as JSON rapper for eventQueue fields.
 type EventQueueJSON struct {
 	ID        int              `storm:"id,increment" json:"id"` // primary key with auto increment
 	Round     uint64           `json:"round"`
@@ -23,7 +23,7 @@ type EventQueueJSON struct {
 	UpdatedAt time.Time        `json:"updated_at"`
 }
 
-// RoundInfoJSON is used as JSON wrapper for round info fields
+// RoundInfoJSON is used as JSON wrapper for round info fields.
 type RoundInfoJSON struct {
 	ID        int       `storm:"id,increment" json:"id"`
 	Round     uint64    `storm:"index" json:"round"`
@@ -33,7 +33,7 @@ type RoundInfoJSON struct {
 	Name      string    `json:"name"`
 }
 
-// PeerJSON is used as JSON wrapper for peer info fields
+// PeerJSON is used as JSON wrapper for peer info fields.
 type PeerJSON struct {
 	ID       int       `storm:"id,increment" json:"id"`
 	Address  string    `json:"address"`
@@ -42,31 +42,31 @@ type PeerJSON struct {
 	LastSeen time.Time `storm:"index" json:"last_seen"`
 }
 
-// Count is the struct used to return a count for a API service
+// Count is the struct used to return a count for a API service.
 type Count struct {
 	Count int `json:"count"`
 }
 
-// PeerCount is the struct used to save a peer or remove from a PeerCount collection in the API monitoring database
+// PeerCount is the struct used to save a peer or remove from a PeerCount collection in the API monitoring database.
 type PeerCount struct {
 	ID       string    `storm:"id" json:"id"`
 	LastSeen time.Time `storm:"index" json:"last_seen"`
 }
 
-// Member is the holder of bls and stakes
+// Member is the holder of bls and stakes.
 type Member struct {
 	PublicKeyBLS []byte  `json:"bls_key"`
 	Stakes       []Stake `json:"stakes"`
 }
 
-// Stake represents the Provisioner's stake
+// Stake represents the Provisioner's stake.
 type Stake struct {
 	Amount      uint64 `json:"amount"`
 	StartHeight uint64 `json:"start_height"`
 	EndHeight   uint64 `json:"end_height"`
 }
 
-// ProvisionerJSON represents the Provisioner
+// ProvisionerJSON represents the Provisioner.
 type ProvisionerJSON struct {
 	ID      uint64        `storm:"id" json:"id"`
 	Set     sortedset.Set `json:"set"`

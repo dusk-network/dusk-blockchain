@@ -15,22 +15,22 @@ import (
 	"github.com/machinebox/graphql"
 )
 
-// DuskNode is the struct representing a node instance in the local Network
+// DuskNode is the struct representing a node instance in the local Network.
 type DuskNode struct {
 	Id              string //nolint
 	ConfigProfileID string
 
-	// fields represents a dusk-blockchain instance
+	// Fields represents a dusk-blockchain instance.
 	Cfg        config.Registry
 	Gql        *graphql.Client
 	Srv        *ruskmock.Server
 	GRPCClient *client.NodeClient
 
-	// dusk-blockchain node directory
+	// Dusk-blockchain node directory.
 	Dir string
 }
 
-// NewDuskNode instantiates a new DuskNode
+// NewDuskNode instantiates a new DuskNode.
 func NewDuskNode(graphqlPort, nodeID int, profileID string, requireSession bool) *DuskNode {
 	node := new(DuskNode)
 	node.Id = strconv.Itoa(nodeID)

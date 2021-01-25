@@ -34,7 +34,7 @@ func TestMultipleConsumersMultipleProducers(t *testing.T) {
 	testConsumerProducer(t, 1000, 10, 100)
 }
 
-// safe array of arrays
+// Safe array of arrays.
 type safeSlice struct {
 	data [][]byte
 	mu   sync.RWMutex
@@ -42,11 +42,13 @@ type safeSlice struct {
 
 func (s *safeSlice) append(items [][]byte) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.data == nil {
 		s.data = make([][]byte, 0)
 	}
+
 	s.data = append(s.data, items...)
-	s.mu.Unlock()
 }
 
 func (s *safeSlice) Len() int {
@@ -58,8 +60,10 @@ func (s *safeSlice) Len() int {
 func (s *safeSlice) Equal(b *safeSlice) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
 	for _, sItem := range s.data {
 		var found bool
+
 		b.mu.RLock()
 		for _, bItem := range b.data {
 			if bytes.Equal(sItem, bItem) {
@@ -67,6 +71,7 @@ func (s *safeSlice) Equal(b *safeSlice) bool {
 				break
 			}
 		}
+
 		b.mu.RUnlock()
 
 		if !found {
@@ -77,13 +82,13 @@ func (s *safeSlice) Equal(b *safeSlice) bool {
 	return true
 }
 
-// testConsumerProducer instantiates a ring buffer, Consumer(s) and Producers
+// testConsumerProducer instantiates a ring buffer, Consumer(s) and Producers.
 func testConsumerProducer(t *testing.T, bufferSize int, consumersNum int, producersNum int) {
-
 	ring := NewBuffer(bufferSize)
 
 	// items slice read from ring buffer
 	var rItems safeSlice
+
 	consumeFunc := func(items [][]byte, w io.WriteCloser) bool {
 		rItems.append(items)
 		return true
@@ -101,7 +106,6 @@ func testConsumerProducer(t *testing.T, bufferSize int, consumersNum int, produc
 
 	// Init a producer
 	producer := func(id int, wg *sync.WaitGroup) {
-
 		data := make([][]byte, 20*consumersNum)
 		for j := 0; j < len(data); j++ {
 			data[j] = []byte{byte(id + j)}
@@ -114,7 +118,9 @@ func testConsumerProducer(t *testing.T, bufferSize int, consumersNum int, produc
 	}
 
 	var wg sync.WaitGroup
+
 	wg.Add(producersNum)
+
 	// Multiple producers putting data
 	for i := 1; i <= producersNum; i++ {
 		go producer(i+100, &wg)
@@ -131,6 +137,7 @@ func testConsumerProducer(t *testing.T, bufferSize int, consumersNum int, produc
 
 	// All written items should read (as result stored in rItems)
 	retry := 0
+
 	for {
 		retry++
 		if retry == 4 {

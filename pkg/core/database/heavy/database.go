@@ -17,38 +17,39 @@ import (
 )
 
 var (
-	// See openStorage for detailed explanation
+	// See openStorage for detailed explanation.
 	_storage   *leveldb.DB
 	_storageMu sync.Mutex
 )
 
-// DB on top of underlying storage syndtr/goleveldb/leveldb
+// DB on top of underlying storage syndtr/goleveldb/leveldb.
 type DB struct {
-	// an alias to the global storage var
+	// an alias to the global storage var.
 	storage *leveldb.DB
 
-	// Read-only mode provided at heavy.DB level. If true, accepts read-only Transaction
+	// Read-only mode provided at heavy.DB level. If true, accepts read-only Transaction.
 	readOnly bool
 }
 
 // openStorage is a wrapper around leveldb.OpenFile to provide singleton
-// leveldb.DB instance
+// leveldb.DB instance.
 //
 // leveldb.OpenFile returns a new filesystem-backed storage implementation with
 // the given path. This also acquire a file lock, so any subsequent attempt to
 // open the same path will fail.
 //
-// Even opening with leveldb.Options{ ReadOnly: true} an err EAGAIN is returned
+// Even opening with leveldb.Options{ ReadOnly: true} an err EAGAIN is returned.
 func openStorage(path string) (*leveldb.DB, error) {
 	_storageMu.Lock()
 	defer _storageMu.Unlock()
 
 	var err error
+
 	if _storage == nil {
 		var s *leveldb.DB
 		s, err = leveldb.OpenFile(path, nil)
 
-		// Try to recover if corrupted
+		// Try to recover if corrupted.
 		if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
 			s, err = leveldb.RecoverFile(path, nil)
 		}
@@ -64,7 +65,7 @@ func openStorage(path string) (*leveldb.DB, error) {
 	return _storage, err
 }
 
-// closeStorage should safely close the underlying storage
+// closeStorage should safely close the underlying storage.
 func closeStorage() error {
 	_storageMu.Lock()
 	defer _storageMu.Unlock()
@@ -80,9 +81,8 @@ func closeStorage() error {
 
 // NewDatabase create or open backend storage (goleveldb) located at the
 // specified path. Readonly option is pseudo read-only mode implemented by
-// heavy.Database. Not to be confused with read-only goleveldb mode
+// heavy.Database. Not to be confused with read-only goleveldb mode.
 func NewDatabase(path string, network protocol.Magic, readonly bool) (database.DB, error) {
-
 	storage, err := openStorage(path)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func NewDatabase(path string, network protocol.Magic, readonly bool) (database.D
 	return DB{storage, readonly}, nil
 }
 
-// Begin builds read-only or read-write Transaction
+// Begin builds read-only or read-write Transaction.
 func (db DB) Begin(writable bool) (database.Transaction, error) {
 	// If the database was opened with DB.readonly flag true, we cannot create
 	// a writable transaction
@@ -117,7 +117,6 @@ func (db DB) Begin(writable bool) (database.Transaction, error) {
 
 	// Snapshot is a DB snapshot. It must be released on Transaction.Close()
 	snapshot, err := db.storage.GetSnapshot()
-
 	if err != nil {
 		return nil, err
 	}
@@ -130,19 +129,20 @@ func (db DB) Begin(writable bool) (database.Transaction, error) {
 
 	// Create a transaction instance. Mind Transaction.Close() must be called
 	// when Transaction is done
-	t := &transaction{writable: writable,
+	t := &transaction{
+		writable: writable,
 		db:       &db,
 		snapshot: snapshot,
 		batch:    batch,
-		closed:   false}
+		closed:   false,
+	}
 
 	return t, nil
 }
 
-// Update a record within a transaction
+// Update a record within a transaction.
 func (db DB) Update(fn func(database.Transaction) error) error {
-
-	// Create a writable transaction for atomic update
+	// Create a writable transaction for atomic update.
 	t, err := db.Begin(true)
 	if err != nil {
 		return err
@@ -164,9 +164,8 @@ func (db DB) Update(fn func(database.Transaction) error) error {
 	return t.Commit()
 }
 
-// View is the equivalent of a Select SQL statement
+// View is the equivalent of a Select SQL statement.
 func (db DB) View(fn func(database.Transaction) error) error {
-
 	t, err := db.Begin(false)
 	if err != nil {
 		return err
@@ -184,14 +183,14 @@ func (db DB) isOpen() bool {
 // Close does not close the underlying storage as we need to reuse it within
 // another DB instances. Note that we rely on the Finalizer that goleveldb is
 // setting at the point of leveldb.DB.openDB to call leveldb.DB.Close() when
-// the process is terminating
+// the process is terminating.
 func (db DB) Close() error {
 	db.storage = nil
 	return nil
 }
 
 // GetSnapshot returns current storage snapshot. To be used only by
-// database/testing pkg
+// database/testing pkg.
 func (db DB) GetSnapshot() (*leveldb.Snapshot, error) {
 	return db.storage.GetSnapshot()
 }

@@ -13,13 +13,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	// DriverName is the unique identifier for the heavy driver
-	DriverName = "heavy_v0.1.0"
-)
+// DriverName is the unique identifier for the heavy driver.
+var DriverName = "heavy_v0.1.0"
 
-type driver struct {
-}
+type driver struct{}
 
 func (d *driver) Open(path string, network protocol.Magic, readonly bool) (database.DB, error) {
 	return NewDatabase(path, network, readonly)
@@ -35,13 +32,14 @@ func (d *driver) Name() string {
 
 func init() {
 	d := driver{}
+
 	err := database.Register(&d)
 	if err != nil {
 		log.Panic(err)
 	}
 }
 
-// CreateDBConnection creates a connection with the DB using the `heavy` driver
+// CreateDBConnection creates a connection with the DB using the `heavy` driver.
 func CreateDBConnection() (database.Driver, database.DB) {
 	drvr, err := database.From(cfg.Get().Database.Driver)
 	if err != nil {

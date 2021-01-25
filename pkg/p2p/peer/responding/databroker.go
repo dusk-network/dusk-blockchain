@@ -35,22 +35,22 @@ func NewDataBroker(db database.DB, rpcBus *rpcbus.RPCBus) *DataBroker {
 	}
 }
 
-// MarshalObjects marshals requested objects by a message of type message.Inv
+// MarshalObjects marshals requested objects by a message of type message.Inv.
 func (d *DataBroker) MarshalObjects(m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.Inv)
-
 	bufs := make([]bytes.Buffer, 0, len(msg.InvList))
+
 	for _, obj := range msg.InvList {
 		switch obj.Type {
 		case message.InvTypeBlock:
 			// Fetch block from local state. It must be available
 			var b *block.Block
+
 			err := d.db.View(func(t database.Transaction) error {
 				var err error
 				b, err = t.FetchBlock(obj.Hash)
 				return err
 			})
-
 			if err != nil {
 				return nil, err
 			}
@@ -79,21 +79,15 @@ func (d *DataBroker) MarshalObjects(m message.Message) ([]bytes.Buffer, error) {
 
 				bufs = append(bufs, *buf)
 			}
-
-			// A txID will not be found in a few situations:
-			//
-			// - The node has restarted and lost this Tx
-			// - The node has recently accepted a block that includes this Tx
-			// No action to run in these cases.
 		}
 	}
 
 	return bufs, nil
 }
 
-// MarshalMempoolTxs marshals all or subset of pending Mempool transactions
+// MarshalMempoolTxs marshals all or subset of pending Mempool transactions.
 func (d *DataBroker) MarshalMempoolTxs(m message.Message) ([]bytes.Buffer, error) {
-	var maxItemsSent = config.Get().Mempool.MaxInvItems
+	maxItemsSent := config.Get().Mempool.MaxInvItems
 	if maxItemsSent == 0 {
 		// responding to topics.Mempool disabled
 		return nil, errors.New("responding to topics.Mempool is disabled")
@@ -106,6 +100,7 @@ func (d *DataBroker) MarshalMempoolTxs(m message.Message) ([]bytes.Buffer, error
 
 	bufs := make([]bytes.Buffer, 0, len(txs))
 	msg := &message.Inv{}
+
 	for _, tx := range txs {
 		hash, calcErr := tx.CalculateHash()
 		if calcErr != nil {
@@ -113,6 +108,7 @@ func (d *DataBroker) MarshalMempoolTxs(m message.Message) ([]bytes.Buffer, error
 		}
 
 		msg.AddItem(message.InvTypeMempoolTx, hash)
+
 		maxItemsSent--
 		if maxItemsSent == 0 {
 			break
@@ -123,12 +119,17 @@ func (d *DataBroker) MarshalMempoolTxs(m message.Message) ([]bytes.Buffer, error
 	if err == nil {
 		bufs = append(bufs, buf)
 	}
+	// A txID will not be found in a few situations:
+	//
+	// - The node has restarted and lost this Tx
+	// - The node has recently accepted a block that includes this Tx
+	// No action to run in these cases.
 
 	return bufs, nil
 }
 
 func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
-	//TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
+	// TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
 	// buf := topics.Topics[topics.Block].Buffer
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, b); err != nil {
@@ -143,7 +144,7 @@ func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
 }
 
 func marshalTx(tx transactions.ContractCall) (*bytes.Buffer, error) {
-	//TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
+	// TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
 	// buf := topics.Topics[topics.Block].Buffer
 	buf := new(bytes.Buffer)
 	if err := transactions.Marshal(buf, tx); err != nil {

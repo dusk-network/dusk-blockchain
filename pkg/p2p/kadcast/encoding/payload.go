@@ -11,20 +11,19 @@ import (
 	"errors"
 )
 
-// BroadcastPayload payload data of BROADCAST message
+// BroadcastPayload payload data of BROADCAST message.
 type BroadcastPayload struct {
 	Height      byte
 	GossipFrame []byte
 }
 
-// NodesPayload payload data of NODES message
+// NodesPayload payload data of NODES message.
 type NodesPayload struct {
 	Peers []PeerInfo
 }
 
-// MarshalBinary implements BinaryMarshaler
+// MarshalBinary implements BinaryMarshaler.
 func (payload *NodesPayload) MarshalBinary(buf *bytes.Buffer) error {
-
 	peersNum := uint16(len(payload.Peers))
 	if peersNum == 0 {
 		return errors.New("invalid peers count")
@@ -46,13 +45,14 @@ func (payload *NodesPayload) MarshalBinary(buf *bytes.Buffer) error {
 	return nil
 }
 
-// UnmarshalBinary implements BinaryMarshaler
+// UnmarshalBinary implements BinaryMarshaler.
 func (payload *NodesPayload) UnmarshalBinary(buf *bytes.Buffer) error {
-
 	var b [2]byte
+
 	if _, err := buf.Read(b[:]); err != nil {
 		return err
 	}
+
 	num := byteOrder.Uint16(b[:])
 
 	for i := uint16(0); i < num; i++ {
@@ -63,12 +63,12 @@ func (payload *NodesPayload) UnmarshalBinary(buf *bytes.Buffer) error {
 
 		payload.Peers = append(payload.Peers, pinfo)
 	}
+
 	return nil
 }
 
-// MarshalBinary implements BinaryMarshaler
+// MarshalBinary implements BinaryMarshaler.
 func (payload *BroadcastPayload) MarshalBinary(buf *bytes.Buffer) error {
-
 	if err := buf.WriteByte(payload.Height); err != nil {
 		return err
 	}
@@ -88,9 +88,8 @@ func (payload *BroadcastPayload) MarshalBinary(buf *bytes.Buffer) error {
 	return nil
 }
 
-// UnmarshalBinary implements BinaryMarshaler
+// UnmarshalBinary implements BinaryMarshaler.
 func (payload *BroadcastPayload) UnmarshalBinary(buf *bytes.Buffer) error {
-
 	height, err := buf.ReadByte()
 	if err != nil {
 		return err
@@ -100,6 +99,7 @@ func (payload *BroadcastPayload) UnmarshalBinary(buf *bytes.Buffer) error {
 	if _, err := buf.Read(b[:]); err != nil {
 		return err
 	}
+
 	length := byteOrder.Uint32(b[:])
 
 	gossipFrame := make([]byte, length)

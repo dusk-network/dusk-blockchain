@@ -32,7 +32,7 @@ func getLog(r uint64, s uint8) *log.Entry {
 	})
 }
 
-// Phase is the implementation of the Selection step component
+// Phase is the implementation of the Selection step component.
 type Phase struct {
 	*reduction.Reduction
 
@@ -51,7 +51,7 @@ type Phase struct {
 
 // New creates and launches the component which responsibility is to reduce the
 // candidates gathered as winner of the selection of all nodes in the committee
-// and reduce them to just one candidate obtaining 64% of the committee vote
+// and reduce them to just one candidate obtaining 64% of the committee vote.
 func New(next consensus.Phase, e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration, db database.DB, requestor *candidate.Requestor) *Phase {
 	return &Phase{
 		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
@@ -62,19 +62,19 @@ func New(next consensus.Phase, e *consensus.Emitter, verifyFn consensus.Candidat
 	}
 }
 
-// String returns the reduction
+// String returns the reduction.
 func (p *Phase) String() string {
 	return "reduction-first-step"
 }
 
-// Initialize passes to this reduction step the best score collected during selection
+// Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.selectionResult = re.(message.Score)
 	return p
 }
 
 // Run the first reduction step until either there is a timeout, we reach 64%
-// of votes, or we experience an unrecoverable error
+// of votes, or we experience an unrecoverable error.
 func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	tlog := getLog(r.Round, step)
 	tlog.Traceln("starting first reduction step")
@@ -164,6 +164,7 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 	}
 
 	hdr := r.State()
+
 	lg.WithFields(log.Fields{
 		"round": hdr.Round,
 		"step":  hdr.Step,
@@ -184,6 +185,7 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 
 	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Header.Hash) {
 		var err error
+
 		p.selectionResult.Candidate, err = p.fetchCandidate(ctx, hdr.BlockHash)
 		if err != nil {
 			log.
@@ -210,12 +212,12 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 func (p *Phase) fetchCandidate(ctx context.Context, hash []byte) (block.Block, error) {
 	// First, check to see if we have the candidate in the db.
 	var cm block.Block
+
 	err := p.db.View(func(t database.Transaction) error {
 		var err error
 		cm, err = t.FetchCandidateMessage(hash)
 		return err
 	})
-
 	if err == nil && !cm.Equals(&block.Block{}) {
 		return cm, nil
 	}
@@ -227,6 +229,7 @@ func (p *Phase) requestCandidate(ctx context.Context, hash []byte) (block.Block,
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(2*time.Second))
 	// Ensure we release the resources associated to this context.
 	defer cancel()
+
 	cm, err := p.requestor.RequestCandidate(ctx, hash)
 	if err != nil {
 		return block.Block{}, err

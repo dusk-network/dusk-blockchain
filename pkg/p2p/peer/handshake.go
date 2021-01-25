@@ -84,6 +84,7 @@ func (c *Connection) readRemoteMsgVersion() error {
 	}
 
 	decodedMsg := bytes.NewBuffer(m)
+
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
@@ -118,6 +119,7 @@ func (c *Connection) readVerAck() error {
 	}
 
 	decodedMsg := bytes.NewBuffer(m)
+
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
@@ -150,6 +152,7 @@ func (c *Connection) writeVerAck(g *protocol.Gossip) error {
 
 func (c *Connection) createVersionBuffer() (*bytes.Buffer, error) {
 	version := protocol.NodeVer
+
 	message, err := newVersionMessageBuffer(version, protocol.FullNode)
 	if err != nil {
 		return nil, err

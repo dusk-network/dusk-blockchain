@@ -46,10 +46,12 @@ import (
 	"google.golang.org/grpc"
 )
 
-var logServer = logrus.WithField("process", "server")
-var testnet = byte(2)
+var (
+	logServer = logrus.WithField("process", "server")
+	testnet   = byte(2)
+)
 
-// Server is the main process of the node
+// Server is the main process of the node.
 type Server struct {
 	eventBus          *eventbus.EventBus
 	rpcBus            *rpcbus.RPCBus
@@ -64,7 +66,7 @@ type Server struct {
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
-// component and performs a DB sanity check
+// component and performs a DB sanity check.
 func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (*chain.Chain, error) {
 	// creating and firing up the chain process
 	genesis := cfg.DecodeGenesis()
@@ -122,16 +124,19 @@ func readPassword(prompt string) ([]byte, error) {
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
 // launches a new `CommitteeStore`, launches the Blockchain process, creates
 // and launches a monitor client (if configuration demands it), and inits the
-// Stake and Blind Bid channels
+// Stake and Blind Bid channels.
 func Setup() *Server {
-	ctx := context.Background()
 	var pw string
+
+	ctx := context.Background()
 	_, err := os.Stat(cfg.Get().Wallet.File)
+
 	switch {
 	case cfg.Get().General.TestHarness:
 		pw = os.Getenv("DUSK_WALLET_PASS")
 	case os.IsNotExist(err):
 		fmt.Fprintln(os.Stderr, "Wallet file not found. Creating new file...")
+
 		for {
 			pw, err = getPassword("Enter password:")
 			if err != nil {
@@ -139,6 +144,7 @@ func Setup() *Server {
 			}
 
 			var pw2 string
+
 			pw2, err = getPassword("Confirm password:")
 			if err != nil {
 				log.Panic(err)
@@ -174,14 +180,17 @@ func Setup() *Server {
 	// TODO: get address from config
 	gctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Get().RPC.Rusk.ConnectionTimeout)*time.Millisecond)
 	defer cancel()
+
 	proxy, ruskConn := setupGRPCClients(gctx)
 
 	var w *wallet.Wallet
+
 	if _, err = os.Stat(cfg.Get().Wallet.File); err == nil {
 		w, err = loadWallet(pw)
 	} else {
 		w, err = createWallet(nil, pw, proxy.KeyMaster())
 	}
+
 	if err != nil {
 		log.Panic(err)
 	}
@@ -267,6 +276,7 @@ func Setup() *Server {
 	// Start serving from the gRPC server
 	go func() {
 		conf := cfg.Get().RPC
+
 		l, err := net.Listen(conf.Network, conf.Address)
 		if err != nil {
 			log.Panic(err)
@@ -289,26 +299,30 @@ func Setup() *Server {
 	return srv
 }
 
-// OnAccept read incoming packet from the peers
+// OnAccept read incoming packet from the peers.
 func (s *Server) OnAccept(conn net.Conn) {
 	writeQueueChan := make(chan bytes.Buffer, 1000)
+
 	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan)
 	if err := peerReader.Accept(); err != nil {
 		logServer.WithError(err).Warnln("OnAccept, problem performing handshake")
 		return
 	}
+
 	logServer.WithField("address", peerReader.Addr()).Debugln("connection established")
 
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
+
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
 		err := peer.Create(ctx, peerReader, peerWriter, writeQueueChan)
 		logServer.WithError(err).Warnln("error received from peer")
 	}()
 }
 
-// OnConnection is the callback for writing to the peers
+// OnConnection is the callback for writing to the peers.
 func (s *Server) OnConnection(conn net.Conn, addr string) {
 	writeQueueChan := make(chan bytes.Buffer, 1000)
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
@@ -317,7 +331,9 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		logServer.WithError(err).Warnln("OnConnection, problem performing handshake")
 		return
 	}
+
 	address := peerWriter.Addr()
+
 	logServer.WithField("address", address).
 		Debugln("connection established")
 
@@ -326,12 +342,13 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
 		err := peer.Create(ctx, peerReader, peerWriter, writeQueueChan)
 		logServer.WithError(err).Warnln("error received from peer")
 	}()
 }
 
-// Close the chain and the connections created through the RPC bus
+// Close the chain and the connections created through the RPC bus.
 func (s *Server) Close() {
 	// TODO: disconnect peers
 	// _ = s.c.Close(cfg.Get().Database.Driver)
@@ -346,17 +363,19 @@ func (s *Server) Close() {
 
 func registerPeerServices(processor *peer.MessageProcessor, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) {
 	processor.Register(topics.Ping, responding.ProcessPing)
-	processor.Register(topics.Pong, responding.ProcessPong)
 	dataBroker := responding.NewDataBroker(db, rpcBus)
+	dataRequestor := responding.NewDataRequestor(db, rpcBus, eventBus)
+	bhb := responding.NewBlockHashBroker(db)
+	cb := responding.NewCandidateBroker(db)
+	cp := consensus.NewPublisher(eventBus)
+
 	processor.Register(topics.GetData, dataBroker.MarshalObjects)
 	processor.Register(topics.MemPool, dataBroker.MarshalMempoolTxs)
-	dataRequestor := responding.NewDataRequestor(db, rpcBus, eventBus)
+	processor.Register(topics.Ping, responding.ProcessPing)
+	processor.Register(topics.Pong, responding.ProcessPong)
 	processor.Register(topics.Inv, dataRequestor.RequestMissingItems)
-	bhb := responding.NewBlockHashBroker(db)
 	processor.Register(topics.GetBlocks, bhb.AdvertiseMissingBlocks)
-	cb := responding.NewCandidateBroker(db)
 	processor.Register(topics.GetCandidate, cb.ProvideCandidate)
-	cp := consensus.NewPublisher(eventBus)
 	processor.Register(topics.Score, cp.Process)
 	processor.Register(topics.Reduction, cp.Process)
 	processor.Register(topics.Agreement, cp.Process)

@@ -23,12 +23,12 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
-// TestGenerate tests that we can run the score
+// TestGenerate tests that we can run the score.
 func TestGenerate(t *testing.T) {
 	round := uint64(1)
 	step := uint8(1)
 
-	//setup viper timeout
+	// setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
 
@@ -57,6 +57,7 @@ func TestGenerate(t *testing.T) {
 
 	ctx, canc := context.WithTimeout(context.Background(), 2*time.Second)
 	defer canc()
+
 	scoreProposal := scoreInstance.Generate(ctx, consensus.RoundUpdate{Round: round}, step)
 	require.False(t, scoreProposal.IsEmpty())
 }

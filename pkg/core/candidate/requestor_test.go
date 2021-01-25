@@ -36,7 +36,9 @@ func TestCandidateQueue(t *testing.T) {
 
 	// Getting a block when requesting should make it end up in the queue
 	c := config.DecodeGenesis()
+
 	req.setRequesting(true)
+
 	_, err = req.ProcessCandidate(message.New(topics.Candidate, *c))
 	assert.NoError(err)
 
@@ -54,14 +56,18 @@ func TestRequestor(t *testing.T) {
 	c := config.DecodeGenesis()
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+
 	bus.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+
 	cChan := make(chan block.Block, 1)
 
 	go func() {
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
 		defer cancel()
+
 		cm, err := req.RequestCandidate(ctx, c.Header.Hash)
 		assert.NoError(err)
+
 		cChan <- cm
 	}()
 

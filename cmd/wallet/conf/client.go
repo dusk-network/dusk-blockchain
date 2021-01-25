@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-// NodeClient holds node related fields
+// NodeClient holds node related fields.
 type NodeClient struct {
 	dialTimeout          int64
 	WalletClient         node.WalletClient
@@ -28,7 +28,7 @@ type NodeClient struct {
 	conn                 *grpc.ClientConn
 }
 
-// NewNodeClient returns a nodeClient with fixed dialTimeout of 5s
+// NewNodeClient returns a nodeClient with fixed dialTimeout of 5s.
 func NewNodeClient() *NodeClient {
 	return &NodeClient{
 		dialTimeout: 5,
@@ -36,9 +36,8 @@ func NewNodeClient() *NodeClient {
 }
 
 // Connect initializes a grpcClient to dusk-blockchain node grpc interface.
-// For over-tcp communication, it could enable TLS and Basic Authentication
+// For over-tcp communication, it could enable TLS and Basic Authentication.
 func (c *NodeClient) Connect(conf rpcConfiguration) error {
-
 	addr := conf.Address
 	if conf.Network == "unix" {
 		addr = "unix://" + conf.Address
@@ -56,9 +55,7 @@ func (c *NodeClient) Connect(conf rpcConfiguration) error {
 
 		credsOpt := grpc.WithTransportCredentials(transportCred)
 		dialOptions = append(dialOptions, credsOpt)
-
 	} else {
-
 		if conf.Network != "unix" {
 			// Insecure connection can be suitable only for unix socket
 			// transport where node and wallet-cli are co-deployed
@@ -70,15 +67,17 @@ func (c *NodeClient) Connect(conf rpcConfiguration) error {
 
 	// Init dial timeout
 	var dialCtx context.Context
+
 	if c.dialTimeout > 0 {
 		var cancel context.CancelFunc
+
 		dialCtx, cancel = context.WithTimeout(context.Background(),
 			time.Duration(c.dialTimeout)*time.Second)
 		defer cancel()
 	}
 
 	// Initialize Basic Auth.
-	// It requires secured transport by default
+	// It requires secured transport by default.
 	if len(conf.User) > 0 {
 		authOpt := grpc.WithPerRPCCredentials(basicAuth{
 			username: conf.User,
@@ -106,20 +105,20 @@ func (c *NodeClient) Connect(conf rpcConfiguration) error {
 	return nil
 }
 
-// Close conn
+// Close conn.
 func (c *NodeClient) Close() {
 	if c.conn != nil {
 		_ = c.conn.Close()
 	}
 }
 
-// Ping not yet implemented
+// Ping not yet implemented.
 func (c *NodeClient) Ping() error {
 	// TODO:
 	return nil
 }
 
-// basicAuth builds request metadata to provide HTTP Basic Authentication params
+// basicAuth builds request metadata to provide HTTP Basic Authentication params.
 type basicAuth struct {
 	username string
 	password string
@@ -129,6 +128,7 @@ type basicAuth struct {
 func (b basicAuth) GetRequestMetadata(ctx context.Context, in ...string) (map[string]string, error) {
 	auth := b.username + ":" + b.password
 	enc := base64.StdEncoding.EncodeToString([]byte(auth))
+
 	return map[string]string{
 		"authorization": "Basic " + enc,
 	}, nil

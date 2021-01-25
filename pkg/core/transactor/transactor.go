@@ -21,7 +21,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-//Transactor is the implementation of both the Waller and the Transactor GRPC servers
+// Transactor is the implementation of both the Waller and the Transactor GRPC servers.
 type Transactor struct { // TODO: rename
 	db database.DB
 	eb *eventbus.EventBus
@@ -77,9 +77,10 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 }
 
 // Listen to the stake and bid channels and trigger a stake and bid transaction
-// requests
+// requests.
 func (t *Transactor) Listen() {
 	l := log.WithField("action", "listen")
+
 	for {
 		select {
 		case r := <-t.stakeChan:
@@ -112,20 +113,20 @@ func (t *Transactor) GetTxHistory(ctx context.Context, e *node.EmptyRequest) (*n
 	return t.handleGetTxHistory()
 }
 
-// CreateWallet creates a new wallet from a password or seed
-// XXX: DEPRECATED
+// CreateWallet creates a new wallet from a password or seed.
+// XXX: DEPRECATED.
 func (t *Transactor) CreateWallet(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
 	return nil, nil
 }
 
-// LoadWallet from a password
-// XXX: DEPRECATED
+// LoadWallet from a password.
+// XXX: DEPRECATED.
 func (t *Transactor) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node.LoadResponse, error) {
 	return nil, nil
 }
 
-// CreateFromSeed creates a wallet from a seed
-// XXX: DEPRECATED
+// CreateFromSeed creates a wallet from a seed.
+// XXX: DEPRECATED.
 func (t *Transactor) CreateFromSeed(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
 	return nil, nil
 }
@@ -156,7 +157,7 @@ func (t *Transactor) Stake(ctx context.Context, c *node.StakeRequest) (*node.Tra
 }
 
 // GetWalletStatus returns whether or not the wallet is currently loaded.
-// XXX: DEPRECATED
+// XXX: DEPRECATED.
 func (t *Transactor) GetWalletStatus(ctx context.Context, e *node.EmptyRequest) (*node.WalletStatusResponse, error) {
 	return nil, nil
 }

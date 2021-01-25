@@ -23,7 +23,7 @@ func TestStepVotes(t *testing.T) {
 	k1 := genKeys(&set)
 	k2 := genKeys(&set)
 	subset := set
-	//inserting a third key in the set to better test packing and unpacking
+	// inserting a third key in the set to better test packing and unpacking
 	genKeys(&set)
 
 	bitset := set.Bits(subset)
@@ -77,6 +77,7 @@ func genKeys(set *sortedset.Set) key.Keys {
 
 func genReduction(hash []byte, set *sortedset.Set) ([]byte, []byte, uint8) {
 	k := genKeys(set)
+
 	s, err := bls.Sign(k.BLSSecretKey, k.BLSPubKey, hash)
 	if err != nil {
 		panic(err)

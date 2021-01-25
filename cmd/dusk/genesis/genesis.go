@@ -14,9 +14,10 @@ import (
 	"github.com/urfave/cli"
 )
 
-// Action prints a genesis
+// Action prints a genesis.
 func Action(c *cli.Context) error {
 	blk := cfg.DecodeGenesis()
+
 	b, err := json.MarshalIndent(blk, "", "  ")
 	if err != nil {
 		return err

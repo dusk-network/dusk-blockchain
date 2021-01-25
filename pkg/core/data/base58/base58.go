@@ -24,11 +24,11 @@ func EncodeAlphabet(bin []byte, alphabet *Alphabet) string {
 
 // Encoding encodes the passed bytes into a base58 encoded string.
 func Encoding(bin []byte) (string, error) {
-
 	BTCAlphabet, err := NewAlphabet(ab)
 	if err != nil {
 		return "", nil
 	}
+
 	return EncodingAlphabet(bin, BTCAlphabet), nil
 }
 
@@ -36,8 +36,8 @@ func Encoding(bin []byte) (string, error) {
 // string with the passed alphabet.
 func EncodingAlphabet(bin []byte, alphabet *Alphabet) string {
 	zero := alphabet.encode[0]
-
 	binsz := len(bin)
+
 	var i, j, zcount, high int
 	var carry uint32
 
@@ -46,23 +46,25 @@ func EncodingAlphabet(bin []byte, alphabet *Alphabet) string {
 	}
 
 	size := (binsz-zcount)*138/100 + 1
-	var buf = make([]byte, size)
+	buf := make([]byte, size)
 
 	high = size - 1
+
 	for i = zcount; i < binsz; i++ {
 		j = size - 1
 		for carry = uint32(bin[i]); j > high || carry != 0; j-- {
-			carry = carry + 256*uint32(buf[j])
+			carry += 256 * uint32(buf[j])
 			buf[j] = byte(carry % 58)
 			carry /= 58
 		}
+
 		high = j
 	}
 
 	for j = 0; j < size && buf[j] == 0; j++ {
 	}
 
-	var b58 = make([]byte, size-j+zcount)
+	b58 := make([]byte, size-j+zcount)
 
 	if zcount != 0 {
 		for i = 0; i < zcount; i++ {
@@ -90,11 +92,11 @@ func DecodeAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 
 // Decoding decodes the base58 encoded bytes.
 func Decoding(str string) ([]byte, error) {
-
 	BTCAlphabet, err := NewAlphabet(ab)
 	if err != nil {
 		return nil, err
 	}
+
 	return DecodingAlphabet(str, BTCAlphabet)
 }
 
@@ -126,7 +128,7 @@ func DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 		bytesleft = 4
 	}
 
-	var outi = make([]uint32, outisz)
+	outi := make([]uint32, outisz)
 
 	for i := 0; i < b58sz && b58u[i] == zero; i++ {
 		zcount++
@@ -136,6 +138,7 @@ func DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 		if r > 127 {
 			return nil, fmt.Errorf("High-bit set on invalid digit")
 		}
+
 		if alphabet.decode[r] == -1 {
 			return nil, fmt.Errorf("Invalid base58 digit (%q)", r)
 		}
@@ -162,6 +165,7 @@ func DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 		for mask := byte(bytesleft-1) * 8; mask <= 0x18; mask, cnt = mask-8, cnt+1 {
 			binu[cnt] = byte(outi[j] >> mask)
 		}
+
 		if j == 0 {
 			bytesleft = 4 // because it could be less than 4 the first time through
 		}
@@ -173,8 +177,10 @@ func DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 			if start < 0 {
 				start = 0
 			}
+
 			return binu[start:cnt], nil
 		}
 	}
+
 	return binu[:cnt], nil
 }

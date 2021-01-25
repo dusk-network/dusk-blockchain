@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// Ensure integrity of data between encoding and decoding
+// Ensure integrity of data between encoding and decoding.
 func TestEncodeDecodeTxRecord(t *testing.T) {
 	// FIXME: 459 - rework for RUSK integration
 	/*

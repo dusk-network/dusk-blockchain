@@ -16,7 +16,7 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
-// Test that the Header is a functional payload.Safe implementation
+// Test that the Header is a functional payload.Safe implementation.
 func TestCopy(t *testing.T) {
 	assert := assert.New(t)
 	red := header.Header{}
@@ -56,6 +56,7 @@ func TestUnMarshal(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	assert.NoError(header.Marshal(buf, header1))
+
 	header2 := header.Header{}
 	assert.NoError(header.Unmarshal(buf, &header2))
 

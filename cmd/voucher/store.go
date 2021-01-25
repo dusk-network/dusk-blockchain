@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Node defines the status of a Dusk node
+// Node defines the status of a Dusk node.
 type Node struct {
 	status          connStatus
 	lastSeen        string
@@ -27,7 +27,7 @@ const (
 	down   connStatus = 0
 )
 
-// max amount of ips we send to requesting nodes
+// max amount of ips we send to requesting nodes.
 var maxIPs = 10
 
 // DuskNodes contains a map to pointers to node elements, where their ip is used as key.
@@ -36,17 +36,18 @@ type DuskNodes struct {
 	Nodes map[string]*Node
 }
 
-// New creates a new instance of DuskNodes
+// New creates a new instance of DuskNodes.
 func New() *DuskNodes {
 	return &DuskNodes{
 		Nodes: make(map[string]*Node),
 	}
 }
 
-// BlackList sets the blacklist flag on the node with the provided ip
+// BlackList sets the blacklist flag on the node with the provided ip.
 func (d *DuskNodes) BlackList(ip string, flag bool) {
 	node := d.Get(ip)
 	bltime := ""
+
 	// reset the blacklist timer
 	if flag {
 		bltime = time.Now().Format(time.RFC3339)
@@ -66,23 +67,24 @@ func (d *DuskNodes) BlackList(ip string, flag bool) {
 
 	d.Lock()
 	defer d.Unlock()
+
 	d.Nodes[ip] = node
 }
 
-// IsBlackListed checks if a node is present in the blacklist
+// IsBlackListed checks if a node is present in the blacklist.
 func (d *DuskNodes) IsBlackListed(ip string) bool {
 	node := d.Get(ip)
 
 	if node == nil || !node.blackListed {
 		return false
 	}
+
 	return true
 }
 
-// Update updates the DuskNodes struct with the connecting node
+// Update updates the DuskNodes struct with the connecting node.
 func (d *DuskNodes) Update(ip string) *Node {
 	node := d.Get(ip)
-
 	if node == nil {
 		node = &Node{
 			status:      active,
@@ -93,19 +95,23 @@ func (d *DuskNodes) Update(ip string) *Node {
 		node.status = active
 		node.lastSeen = time.Now().Format(time.RFC3339)
 	}
+
 	d.Lock()
 	defer d.Unlock()
+
 	d.Nodes[ip] = node
 	return node
 }
 
-// Get returns a node if present in the internal node list
+// Get returns a node if present in the internal node list.
 func (d *DuskNodes) Get(ip string) *Node {
 	d.RLock()
 	defer d.RUnlock()
+
 	if node, ok := d.Nodes[ip]; ok {
 		return node
 	}
+
 	return nil
 }
 
@@ -123,23 +129,24 @@ func (d *DuskNodes) CheckUnBAN(ip string) (bool, error) {
 		if e != nil {
 			return false, e
 		}
+
 		duration := time.Since(bantime)
 		if duration.Hours() > 24 {
 			return true, nil
 		}
-
 	}
-	return false, nil
 
+	return false, nil
 }
 
 // DumpNodes returns a comma separated string of non-blacklisted, active IPs
 // of dusk nodes currently stored.
 func (d *DuskNodes) DumpNodes(connectedIP string) string {
-
 	ips := make([]string, 0, 1)
+
 	d.RLock()
 	defer d.RUnlock()
+
 	for ip, n := range d.Nodes {
 		if !n.blackListed && strings.TrimSpace(ip) != connectedIP &&
 			n.status == active {
@@ -160,6 +167,7 @@ func (d *DuskNodes) SetInactive(ip string) {
 	node := d.Get(ip)
 	if node != nil {
 		node.status = down
+
 		d.Lock()
 		d.Nodes[ip] = node
 		d.Unlock()

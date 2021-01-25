@@ -29,7 +29,7 @@ import (
 )
 
 func init() {
-	// suppressing logging due to expected errors
+	// Suppressing logging due to expected errors.
 	logrus.SetLevel(logrus.FatalLevel)
 }
 
@@ -39,7 +39,7 @@ func TestPingLoop(t *testing.T) {
 	bus := eventbus.New()
 	client, srv := net.Pipe()
 
-	//setup viper timeout
+	// setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
 
@@ -73,6 +73,7 @@ func TestPingLoop(t *testing.T) {
 	// We should eventually get a pong message out of responseChan2
 	for {
 		buf := <-responseChan2
+
 		topic, err := topics.Extract(&buf)
 		if err != nil {
 			t.Fatal(err)
@@ -85,15 +86,15 @@ func TestPingLoop(t *testing.T) {
 }
 
 // TestIncompleteChecksum ensures peer reader does not panic on
-// incomplete checksum buffer
+// incomplete checksum buffer.
 func TestIncompleteChecksum(t *testing.T) {
 	bus := eventbus.New()
 
 	// Set up reader factory
 	processor := NewMessageProcessor(bus)
 	factory := NewReaderFactory(processor)
-
 	peer, _, w, _ := testReader(t, factory)
+
 	defer func() {
 		_ = peer.Close()
 	}()
@@ -124,15 +125,15 @@ func TestIncompleteChecksum(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 
-// TestZeroLength ensures peer reader does not panic on 0 length field
+// TestZeroLength ensures peer reader does not panic on 0 length field.
 func TestZeroLength(t *testing.T) {
 	bus := eventbus.New()
 
 	// Set up reader factory
 	processor := NewMessageProcessor(bus)
 	factory := NewReaderFactory(processor)
-
 	peer, _, w, _ := testReader(t, factory)
+
 	defer func() {
 		_ = peer.Close()
 	}()
@@ -159,15 +160,15 @@ func TestZeroLength(t *testing.T) {
 }
 
 // TestOverflowLength
-// Ensure peer reader does not panic overflow length value
+// Ensure peer reader does not panic overflow length value.
 func TestOverflowLength(t *testing.T) {
 	bus := eventbus.New()
 
 	// Set up reader factory
 	processor := NewMessageProcessor(bus)
 	factory := NewReaderFactory(processor)
-
 	peer, _, w, _ := testReader(t, factory)
+
 	defer func() {
 		_ = peer.Close()
 	}()
@@ -187,15 +188,15 @@ func TestOverflowLength(t *testing.T) {
 }
 
 // TestInvalidPayload
-// Ensure peer reader does not panic on sending invalid payload to any topic
+// Ensure peer reader does not panic on sending invalid payload to any topic.
 func TestInvalidPayload(t *testing.T) {
 	bus := eventbus.New()
 
 	// Set up reader factory
 	processor := NewMessageProcessor(bus)
 	factory := NewReaderFactory(processor)
-
 	peer, _, w, _ := testReader(t, factory)
+
 	defer func() {
 		_ = peer.Close()
 	}()

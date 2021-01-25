@@ -17,11 +17,11 @@ import (
 )
 
 const (
-	// MaxFrameSize is set at 250000 bytes
+	// MaxFrameSize is set at 250000 bytes.
 	MaxFrameSize = uint64(250000)
 )
 
-//WriteFrame mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message
+// WriteFrame mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message.
 func WriteFrame(buf *bytes.Buffer, magic Magic, cs []byte) error {
 	ln := uint64(magic.Len() + checksum.Length + buf.Len())
 	if ln > MaxFrameSize {
@@ -57,9 +57,10 @@ func WriteFrame(buf *bytes.Buffer, magic Magic, cs []byte) error {
 }
 
 // ReadFrame extract the bytes representing the size of the packet and thus
-// read the amount of bytes specified by such prefix in little endianness
+// read the amount of bytes specified by such prefix in little endianness.
 func ReadFrame(r io.Reader) (uint64, error) {
 	var length uint64
+
 	sizeBytes := make([]byte, 8)
 	// this is used mainly for net.Conn, therefore io.ReadFull prevents weird
 	// unbuffered reads which would terminate the reading operation before

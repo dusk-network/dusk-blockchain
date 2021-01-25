@@ -20,23 +20,26 @@ type Certificate struct {
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
-// the message safe to publish to multiple subscribers
+// the message safe to publish to multiple subscribers.
 func (c *Certificate) Copy() *Certificate {
 	cert := EmptyCertificate()
 
 	if c.StepOneBatchedSig != nil {
 		copy(cert.StepOneBatchedSig, c.StepOneBatchedSig)
 	}
+
 	if c.StepTwoBatchedSig != nil {
 		copy(cert.StepTwoBatchedSig, c.StepTwoBatchedSig)
 	}
+
 	cert.Step = c.Step
 	cert.StepOneCommittee = c.StepOneCommittee
 	cert.StepTwoCommittee = c.StepTwoCommittee
+
 	return cert
 }
 
-// EmptyCertificate returns an empty Certificate instance
+// EmptyCertificate returns an empty Certificate instance.
 func EmptyCertificate() *Certificate {
 	return &Certificate{
 		StepOneBatchedSig: make([]byte, 33),
@@ -47,7 +50,7 @@ func EmptyCertificate() *Certificate {
 	}
 }
 
-// Equals returns true if both certificates are equal
+// Equals returns true if both certificates are equal.
 func (c *Certificate) Equals(other *Certificate) bool {
 	if other == nil {
 		return false

@@ -26,7 +26,9 @@ func TestSignAuthToken(t *testing.T) {
 
 	jb, err := tky.AsSignable()
 	assert.NoError(err)
+
 	tky.Sig = ed25519.Sign(sk, jb)
+
 	assert.True(tky.Verify(pk))
 }
 

@@ -16,18 +16,17 @@ import (
 type Header struct {
 	MsgType byte
 
-	// Remote peer details
+	// Remote peer details.
 	RemotePeerID    [IDLen]byte
 	RemotePeerNonce uint32
 	RemotePeerPort  uint16
 
-	// Reserved bytes for future use
+	// Reserved bytes for future use.
 	Reserved [2]byte
 }
 
-// MarshalBinary marshal wire header into bytes buffer, if valid
+// MarshalBinary marshal wire header into bytes buffer, if valid.
 func (h *Header) MarshalBinary(buf *bytes.Buffer) error {
-
 	if _, err := MsgTypeToString(h.MsgType); err != nil {
 		return errors.New("unknown message type")
 	}
@@ -67,9 +66,8 @@ func (h *Header) MarshalBinary(buf *bytes.Buffer) error {
 }
 
 // UnmarshalBinary umarshal wire header from bytes buffer, if valid
-// It ensures ID-nonce pair is correct
+// It ensures ID-nonce pair is correct.
 func (h *Header) UnmarshalBinary(buf *bytes.Buffer) error {
-
 	msgType, err := buf.ReadByte()
 	if err != nil {
 		return err

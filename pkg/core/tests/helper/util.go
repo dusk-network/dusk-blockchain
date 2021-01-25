@@ -23,6 +23,7 @@ func TxsToBuffer(t *testing.T, txs []transactions.ContractCall) *bytes.Buffer {
 	for _, tx := range txs {
 		buf := new(bytes.Buffer)
 		assert.NoError(transactions.Marshal(buf, tx))
+
 		_, err := whole.ReadFrom(buf)
 		assert.NoError(err)
 	}
@@ -30,12 +31,14 @@ func TxsToBuffer(t *testing.T, txs []transactions.ContractCall) *bytes.Buffer {
 	return whole
 }
 
-// RandomSlice returns a random slice of size `size`
+// RandomSlice returns a random slice of size `size`.
 func RandomSlice(size uint32) []byte {
 	randSlice := make([]byte, size)
+
 	_, err := rand.Read(randSlice)
 	if err != nil {
 		panic(err)
 	}
+
 	return randSlice
 }

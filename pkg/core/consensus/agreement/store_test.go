@@ -45,21 +45,26 @@ var test = []struct {
 func TestStore(t *testing.T) {
 	s := newStore()
 	steps := make([]uint8, 0)
+
 	for i, tt := range test {
 		steps = append(steps, tt.step)
+
 		mock := mockAgreement(tt.sig, tt.hash, tt.step)
 		if !assert.Equal(t, tt.storedAgreements, s.Insert(mock, 1)) {
 			assert.FailNow(t, fmt.Sprintf("store.Insertion failed at row: %d", i))
 		}
+
 		if !assert.True(t, s.Contains(mock)) {
 			assert.FailNow(t, fmt.Sprintf("store.Contains failed at row: %d", i))
 		}
+
 		if !assert.Equal(t, tt.storedAgreements, len(s.Get(tt.step))) {
 			assert.FailNow(t, fmt.Sprintf("store.Get failed at row: %d", i))
 		}
 	}
 
 	s.Clear()
+
 	for _, step := range steps {
 		if !assert.Nil(t, s.Get(step)) {
 			assert.FailNow(t, fmt.Sprintf("store.Clear failed to clean 0x%x", step))

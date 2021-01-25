@@ -25,10 +25,9 @@ const (
 	blockSinceArg  = "since"
 )
 
-// File purpose is to define all arguments and resolvers relevant to "blocks" query only
+// File purpose is to define all arguments and resolvers relevant to "blocks" query only.
 
-type blocks struct {
-}
+type blocks struct{}
 
 func (b blocks) getQuery() *graphql.Field {
 	return &graphql.Field{
@@ -56,8 +55,8 @@ func (b blocks) getQuery() *graphql.Field {
 		Resolve: b.resolve,
 	}
 }
-func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 
+func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 	// Retrieve DB conn from context
 	db, ok := p.Context.Value("database").(database.DB)
 	if !ok {
@@ -118,11 +117,10 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 }
 
 func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
-
 	txs := make([]queryTx, 0)
+
 	b, ok := p.Source.(*block.Block)
 	if ok {
-
 		// Retrieve DB conn from context
 		db, ok := p.Context.Value("database").(database.DB)
 		if !ok {
@@ -141,17 +139,18 @@ func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 					txs = append(txs, d)
 				}
 			}
+
 			return nil
 		})
 
 		return txs, err
 	}
+
 	return nil, errors.New("invalid source block")
 }
 
-// Fetch block headers by a list of hashes
+// Fetch block headers by a list of hashes.
 func (b blocks) fetchBlocksByHashes(db database.DB, hashes []interface{}) ([]*block.Block, error) {
-
 	blocks := make([]*block.Block, 0)
 	err := db.View(func(t database.Transaction) error {
 		for _, v := range hashes {
@@ -184,12 +183,10 @@ func (b blocks) fetchBlocksByHashes(db database.DB, hashes []interface{}) ([]*bl
 	return blocks, err
 }
 
-// Fetch block headers by a range of heights
+// Fetch block headers by a range of heights.
 func (b blocks) fetchBlocksByHeights(db database.DB, from, to int64) ([]*block.Block, error) {
-
 	blocks := make([]*block.Block, 0)
 	err := db.View(func(t database.Transaction) error {
-
 		var tip uint64
 		if from < 0 || to < 0 {
 			var err error
@@ -240,12 +237,11 @@ func (b blocks) fetchBlocksByHeights(db database.DB, from, to int64) ([]*block.B
 	return blocks, err
 }
 
-// Fetch block headers by a range of heights
+// Fetch block headers by a range of heights.
 func (b blocks) fetchBlocksByDate(db database.DB, sinceDate time.Time) ([]*block.Block, error) {
-
 	blocks := make([]*block.Block, 0)
-	err := db.View(func(t database.Transaction) error {
 
+	err := db.View(func(t database.Transaction) error {
 		const offset = 24 * 3600
 		height, err := t.FetchBlockHeightSince(sinceDate.Unix(), offset)
 		if err != nil {
@@ -271,11 +267,9 @@ func (b blocks) fetchBlocksByDate(db database.DB, sinceDate time.Time) ([]*block
 		blocks = append(blocks, b)
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
 	return blocks, err
-
 }

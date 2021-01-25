@@ -12,18 +12,18 @@ import (
 	"io"
 )
 
-// Topic defines a topic
+// Topic defines a topic.
 type Topic uint8
 
-// A list of all valid topics
+// A list of all valid topics.
 const (
-	// Standard topics
+	// Standard topics.
 	Version Topic = iota
 	VerAck
 	Ping
 	Pong
 
-	// Data exchange topics
+	// Data exchange topics.
 	GetData
 	GetBlocks
 	Tx
@@ -32,34 +32,33 @@ const (
 	MemPool
 	Inv
 
-	// Gossiped topics
+	// Gossiped topics.
 	Candidate
 	Score
 	Reduction
 	Agreement
 
-	// Peer topics
+	// Peer topics.
 	Gossip
 
-	// Error topics
+	// Error topics.
 	Unknown
 	Reject
 
-	//Internal
+	// Internal.
 	Quit
 	Log
 	Monitor
 	Test
 
-	// RPCBus topics
+	// RPCBus topics.
 	GetMempoolTxs
 	GetMempoolTxsBySize
 	SendMempoolTx
 	VerifyStateTransition
 	ExecuteStateTransition
 
-	// Cross-process RPCBus topics
-	// Wallet
+	// Cross-process RPCBus topics.
 	GetMempoolView
 	SendBidTx
 	SendStakeTx
@@ -75,13 +74,13 @@ const (
 	StartProfile
 	StopProfile
 
-	// Cross-network RPCBus topics
+	// Cross-network RPCBus topics.
 	GetCandidate
 
-	// Monitoring topics
+	// Monitoring topics.
 	SyncProgress
 
-	// Kadcast wire messaging
+	// Kadcast wire messaging.
 	Kadcast
 )
 
@@ -92,8 +91,8 @@ type topicBuf struct {
 }
 
 // Topics represents the associated string and byte representation respectively
-// of the Topic objects
-// NOTE: this needs to be in the same order in which the topics are declared
+// of the Topic objects.
+// NOTE: this needs to be in the same order in which the topics are declared.
 var Topics = [...]topicBuf{
 	{Version, *(bytes.NewBuffer([]byte{byte(Version)})), "version"},
 	{VerAck, *(bytes.NewBuffer([]byte{byte(VerAck)})), "verack"},
@@ -153,31 +152,33 @@ func init() {
 	checkConsistency(Topics[:])
 }
 
-// ToBuffer returns Topic as a Buffer
+// ToBuffer returns Topic as a Buffer.
 func (t Topic) ToBuffer() bytes.Buffer {
 	return Topics[int(t)].Buffer
 }
 
-// String representation of a known topic
+// String representation of a known topic.
 func (t Topic) String() string {
 	if len(Topics) > int(t) {
 		return Topics[t].str
 	}
+
 	return "unknown"
 }
 
 // StringToTopic turns a string into a Topic if the Topic is in the enum of known topics.
-// Return Unknown topic if the string is not coupled with any
+// Return Unknown topic if the string is not coupled with any of them.
 func StringToTopic(topic string) Topic {
 	for _, t := range Topics {
 		if t.Topic.String() == topic {
 			return t.Topic
 		}
 	}
+
 	return Unknown
 }
 
-// Prepend a topic to a binary-serialized form of a message
+// Prepend a topic to a binary-serialized form of a message.
 func Prepend(b *bytes.Buffer, t Topic) error {
 	var buf bytes.Buffer
 	if int(t) > len(Topics) {
@@ -189,20 +190,22 @@ func Prepend(b *bytes.Buffer, t Topic) error {
 	if _, err := b.WriteTo(&buf); err != nil {
 		return err
 	}
+
 	*b = buf
 	return nil
 }
 
-// Extract the topic from an io.Reader
+// Extract the topic from an io.Reader.
 func Extract(p io.Reader) (Topic, error) {
 	var cmdBuf [1]byte
 	if _, err := p.Read(cmdBuf[:]); err != nil {
 		return Reject, err
 	}
+
 	return Topic(cmdBuf[0]), nil
 }
 
-// Write a topic to a Writer
+// Write a topic to a Writer.
 func Write(r io.Writer, topic Topic) error {
 	_, err := r.Write([]byte{byte(topic)})
 	return err

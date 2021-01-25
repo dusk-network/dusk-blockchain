@@ -23,7 +23,7 @@ import (
 )
 
 func TestHandshake(t *testing.T) {
-	//setup viper timeout
+	// setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
 
@@ -40,6 +40,7 @@ func TestHandshake(t *testing.T) {
 
 	go func() {
 		responseChan := make(chan bytes.Buffer, 100)
+
 		peerReader := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan)
 		if err := peerReader.Accept(); err != nil {
 			panic(err)
@@ -47,11 +48,14 @@ func TestHandshake(t *testing.T) {
 	}()
 
 	time.Sleep(500 * time.Millisecond)
+
 	g := protocol.NewGossip(protocol.TestNet)
 	pw := NewWriter(client, g, eb)
+
 	defer func() {
 		_ = pw.Conn.Close()
 	}()
+
 	if err := pw.Handshake(); err != nil {
 		t.Fatal(err)
 	}

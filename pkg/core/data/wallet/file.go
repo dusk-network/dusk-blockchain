@@ -17,7 +17,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// saveEncrypted saves a []byte to a dat @file
+// saveEncrypted saves a []byte to a .dat file.
 func saveEncrypted(text []byte, password string, file string) error {
 	// Overwriting a seed file may cause loss of funds
 	if _, err := os.Stat(file); err == nil {
@@ -41,12 +41,11 @@ func saveEncrypted(text []byte, password string, file string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, text, nil), 0600)
+	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, text, nil), 0o600)
 }
 
-//fetchEncrypted load encrypted from file
+// fetchEncrypted load encrypted from file.
 func fetchEncrypted(password string, file string) ([]byte, error) {
-
 	digest := sha3.Sum256([]byte(password))
 
 	ciphertext, err := ioutil.ReadFile(file) //nolint

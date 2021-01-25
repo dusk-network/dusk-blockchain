@@ -39,14 +39,16 @@ func makeBucket(idlen uint8) bucket {
 // of the `bucket` and returns it's index on the entries
 // set and the `Peer` info that is hold on it.
 func (b bucket) findLRUPeerIndex() (int, uint64) {
-	var val = b.totalPeersPassed
+	val := b.totalPeersPassed
 	i := 0
+
 	for index, p := range b.entries {
 		if b.lru[p] <= val {
 			val = b.lru[p]
 			i = index
 		}
 	}
+
 	return i, val
 }
 
@@ -59,6 +61,7 @@ func (b *bucket) removePeerAtIndex(index int) []encoding.PeerInfo {
 	b.lruPresent[b.entries[index]] = false
 
 	b.entries[index] = b.entries[len(b.entries)-1]
+
 	// We do not need to put s[i] at the end, as it will be discarded anyway
 	return b.entries[:len(b.entries)-1]
 }
@@ -66,7 +69,6 @@ func (b *bucket) removePeerAtIndex(index int) []encoding.PeerInfo {
 // Adds a `Peer` to the `bucket` entries list.
 // the LRU policy.
 func (b *bucket) addPeer(peer encoding.PeerInfo) {
-
 	// Check if the entries set can hold more peers.
 	if len(b.entries) < int(DefaultMaxBucketPeers) {
 		// Insert it into the set if not present
@@ -75,11 +77,13 @@ func (b *bucket) addPeer(peer encoding.PeerInfo) {
 			b.entries = append(b.entries, peer)
 			b.lruPresent[peer] = true
 		}
+
 		// Store recently used peer.
 		b.lru[peer] = b.totalPeersPassed
 		b.totalPeersPassed++
 		return
 	}
+
 	// If the entries set is full, we perform
 	// LRU and remove a peer to include the new one.
 	//
@@ -87,7 +91,7 @@ func (b *bucket) addPeer(peer encoding.PeerInfo) {
 	// entries set
 	if !b.lruPresent[peer] {
 		// Search for the least recently used peer.
-		var index, _ = b.findLRUPeerIndex()
+		index, _ := b.findLRUPeerIndex()
 		// Remove it from the entries set and from
 		// the lruPresent map.
 		b.entries = b.removePeerAtIndex(index)
@@ -96,5 +100,6 @@ func (b *bucket) addPeer(peer encoding.PeerInfo) {
 		b.lruPresent[peer] = true
 		b.totalPeersPassed++
 	}
+
 	b.lru[peer] = b.totalPeersPassed
 }

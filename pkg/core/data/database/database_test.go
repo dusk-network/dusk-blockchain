@@ -17,7 +17,7 @@ import (
 
 const path = "mainnet"
 
-//TODO: #446 , shall this be refactored ?
+// TODO: #446 , shall this be refactored ?
 func TestPutGet(t *testing.T) {
 	assert := assert.New(t)
 

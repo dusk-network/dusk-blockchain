@@ -16,7 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
-// MarshalBlock marshals a block into a binary buffer
+// MarshalBlock marshals a block into a binary buffer.
 func MarshalBlock(r *bytes.Buffer, b *block.Block) error {
 	if err := MarshalHeader(r, b.Header); err != nil {
 		return err
@@ -49,7 +49,7 @@ func UnmarshalBlockMessage(r *bytes.Buffer, m SerializableMessage) error {
 	return nil
 }
 
-// UnmarshalBlock unmarshals a block from a binary buffer
+// UnmarshalBlock unmarshals a block from a binary buffer.
 func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
 	if err := UnmarshalHeader(r, b.Header); err != nil {
 		return err
@@ -72,13 +72,14 @@ func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
 		if err := transactions.Unmarshal(r, c); err != nil {
 			return err
 		}
+
 		b.Txs[i] = c
 	}
 
 	return nil
 }
 
-//MarshalHashable marshals the hashable part of the block into a binary buffer
+// MarshalHashable marshals the hashable part of the block into a binary buffer.
 func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 	if err := encoding.WriteUint8(r, h.Version); err != nil {
 		return err
@@ -103,7 +104,7 @@ func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 	return nil
 }
 
-// MarshalHeader marshals the header of a block into a binary buffer
+// MarshalHeader marshals the header of a block into a binary buffer.
 func MarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	if err := MarshalHashable(r, h); err != nil {
 		return err
@@ -124,7 +125,7 @@ func MarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	return nil
 }
 
-// UnmarshalHeader unmarshal a block header from a binary buffer
+// UnmarshalHeader unmarshal a block header from a binary buffer.
 func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	if err := encoding.ReadUint8(r, &h.Version); err != nil {
 		return err
@@ -138,6 +139,7 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	if err := encoding.ReadUint64LE(r, &timestamp); err != nil {
 		return err
 	}
+
 	h.Timestamp = int64(timestamp)
 
 	h.PrevBlockHash = make([]byte, 32)
@@ -167,7 +169,7 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	return nil
 }
 
-// MarshalCertificate marshals a certificate
+// MarshalCertificate marshals a certificate.
 func MarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 	if err := encoding.WriteBLS(r, c.StepOneBatchedSig); err != nil {
 		return err
@@ -192,7 +194,7 @@ func MarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 	return nil
 }
 
-// UnmarshalCertificate unmarshals a certificate
+// UnmarshalCertificate unmarshals a certificate.
 func UnmarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 	c.StepOneBatchedSig = make([]byte, 33)
 	if err := encoding.ReadBLS(r, c.StepOneBatchedSig); err != nil {

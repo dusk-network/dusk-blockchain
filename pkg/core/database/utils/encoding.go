@@ -17,11 +17,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 )
 
-var (
-	byteOrder = binary.LittleEndian
-)
+var byteOrder = binary.LittleEndian
 
-// EncodeBlockTx tries to serialize type, index and encoded value of transactions.ContractCall
+// EncodeBlockTx tries to serialize type, index and encoded value of transactions.ContractCall.
 func EncodeBlockTx(tx transactions.ContractCall, txIndex uint32) ([]byte, error) {
 	buf := new(bytes.Buffer)
 
@@ -47,7 +45,7 @@ func EncodeBlockTx(tx transactions.ContractCall, txIndex uint32) ([]byte, error)
 	return buf.Bytes(), nil
 }
 
-// DecodeBlockTx tries to deserialize the type, index and decoded value of a tx
+// DecodeBlockTx tries to deserialize the type, index and decoded value of a tx.
 func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.ContractCall, uint32, error) {
 	txIndex := uint32(math.MaxUint32)
 
@@ -59,6 +57,7 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Co
 	if err != nil {
 		return nil, txIndex, err
 	}
+
 	txReadType := transactions.TxType(typeBytes)
 
 	if typeFilter != database.AnyTxType {
@@ -78,10 +77,12 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Co
 	return tx, txIndex, err
 }
 
-// WriteUint32 Tx utility to use a Tx byteOrder on internal encoding
+// WriteUint32 Tx utility to use a Tx byteOrder on internal encoding.
 func WriteUint32(w io.Writer, value uint32) error {
 	var b [4]byte
+
 	byteOrder.PutUint32(b[:], value)
+
 	_, err := w.Write(b[:])
 	return err
 }
@@ -90,18 +91,22 @@ func WriteUint32(w io.Writer, value uint32) error {
 // byteOrder. The result is put into v.
 func ReadUint32(r io.Reader, v *uint32) error {
 	var b [4]byte
+
 	n, err := r.Read(b[:])
 	if err != nil || n != len(b) {
 		return err
 	}
+
 	*v = byteOrder.Uint32(b[:])
 	return nil
 }
 
-// WriteUint64 Tx utility to use a common byteOrder on internal encoding
+// WriteUint64 Tx utility to use a common byteOrder on internal encoding.
 func WriteUint64(w io.Writer, value uint64) error {
 	var b [8]byte
+
 	byteOrder.PutUint64(b[:], value)
+
 	_, err := w.Write(b[:])
 	return err
 }

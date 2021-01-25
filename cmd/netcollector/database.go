@@ -30,7 +30,6 @@ type database struct {
 }
 
 func (d *database) HandleNote(args *NoteArgs) error {
-
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -42,7 +41,8 @@ func (d *database) HandleNote(args *NoteArgs) error {
 		d.messages[args.MsgID] = &stats{
 			max:   args.Recv_at,
 			min:   args.Recv_at,
-			addrs: make(map[string]bool)}
+			addrs: make(map[string]bool),
+		}
 
 		d.messages[args.MsgID].addrs[args.Addr] = true
 		return nil
@@ -67,7 +67,7 @@ func (d *database) HandleNote(args *NoteArgs) error {
 }
 
 // printTPS calculates and prints Transactions Per Second metric
-// TPS = nodesCount/(lastTimeStamp - firstTimeStamp)
+// TPS = nodesCount/(lastTimeStamp - firstTimeStamp).
 func (d *database) printTPS(interval time.Duration) {
 	for {
 		time.Sleep(interval)
@@ -83,10 +83,12 @@ func (d *database) printTPS(interval time.Duration) {
 		for k := range d.messages {
 			keys = append(keys, k)
 		}
-		sort.Strings(keys)
 
+		sort.Strings(keys)
 		d.lock.RLock()
+
 		var averageTPS float64
+
 		for _, key := range keys {
 			m := d.messages[key]
 			nodesCount := len(m.addrs)

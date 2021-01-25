@@ -28,7 +28,7 @@ import (
 var lg = log.WithField("process", "candidate generator")
 
 // MaxTxSetSize defines the maximum amount of transactions.
-// It is TBD along with block size and processing.MaxFrameSize
+// It is TBD along with block size and processing.MaxFrameSize.
 const MaxTxSetSize = 150000
 
 // Generator is responsible for generating candidate blocks, and propagating them
@@ -42,7 +42,7 @@ type generator struct {
 	genPubKey *keys.PublicKey
 }
 
-// New creates a new block generator
+// New creates a new block generator.
 func New(e *consensus.Emitter, genPubKey *keys.PublicKey) Generator {
 	return &generator{
 		Emitter:   e,
@@ -59,7 +59,7 @@ func (bg *generator) regenerateCommittee(r consensus.RoundUpdate) [][]byte {
 	return r.P.CreateVotingCommittee(r.Round-1, r.LastCertificate.Step, size).MemberKeys()
 }
 
-// PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`
+// PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`.
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
 func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
@@ -68,6 +68,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.S
 		WithField("step", sev.State().Step)
 
 	committee := bg.regenerateCommittee(r)
+
 	blk, err := bg.Generate(sev, committee, r)
 	if err != nil {
 		log.
@@ -82,7 +83,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.S
 	return message.NewScore(sev, bg.Keys.BLSPubKeyBytes, r.Hash, *blk), nil
 }
 
-// Generate a Block
+// Generate a Block.
 func (bg *generator) Generate(sev message.ScoreProposal, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
 	return bg.GenerateBlock(r.Round, sev.Seed, sev.Proof, sev.Score, r.Hash, keys)
 }
@@ -120,6 +121,7 @@ func (bg *generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 			Error("failed to CalculateRoot")
 		return nil, err
 	}
+
 	candidateBlock.Header.TxRoot = root
 
 	// Generate the block hash
@@ -127,8 +129,8 @@ func (bg *generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 	if err != nil {
 		return nil, err
 	}
-	candidateBlock.Header.Hash = hash
 
+	candidateBlock.Header.Hash = hash
 	return candidateBlock, nil
 }
 
@@ -151,6 +153,7 @@ func (bg *generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 	if err != nil {
 		return nil, err
 	}
+
 	txs = append(txs, resp.([]transactions.ContractCall)...)
 
 	// Construct and append coinbase Tx to reward the generator

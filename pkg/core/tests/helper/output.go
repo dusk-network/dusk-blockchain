@@ -12,7 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
-// RandomOutput returns a random output for testing
+// RandomOutput returns a random output for testing.
 func RandomOutput(t *testing.T) *transactions.Note {
 	/*
 		seed := RandomSlice(t, 128)
@@ -36,7 +36,7 @@ func RandomOutput(t *testing.T) *transactions.Note {
 	return nil
 }
 
-// RandomOutputs returns a slice of random outputs for testing
+// RandomOutputs returns a slice of random outputs for testing.
 func RandomOutputs(t *testing.T, size int) []*transactions.Note {
 	/*
 

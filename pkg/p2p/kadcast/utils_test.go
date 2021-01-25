@@ -44,7 +44,6 @@ func TestWriteTCPFrameErr(t *testing.T) {
 }
 
 func TestReadTCPFrameErr(t *testing.T) {
-
 	frame := new(bytes.Buffer)
 
 	var b [4]byte
@@ -55,18 +54,18 @@ func TestReadTCPFrameErr(t *testing.T) {
 	if readPayload != nil {
 		t.Error("expect an nil payload ")
 	}
+
 	if err != ErrExceedMaxLen {
 		t.Error("expect frame size error")
 	}
 }
 
 // TestClassifyDistance compares classifyDistance result with the result of the
-// floor of log2 calculation over 64bits distances
+// floor of log2 calculation over 64bits distances.
 func TestClassifyDistance(t *testing.T) {
-
 	c := 0
-	for {
 
+	for {
 		b, _ := crypto.RandEntropy(8)
 		var distance [16]byte
 		copy(distance[:], b)
@@ -93,19 +92,21 @@ func TestClassifyDistance(t *testing.T) {
 }
 
 func TestGenerateRandomDelegates(t *testing.T) {
-
 	ip := [4]byte{127, 0, 0, 1}
 	id := [16]byte{1, 2, 3, 4}
 
 	in := make([]encoding.PeerInfo, 10)
 	for i := 0; i < len(in); i++ {
-		in[i] = encoding.PeerInfo{IP: ip,
+		in[i] = encoding.PeerInfo{
+			IP:   ip,
 			Port: uint16(i),
-			ID:   id}
+			ID:   id,
+		}
 	}
 
 	for i := 0; i < len(in); i++ {
 		var beta uint8 = uint8(i)
+
 		out := make([]encoding.PeerInfo, 0)
 		generateRandomDelegates(beta, in, &out)
 

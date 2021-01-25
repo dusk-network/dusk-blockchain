@@ -7,9 +7,8 @@
 package notifications
 
 import (
-	"time"
-
 	"container/list"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -20,7 +19,7 @@ import (
 
 const (
 	// Write deadline. After a write has timed out, the websocket state is
-	// corrupt and all future writes will return an error
+	// corrupt and all future writes will return an error.
 	writeDeadline = 3 * time.Second
 
 	maxTxsPerMsg = 15
@@ -29,7 +28,7 @@ const (
 var log = logger.WithField("process", "broker")
 
 // Broker is a pub/sub broker that keeps updated all subscribers (websocket
-// connections) with latest block accepted published by node layer
+// connections) with latest block accepted published by node layer.
 //
 // IMPL Notes:
 // Broker is implemented in a non-blocking manner. That means it should not be
@@ -38,24 +37,23 @@ var log = logger.WithField("process", "broker")
 type Broker struct {
 	id uint
 
-	// active clients subscribed for updates
+	// Active clients subscribed for updates.
 	clients *list.List
-	// max number of clients per a broker instance
+	// Max number of clients per a broker instance.
 	maxClientsCount uint
 
 	// ConnectionChan is a shared queue to buffer incoming websocket connections
-	// closing connChan will terminate the broker
+	// closing connChan will terminate the broker.
 	ConnectionChan chan wsConn
 
-	// Events
+	// Events.
 	eventBus          eventbus.Broker
 	acceptedBlockChan chan block.Block
 	acceptedBlockID   uint32
 }
 
-// NewBroker creates a new Broker instance
+// NewBroker creates a new Broker instance.
 func NewBroker(id uint, eventBus eventbus.Broker, maxClientsCount uint, connChan chan wsConn) *Broker {
-
 	b := new(Broker)
 	b.eventBus = eventBus
 	b.ConnectionChan = connChan
@@ -68,20 +66,18 @@ func NewBroker(id uint, eventBus eventbus.Broker, maxClientsCount uint, connChan
 
 // Run represents the main loop of the Broker, where block data get piped to
 // incoming connections. Connections are put in Idle state after 30 seconds of
-// inactivity
+// inactivity.
 func (b *Broker) Run() {
-
-	// Teardown procedure for the Broker
+	// Teardown procedure for the Broker.
 	defer func() {
-
 		// It's advisable to reset the broker state entirely.
 		// This would allow later to restart a broker without any leaks.
 		log.Infof("Terminating broker %d", b.id)
 
-		// Unsubscribe from all eventBus events
+		// Unsubscribe from all eventBus events.
 		b.eventBus.Unsubscribe(topics.AcceptedBlock, b.acceptedBlockID)
 
-		// Terminate all clients goroutines
+		// Terminate all clients goroutines.
 		for e := b.clients.Front(); e != nil; e = e.Next() {
 			c := e.Value.(*wsClient)
 			close(c.msgChan)
@@ -89,7 +85,6 @@ func (b *Broker) Run() {
 
 		// reset clients list
 		b.clients.Init()
-
 	}()
 
 	for {
@@ -101,6 +96,7 @@ func (b *Broker) Run() {
 				// Terminate the broker when the shared connChan is closed
 				return
 			}
+
 			b.handleConn(conn)
 		// new accepted block from node
 		case blk := <-b.acceptedBlockChan:
@@ -112,9 +108,8 @@ func (b *Broker) Run() {
 }
 
 // handleBlock handles the topics.AcceptedBlock event emitted from node layer.
-// It packs a json from the block and broadcast it to all active clients
+// It packs a json from the block and broadcast it to all active clients.
 func (b *Broker) handleBlock(blk block.Block) {
-
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("handleBlock recovered from err: %v", r)
@@ -132,9 +127,8 @@ func (b *Broker) handleBlock(blk block.Block) {
 }
 
 // handleConn handles a new websocket conn pushed from webserver layer It stores
-// the conn to list of active clients
+// the conn to list of active clients.
 func (b *Broker) handleConn(conn wsConn) {
-
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("handleConn recovered from err: %v", r)
@@ -171,7 +165,7 @@ func (b *Broker) handleConn(conn wsConn) {
 	// writers.
 	go c.writeLoop()
 
-	// Although, no message reading is necessary, we need to drain TCP receive buffer
+	// Although, no message reading is necessary, we need to drain TCP receive buffer.
 	go c.readLoop()
 }
 
@@ -179,9 +173,8 @@ func (b *Broker) handleIdle() {
 	log.Infof("Broker %d, active conn: %d", b.id, b.clients.Len())
 }
 
-// broadcastMessage propagates data to all active clients
+// broadcastMessage propagates data to all active clients.
 func (b *Broker) broadcastMessage(data string) {
-
 	if len(data) == 0 || b.clients.Len() == 0 {
 		return
 	}
@@ -195,16 +188,15 @@ func (b *Broker) broadcastMessage(data string) {
 	}
 }
 
-// reap cleans up clients list from inactive/closed connections
+// reap cleans up clients list from inactive/closed connections.
 func (b *Broker) reap() {
-
 	for e := b.clients.Front(); e != nil; {
-
 		c := e.Value.(*wsClient)
 
 		if c.IsClosed() {
 			closedElm := e
 			e = e.Next()
+
 			b.clients.Remove(closedElm)
 		} else {
 			e = e.Next()

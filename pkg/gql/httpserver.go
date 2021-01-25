@@ -41,13 +41,13 @@ type Server struct {
 	listener net.Listener
 	lmt      *limiter.Limiter
 
-	// Graphql utility
+	// Graphql utility.
 	schema *graphql.Schema
 
-	// Websocket connections pool
+	// Websocket connections pool.
 	pool *notifications.BrokerPool
 
-	// Node components
+	// Node components.
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 	db       database.DB
@@ -55,7 +55,6 @@ type Server struct {
 
 // NewHTTPServer instantiates a new NewHTTPServer to handle GraphQL queries.
 func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server, error) {
-
 	max := float64(cfg.Get().Gql.MaxRequestLimit)
 
 	srv := Server{
@@ -76,6 +75,7 @@ func (s *Server) Start() error {
 	}
 
 	conf := cfg.Get().Gql
+
 	if err := s.EnableGraphQL(mux); err != nil {
 		return err
 	}
@@ -102,7 +102,6 @@ func (s *Server) Start() error {
 
 // Listen on the http server.
 func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
-
 	conf := cfg.Get().Gql
 
 	log.WithField("net", conf.Network).
@@ -124,18 +123,17 @@ func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
 }
 
 // EnableGraphQL sets up the GraphQL service, wires the request handler, sets
-// the limiter, instantiates the Schema and creates a DB connection
+// the limiter, instantiates the Schema and creates a DB connection.
 func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
-
 	// GraphQL service
 	gqlHandler := func(w http.ResponseWriter, r *http.Request) {
-
 		if !s.started {
 			return
 		}
 
 		w.Header().Set("Connection", "close")
 		w.Header().Set("Content-Type", "application/json")
+
 		r.Close = true
 
 		handleQuery(s.schema, w, r, s.db)
@@ -160,9 +158,8 @@ func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
 }
 
 // EnableNotifications uses the configured amount of brokers and clients (per
-// broker) to push graphql notifications over websocket
+// broker) to push graphql notifications over websocket.
 func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
-
 	nc := cfg.Get().Gql.Notification
 
 	upgrader := &websocket.Upgrader{
@@ -182,7 +179,6 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 	s.pool = notifications.NewPool(s.eventBus, nc.BrokersNum, clientsPerBroker)
 
 	wsHandler := func(w http.ResponseWriter, r *http.Request) {
-
 		if !s.started {
 			return
 		}
@@ -192,6 +188,7 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 			log.WithError(err).Error("Failed to set websocket upgrade")
 			return
 		}
+
 		s.pool.PushConn(conn)
 	}
 
@@ -201,11 +198,12 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 	return nil
 }
 
-// Stop the server
+// Stop the server.
 func (s *Server) Stop() error {
-
 	s.started = false
+
 	s.pool.Close()
+
 	if err := s.listener.Close(); err != nil {
 		log.WithError(err).Error("error shutting down")
 		return err

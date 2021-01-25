@@ -43,7 +43,7 @@ func (g *Gossip) Process(m *bytes.Buffer) error {
 	return WriteFrame(m, g.Magic, cs)
 }
 
-// UnpackLength unwraps the incoming packet (likely from a net.Conn struct) and returns the length of the packet without reading the payload (which is left to the user of this method)
+// UnpackLength unwraps the incoming packet (likely from a net.Conn struct) and returns the length of the packet without reading the payload (which is left to the user of this method).
 func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 	packetLength, err := ReadFrame(r)
 	if err != nil {
@@ -70,8 +70,8 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 	return ln, nil
 }
 
-// ReadMessage reads from the connection
-// TODO: Replace ReadMessage with ReadFrame
+// ReadMessage reads from the connection.
+// TODO: Replace ReadMessage with ReadFrame.
 func (g *Gossip) ReadMessage(src io.Reader) ([]byte, error) {
 	length, err := g.UnpackLength(src)
 	if err != nil {
@@ -80,6 +80,7 @@ func (g *Gossip) ReadMessage(src io.Reader) ([]byte, error) {
 
 	// read a [length]byte from connection
 	buf := make([]byte, int(length))
+
 	_, err = io.ReadFull(src, buf)
 	if err != nil {
 		return nil, err
@@ -88,7 +89,7 @@ func (g *Gossip) ReadMessage(src io.Reader) ([]byte, error) {
 	return buf, err
 }
 
-// ReadFrame extract message from gossip frame, if no errors found
+// ReadFrame extract message from gossip frame, if no errors found.
 func (g *Gossip) ReadFrame(src io.Reader) ([]byte, error) {
 	length, err := g.UnpackLength(src)
 	if err != nil {
@@ -97,6 +98,7 @@ func (g *Gossip) ReadFrame(src io.Reader) ([]byte, error) {
 
 	// read a [length]byte from connection
 	buf := make([]byte, int(length))
+
 	_, err = io.ReadFull(src, buf)
 	if err != nil {
 		return nil, err

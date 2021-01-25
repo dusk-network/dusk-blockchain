@@ -8,13 +8,11 @@ package client
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/json"
 	"errors"
 	"sync"
-
-	"encoding/json"
 	"time"
-
-	"crypto/ed25519"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/hashset"
@@ -37,10 +35,9 @@ var log = logger.WithFields(logger.Fields{"prefix": "grpc"})
 // channel.
 // QUESTION: should this function be triggered everytime we wanna query
 // RUSK or the client can remain connected?
+// NOTE: the grpc client connections should be reused for the lifetime of
+// the client. For this reason, we do not set a timeout at this stage.
 func CreateStateClient(ctx context.Context, address string) (rusk.StateClient, *grpc.ClientConn) {
-	// NOTE: the grpc client connections should be reused for the lifetime of
-	// the client. For this reason, we do not set a timeout at this stage
-
 	// FIXME: create TLS channel here
 	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
@@ -101,14 +98,14 @@ func CreateStakeClient(ctx context.Context, address string) (rusk.StakeServiceCl
 }
 
 type (
-	// AuthClient is the client used to test the authorization service
+	// AuthClient is the client used to test the authorization service.
 	AuthClient struct {
 		service node.AuthClient
 		edPk    ed25519.PublicKey
 		edSk    ed25519.PrivateKey
 	}
 
-	// AuthClientInterceptor handles the authorization for the grpc systems
+	// AuthClientInterceptor handles the authorization for the grpc systems.
 	AuthClientInterceptor struct {
 		lock        sync.RWMutex
 		accessToken string
@@ -118,7 +115,7 @@ type (
 	}
 )
 
-// NewClient returns a new AuthClient and AuthClientInterceptor
+// NewClient returns a new AuthClient and AuthClientInterceptor.
 func NewClient(cc *grpc.ClientConn, edPk ed25519.PublicKey, edSk ed25519.PrivateKey) *AuthClient {
 	return &AuthClient{
 		service: node.NewAuthClient(cc),
@@ -127,7 +124,7 @@ func NewClient(cc *grpc.ClientConn, edPk ed25519.PublicKey, edSk ed25519.Private
 	}
 }
 
-// NewClientInterceptor injects the session to the outgoing requests
+// NewClientInterceptor injects the session to the outgoing requests.
 func NewClientInterceptor(edPk ed25519.PublicKey, edSk ed25519.PrivateKey) *AuthClientInterceptor {
 	return &AuthClientInterceptor{
 		openMethods: rpc.OpenRoutes,
@@ -136,11 +133,10 @@ func NewClientInterceptor(edPk ed25519.PublicKey, edSk ed25519.PrivateKey) *Auth
 	}
 }
 
-// CreateSession creates a JWT
+// CreateSession creates a JWT.
 func (c *AuthClient) CreateSession() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	return c.createSessionWithContext(ctx)
 }
 
@@ -159,7 +155,7 @@ func (c *AuthClient) createSessionWithContext(ctx context.Context) (string, erro
 	return res.GetAccessToken(), nil
 }
 
-// DropSession deletes the user PK from the set
+// DropSession deletes the user PK from the set.
 func (c *AuthClient) DropSession() error {
 	_, err := c.service.DropSession(context.Background(), &node.EmptyRequest{})
 	return err
@@ -173,7 +169,7 @@ func (i *AuthClientInterceptor) isSessionActive() bool {
 
 // Unary returns the grpc unary interceptor. It implictly saves the access
 // token when a new session is created and drops it when the session gets
-// explicitly dropped
+// explicitly dropped.
 func (i *AuthClientInterceptor) Unary() grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		if !i.openMethods.Has([]byte(method)) {
@@ -181,12 +177,15 @@ func (i *AuthClientInterceptor) Unary() grpc.UnaryClientInterceptor {
 			if err != nil {
 				return err
 			}
+
 			err = invoker(tky, method, req, reply, cc, opts...)
-			//following an explicit session drop, the session token is
-			//invalidated, no matter the error
+
+			// following an explicit session drop, the session token is
+			// invalidated, no matter the error
 			if method == rpc.DropSessionRoute {
 				i.invalidateToken()
 			}
+
 			return err
 		}
 
@@ -197,6 +196,7 @@ func (i *AuthClientInterceptor) Unary() grpc.UnaryClientInterceptor {
 			}
 
 			session := reply.(*node.Session)
+
 			i.SetAccessToken(session.GetAccessToken())
 			return nil
 		}
@@ -205,7 +205,7 @@ func (i *AuthClientInterceptor) Unary() grpc.UnaryClientInterceptor {
 	}
 }
 
-// SetAccessToken sets the session token in a threadsafe way
+// SetAccessToken sets the session token in a threadsafe way.
 func (i *AuthClientInterceptor) SetAccessToken(accessToken string) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
@@ -223,7 +223,7 @@ func (i *AuthClientInterceptor) invalidateToken() {
 // - Token: the jwt encoded access token
 // - time: the Unix time expressed as an int64
 // - signature: the ED25519 signature of the JSON marshaling of the AuthToken
-// object (without the signature, obviously)
+// object (without the signature, obviously).
 func (i *AuthClientInterceptor) attachToken(ctx context.Context) (context.Context, error) {
 	auth := rpc.AuthToken{
 		AccessToken: i.accessToken,
@@ -253,7 +253,7 @@ func (i *AuthClientInterceptor) attachToken(ctx context.Context) (context.Contex
 }
 
 // ScheduleRefreshToken is supposed to run in a goroutine. It refreshes the
-// session token according to the specified refresh frequency
+// session token according to the specified refresh frequency.
 func ScheduleRefreshToken(ctx context.Context, client *AuthClient, interceptor *AuthClientInterceptor, refresh time.Time, retries int, errChan chan error) {
 	for {
 		refreshCtx, cancel := context.WithDeadline(ctx, refresh)
@@ -263,6 +263,7 @@ func ScheduleRefreshToken(ctx context.Context, client *AuthClient, interceptor *
 			return
 		case <-refreshCtx.Done(): // time to recreate the Session
 			cancel() // avoiding goroutine leaks
+
 			sessionToken, err := refreshToken(ctx, client, 1*time.Second, retries)
 			if err != nil {
 				errChan <- err
@@ -294,12 +295,14 @@ func refreshToken(ctx context.Context, client *AuthClient, timeout time.Duration
 		// the context if it takes too long
 		sessionChan := make(chan string, 1)
 		iErrChan := make(chan error, 1)
+
 		go func() {
 			session, err := client.createSessionWithContext(reqCtx)
 			if err != nil {
 				iErrChan <- err
 				return
 			}
+
 			sessionChan <- session
 		}()
 

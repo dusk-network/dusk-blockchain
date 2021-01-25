@@ -20,8 +20,8 @@ import (
 // Test the behavior of the data broker, when it receives a GetData message.
 func TestSendData(t *testing.T) {
 	assert := assert.New(t)
-
 	_, db := lite.CreateDBConnection()
+
 	defer func() {
 		_ = db.Close()
 	}()
@@ -34,6 +34,7 @@ func TestSendData(t *testing.T) {
 
 	// Make a GetData and give it to the dataBroker
 	msg := createGetData(hashes...)
+
 	bufs, err := dataBroker.MarshalObjects(msg)
 	if err != nil {
 		t.Fatal(err)
@@ -41,6 +42,7 @@ func TestSendData(t *testing.T) {
 
 	// We should receive 5 new blocks from the broker
 	recvBlocks := make([]*block.Block, 0, 5)
+
 	for _, buf := range bufs {
 		// Check for correctness of topic
 		topic, _ := topics.Extract(&buf)
@@ -59,11 +61,13 @@ func TestSendData(t *testing.T) {
 	}
 }
 
-// TODO: probably specify somewhere a choice between block and tx type
+// TODO: probably specify somewhere a choice between block and tx type.
 func createGetData(hashes ...[]byte) message.Message {
 	inv := &message.Inv{}
+
 	for _, hash := range hashes {
 		inv.AddItem(message.InvTypeBlock, hash)
 	}
+
 	return message.New(topics.GetData, *inv)
 }

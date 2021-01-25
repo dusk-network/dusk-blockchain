@@ -22,7 +22,7 @@ import (
 
 var log = logger.WithFields(logger.Fields{"process": "rcudp"})
 
-// msgID alias
+// msgID alias.
 type msgID [8]byte
 
 type message struct {
@@ -31,10 +31,10 @@ type message struct {
 	recv_time int64
 }
 
-// MessageCollector callback to be run on a newly decoded message
+// MessageCollector callback to be run on a newly decoded message.
 type MessageCollector func(addr string, decoded []byte) error
 
-// UDPReader that supports decoding Raptor codes packets
+// UDPReader that supports decoding Raptor codes packets.
 type UDPReader struct {
 	lAddr *net.UDPAddr
 
@@ -44,7 +44,7 @@ type UDPReader struct {
 	collector MessageCollector
 }
 
-// NewUDPReader instantiate a UDP reader of raptor code packets
+// NewUDPReader instantiate a UDP reader of raptor code packets.
 func NewUDPReader(lAddr *net.UDPAddr, h MessageCollector) (*UDPReader, error) {
 	return &UDPReader{
 		objects:   make(map[msgID]*message),
@@ -53,9 +53,8 @@ func NewUDPReader(lAddr *net.UDPAddr, h MessageCollector) (*UDPReader, error) {
 	}, nil
 }
 
-// Serve reads data from UDP socket and tries to re-assemble the sourceObject
+// Serve reads data from UDP socket and tries to re-assemble the sourceObject.
 func (r *UDPReader) Serve() {
-
 	listener, err := net.ListenUDP("udp4", r.lAddr)
 	if err != nil {
 		log.Panic(err)
@@ -72,6 +71,7 @@ func (r *UDPReader) Serve() {
 
 	for {
 		b := make([]byte, maxPacketLen)
+
 		n, uAddr, err := listener.ReadFromUDP(b)
 		if err != nil {
 			log.WithError(err).Warn("Error on packet read")
@@ -83,13 +83,13 @@ func (r *UDPReader) Serve() {
 			if err := r.processPacket(*uAddr, b[:n]); err != nil {
 				log.WithError(err).Warn("Error on packet processing")
 			}
+
 			r.lock.Unlock()
 		}()
 	}
 }
 
 func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
-
 	defer func() {
 		if r := recover(); r != nil {
 			// Panicking here might be caused by corrupted packets
@@ -98,17 +98,19 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 	}()
 
 	p := Packet{}
+
 	buf := bytes.NewBuffer(data)
 	if err := p.unmarshalBinary(buf); err != nil {
 		return err
 	}
 
-	//log.WithField("receiver", r.lAddr.Port).
+	// log.WithField("receiver", r.lAddr.Port).
 	//	Infof("Received packet:  oID %s, bID %d, TL %d, NSS %d ",
 	//		hex.EncodeToString(p.objectID[:]), p.blockID, p.transferLength, p.NumSourceSymbols)
 
 	var m *message
 	var ok bool
+
 	if m, ok = r.objects[p.messageID]; !ok {
 		// Instantiate a new decoder for handling the packet
 		// a decoder per packet
@@ -152,7 +154,6 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 	if decoded != nil {
 		// The object(message) is reconstructed.
 		// Run callback to collect the message
-
 		msgID, err := hash.Xxhash(decoded)
 		if err != nil {
 			return err
@@ -166,26 +167,24 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 		if err := r.collector(srcAddr.String(), decoded); err != nil {
 			return err
 		}
-
-		// At that point in time, the object(message) is already decoded and
-		// collected. However, we can not delete it immediately. This is because
-		// more blocks of this message will probably arrive in the next second
-		// or two. Here the staleTimeout plays its role
 	}
+	// At that point in time, the object(message) is already decoded and
+	// collected. However, we can not delete it immediately. This is because
+	// more blocks of this message will probably arrive in the next second
+	// or two. Here the staleTimeout plays its role
+
 	return nil
 }
 
-// cleanup checks for stale and consumed messages. If found, deletes them
+// Cleanup checks for stale and consumed messages. If found, deletes them.
 func (r *UDPReader) cleanup() {
-
 	for {
-
 		time.Sleep(time.Duration(staleTimeout) * time.Second)
 
 		deletionList := make([][8]byte, 0)
+
 		r.lock.RLock()
 		for k, v := range r.objects {
-
 			// message not consumed and staleTimeout has been reached
 			if (time.Now().Unix() - v.recv_time) > staleTimeout {
 				deletionList = append(deletionList, k)
@@ -201,6 +200,7 @@ func (r *UDPReader) cleanup() {
 				}
 			}
 		}
+
 		r.lock.RUnlock()
 
 		if len(deletionList) == 0 {
@@ -212,12 +212,12 @@ func (r *UDPReader) cleanup() {
 		for _, key := range deletionList {
 			delete(r.objects, key)
 		}
+
 		r.lock.Unlock()
 	}
 }
 
 func addrEqual(a1, a2 net.UDPAddr) bool {
-
 	if !a1.IP.Equal(a2.IP) {
 		return false
 	}

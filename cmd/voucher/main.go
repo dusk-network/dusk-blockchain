@@ -53,5 +53,6 @@ func handlePanic() {
 	if r := recover(); r != nil {
 		log.WithError(fmt.Errorf("%+v", r)).Errorln("Application Voucher panic")
 	}
+
 	time.Sleep(time.Second * 1)
 }

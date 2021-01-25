@@ -13,10 +13,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 )
 
-// DecodeAddressToPublicKey will decode a []byte to rusk.PublicKey
+// DecodeAddressToPublicKey will decode a []byte to rusk.PublicKey.
 func DecodeAddressToPublicKey(in []byte) (*keys.StealthAddress, error) {
 	pk := keys.NewStealthAddress()
-	var buf = &bytes.Buffer{}
+	buf := &bytes.Buffer{}
+
 	_, err := buf.Write(in)
 	if err != nil {
 		return pk, err

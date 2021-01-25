@@ -18,7 +18,7 @@ import (
 
 // GenerateGenesisBlock is a developer utility for regenerating the genesis block
 // as they would be different per network type. Once a genesis block is
-// approved, its hex blob should be copied into config.TestNetGenesisBlob
+// approved, its hex blob should be copied into config.TestNetGenesisBlob.
 func GenerateGenesisBlock(e *consensus.Emitter, generatorPubKey *keys.PublicKey) (string, error) {
 	g := &generator{
 		Emitter:   e,

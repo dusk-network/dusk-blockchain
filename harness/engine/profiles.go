@@ -16,12 +16,12 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Profiles is a map with the node name as key and Profile function
+// Profiles is a map with the node name as key and Profile function.
 type Profiles map[string]func(index int, node *DuskNode, walletPath string)
 
 var profileList Profiles
 
-// Profile1 builds the default dusk.toml definition
+// Profile1 builds the default dusk.toml definition.
 func Profile1(index int, node *DuskNode, walletPath string) {
 	walletFileName := "wallet" + strconv.Itoa(index) + ".dat"
 
@@ -31,36 +31,36 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("general.safecallbacklistener", "false")
 	viper.Set("general.testharness", "true")
 
-	//bidautomaton.go
+	// bidautomaton.go
 	viper.Set("timeout.timeoutsendbidtx", 5)
-	//blockgenerator.go
+	// blockgenerator.go
 	viper.Set("timeout.timeoutgetlastcommittee", 5)
-	//blockgenerator.go
+	// blockgenerator.go
 	viper.Set("timeout.timeoutgetlastcertificate", 5)
-	//blockgenerator.go
+	// blockgenerator.go
 	viper.Set("timeout.timeoutgetmempooltxsbysize", 4)
-	//initiator.go
-	//sync.go
+	// initiator.go
+	// sync.go
 	viper.Set("timeout.timeoutgetlastblock", 5)
-	//aggregator.go
-	//candidatebroker.go
-	//chain.go
+	// aggregator.go
+	// candidatebroker.go
+	// chain.go
 	viper.Set("timeout.timeoutgetcandidate", 5)
-	//chain.go
+	// chain.go
 	viper.Set("timeout.timeoutclearwalletdatabase", 0)
-	//aggregator.go
+	// aggregator.go
 	viper.Set("timeout.timeoutverifycandidateblock", 5)
-	//stakeautomaton.go
+	// stakeautomaton.go
 	viper.Set("timeout.timeoutsendstaketx", 5)
-	//mempool.go datarequestor.go
+	// mempool.go datarequestor.go
 	viper.Set("timeout.timeoutgetmempooltxs", 3)
-	//roundresultsbroker.go
+	// roundresultsbroker.go
 	viper.Set("timeout.timeoutgetroundresults", 5)
-	//broker.go
+	// broker.go
 	viper.Set("timeout.timeoutbrokergetcandidate", 2)
-	//peer.go
+	// peer.go
 	viper.Set("timeout.timeoutreadwrite", 60)
-	//peer.go
+	// peer.go
 	viper.Set("timeout.timeoutkeepalivetime", 30)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
@@ -73,11 +73,13 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("gql.enabled", "true")
 
 	viper.Set("rpc.network", node.Cfg.RPC.Network)
+
 	if node.Cfg.RPC.Network == "unix" {
 		viper.Set("rpc.address", node.Dir+node.Cfg.RPC.Address)
 	} else {
 		viper.Set("rpc.address", node.Cfg.RPC.Address)
 	}
+
 	viper.Set("rpc.sessionDurationMins", node.Cfg.RPC.SessionDurationMins)
 	viper.Set("rpc.requireSession", node.Cfg.RPC.RequireSession)
 
@@ -109,26 +111,26 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("api.expirationtime", 300)
 }
 
-// Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing)
+// Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing).
 func Profile2(index int, node *DuskNode, walletPath string) {
 	Profile1(index, node, walletPath)
 	viper.Set("database.driver", lite.DriverName)
 }
 
-// Profile3 builds dusk.toml with kadcast enabled and gossip disabled
+// Profile3 builds dusk.toml with kadcast enabled and gossip disabled.
 func Profile3(index int, node *DuskNode, walletPath string) {
-
 	Profile1(index, node, walletPath)
-
 	viper.Set("kadcast.enabled", true)
-	basePortNumber := 10000
 
+	basePortNumber := 10000
 	laddr := getOutboundAddr(basePortNumber + index)
+
 	viper.Set("kadcast.address", laddr)
 	viper.Set("kadcast.maxDelegatesNum", 1)
 	viper.Set("kadcast.raptor", true)
 
 	bootstrappers := make([]string, 4)
+
 	bootstrappers[0] = getOutboundAddr(basePortNumber)
 	bootstrappers[1] = getOutboundAddr(basePortNumber + 1)
 	bootstrappers[2] = getOutboundAddr(basePortNumber + 2)
@@ -141,6 +143,7 @@ func getOutboundAddr(port int) string {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer func() {
 		_ = conn.Close()
 	}()

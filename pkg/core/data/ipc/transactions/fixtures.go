@@ -25,13 +25,13 @@ import (
 
 // PermissiveExecutor implements the transactions.Executor interface. It
 // simulates successful Validation and Execution of State transitions
-// all Validation and simulates
+// all Validation and simulates.
 type PermissiveExecutor struct {
 	height uint64
 	P      *user.Provisioners
 }
 
-// MockExecutor returns an instance of PermissiveExecutor
+// MockExecutor returns an instance of PermissiveExecutor.
 func MockExecutor(height uint64) *PermissiveExecutor {
 	return &PermissiveExecutor{
 		height: height,
@@ -40,35 +40,34 @@ func MockExecutor(height uint64) *PermissiveExecutor {
 }
 
 // VerifyStateTransition returns all ContractCalls passed
-// height. It returns those ContractCalls deemed valid
+// height. It returns those ContractCalls deemed valid.
 func (p *PermissiveExecutor) VerifyStateTransition(ctx context.Context, cc []ContractCall, height uint64) ([]ContractCall, error) {
 	return cc, nil
 }
 
 // ExecuteStateTransition performs a global state mutation and steps the
-// block-height up
+// block-height up.
 func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, height uint64) (user.Provisioners, error) {
 	return *p.P, nil
 }
 
-// GetProvisioners returns current state of provisioners
+// GetProvisioners returns current state of provisioners.
 func (p *PermissiveExecutor) GetProvisioners(ctx context.Context) (user.Provisioners, error) {
 	return *p.P, nil
 }
 
-// PermissiveProvisioner mocks verification of scores
-type PermissiveProvisioner struct {
-}
+// PermissiveProvisioner mocks verification of scores.
+type PermissiveProvisioner struct{}
 
-// VerifyScore returns nil all the time
+// VerifyScore returns nil all the time.
 func (p PermissiveProvisioner) VerifyScore(context.Context, uint64, uint8, blindbid.VerifyScoreRequest) error {
 	return nil
 }
 
-// MockBlockGenerator mocks a blockgenerator
+// MockBlockGenerator mocks a blockgenerator.
 type MockBlockGenerator struct{}
 
-// GenerateScore obeys the BlockGenerator interface
+// GenerateScore obeys the BlockGenerator interface.
 func (b MockBlockGenerator) GenerateScore(context.Context, blindbid.GenerateScoreRequest) (blindbid.GenerateScoreResponse, error) {
 	limit, _ := big.NewInt(0).SetString("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 16)
 	prove, _ := crypto.RandEntropy(256)
@@ -89,7 +88,7 @@ func (b MockBlockGenerator) GenerateScore(context.Context, blindbid.GenerateScor
 	}, nil
 }
 
-// MockProxy mocks a proxy for ease of testing
+// MockProxy mocks a proxy for ease of testing.
 type MockProxy struct {
 	P  Provisioner
 	Pr Provider
@@ -111,6 +110,7 @@ func (v *mockVerifier) VerifyTransaction(ctx context.Context, cc ContractCall) e
 	if IsMockInvalid(cc) {
 		return errors.New("Invalid transaction")
 	}
+
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (v *mockVerifier) CalculateBalance(ctx context.Context, vkBytes []byte, txs
 	return uint64(0), nil
 }
 
-// Prober returns a UnconfirmedTxProber that is capable of checking invalid mocked up transactions
+// Prober returns a UnconfirmedTxProber that is capable of checking invalid mocked up transactions.
 func (m MockProxy) Prober() UnconfirmedTxProber {
 	return &mockVerifier{}
 }
@@ -132,12 +132,14 @@ func (m MockProxy) Executor() Executor { return m.E }
 // BlockGenerator ...
 func (m MockProxy) BlockGenerator() BlockGenerator { return m.BG }
 
-// MockKeys mocks the keys
+// MockKeys mocks the keys.
 func MockKeys() (*keys.SecretKey, *keys.PublicKey) {
 	sk := keys.NewSecretKey()
 	pk := keys.NewPublicKey()
+
 	keys.USecretKey(RuskSecretKey(), sk)
 	keys.UPublicKey(RuskPublicKey(), pk)
+
 	return sk, pk
 }
 
@@ -145,7 +147,7 @@ func MockKeys() (*keys.SecretKey, *keys.PublicKey) {
 /** ContractCall **/
 /******************/
 
-// RandContractCall returns a random ContractCall
+// RandContractCall returns a random ContractCall.
 func RandContractCall() ContractCall {
 	switch RandTxType() {
 	case Stake:
@@ -166,8 +168,8 @@ func RandContractCall() ContractCall {
 // valid or not without RUSK, since syntactically wrong transactions would be
 // discarded when Unmarshalling.
 // The set is composed of Stake, Bid and normal Transactions.
-// If a coinbase is included, // an additional Distribute transaction is added
-// at the top. A coinbase is never invalid
+// If a coinbase is included, an additional Distribute transaction is added
+// at the top. A coinbase is never invalid.
 func RandContractCalls(amount, invalid int, includeCoinbase bool) []ContractCall {
 	if invalid > amount {
 		panic("inconsistent number of invalid transactions wrt the total amount")
@@ -179,8 +181,8 @@ func RandContractCalls(amount, invalid int, includeCoinbase bool) []ContractCall
 	}
 
 	for i := 0; i < invalid; {
-		// pick a random tx within the set and invalidate it until we reach the
-		// invalid amount
+		// Pick a random tx within the set and invalidate it until we reach the
+		// invalid amount.
 		idx, err := rand.Int(rand.Reader, big.NewInt(int64(amount)))
 		if err != nil {
 			panic(err)
@@ -206,7 +208,7 @@ func RandContractCalls(amount, invalid int, includeCoinbase bool) []ContractCall
 
 // RandTx returns a random transaction. The randomization includes the amount,
 // the fee, the blinding factor and whether the transaction is obfuscated or
-// otherwise
+// otherwise.
 func RandTx() *Transaction {
 	bf := make([]byte, 32)
 	if _, err := rand.Read(bf); err != nil {
@@ -219,7 +221,7 @@ func RandTx() *Transaction {
 // MockTx mocks a transfer transaction. For simplicity it includes a single
 // output with the amount specified. The blinding factor can be left to nil if
 // the test is not interested in Transaction equality/differentiation.
-// Otherwise it can be used to identify/differentiate the transaction
+// Otherwise it can be used to identify/differentiate the transaction.
 func MockTx(obfuscated bool, blindingFactor []byte, randomized bool) *Transaction {
 	ccTx := NewTransaction()
 	rtx := mockRuskTx(obfuscated, blindingFactor, randomized)
@@ -232,7 +234,7 @@ func MockTx(obfuscated bool, blindingFactor []byte, randomized bool) *Transactio
 /** DISTRIBUTE **/
 /****************/
 
-// RandDistributeTx creates a random distribute transaction
+// RandDistributeTx creates a random distribute transaction.
 func RandDistributeTx(reward uint64, provisionerNr int) *Transaction {
 	rew := reward
 	if reward == uint64(0) {
@@ -266,6 +268,7 @@ func RandDistributeTx(reward uint64, provisionerNr int) *Transaction {
 	tx.TxPayload.CallData = buf.Bytes()
 	tx.TxPayload.Nullifiers = make([]*common.BlsScalar, 0)
 	tx.TxType = Distribute
+
 	return tx
 }
 
@@ -274,23 +277,27 @@ func RandDistributeTx(reward uint64, provisionerNr int) *Transaction {
 /************/
 
 // RandStakeTx creates a random stake transaction. If the expiration
-// is <1, then it is randomly set
+// is <1, then it is randomly set.
 func RandStakeTx(expiration uint64) *Transaction {
 	if expiration < 1 {
 		expiration = RandUint64()
 	}
+
 	blsKey := make([]byte, 129)
 	if _, err := rand.Read(blsKey); err != nil {
 		panic(err)
 	}
+
 	return MockStakeTx(expiration, blsKey, true)
 }
 
-// MockStakeTx creates a StakeTransaction
+// MockStakeTx creates a StakeTransaction.
 func MockStakeTx(expiration uint64, blsKey []byte, randomized bool) *Transaction {
 	stx := NewTransaction()
 	rtx := mockRuskTx(false, Rand32Bytes(), randomized)
+
 	UTransaction(rtx, stx)
+
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64LE(buf, expiration); err != nil {
 		panic(err)
@@ -302,6 +309,7 @@ func MockStakeTx(expiration uint64, blsKey []byte, randomized bool) *Transaction
 
 	stx.TxPayload.CallData = buf.Bytes()
 	stx.TxType = Stake
+
 	return stx
 }
 
@@ -310,20 +318,22 @@ func MockStakeTx(expiration uint64, blsKey []byte, randomized bool) *Transaction
 /*********/
 
 // RandBidTx creates a random bid transaction. If the expiration
-// is <1, then it is randomly set
+// is <1, then it is randomly set.
 func RandBidTx(expiration uint64) *Transaction {
 	if expiration < 1 {
 		expiration = RandUint64()
 	}
+
 	return MockBidTx(expiration, Rand32Bytes(), Rand32Bytes(), true)
 }
 
-// MockBidTx creates a BidTransaction
+// MockBidTx creates a BidTransaction.
 func MockBidTx(expiration uint64, edPk, seed []byte, randomized bool) *Transaction {
 	stx := NewTransaction()
-	// amount is set directly in the underlying ContractCallTx
+	// Amount is set directly in the underlying ContractCallTx.
 	rtx := mockRuskTx(true, Rand32Bytes(), randomized)
 	UTransaction(rtx, stx)
+
 	buf := new(bytes.Buffer)
 
 	// M, Commitment, R
@@ -347,6 +357,7 @@ func MockBidTx(expiration uint64, edPk, seed []byte, randomized bool) *Transacti
 
 	stx.TxPayload.CallData = buf.Bytes()
 	stx.TxType = Bid
+
 	return stx
 }
 
@@ -358,6 +369,7 @@ func MockDeterministicBid(expiration uint64, edPk, seed []byte) *Transaction {
 	// amount is set directly in the underlying ContractCallTx
 	rtx := mockRuskTx(true, make([]byte, 32), false)
 	UTransaction(rtx, stx)
+
 	buf := new(bytes.Buffer)
 
 	// M, Commitment, R
@@ -381,6 +393,7 @@ func MockDeterministicBid(expiration uint64, edPk, seed []byte) *Transaction {
 
 	stx.TxPayload.CallData = buf.Bytes()
 	stx.TxType = Bid
+
 	return stx
 }
 
@@ -429,7 +442,7 @@ func mockRuskTx(obfuscated bool, blindingFactor []byte, randomized bool) *rusk.T
 	}
 }
 
-//RuskTx is the mock of a ContractCallTx
+// RuskTx is the mock of a ContractCallTx.
 func RuskTx() *rusk.Transaction {
 	return &rusk.Transaction{
 		TxPayload: &rusk.TransactionPayload{
@@ -452,11 +465,13 @@ func RuskTx() *rusk.Transaction {
 /** TX OUTPUTS AND NOTES **/
 /**************************/
 
-// MockTransparentOutput returns a transparent Note
+// MockTransparentOutput returns a transparent Note.
 func MockTransparentOutput(blindingFactor []byte) Note {
 	out := new(Note)
 	rto := mockRuskTransparentOutput(blindingFactor)
+
 	UNote(rto, out)
+
 	return *out
 }
 
@@ -464,12 +479,12 @@ func mockRuskTransparentOutput(blindingFactor []byte) *rusk.Note {
 	return RuskTransparentTxOut(blindingFactor)
 }
 
-// RuskTransparentTxOut is a transparent Tx Out Mock
+// RuskTransparentTxOut is a transparent Tx Out Mock.
 func RuskTransparentTxOut(blindingFactor []byte) *rusk.Note {
 	return RuskTransparentNote(blindingFactor)
 }
 
-// RuskTransparentNote is a transparent note
+// RuskTransparentNote is a transparent note.
 func RuskTransparentNote(blindingFactor []byte) *rusk.Note {
 	return &rusk.Note{
 		Nonce:      &rusk.BlsScalar{Data: make([]byte, 32)},
@@ -483,14 +498,15 @@ func RuskTransparentNote(blindingFactor []byte) *rusk.Note {
 	}
 }
 
-// MockOfuscatedOutput returns a Note with the amount hashed. To
+// MockObfuscatedOutput returns a Note with the amount hashed. To
 // allow for equality checking and retrieval, an encrypted blinding factor can
 // also be provided.
 // Despite the unsofisticated mocking, the hashing should be enough since the
 // node has no way to decode obfuscation as this is delegated to RUSK.
-func MockOfuscatedOutput(blindingFactor []byte) Note {
+func MockObfuscatedOutput(blindingFactor []byte) Note {
 	out := &Note{}
 	rto := mockRuskObfuscatedOutput(blindingFactor)
+
 	UNote(rto, out)
 	return *out
 }
@@ -499,7 +515,7 @@ func mockRuskObfuscatedOutput(blindingFactor []byte) *rusk.Note {
 	return RuskObfuscatedTxOut(blindingFactor)
 }
 
-// RuskObfuscatedTxOut is an encrypted Tx Out Mock
+// RuskObfuscatedTxOut is an encrypted Tx Out Mock.
 func RuskObfuscatedTxOut(blindingFactor []byte) *rusk.Note {
 	return &rusk.Note{
 		Nonce:      &rusk.BlsScalar{Data: make([]byte, 32)},
@@ -513,7 +529,7 @@ func RuskObfuscatedTxOut(blindingFactor []byte) *rusk.Note {
 	}
 }
 
-// RuskObfuscatedNote is an obfuscated note mock
+// RuskObfuscatedNote is an obfuscated note mock.
 func RuskObfuscatedNote() *rusk.Note {
 	return &rusk.Note{
 		Nonce:      &rusk.BlsScalar{Data: make([]byte, 32)},
@@ -612,14 +628,14 @@ func MockRuskFee(randomized bool) *rusk.Fee {
 /** TX INPUTS **/
 /***************/
 
-// RuskTransparentTxIn is a transparent Tx Input mock
+// RuskTransparentTxIn is a transparent Tx Input mock.
 func RuskTransparentTxIn() *rusk.BlsScalar {
 	return &rusk.BlsScalar{
 		Data: make([]byte, 32),
 	}
 }
 
-// RuskObfuscatedTxIn is an encrypted Tx Input Mock
+// RuskObfuscatedTxIn is an encrypted Tx Input Mock.
 func RuskObfuscatedTxIn() *rusk.BlsScalar {
 	return &rusk.BlsScalar{
 		Data: make([]byte, 32),
@@ -630,17 +646,17 @@ func RuskObfuscatedTxIn() *rusk.BlsScalar {
 /** INVALID **/
 /*************/
 
-// IsMockInvalid checks whether a ContractCall mock is invalid or not
+// IsMockInvalid checks whether a ContractCall mock is invalid or not.
 func IsMockInvalid(cc ContractCall) bool {
 	return bytes.Equal(cc.StandardTx().SpendingProof.Data, []byte("INVALID"))
 }
 
-// Invalidate a transaction by marking its Proof field as "INVALID"
+// Invalidate a transaction by marking its Proof field as "INVALID".
 func Invalidate(cc ContractCall) {
 	cc.StandardTx().SpendingProof.Data = []byte("INVALID")
 }
 
-// MockInvalidTx creates an invalid transaction
+// MockInvalidTx creates an invalid transaction.
 func MockInvalidTx() *Transaction {
 	tx := NewTransaction()
 
@@ -660,6 +676,7 @@ func MockInvalidTx() *Transaction {
 	tx.TxPayload.Notes = []*Note{output}
 	tx.TxPayload.Nullifiers = []*common.BlsScalar{input}
 	tx.TxPayload.SpendingProof.Data = []byte("INVALID")
+
 	return tx
 }
 
@@ -667,12 +684,13 @@ func MockInvalidTx() *Transaction {
 /** KEYS **/
 /**********/
 
-// RandKeys returns a syntactically correct (but semantically rubbish) keypair
+// RandKeys returns a syntactically correct (but semantically rubbish) keypair.
 func RandKeys() (keys.SecretKey, keys.PublicKey) {
 	sk := &rusk.SecretKey{
 		A: &rusk.JubJubScalar{Data: Rand32Bytes()},
 		B: &rusk.JubJubScalar{Data: Rand32Bytes()},
 	}
+
 	pk := &rusk.PublicKey{
 		AG: &rusk.JubJubCompressed{Data: Rand32Bytes()},
 		BG: &rusk.JubJubCompressed{Data: Rand32Bytes()},
@@ -680,12 +698,14 @@ func RandKeys() (keys.SecretKey, keys.PublicKey) {
 
 	tsk := new(keys.SecretKey)
 	keys.USecretKey(sk, tsk)
+
 	tpk := new(keys.PublicKey)
 	keys.UPublicKey(pk, tpk)
+
 	return *tsk, *tpk
 }
 
-// RuskPublicKey mocks rusk pk
+// RuskPublicKey mocks rusk pk.
 func RuskPublicKey() *rusk.PublicKey {
 	return &rusk.PublicKey{
 		AG: &rusk.JubJubCompressed{Data: make([]byte, 32)},
@@ -693,7 +713,7 @@ func RuskPublicKey() *rusk.PublicKey {
 	}
 }
 
-// RuskSecretKey mocks rusk sk
+// RuskSecretKey mocks rusk sk.
 func RuskSecretKey() *rusk.SecretKey {
 	return &rusk.SecretKey{
 		A: &rusk.JubJubScalar{Data: make([]byte, 32)},
@@ -705,40 +725,41 @@ func RuskSecretKey() *rusk.SecretKey {
 /** UTILITY **/
 /*************/
 
-// RandUint64 returns a random uint64
+// RandUint64 returns a random uint64.
 func RandUint64() uint64 {
 	bint64 := make([]byte, 8)
 	if _, err := rand.Read(bint64); err != nil {
 		panic(err)
 	}
+
 	return binary.LittleEndian.Uint64(bint64)
 }
 
 // RandBlind returns a random BlindingFactor (it is just an alias for
-// Rand32Bytes)
+// Rand32Bytes).
 var RandBlind = Rand32Bytes
 
-// RandBytes returns a random byte slice of the desired size
+// RandBytes returns a random byte slice of the desired size.
 func RandBytes(size int) []byte {
 	blind := make([]byte, 32)
 	if _, err := rand.Read(blind); err != nil {
 		panic(err)
 	}
-	return blind
 
+	return blind
 }
 
-// Rand32Bytes returns random 32 bytes
+// Rand32Bytes returns random 32 bytes.
 func Rand32Bytes() []byte {
 	return RandBytes(32)
 }
 
-// RandBool returns a random boolean
+// RandBool returns a random boolean.
 func RandBool() bool {
 	return RandUint64()&(1<<63) == 0
 }
 
-// RandTxType returns a random TxType
+// RandTxType returns a random TxType.
 func RandTxType() TxType {
 	t, err := rand.Int(rand.Reader, big.NewInt(8))
 	if err != nil {

@@ -15,13 +15,13 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 )
 
-// InvType is a byte describing the Inventory type
+// InvType is a byte describing the Inventory type.
 type InvType uint8
 
 var (
-	//InvTypeMempoolTx is the inventory type for unconfirmed Txs
+	// InvTypeMempoolTx is the inventory type for unconfirmed Txs.
 	InvTypeMempoolTx InvType = 0
-	// InvTypeBlock is the inventory type for confirmed Txs
+	// InvTypeBlock is the inventory type for confirmed Txs.
 	InvTypeBlock InvType = 1
 
 	supportedInvTypes = [2]InvType{
@@ -30,13 +30,13 @@ var (
 	}
 )
 
-// InvVect represents a request of sort for Inventory data
+// InvVect represents a request of sort for Inventory data.
 type InvVect struct {
 	Type InvType // Type of data
 	Hash []byte  // Hash of the data
 }
 
-// Inv contains a list of Inventory vector
+// Inv contains a list of Inventory vector.
 type Inv struct {
 	InvList []InvVect
 }
@@ -46,6 +46,7 @@ type Inv struct {
 func (i InvVect) Copy() payload.Safe {
 	hash := make([]byte, len(i.Hash))
 	copy(hash, i.Hash)
+
 	return &InvVect{
 		Type: i.Type,
 		Hash: hash,
@@ -63,7 +64,7 @@ func (inv Inv) Copy() payload.Safe {
 	return &Inv{list}
 }
 
-// Encode an Inventory request into a buffer
+// Encode an Inventory request into a buffer.
 func (inv *Inv) Encode(w *bytes.Buffer) error {
 	// NOTE: this is hardcoded due to recursive imports. this needs to be fixed
 	if uint32(len(inv.InvList)) > 10000 {
@@ -106,7 +107,7 @@ func UnmarshalInvMessage(r *bytes.Buffer, m SerializableMessage) error {
 	return nil
 }
 
-// Decode an Inventory from a buffer
+// Decode an Inventory from a buffer.
 func (inv *Inv) Decode(r *bytes.Buffer) error {
 	lenVect, e := encoding.ReadVarInt(r)
 	if e != nil {
@@ -118,6 +119,7 @@ func (inv *Inv) Decode(r *bytes.Buffer) error {
 	}
 
 	inv.InvList = make([]InvVect, lenVect)
+
 	for i := uint64(0); i < lenVect; i++ {
 		var invType uint8
 		if err := encoding.ReadUint8(r, &invType); err != nil {
@@ -139,12 +141,13 @@ func (inv *Inv) Decode(r *bytes.Buffer) error {
 	return nil
 }
 
-// AddItem to an Inventory
+// AddItem to an Inventory.
 func (inv *Inv) AddItem(t InvType, hash []byte) {
 	item := InvVect{
 		Type: t,
 		Hash: hash,
 	}
+
 	inv.InvList = append(inv.InvList, item)
 }
 
@@ -154,5 +157,6 @@ func supportedInvType(t InvType) bool {
 			return true
 		}
 	}
+
 	return false
 }

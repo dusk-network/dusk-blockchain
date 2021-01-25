@@ -84,8 +84,8 @@ func (r *Requestor) publishGetCandidate(hash []byte) error {
 	if err := topics.Prepend(buf, topics.GetCandidate); err != nil {
 		return err
 	}
-	msg := message.New(topics.GetCandidate, *buf)
-	r.publisher.Publish(topics.Gossip, msg)
+
+	r.publisher.Publish(topics.Gossip, message.New(topics.GetCandidate, *buf))
 	return nil
 }
 
@@ -98,6 +98,7 @@ func (r *Requestor) setRequesting(status bool) {
 func (r *Requestor) isRequesting() bool {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
+
 	req := r.requesting
 	return req
 }

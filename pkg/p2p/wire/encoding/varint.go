@@ -23,6 +23,7 @@ func ReadVarInt(r *bytes.Buffer) (uint64, error) {
 	}
 
 	var rv uint64
+
 	switch d {
 	case 0xff:
 		if err := ReadUint64LE(r, &rv); err != nil {
@@ -38,6 +39,7 @@ func ReadVarInt(r *bytes.Buffer) (uint64, error) {
 		if err := ReadUint32LE(r, &v); err != nil {
 			return 0, err
 		}
+
 		rv = uint64(v)
 
 		// Canonical encoding check
@@ -49,6 +51,7 @@ func ReadVarInt(r *bytes.Buffer) (uint64, error) {
 		if err := ReadUint16LE(r, &v); err != nil {
 			return 0, err
 		}
+
 		rv = uint64(v)
 
 		// Canonical encoding check
@@ -62,7 +65,7 @@ func ReadVarInt(r *bytes.Buffer) (uint64, error) {
 	return rv, nil
 }
 
-// WriteVarInt writes a CompactSize integer with a number of bytes depending on it's value
+// WriteVarInt writes a CompactSize integer with a number of bytes depending on it's value.
 func WriteVarInt(w *bytes.Buffer, v uint64) error {
 	if v < 0xfd {
 		return WriteUint8(w, uint8(v))
@@ -72,6 +75,7 @@ func WriteVarInt(w *bytes.Buffer, v uint64) error {
 		if err := WriteUint8(w, 0xfd); err != nil {
 			return err
 		}
+
 		return WriteUint16LE(w, uint16(v))
 	}
 
@@ -79,6 +83,7 @@ func WriteVarInt(w *bytes.Buffer, v uint64) error {
 		if err := WriteUint8(w, 0xfe); err != nil {
 			return err
 		}
+
 		return WriteUint32LE(w, uint32(v))
 	}
 
@@ -90,7 +95,7 @@ func WriteVarInt(w *bytes.Buffer, v uint64) error {
 }
 
 // VarIntEncodeSize returns the number of bytes needed to serialize a CompactSize int
-// of size v
+// of size v.
 func VarIntEncodeSize(v uint64) uint64 {
 	// Small enough to write in 1 byte (uint8)
 	if v < 0xfd {

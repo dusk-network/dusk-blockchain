@@ -16,42 +16,40 @@ import (
 )
 
 // Config package should avoid importing any dusk-go packages in order to
-// prevent any cyclic-dependency issues
+// prevent any cyclic-dependency issues.
 
 const (
-	// current working dir
+	// Current working dir.
 	searchPath1 = "."
-	// home datadir
+	// Home datadir.
 	searchPath2 = "$HOME/.dusk/"
 	testnet     = "testnet"
 )
 
-var (
-	r *Registry
-)
+var r *Registry
 
-// Base configurations structure
+// Base configurations structure.
 type Base struct {
-	// UsedConfigFile points at the loaded config file
+	// UsedConfigFile points at the loaded config file.
 	UsedConfigFile string
 	// FixedConfigFile fixes the config file to be loaded. If not set,
-	// the default search-for-config procedure is used
+	// the default search-for-config procedure is used.
 	FixedConfigFile string
 
 	// name for the config file. Does not include extension.
 	ConfigFileName string
 
-	// custom commandline loader
+	// custom commandline loader.
 	//nolint
 	loadFlagsFn func() (string, error)
 }
 
 // Registry stores all loaded configurations according to the config order
-// NB It should be cheap to be copied by value
+// NB It should be cheap to be copied by value.
 type Registry struct {
 	Base
 
-	// All configuration groups
+	// All configuration groups.
 	General   generalConfiguration
 	Timeout   timeoutConfiguration
 	Database  databaseConfiguration
@@ -83,9 +81,8 @@ type Registry struct {
 //  - default
 //
 // Dusk configuration file can be in form of TOML, JSON, YAML, HCL or Java
-// properties config files
+// properties config files.
 func Load(configFileName string, secondary interface{}, customflags func() (string, error)) error {
-
 	r = new(Registry)
 	r.lock = new(sync.RWMutex)
 	r.ConfigFileName = configFileName
@@ -102,25 +99,21 @@ func Load(configFileName string, secondary interface{}, customflags func() (stri
 
 	// Validation and defaulting should be done by the consumers (packages) as
 	// they will be the best at knowing what they expect
-
 	return nil
 }
 
 // LoadFromFile unmarshalls configPath file into a new Registry instance
-// NB. It does not overwrite the global Registry
+// NB. It does not overwrite the global Registry.
 func LoadFromFile(configPath string) (Registry, error) {
-
 	registry := Registry{}
 	registry.lock = new(sync.RWMutex)
 	registry.FixedConfigFile = configPath
 
-	// Initialization
-	err := registry.init(nil)
-	return registry, err
+	return registry, registry.init(nil)
 }
 
 // Get returns registry by value in order to avoid further modifications after
-// initial configuration loading
+// initial configuration loading.
 func Get() Registry {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
@@ -128,7 +121,6 @@ func Get() Registry {
 }
 
 func (r *Registry) init(secondary interface{}) error {
-
 	// Make an attempt to find dusk.toml/dusk.json/dusk.yaml in any of the
 	// provided paths below
 	viper.SetConfigName(r.ConfigFileName)
@@ -141,6 +133,7 @@ func (r *Registry) init(secondary interface{}) error {
 	confFile := r.FixedConfigFile
 	if len(confFile) == 0 {
 		var err error
+
 		confFile, err = r.loadFlagsFn()
 		if err != nil {
 			return err
@@ -175,22 +168,22 @@ func (r *Registry) init(secondary interface{}) error {
 	}
 
 	r.UsedConfigFile = viper.ConfigFileUsed()
-
 	return nil
 }
 
 func loadFlags() (string, error) {
-
 	pflag.CommandLine.Init("Dusk node", pflag.ExitOnError)
 
 	pflag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage of %s:\n", "Dusk node")
+
 		pflag.PrintDefaults()
 	}
 
 	// Define all supported flags.
 	// All flags should be verified `loader_test.go/TestSupportedFlags`
 	defineFlags()
+
 	configFile := pflag.String("config", "", "Set path to the config file")
 
 	// Bind all command line parameters to their corresponding file configs
@@ -202,12 +195,11 @@ func loadFlags() (string, error) {
 	}
 
 	pflag.Parse()
-
 	return *configFile, nil
 }
 
 // define a set of flags as bindings to config file settings
-// The settings that are needed to be passed frequently by CLI should be added here
+// The settings that are needed to be passed frequently by CLI should be added here.
 func defineFlags() {
 	_ = pflag.StringP("logger.level", "l", "", "override logger.level settings in config file")
 	_ = pflag.StringP("general.network", "n", testnet, "override general.network settings in config file")
@@ -220,9 +212,8 @@ func defineFlags() {
 	_ = pflag.StringP("gql.port", "q", "9500", "sets gql server port")
 }
 
-// define a set of environment variables as bindings to config file settings
+// define a set of environment variables as bindings to config file settings.
 func defineENV() {
-
 	// Bind config key general.network to ENV var DUSK_GENERAL_NETWORK
 	if err := viper.BindEnv("general.network", "DUSK_GENERAL_NETWORK"); err != nil {
 		fmt.Printf("defineENV %v", err)
@@ -247,8 +238,10 @@ func Mock(m *Registry) {
 	if m.lock == nil {
 		m.lock = new(sync.RWMutex)
 	}
+
 	r.lock.Lock()
 	defer r.lock.Unlock()
+
 	r = m
 }
 

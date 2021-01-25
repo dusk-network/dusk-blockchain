@@ -11,7 +11,7 @@ import (
 	lg "github.com/sirupsen/logrus"
 )
 
-// Subscriber subscribes a channel to Event notifications on a specific topic
+// Subscriber subscribes a channel to Event notifications on a specific topic.
 type Subscriber interface {
 	Subscribe(topic topics.Topic, listener Listener) uint32
 	Unsubscribe(topics.Topic, uint32)

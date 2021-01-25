@@ -20,14 +20,14 @@ import (
 type Direction uint8
 
 const (
-	// In identifies incoming transaction
+	// In identifies incoming transaction.
 	In Direction = iota
-	// Out identifies outgoing transaction
+	// Out identifies outgoing transaction.
 	Out
 )
 
 // TxMeta is a convenience structure which groups fields common to the TxView
-// and the TxRecord
+// and the TxRecord.
 type TxMeta struct {
 	Height    uint64
 	Direction Direction
@@ -44,7 +44,7 @@ type TxRecord struct {
 	Transaction transactions.ContractCall
 }
 
-// TxView is the UX-friendly structure to be served to the UI requesting them
+// TxView is the UX-friendly structure to be served to the UI requesting them.
 type TxView struct {
 	TxMeta
 	Type       transactions.TxType
@@ -56,7 +56,7 @@ type TxView struct {
 	Obfuscated bool
 }
 
-// New creates a TxRecord
+// New creates a TxRecord.
 func New(call transactions.ContractCall, height uint64, direction Direction) *TxRecord {
 	return &TxRecord{
 		Transaction: call,
@@ -68,7 +68,7 @@ func New(call transactions.ContractCall, height uint64, direction Direction) *Tx
 	}
 }
 
-// View returns a UI consumable representation of a TXRecord
+// View returns a UI consumable representation of a TXRecord.
 func (t TxRecord) View() TxView {
 	h, err := t.Transaction.CalculateHash()
 	if err != nil {
@@ -96,7 +96,7 @@ func (t TxRecord) View() TxView {
 	return view
 }
 
-// Encode the TxRecord into a buffer
+// Encode the TxRecord into a buffer.
 func Encode(b *bytes.Buffer, t *TxRecord) error {
 	if err := binary.Write(b, binary.LittleEndian, t.Direction); err != nil {
 		return err
@@ -117,7 +117,7 @@ func Encode(b *bytes.Buffer, t *TxRecord) error {
 	return nil
 }
 
-// Decode a TxRecord from a buffer
+// Decode a TxRecord from a buffer.
 func Decode(b *bytes.Buffer, t *TxRecord) error {
 	if err := binary.Read(b, binary.LittleEndian, &t.Direction); err != nil {
 		return err

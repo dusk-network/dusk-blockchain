@@ -27,8 +27,7 @@ import (
 // Test that the maintainer will properly send new bid transactions, when
 // one is about to expire, or if none exist.
 func TestMaintainBids(t *testing.T) {
-
-	//setup viper timeout
+	// setup viper timeout
 	cwd, err := os.Getwd()
 	require.Nil(t, err)
 
@@ -37,6 +36,7 @@ func TestMaintainBids(t *testing.T) {
 	cfg.Mock(&r)
 
 	bus, rb := setupMaintainerTest(t)
+
 	defer func() {
 		_ = os.Remove("wallet.dat")
 		_ = os.RemoveAll("walletDB")
@@ -65,8 +65,8 @@ func TestMaintainBids(t *testing.T) {
 	select {
 	case <-c:
 		t.Fatal("was not supposed to get a tx in c")
+	// success
 	case <-time.After(1 * time.Second):
-		// success
 	}
 
 	// Send another round update that is within the 'offset', to trigger sending a new tx
@@ -99,6 +99,7 @@ func catchStakeRequest(rb *rpcbus.RPCBus, respChan chan struct{}) {
 	go func() {
 		<-c
 		respChan <- struct{}{}
+
 		rb.Deregister(topics.SendBidTx)
 	}()
 }

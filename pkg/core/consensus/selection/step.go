@@ -27,7 +27,7 @@ import (
 
 var lg = log.WithField("process", "selector")
 
-// Phase is the implementation of the Selection step component
+// Phase is the implementation of the Selection step component.
 type Phase struct {
 	*consensus.Emitter
 	handler   Handler
@@ -46,7 +46,7 @@ type Phase struct {
 
 // New creates and launches the component which responsibility is to validate
 // and select the best score among the blind bidders. The component publishes under
-// the topic BestScoreTopic
+// the topic BestScoreTopic.
 func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emitter, timeout time.Duration, db database.DB) *Phase {
 	selector := &Phase{
 		Emitter:     e,
@@ -59,6 +59,7 @@ func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emi
 
 		next: next,
 	}
+
 	CUSTOM_SELECTOR_TIMEOUT := os.Getenv("CUSTOM_SELECTOR_TIMEOUT")
 	if CUSTOM_SELECTOR_TIMEOUT != "" {
 		customTimeout, err := strconv.Atoi(CUSTOM_SELECTOR_TIMEOUT)
@@ -66,6 +67,7 @@ func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emi
 			log.
 				WithField("customTimeout", customTimeout).
 				Info("selector will set a custom timeout")
+
 			selector.timeout = time.Duration(customTimeout) * time.Second
 		} else {
 			log.
@@ -79,7 +81,7 @@ func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emi
 }
 
 // Initialize returns the Phase state function for the next phase, and initializes it
-// with the result from this phase
+// with the result from this phase.
 func (p *Phase) Initialize(_ consensus.InternalPacket) consensus.PhaseFn {
 	return p
 }
@@ -113,13 +115,13 @@ func (p *Phase) generateCandidate(ctx context.Context, round consensus.RoundUpda
 	internalScoreChan <- message.New(topics.Score, *scr)
 }
 
-// String as required by the interface PhaseFn
+// String as required by the interface PhaseFn.
 func (p *Phase) String() string {
 	return "selection"
 }
 
-// Run executes the logic for this phase
-// In this case the selection listens to new Score/Candidate messages
+// Run executes the logic for this phase.
+// In this case the selection listens to new Score/Candidate messages.
 func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	ctx, cancel := context.WithCancel(parentCtx)
 	// this makes sure that the internal score channel gets canceled
@@ -137,6 +139,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 	p.handler = NewScoreHandler(p.provisioner)
 	timeoutChan := time.After(p.timeout)
+
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Score {
 			p.collectScore(ctx, ev.Payload().(message.Score))
@@ -183,6 +186,7 @@ func (p *Phase) endSelection(_ uint64, _ uint8) consensus.PhaseFn {
 	}
 
 	log.Debug("endSelection, p.next.Fn(p.bestEvent)")
+
 	e := p.bestEvent
 	p.bestEvent = message.EmptyScore()
 	return p.next.Initialize(e)
@@ -232,7 +236,7 @@ func (p *Phase) collectScore(ctx context.Context, sc message.Score) {
 	p.bestEvent = sc
 }
 
-// increaseTimeOut increases the timeout after a failed selection
+// increaseTimeOut increases the timeout after a failed selection.
 func (p *Phase) increaseTimeOut() {
 	p.timeout = p.timeout * 2
 	if p.timeout > 60*time.Second {
@@ -241,8 +245,10 @@ func (p *Phase) increaseTimeOut() {
 			WithField("round", p.bestEvent.State().Round).
 			WithField("timeout", p.timeout).
 			Error("max_timeout_reached")
+
 		p.timeout = 60 * time.Second
 	}
+
 	lg.
 		WithField("step", p.bestEvent.State().Step).
 		WithField("round", p.bestEvent.State().Round).
@@ -277,6 +283,7 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 			}).
 			Debugln("storing future event for later")
 		queue.PutEvent(hdr.Round, hdr.Step, m)
+
 		return false
 	}
 

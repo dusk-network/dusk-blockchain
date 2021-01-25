@@ -12,7 +12,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 	errSigMethodMismatch = errors.New("wrong signature scheme used")
 )
 
-// JWTManager is a simple struct for managing the JWT token lifecycle
+// JWTManager is a simple struct for managing the JWT token lifecycle.
 type JWTManager struct {
 	pk        ed25519.PublicKey
 	sk        ed25519.PrivateKey
@@ -29,7 +29,7 @@ type JWTManager struct {
 }
 
 // ClientClaims is a simple extension of jwt.StandardClaims that includes the
-// ED25519 public key of a client
+// ED25519 public key of a client.
 type ClientClaims struct {
 	jwt.StandardClaims
 	ClientEdPk string `json:"client-edpk"`
@@ -42,7 +42,7 @@ func init() {
 	})
 }
 
-// NewJWTManager creates a JWTManager
+// NewJWTManager creates a JWTManager.
 func NewJWTManager(duration time.Duration) (*JWTManager, error) {
 	pk, sk, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -56,7 +56,7 @@ func NewJWTManager(duration time.Duration) (*JWTManager, error) {
 	}, nil
 }
 
-// Generate a session token used by the client to authenticate
+// Generate a session token used by the client to authenticate.
 func (m *JWTManager) Generate(edPkBase64 string) (string, error) {
 	claims := ClientClaims{
 		StandardClaims: jwt.StandardClaims{
@@ -69,7 +69,7 @@ func (m *JWTManager) Generate(edPkBase64 string) (string, error) {
 	return token.SignedString(m.sk)
 }
 
-// Verify the session token
+// Verify the session token.
 func (m *JWTManager) Verify(accessToken string) (*ClientClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		accessToken,
@@ -82,7 +82,6 @@ func (m *JWTManager) Verify(accessToken string) (*ClientClaims, error) {
 			return m.pk, nil
 		},
 	)
-
 	if err != nil {
 		log.WithError(err).Warnln("invalid token")
 		return nil, errInvalidToken
@@ -93,23 +92,24 @@ func (m *JWTManager) Verify(accessToken string) (*ClientClaims, error) {
 		log.WithError(err).Warnln("invalid claim")
 		return nil, errInvalidToken
 	}
+
 	return claims, nil
 }
 
 // SigningMethodEdDSA is the encryption method based on ed25519. It is demanded
-// by the JWT library and implements jwt.SigningMethod interface
+// by the JWT library and implements jwt.SigningMethod interface.
 type SigningMethodEdDSA struct{}
 
 // ErrEdDSAVerification is the error triggered when verification of ed25519
-// signatures within the JWT is not successful
+// signatures within the JWT is not successful.
 var ErrEdDSAVerification = errors.New("crypto/ed25519: verification error")
 
-// Alg complies with jwt.SigningMethod interface
+// Alg complies with jwt.SigningMethod interface.
 func (m *SigningMethodEdDSA) Alg() string {
 	return "EdDSA"
 }
 
-// Verify complies with jwt.SigningMethod interface for signature verification
+// Verify complies with jwt.SigningMethod interface for signature verification.
 func (m *SigningMethodEdDSA) Verify(signingString string, signature string, key interface{}) error {
 	sig, err := jwt.DecodeSegment(signature)
 	if err != nil {
@@ -132,7 +132,7 @@ func (m *SigningMethodEdDSA) Verify(signingString string, signature string, key 
 	return nil
 }
 
-// Sign complies with jwt.SigningMethod interface for signing
+// Sign complies with jwt.SigningMethod interface for signing.
 func (m *SigningMethodEdDSA) Sign(signingString string, key interface{}) (str string, err error) {
 	ed25519Key, ok := key.(ed25519.PrivateKey)
 	if !ok {
@@ -143,7 +143,7 @@ func (m *SigningMethodEdDSA) Sign(signingString string, key interface{}) (str st
 		return "", jwt.ErrInvalidKey
 	}
 
-	// Sign the string and return the encoded result
+	// Sign the string and return the encoded result.
 	sig := ed25519.Sign(ed25519Key, []byte(signingString))
 	return jwt.EncodeSegment(sig), nil
 }

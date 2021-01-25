@@ -19,7 +19,6 @@ import (
 // Benchmark which hashing function would perform better for checksum
 // generation.
 
-// SHA3-256
 func BenchmarkSHA3256(b *testing.B) {
 	message, _ := crypto.RandEntropy(200)
 	for i := 0; i < b.N; i++ {
@@ -27,7 +26,6 @@ func BenchmarkSHA3256(b *testing.B) {
 	}
 }
 
-// Blake2b
 func BenchmarkBlake2b(b *testing.B) {
 	message, _ := crypto.RandEntropy(200)
 	for i := 0; i < b.N; i++ {

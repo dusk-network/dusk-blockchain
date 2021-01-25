@@ -20,12 +20,12 @@ import (
 )
 
 // Collector is a very stupid implementation of the wire.EventCollector interface
-// in case no function would be supplied, it would use a channel to publish the collected packets
+// in case no function would be supplied, it would use a channel to publish the collected packets.
 type Collector struct {
 	f func(message.Message) error
 }
 
-// NewSimpleCollector is a simple wrapper around a callback that redirects collected buffers into a channel
+// NewSimpleCollector is a simple wrapper around a callback that redirects collected buffers into a channel.
 func NewSimpleCollector(rChan chan message.Message, f func(message.Message) error) *Collector {
 	if f == nil {
 		f = func(m message.Message) error {
@@ -33,10 +33,11 @@ func NewSimpleCollector(rChan chan message.Message, f func(message.Message) erro
 			return nil
 		}
 	}
+
 	return &Collector{f}
 }
 
-// Collect redirects a buffer copy to a channel
+// Collect redirects a buffer copy to a channel.
 func (m *Collector) Collect(b message.Message) error {
 	return m.f(b)
 }
@@ -48,7 +49,6 @@ func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 	streamer := NewGossipStreamer(protocol.TestNet)
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topics.Gossip, streamListener)
-
 	return eb, streamer
 }
 
@@ -59,17 +59,18 @@ func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
 	streamer := NewSimpleStreamer(protocol.TestNet)
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topic, streamListener)
-
 	return eb, streamer
 }
 
-// SimpleStreamer is a WriteCloser
-var _ io.WriteCloser = (*SimpleStreamer)(nil)
-var _ io.WriteCloser = (*StupidStreamer)(nil)
+// SimpleStreamer is a WriteCloser.
+var (
+	_ io.WriteCloser = (*SimpleStreamer)(nil)
+	_ io.WriteCloser = (*StupidStreamer)(nil)
+)
 
 // StupidStreamer is a streamer meant for using when testing internal
 // forwarding of binary packets through the ring buffer. It does *not* add
-// magic, frames or other wraps on the forwarded packet
+// magic, frames or other wraps on the forwarded packet.
 type StupidStreamer struct {
 	*bufio.Reader
 	*bufio.Writer
@@ -85,7 +86,7 @@ func NewStupidStreamer() *StupidStreamer {
 }
 
 // Write receives the packets from the ringbuffer and writes it on the internal
-// pipe immediatelyh
+// pipe immediately.
 func (sss *StupidStreamer) Write(p []byte) (n int, err error) {
 	lg := make([]byte, 4)
 	binary.LittleEndian.PutUint32(lg, uint32(len(p)))
@@ -107,6 +108,7 @@ func (sss *StupidStreamer) Read() ([]byte, error) {
 	}
 
 	l := binary.LittleEndian.Uint32(length)
+
 	payload := make([]byte, l)
 	if _, err := io.ReadFull(sss.Reader, payload); err != nil {
 		return nil, err
@@ -135,6 +137,7 @@ type SimpleStreamer struct {
 // NewSimpleStreamer returns an initialized SimpleStreamer.
 func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
 	r, w := io.Pipe()
+
 	return &SimpleStreamer{
 		seenTopics: make([]topics.Topic, 0),
 		Reader:     bufio.NewReader(r),
@@ -144,7 +147,7 @@ func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
 }
 
 // Write receives the packets from the ringbuffer and writes it on the internal
-// pipe immediatelyh
+// pipe immediately.
 func (ms *SimpleStreamer) Write(p []byte) (n int, err error) {
 	b := bytes.NewBuffer(p)
 	if e := ms.gossip.Process(b); e != nil {
@@ -171,24 +174,25 @@ func (ms *SimpleStreamer) Read() ([]byte, error) {
 	} else if uint64(read) != length {
 		return nil, io.EOF
 	}
+
 	return packet, nil
 }
 
 // GossipStreamer is a SimpleStreamer which removes the checksum and the topic
 // when reading. It is supposed to be used when testing data that needs to be
-// streamed over the network
+// streamed over the network.
 type GossipStreamer struct {
 	*SimpleStreamer
 }
 
-// NewGossipStreamer creates a new GossipStreamer instance
+// NewGossipStreamer creates a new GossipStreamer instance.
 func NewGossipStreamer(magic protocol.Magic) *GossipStreamer {
 	return &GossipStreamer{
 		SimpleStreamer: NewSimpleStreamer(magic),
 	}
 }
 
-// Read the stream
+// Read the stream.
 func (ms *GossipStreamer) Read() ([]byte, error) {
 	b, err := ms.SimpleStreamer.Read()
 	if err != nil {
@@ -205,6 +209,7 @@ func (ms *GossipStreamer) Read() ([]byte, error) {
 
 	// check the topic
 	decoded = bytes.NewBuffer(m)
+
 	topic, err := topics.Extract(decoded)
 	if err != nil {
 		return nil, err
@@ -230,20 +235,19 @@ func (ms *SimpleStreamer) Close() error {
 	return nil
 }
 
-// RouterStreamer reroutes a gossiped message to a list of EventBus instances
+// RouterStreamer reroutes a gossiped message to a list of EventBus instances.
 type RouterStreamer struct {
-
 	// list of peers eventBus instances to route msg to
 	lock  sync.Mutex
 	peers []*EventBus
 }
 
-// NewRouterStreamer instantiate RouterStreamer with empty list
+// NewRouterStreamer instantiate RouterStreamer with empty list.
 func NewRouterStreamer() *RouterStreamer {
 	return &RouterStreamer{peers: make([]*EventBus, 0)}
 }
 
-// Add adds a dest eventBus
+// Add adds a dest eventBus.
 func (r *RouterStreamer) Add(p *EventBus) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -252,14 +256,13 @@ func (r *RouterStreamer) Add(p *EventBus) {
 
 // Write implements io.WriteCloser.
 func (r *RouterStreamer) Write(p []byte) (n int, err error) {
-
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
 	// Re-route message to all peers
 	for i := 0; i < len(r.peers); i++ {
-
 		b := bytes.NewBuffer(p)
+
 		msg, err := message.Unmarshal(b)
 		if err != nil {
 			return 0, err

@@ -20,7 +20,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// WWalletSrvMock is a mockup structure used to test the session client and server
+// WalletSrvMock is a mockup structure used to test the session client and server.
 type WalletSrvMock struct{}
 
 // GetTxHistory will return a subset of the transactions that were sent and received.
@@ -28,17 +28,17 @@ func (t *WalletSrvMock) GetTxHistory(ctx context.Context, e *node.EmptyRequest) 
 	return &node.TxHistoryResponse{}, nil
 }
 
-// CreateWallet creates a new wallet from a password or seed
+// CreateWallet creates a new wallet from a password or seed.
 func (t *WalletSrvMock) CreateWallet(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
 	return &node.LoadResponse{}, nil
 }
 
-// LoadWallet from a password
+// LoadWallet from a password.
 func (t *WalletSrvMock) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node.LoadResponse, error) {
 	return &node.LoadResponse{}, nil
 }
 
-// CreateFromSeed creates a wallet from a seed
+// CreateFromSeed creates a wallet from a seed.
 func (t *WalletSrvMock) CreateFromSeed(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
 	return &node.LoadResponse{}, nil
 }
@@ -87,8 +87,10 @@ func init() {
 	log.SetLevel(log.ErrorLevel)
 }
 
-var address = "/tmp/dusk-grpc-test01.sock"
-var nodeClient *client.NodeClient
+var (
+	address    = "/tmp/dusk-grpc-test01.sock"
+	nodeClient *client.NodeClient
+)
 
 func TestMain(m *testing.M) {
 	conf := server.Setup{Network: "unix", Address: address}
@@ -96,7 +98,6 @@ func TestMain(m *testing.M) {
 	conf.RequireSession = true
 	// create the GRPC server here
 	grpcSrv, err := server.SetupGRPC(conf)
-
 	// panic in case of errors
 	if err != nil {
 		panic(err)

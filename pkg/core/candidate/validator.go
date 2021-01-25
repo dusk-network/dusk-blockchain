@@ -21,7 +21,7 @@ func Validate(m message.Message) error {
 }
 
 // ValidateCandidate makes sure the hash and root are correct, to avoid
-// malicious nodes from overwriting the candidate block for a specific hash
+// malicious nodes from overwriting the candidate block for a specific hash.
 func ValidateCandidate(cm block.Block) error {
 	if err := checkHash(&cm); err != nil {
 		log.WithError(err).Errorln("validation failed")

@@ -14,9 +14,8 @@ import (
 )
 
 // TestMarshalHeader ensures both marshal/unmarshal header. In addition, it
-// covers a test for computeNonce
+// covers a test for computeNonce.
 func TestMarshalHeader(t *testing.T) {
-
 	// Construct random header
 	h := Header{
 		MsgType:        PongMsg,
@@ -28,6 +27,7 @@ func TestMarshalHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	copy(h.RemotePeerID[:], b)
 
 	h.RemotePeerNonce = ComputeNonce(h.RemotePeerID[:])
@@ -74,7 +74,6 @@ func TestNodesPayloadMarshaling(t *testing.T) {
 }
 
 func TestBroadcastPayloadMarshaling(t *testing.T) {
-
 	b, err := crypto.RandEntropy(1000)
 	if err != nil {
 		t.Fatal(err)

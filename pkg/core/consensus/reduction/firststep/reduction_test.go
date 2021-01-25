@@ -25,7 +25,7 @@ import (
 
 // TestSendReduction tests that the reduction step completes without problems
 // and produces a StepVotesMsg in case it receives enough valid Reduction messages
-// It uses the reduction common test preparation
+// It uses the reduction common test preparation.
 func TestSendReduction(t *testing.T) {
 	hlp := reduction.NewHelper(50, time.Second)
 	_, db := lite.CreateDBConnection()
@@ -103,14 +103,15 @@ func TestFirstStepReduction(t *testing.T) {
 	step := uint8(2)
 	round := uint64(1)
 	messageToSpawn := 50
+
 	hash, err := crypto.RandEntropy(32)
 	require.NoError(t, err)
-	timeout := time.Second
 
+	timeout := time.Second
 	hlp := reduction.NewHelper(messageToSpawn, timeout)
+
 	table := initiateTableTest(hlp, timeout, hash, round, step)
 	for name, ttest := range table {
-
 		t.Run(name, func(t *testing.T) {
 			queue := consensus.NewQueue()
 			// create the helper

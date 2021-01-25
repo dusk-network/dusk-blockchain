@@ -14,36 +14,34 @@ import (
 	"github.com/gorilla/rpc/json"
 )
 
-// NoteArgs message payload
+// NoteArgs message payload.
 type NoteArgs struct {
-
-	// Unique identifier of the P2P wire message
+	// Unique identifier of the P2P wire message.
 	MsgID string
 
-	// Sender node IP:Port address
+	// Sender node IP:Port address.
 	Addr string
 
-	// Unix nano timestamp of the point in time the node reads the wire message
+	// Unix nano timestamp of the point in time the node reads the wire message.
 	Recv_at uint64
 }
 
-// Response is JSON-RPC NoteService response
+// Response is JSON-RPC NoteService response.
 type Response struct {
 	Result string
 }
 
-// NoteService is JSON-RPC NoteService request
+// NoteService is JSON-RPC NoteService request.
 type NoteService struct {
 	d *database
 }
 
-// Say NoteService Say method handler
+// Say NoteService Say method handler.
 func (t *NoteService) Say( /*req*/ _ *http.Request, args *NoteArgs /*result*/, _ *Response) error {
 	return t.d.HandleNote(args)
 }
 
 func runJSONRPCServer(addr string, d *database) {
-
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(json.NewCodec(), "application/json")
 	rpcServer.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
@@ -55,6 +53,7 @@ func runJSONRPCServer(addr string, d *database) {
 
 	router := mux.NewRouter()
 	router.Handle("/rpc", rpcServer)
+
 	if err := http.ListenAndServe(addr, router); err != nil {
 		panic(err)
 	}

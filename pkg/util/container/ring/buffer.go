@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 )
 
-// Buffer represents a circular array of data items
-// It is suitable for (single/multiple) consumers (single/multiple) producers data transfer
+// Buffer represents a circular array of data items.
+// It is suitable for (single/multiple) consumers (single/multiple) producers data transfer.
 type Buffer struct {
 	items      [][]byte
 	mu         *sync.Mutex
@@ -24,7 +24,6 @@ type Buffer struct {
 
 // NewBuffer returns an initialized ring buffer.
 func NewBuffer(length int) *Buffer {
-
 	m := &sync.Mutex{}
 	cv := sync.NewCond(m)
 
@@ -38,7 +37,6 @@ func NewBuffer(length int) *Buffer {
 
 // Put an item on the ring buffer.
 func (r *Buffer) Put(item []byte) bool {
-
 	if item == nil || r.closed.Load() {
 		return false
 	}
@@ -65,17 +63,15 @@ func (r *Buffer) Put(item []byte) bool {
 	return true
 }
 
-// Close will close the Buffer
+// Close will close the Buffer.
 func (r *Buffer) Close() {
-
 	r.closed.Store(true)
 	// Signal all consumers for the state change
 	r.notEmpty.Broadcast()
 }
 
-// GetAll get all items in a buffer
+// GetAll gets all items in a buffer.
 func (r *Buffer) GetAll() ([][]byte, bool) {
-
 	r.mu.Lock()
 
 	for int(r.writeIndex) < 0 && !r.closed.Load() {
@@ -87,6 +83,7 @@ func (r *Buffer) GetAll() ([][]byte, bool) {
 		if itemPtr == nil {
 			break
 		}
+
 		items = append(items, itemPtr)
 		r.items[i] = nil
 	}
@@ -97,9 +94,8 @@ func (r *Buffer) GetAll() ([][]byte, bool) {
 	return items, r.closed.Load()
 }
 
-// Has check if item exists
+// Has checks if item exists.
 func (r *Buffer) Has(item []byte) bool {
-
 	if item == nil {
 		return false
 	}
@@ -113,12 +109,12 @@ func (r *Buffer) Has(item []byte) bool {
 	return false
 }
 
-// Closed check if buffer is closed
+// Closed checks if buffer is closed.
 func (r *Buffer) Closed() bool {
 	return r.closed.Load()
 }
 
-// syncBool provides atomic Load/Store for bool type
+// syncBool provides atomic Load/Store for bool type.
 type syncBool struct {
 	value int32
 }
@@ -128,6 +124,7 @@ func (s *syncBool) Store(value bool) {
 	if value {
 		i = 1
 	}
+
 	atomic.StoreInt32(&(s.value), i)
 }
 

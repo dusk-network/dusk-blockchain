@@ -24,12 +24,15 @@ func TestCompactSize(t *testing.T) {
 	if err := WriteVarInt(buf, a); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := WriteVarInt(buf, b); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := WriteVarInt(buf, c); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := WriteVarInt(buf, d); err != nil {
 		t.Fatal(err)
 	}
@@ -39,14 +42,17 @@ func TestCompactSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	f, err := ReadVarInt(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	g, err := ReadVarInt(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	h, err := ReadVarInt(buf)
 	if err != nil {
 		t.Fatal(err)

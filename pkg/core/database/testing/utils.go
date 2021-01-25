@@ -16,11 +16,11 @@ import (
 )
 
 var (
-	// heightCounter is used by generateBlocks as atomic counter
+	// heightCounter is used by generateBlocks as atomic counter.
 	heightCounter uint64
 
 	// sampleTxsBatchCount
-	// Number of txs per a sample block is  = ( 1 + sampleTxsBatchCount * 4)
+	// Number of txs per a sample block is  = ( 1 + sampleTxsBatchCount * 4).
 	sampleTxsBatchCount uint16 = 2
 )
 
@@ -36,19 +36,21 @@ func storeBlocks(db database.DB, blocks []*block.Block) error {
 				return err
 			}
 		}
+
 		return nil
 	})
 
 	return err
 }
 
-// A helper function to generate a set of blocks that can be chained
+// A helper function to generate a set of blocks that can be chained.
 func generateChainBlocks(blocksCount int) ([]*block.Block, error) {
 	overallBlockTxs := 1 + 4*int(sampleTxsBatchCount)
 	overallTxsCount := blocksCount * overallBlockTxs
+	newBlocks := make([]*block.Block, blocksCount)
+
 	fmt.Printf("--- MSG  Generate sample data of %d blocks with %d txs each (overall txs %d)\n", blocksCount, overallBlockTxs, overallTxsCount)
 
-	newBlocks := make([]*block.Block, blocksCount)
 	for i := 0; i < blocksCount; i++ {
 		b := helper.RandomBlock(atomic.AddUint64(&heightCounter, 1), sampleTxsBatchCount)
 		// assume consensus time is 10sec

@@ -6,7 +6,7 @@
 
 package header
 
-//TODO: consider moving this into the message package
+// TODO: consider moving this into the message package
 
 import (
 	"bytes"
@@ -25,7 +25,7 @@ import (
 )
 
 type (
-	// Header is an embeddable struct representing the consensus event header fields
+	// Header is an embeddable struct representing the consensus event header fields.
 	Header struct {
 		PubKeyBLS []byte
 		Round     uint64
@@ -34,24 +34,24 @@ type (
 	}
 )
 
-// Writer writes the header to a Buffer. It is an interface injected into components
+// Writer writes the header to a Buffer. It is an interface injected into components.
 type Writer interface {
 	WriteHeader([]byte, *bytes.Buffer) error
 }
 
-// Phase is used to introduce a time order to the Header
+// Phase is used to introduce a time order to the Header.
 type Phase uint8
 
 const (
-	// Same indicates that headers belong to the same phase
+	// Same indicates that headers belong to the same phase.
 	Same Phase = iota
-	// Before indicates that the header indicates a past event
+	// Before indicates that the header indicates a past event.
 	Before
-	// After indicates that the header indicates a future event
+	// After indicates that the header indicates a future event.
 	After
 )
 
-// New will create a Header instance
+// New will create a Header instance.
 func New() Header {
 	return Header{
 		PubKeyBLS: make([]byte, 33),
@@ -61,7 +61,7 @@ func New() Header {
 	}
 }
 
-// Copy complies with the Safe interface
+// Copy complies with the Safe interface.
 func (h Header) Copy() payload.Safe {
 	hdr := Header{
 		Round: h.Round,
@@ -77,23 +77,24 @@ func (h Header) Copy() payload.Safe {
 		hdr.PubKeyBLS = make([]byte, len(h.PubKeyBLS))
 		copy(hdr.PubKeyBLS, h.PubKeyBLS)
 	}
+
 	return hdr
 }
 
 // State returns the Header struct itself. It is mandate by the
-// consensus.InternalPacket interface
+// consensus.InternalPacket interface.
 func (h Header) State() Header {
 	return h
 }
 
 // Sender implements wire.Event.
 // Returns the BLS public key of the event sender.
-// It is part of the consensus.Packet interface
+// It is part of the consensus.Packet interface.
 func (h Header) Sender() []byte {
 	return h.PubKeyBLS
 }
 
-// CompareRoundAndStep Compare headers to establish time order
+// CompareRoundAndStep Compare headers to establish time order.
 func (h Header) CompareRoundAndStep(round uint64, step uint8) Phase {
 	comparison := h.CompareRound(round)
 	if comparison == Same {
@@ -111,7 +112,7 @@ func (h Header) CompareRoundAndStep(round uint64, step uint8) Phase {
 	return comparison
 }
 
-// CompareRound compares the actual h Header v @round returning the respective phase
+// CompareRound compares the actual h Header v @round returning the respective phase.
 func (h Header) CompareRound(round uint64) Phase {
 	if h.Round < round {
 		return Before
@@ -126,12 +127,14 @@ func (h Header) CompareRound(round uint64) Phase {
 
 func (h Header) String() string {
 	var sb strings.Builder
+
 	_, _ = sb.WriteString(fmt.Sprintf("round='%d' step='%d'", h.Round, h.Step))
 	_, _ = sb.WriteString(" sender='")
 	_, _ = sb.WriteString(util.StringifyBytes(h.PubKeyBLS))
 	_, _ = sb.WriteString("' block_hash='")
 	_, _ = sb.WriteString(util.StringifyBytes(h.BlockHash))
 	_, _ = sb.WriteString("'")
+
 	return sb.String()
 }
 
@@ -153,7 +156,7 @@ func Marshal(r *bytes.Buffer, ev Header) error {
 	return MarshalFields(r, ev)
 }
 
-// Compose is useful when header information is cached and there is an opportunity to avoid unnecessary allocations
+// Compose is useful when header information is cached and there is an opportunity to avoid unnecessary allocations.
 func Compose(blsPubKey bytes.Buffer, phase bytes.Buffer, hash []byte) (bytes.Buffer, error) {
 	if _, err := blsPubKey.ReadFrom(&phase); err != nil {
 		return bytes.Buffer{}, err
@@ -176,7 +179,7 @@ func Unmarshal(r *bytes.Buffer, ev *Header) error {
 	return UnmarshalFields(r, ev)
 }
 
-// MarshalFields marshals the core field of the Header (i.e. Round, Step and BlockHash)
+// MarshalFields marshals the core field of the Header (i.e. Round, Step and BlockHash).
 func MarshalFields(r *bytes.Buffer, h Header) error {
 	if err := encoding.WriteUint64LE(r, h.Round); err != nil {
 		return err
@@ -189,7 +192,7 @@ func MarshalFields(r *bytes.Buffer, h Header) error {
 	return encoding.Write256(r, h.BlockHash)
 }
 
-// UnmarshalFields unmarshals the core field of the Header (i.e. Round, Step and BlockHash)
+// UnmarshalFields unmarshals the core field of the Header (i.e. Round, Step and BlockHash).
 func UnmarshalFields(r *bytes.Buffer, h *Header) error {
 	if err := encoding.ReadUint64LE(r, &h.Round); err != nil {
 		return err
@@ -205,13 +208,13 @@ func UnmarshalFields(r *bytes.Buffer, h *Header) error {
 
 // MarshalSignableVote marshals the fields necessary for a Committee member to cast
 // a Vote (namely the Round, the Step and the BlockHash).
-// Note: UnmarshalSignableVote does not make sense as the only reason to use it would be if we could somehow revert a signature to the preimage and thus unmarshal it into a struct :P
+// Note: UnmarshalSignableVote does not make sense as the only reason to use it would be if we could somehow revert a signature to the preimage and thus unmarshal it into a struct :P.
 func MarshalSignableVote(r *bytes.Buffer, h Header) error {
 	return MarshalFields(r, h)
 }
 
 // VerifySignatures verifies the BLS aggregated signature carried by consensus related messages.
-// The signed message needs to carry information about the round, the step and the blockhash
+// The signed message needs to carry information about the round, the step and the blockhash.
 func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, sig *bls.Signature) error {
 	signed := new(bytes.Buffer)
 	vote := Header{
@@ -227,7 +230,7 @@ func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, 
 	return bls.Verify(apk, signed.Bytes(), sig)
 }
 
-// Mock a Header
+// Mock a Header.
 func Mock() Header {
 	hash, _ := crypto.RandEntropy(32)
 	k, _ := key.NewRandKeys()

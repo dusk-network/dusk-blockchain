@@ -13,16 +13,17 @@ import (
 
 func generateRandomBytes(n int) ([]byte, error) {
 	b := make([]byte, n)
+
 	_, err := rand.Read(b)
-	// Note that err == nil only if we read len(b) bytes.
 	if err != nil {
+		// Note that err == nil only if we read len(b) bytes.
 		return nil, err
 	}
 
 	return b, nil
 }
 
-// GenerateRandomString returns a base64 encoded random string, which will be used to issue the challenge
+// GenerateRandomString returns a base64 encoded random string, which will be used to issue the challenge.
 func GenerateRandomString(s int) (string, error) {
 	b, err := generateRandomBytes(s)
 	return base64.URLEncoding.EncodeToString(b), err

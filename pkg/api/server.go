@@ -7,6 +7,7 @@
 package api
 
 import (
+	"context"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -23,8 +24,6 @@ import (
 	"github.com/gorilla/pat"
 
 	"github.com/sirupsen/logrus"
-
-	"context"
 )
 
 var (
@@ -32,9 +31,9 @@ var (
 	log    = logrus.WithField("package", "api")
 )
 
-// Server defines the HTTP server of the API
+// Server defines the HTTP server of the API.
 type Server struct {
-	// Node components
+	// Node components.
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 	store    *capi.StormDBInstance
@@ -42,16 +41,17 @@ type Server struct {
 	Server *http.Server
 }
 
-//NewHTTPServer return pointer to new created server object
+// NewHTTPServer return pointer to new created server object.
 func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server, error) {
-
 	dbFile := cfg.Get().API.DBFile
 	if dbFile == "" {
 		log.Info("Will start monitoring db with in-memory since DBFile cfg is not set")
+
 		dir, err := ioutil.TempDir(os.TempDir(), "storm")
 		if err != nil {
 			panic(err)
 		}
+
 		dbFile = filepath.Join(dir, "api.db")
 	}
 
@@ -59,6 +59,7 @@ func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server,
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	capi.SetStormDBInstance(store)
 
 	srv := Server{
@@ -66,24 +67,25 @@ func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server,
 		rpcBus:   rpcBus,
 		store:    store,
 	}
+
 	addr := cfg.Get().API.Address
 	log.WithField("addr", addr).Info("Will InitRouting for Consensus API server")
+
 	router = srv.InitRouting()
 	httpServer := &http.Server{
 		Addr:    addr,
 		Handler: router,
 	}
-	srv.Server = httpServer
 
+	srv.Server = httpServer
 	return &srv, nil
 }
 
-//Start will start and and listen the *http.Server
+// Start will start and and listen the *http.Server.
 func (s *Server) Start(srv *Server) error {
-
 	log.WithField("address", cfg.Get().API.Address).Info("Starting API server")
 
-	//enable graceful shutdown
+	// enable graceful shutdown
 	err := gracehttp.Serve(
 		srv.Server,
 	)
@@ -91,9 +93,8 @@ func (s *Server) Start(srv *Server) error {
 	return err
 }
 
-// InitRouting will init pat.Router endpoints
+// InitRouting will init pat.Router endpoints.
 func (s *Server) InitRouting() *pat.Router {
-
 	r := pat.New()
 
 	r.Handle("/healthcheck", healthcheck.Handler(

@@ -57,9 +57,10 @@ func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus, broker eventbus.Bro
 func (d *DataRequestor) RequestMissingItems(m message.Message) ([]bytes.Buffer, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	msg := m.Payload().(message.Inv)
 
+	msg := m.Payload().(message.Inv)
 	getData := &message.Inv{}
+
 	for _, obj := range msg.InvList {
 		if !d.dupemap.CanFwd(bytes.NewBuffer(obj.Hash)) {
 			continue
@@ -78,21 +79,20 @@ func (d *DataRequestor) RequestMissingItems(m message.Message) ([]bytes.Buffer, 
 
 				return err
 			})
-
 			if err != nil {
 				return nil, err
 			}
 		case message.InvTypeMempoolTx:
 			txs, _ := GetMempoolTxs(d.rpcBus, obj.Hash)
-			if len(txs) == 0 {
-				// TxID not found in the local mempool:
 
-				// it migth be due to a few reasons:
-				//
-				// Tx has never included in this mempool,
-				// Tx has been included in this mempool but lost on a suddent restart
-				// Tx has been already accepted.
-				// TODO: To check that look for this Tx in the last 10 blocks (db.FetchTxExists())
+			// TxID not found in the local mempool:
+			// it migth be due to a few reasons:
+			//
+			// Tx has never included in this mempool,
+			// Tx has been included in this mempool but lost on a suddent restart
+			// Tx has been already accepted.
+			// TODO: To check that look for this Tx in the last 10 blocks (db.FetchTxExists())
+			if len(txs) == 0 {
 				getData.AddItem(message.InvTypeMempoolTx, obj.Hash)
 			}
 		}
@@ -118,21 +118,23 @@ func marshalGetData(getData *message.Inv) (*bytes.Buffer, error) {
 	if err := topics.Prepend(buf, topics.GetData); err != nil {
 		return nil, err
 	}
+
 	return buf, nil
 }
 
 // GetMempoolTxs is a wire.GetMempoolTx API wrapper. Later it could be moved into
-// a separate utils pkg
+// a separate utils pkg.
 func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.ContractCall, error) {
-
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write(txID)
+
 	timeoutGetMempoolTXs := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXs) * time.Second
+
 	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), timeoutGetMempoolTXs)
 	if err != nil {
 		return nil, err
 	}
-	mempoolTxs := resp.([]transactions.ContractCall)
 
+	mempoolTxs := resp.([]transactions.ContractCall)
 	return mempoolTxs, nil
 }

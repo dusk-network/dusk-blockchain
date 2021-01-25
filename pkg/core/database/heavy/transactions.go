@@ -36,29 +36,29 @@ const (
 )
 
 var (
-	// writeOptions used by both non-Batch and Batch leveldb.Put
+	// writeOptions used by both non-Batch and Batch leveldb.Put.
 	writeOptions = &opt.WriteOptions{NoWriteMerge: optionNoWriteMerge, Sync: optionFsyncEnabled}
 
-	// Key values prefixes to provide prefix-based sorting mechanism
-	// Refer to README.md for overview idea
+	// Key values prefixes to provide prefix-based sorting mechanism.
+	// Refer to README.md for overview idea.
 
-	// HeaderPrefix is the prefix to identify the Header
+	// HeaderPrefix is the prefix to identify the Header.
 	HeaderPrefix = []byte{0x01}
-	// TxPrefix is the prefix to identify Transactions
+	// TxPrefix is the prefix to identify Transactions.
 	TxPrefix = []byte{0x02}
-	// HeightPrefix is the prefix to identify the Height
+	// HeightPrefix is the prefix to identify the Height.
 	HeightPrefix = []byte{0x03}
-	// TxIDPrefix is the prefix to identify the Transaction ID
+	// TxIDPrefix is the prefix to identify the Transaction ID.
 	TxIDPrefix = []byte{0x04}
-	// KeyImagePrefix is the prefix to identify the Key Image
+	// KeyImagePrefix is the prefix to identify the Key Image.
 	KeyImagePrefix = []byte{0x05}
-	// StatePrefix is the prefix to identify the State
+	// StatePrefix is the prefix to identify the State.
 	StatePrefix = []byte{0x06}
-	// OutputKeyPrefix is the prefix to identify the Output
+	// OutputKeyPrefix is the prefix to identify the Output.
 	OutputKeyPrefix = []byte{0x07}
-	// BidValuesPrefix is the prefix to identify Bid Values
+	// BidValuesPrefix is the prefix to identify Bid Values.
 	BidValuesPrefix = []byte{0x08}
-	// CandidatePrefix is the prefix to identify Candidate messages
+	// CandidatePrefix is the prefix to identify Candidate messages.
 	CandidatePrefix = []byte{0x09}
 )
 
@@ -66,7 +66,7 @@ type transaction struct {
 	writable bool
 	db       *DB
 
-	// Get/Has/Iterate calls must be applied into the snapshot only
+	// Get/Has/Iterate calls must be applied into the snapshot only.
 	snapshot *leveldb.Snapshot
 
 	// Put/Delete calls must be applied into a batch only. Transaction does
@@ -84,11 +84,11 @@ type transaction struct {
 // See also the method body to get an idea of Key-Value data schemas.
 //
 // It is assumed that StoreBlock would be called much less times than Fetch*
-// APIs. Based on that, extra indexing data is put to provide fast-read lookups
+// APIs. Based on that, extra indexing data is put to provide fast-read lookups.
 func (t transaction) StoreBlock(b *block.Block) error {
 	if t.batch == nil {
 		// t.batch is initialized only on a open, read-write transaction
-		// (built with transaction.Update())
+		// (built with transaction.Update()).
 		return errors.New("StoreBlock cannot be called on read-only transaction")
 	}
 
@@ -107,15 +107,15 @@ func (t transaction) StoreBlock(b *block.Block) error {
 
 	key := append(HeaderPrefix, b.Header.Hash...)
 	value := blockHeaderFields.Bytes()
+
 	t.put(key, value)
 
-	//fix for #405
 	if uint64(len(b.Txs)) > math.MaxUint32 {
 		return errors.New("too many transactions")
 	}
 
 	// Put block transaction data. A KV pair per a single transaction is added
-	// into the store
+	// into the store.
 	for i, tx := range b.Txs {
 		txID, err := tx.CalculateHash()
 		if err != nil {
@@ -134,6 +134,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// For the retrival of transactions data by block.header.hash
 		keys := append(TxPrefix, b.Header.Hash...)
 		keys = append(keys, txID...)
+
 		entry, err := utils.EncodeBlockTx(tx, uint32(i))
 		if err != nil {
 			return err
@@ -163,6 +164,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 
 	key = append(HeightPrefix, heightBuf.Bytes()...)
 	value = b.Header.Hash
+
 	t.put(key, value)
 
 	// Key = StatePrefix
@@ -171,10 +173,12 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// To support fetching  blockchain tip
 	key = StatePrefix
 	value = b.Header.Hash
+
 	t.put(key, value)
 
 	// Delete expired bid values
 	key = BidValuesPrefix
+
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
 	defer iterator.Release()
 
@@ -186,6 +190,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 				"process": "database",
 				"key":     iterator.Key(),
 			}).WithError(errors.New("bid values entry with malformed key found")).Errorln("error when iterating over bid values")
+
 			// Let's remove it though, so that we don't keep logging errors
 			// for the same entry.
 			t.batch.Delete(iterator.Key())
@@ -201,7 +206,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	return iterator.Error()
 }
 
-// Commit writes a batch to LevelDB storage. See also fsyncEnabled variable
+// Commit writes a batch to LevelDB storage. See also fsyncEnabled variable.
 func (t *transaction) Commit() error {
 	if !t.writable {
 		return errors.New("read-only transaction cannot commit changes")
@@ -214,19 +219,21 @@ func (t *transaction) Commit() error {
 	return t.db.storage.Write(t.batch, writeOptions)
 }
 
-// Rollback is not used by database layer
+// Rollback is not used by database layer.
 func (t transaction) Rollback() error {
 	t.batch.Reset()
 	return nil
 }
 
 // Close releases the retrieved snapshot and resets any open batch(s). It must
-// be called explicitly when a transaction is run in a unmanaged way
+// be called explicitly when a transaction is run in a unmanaged way.
 func (t *transaction) Close() {
 	t.snapshot.Release()
+
 	if t.batch != nil {
 		t.batch.Reset()
 	}
+
 	t.closed = true
 }
 
@@ -244,7 +251,7 @@ func (t transaction) FetchBlockExists(hash []byte) (bool, error) {
 	return exists, err
 }
 
-// FetchOutputExists checks if an output exists in the db
+// FetchOutputExists checks if an output exists in the db.
 func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
 	key := append(OutputKeyPrefix, destkey...)
 	exists, err := t.snapshot.Has(key, nil)
@@ -259,9 +266,10 @@ func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
 	return exists, err
 }
 
-// FetchOutputUnlockHeight returns the unlockheight of an output
+// FetchOutputUnlockHeight returns the unlockheight of an output.
 func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
 	key := append(OutputKeyPrefix, destkey...)
+
 	unlockHeightBytes, err := t.snapshot.Get(key, nil)
 	if err != nil {
 		return 0, err
@@ -278,8 +286,8 @@ func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
 
 func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	key := append(HeaderPrefix, hash...)
-	value, err := t.snapshot.Get(key, nil)
 
+	value, err := t.snapshot.Get(key, nil)
 	if err == leveldb.ErrNotFound {
 		// overwrite error message
 		err = database.ErrBlockNotFound
@@ -290,8 +298,8 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	header := block.NewHeader()
-	err = message.UnmarshalHeader(bytes.NewBuffer(value), header)
 
+	err = message.UnmarshalHeader(bytes.NewBuffer(value), header)
 	if err != nil {
 		return nil, err
 	}
@@ -310,6 +318,7 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.ContractCa
 
 	for iterator.Next() {
 		value := iterator.Value()
+
 		tx, txIndex, err := utils.DecodeBlockTx(value, database.AnyTxType)
 		if err != nil {
 			return nil, err
@@ -343,7 +352,6 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.ContractCa
 }
 
 func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
-
 	// Get height bytes
 	heightBuf := new(bytes.Buffer)
 	if err := utils.WriteUint64(heightBuf, height); err != nil {
@@ -351,13 +359,14 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 	}
 
 	key := append(HeightPrefix, heightBuf.Bytes()...)
-	value, err := t.snapshot.Get(key, nil)
 
+	value, err := t.snapshot.Get(key, nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
 			// overwrite error message
 			err = database.ErrBlockNotFound
 		}
+
 		return nil, err
 	}
 
@@ -365,7 +374,6 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 }
 
 func (t transaction) put(key []byte, value []byte) {
-
 	if !t.writable {
 		return
 	}
@@ -383,12 +391,14 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 
 	// Fetch the block header hash that this Tx belongs to
 	key := append(TxIDPrefix, txID...)
+
 	hashHeader, err := t.snapshot.Get(key, nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
 			// overwrite error message
 			err = database.ErrTxNotFound
 		}
+
 		return nil, txIndex, nil, err
 	}
 
@@ -403,9 +413,9 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 		// Extract TxID from the key to avoid the need of CalculateHash
 		reader := bytes.NewReader(iterator.Key())
 		fetchedTxID := make([]byte, len(txID))
-		n, err := reader.ReadAt(fetchedTxID[:], int64(len(scanFilter)))
 
 		// We should always be capable of reading the TxID from the KEY
+		n, err := reader.ReadAt(fetchedTxID[:], int64(len(scanFilter)))
 		if err != nil || n == 0 {
 			return nil, txIndex, nil, fmt.Errorf("malformed transaction data")
 		}
@@ -417,8 +427,8 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 
 		// TxID matched. Decode the Tx data
 		value := iterator.Value()
-		tx, idx, err := utils.DecodeBlockTx(value, database.AnyTxType)
 
+		tx, idx, err := utils.DecodeBlockTx(value, database.AnyTxType)
 		if err != nil {
 			return nil, idx, hashHeader, err
 		}
@@ -433,17 +443,17 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 // hash of its corresponding tx.
 //
 // Due to performance concerns, the found tx is not verified. By explicitly
-// calling FetchBlockTxByHash, a consumer can check if the tx is real
+// calling FetchBlockTxByHash, a consumer can check if the tx is real.
 func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) {
-
 	key := append(KeyImagePrefix, keyImage...)
-	txID, err := t.snapshot.Get(key, nil)
 
+	txID, err := t.snapshot.Get(key, nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
 			// overwrite error message
 			err = database.ErrKeyImageNotFound
 		}
+
 		return false, nil, err
 	}
 
@@ -469,6 +479,7 @@ func (t transaction) FetchBlock(hash []byte) (*block.Block, error) {
 
 func (t transaction) FetchState() (*database.State, error) {
 	key := StatePrefix
+
 	value, err := t.snapshot.Get(key, nil)
 	if err == leveldb.ErrNotFound || len(value) == 0 {
 		// overwrite error message
@@ -499,6 +510,7 @@ func (t transaction) FetchCurrentHeight() (uint64, error) {
 func (t transaction) StoreBidValues(d, k []byte, index uint64, lockTime uint64) error {
 	// First, delete the old values (if any)
 	heightBytes := make([]byte, 8)
+
 	currentHeight, err := t.FetchCurrentHeight()
 	if err != nil {
 		return err
@@ -515,21 +527,25 @@ func (t transaction) StoreBidValues(d, k []byte, index uint64, lockTime uint64) 
 
 	key := append(BidValuesPrefix, heightBytes...)
 	t.put(key, append(d, append(k, idxBytes...)...))
+
 	return nil
 }
 
-// BidEncodingSize is the expected size of the serialized encoding of the bid
+// BidEncodingSize is the expected size of the serialized encoding of the bid.
 var BidEncodingSize = 72
 
 func (t transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
 	key := BidValuesPrefix
+
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
 	defer iterator.Release()
 
 	// Let's always return the bid values with the lowest height as
 	// those are most likely to be valid.
 	lowestSeen := uint64(1<<64 - 1)
+
 	var value []byte
+
 	for iterator.Next() {
 		if len(iterator.Key()) != 9 {
 			// Malformed key found, however we should not abort the entire
@@ -562,13 +578,11 @@ func (t transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
 	D := value[0:32]
 	K := value[32:64]
 	index := binary.LittleEndian.Uint64(value[64:72])
-
 	return D, K, index, nil
 }
 
-// FetchBlockHeightSince uses binary search to find a block height
+// FetchBlockHeightSince uses binary search to find a block height.
 func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error) {
-
 	tip, err := t.FetchCurrentHeight()
 	if err != nil {
 		return 0, err
@@ -578,6 +592,7 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	pos, err := utils.Search(n, func(pos uint64) (bool, error) {
 		height := tip - n + pos
+
 		hash, heightErr := t.FetchBlockHashByHeight(height)
 		if heightErr != nil {
 			return false, heightErr
@@ -590,18 +605,15 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 		return header.Timestamp >= sinceUnixTime, nil
 	})
-
 	if err != nil {
 		return 0, err
 	}
 
 	return tip - n + pos, nil
-
 }
 
 func (t transaction) StoreCandidateMessage(cm block.Block) error {
 	buf := new(bytes.Buffer)
-
 	if err := message.MarshalBlock(buf, &cm); err != nil {
 		return err
 	}
@@ -613,6 +625,7 @@ func (t transaction) StoreCandidateMessage(cm block.Block) error {
 
 func (t transaction) FetchCandidateMessage(hash []byte) (block.Block, error) {
 	key := append(CandidatePrefix, hash...)
+
 	value, err := t.snapshot.Get(key, nil)
 	if err != nil {
 		return block.Block{}, database.ErrBlockNotFound
@@ -629,6 +642,7 @@ func (t transaction) FetchCandidateMessage(hash []byte) (block.Block, error) {
 func (t transaction) ClearCandidateMessages() error {
 	iter := t.snapshot.NewIterator(util.BytesPrefix(CandidatePrefix), nil)
 	defer iter.Release()
+
 	for iter.Next() {
 		t.batch.Delete(iter.Key())
 	}

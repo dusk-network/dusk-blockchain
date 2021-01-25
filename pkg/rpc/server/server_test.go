@@ -22,8 +22,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-var authClient *client.AuthClient
-var walletClient node.WalletClient
+var (
+	authClient   *client.AuthClient
+	walletClient node.WalletClient
+)
 
 func init() {
 	log.SetLevel(log.ErrorLevel)
@@ -33,6 +35,7 @@ var address = "/tmp/dusk-grpc-test01.sock"
 
 func getDialer(proto string) func(context.Context, string) (net.Conn, error) {
 	d := &net.Dialer{}
+
 	return func(ctx context.Context, addr string) (net.Conn, error) {
 		return d.DialContext(ctx, proto, addr)
 	}
@@ -43,7 +46,6 @@ func TestMain(m *testing.M) {
 	conf.RequireSession = true
 	// create the GRPC server here
 	grpcSrv, err := server.SetupGRPC(conf)
-
 	// panic in case of errors
 	if err != nil {
 		panic(err)
@@ -66,7 +68,6 @@ func TestMain(m *testing.M) {
 		grpc.WithContextDialer(getDialer("unix")),
 		grpc.WithUnaryInterceptor(interceptor.Unary()),
 	)
-
 	if err != nil {
 		panic(err)
 	}

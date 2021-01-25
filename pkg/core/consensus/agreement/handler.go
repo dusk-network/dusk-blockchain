@@ -23,10 +23,10 @@ import (
 )
 
 // MaxCommitteeSize represents the maximum size of the committee for an
-// Agreement quorum
+// Agreement quorum.
 const MaxCommitteeSize = 64
 
-// Handler interface is handy for tests
+// Handler interface is handy for tests.
 type Handler interface {
 	AmMember(uint64, uint8) bool
 	IsMember([]byte, uint64, uint8) bool
@@ -54,23 +54,23 @@ func (a *handler) AmMember(round uint64, step uint8) bool {
 }
 
 // IsMember delegates the committee.Handler to check if a Provisioner is in the
-// committee for a specified round and step
+// committee for a specified round and step.
 func (a *handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
 	return a.Handler.IsMember(pubKeyBLS, round, step, MaxCommitteeSize)
 }
 
-// Committee returns a VotingCommittee for a given round and step
+// Committee returns a VotingCommittee for a given round and step.
 func (a *handler) Committee(round uint64, step uint8) user.VotingCommittee {
 	return a.Handler.Committee(round, step, MaxCommitteeSize)
 }
 
 // VotesFor delegates embedded committee.Handler to accumulate a vote for a
-// given round
+// given round.
 func (a *handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
 	return a.Handler.VotesFor(pubKeyBLS, round, step, MaxCommitteeSize)
 }
 
-// Quorum returns the amount of committee members necessary to reach a quorum
+// Quorum returns the amount of committee members necessary to reach a quorum.
 func (a *handler) Quorum(round uint64) int {
 	return int(math.Ceil(float64(a.CommitteeSize(round, MaxCommitteeSize)) * 0.75))
 }
@@ -78,11 +78,13 @@ func (a *handler) Quorum(round uint64) int {
 // Verify checks the signature of the set.
 func (a *handler) Verify(ev message.Agreement) error {
 	hdr := ev.State()
+
 	if err := verifyWhole(ev); err != nil {
 		return fmt.Errorf("failed to verify Agreement Sender: %w", err)
 	}
 
 	allVoters := 0
+
 	for i, votes := range ev.VotesPerStep {
 		// the beginning step is the same of the second reduction. Since the
 		// consensus steps start at 1, this is always a multiple of 3
@@ -93,6 +95,7 @@ func (a *handler) Verify(ev message.Agreement) error {
 		if step == math.MaxInt8 {
 			err := errors.New("verify, step reached max limit")
 			lg.WithError(err).Error("step overflow")
+
 			return err
 		}
 
@@ -100,6 +103,7 @@ func (a *handler) Verify(ev message.Agreement) error {
 		subcommittee := committee.IntersectCluster(votes.BitSet)
 
 		allVoters += subcommittee.TotalOccurrences()
+
 		apk, err := ReconstructApk(subcommittee.Set)
 		if err != nil {
 			return fmt.Errorf("failed to reconstruct APK in the Agreement verification: %w", err)
@@ -113,12 +117,14 @@ func (a *handler) Verify(ev message.Agreement) error {
 	if allVoters < a.Quorum(hdr.Round) {
 		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum(hdr.Round))
 	}
+
 	return nil
 }
 
 func (a *handler) getVoterKeys(ev message.Agreement) ([][]byte, error) {
 	hdr := ev.State()
 	keys := make([][]byte, 0)
+
 	for i, votes := range ev.VotesPerStep {
 		step := hdr.Step - 2 + uint8(i)
 
@@ -126,6 +132,7 @@ func (a *handler) getVoterKeys(ev message.Agreement) ([][]byte, error) {
 		if step >= math.MaxInt8 {
 			err := errors.New("getVoterKeys, step reached max limit")
 			lg.WithError(err).Error("step overflow")
+
 			return nil, err
 		}
 
@@ -140,6 +147,7 @@ func (a *handler) getVoterKeys(ev message.Agreement) ([][]byte, error) {
 
 func verifyWhole(a message.Agreement) error {
 	hdr := a.State()
+
 	r := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(r, hdr); err != nil {
 		return err
@@ -150,12 +158,14 @@ func verifyWhole(a message.Agreement) error {
 	// see https://github.com/dusk-network/dusk-crypto/issues/16
 	sig := make([]byte, len(a.SignedVotes()))
 	copy(sig, a.SignedVotes())
+
 	return msg.VerifyBLSSignature(hdr.PubKeyBLS, r.Bytes(), sig)
 }
 
 // ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.
 func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 	var apk *bls.Apk
+
 	if len(subcommittee) == 0 {
 		return nil, errors.New("Subcommittee is empty")
 	}
@@ -165,10 +175,12 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if i == 0 {
 			apk = bls.NewApk(pk)
 			continue
 		}
+
 		if err := apk.Aggregate(pk); err != nil {
 			return nil, err
 		}

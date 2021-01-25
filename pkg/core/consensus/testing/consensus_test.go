@@ -60,6 +60,7 @@ func TestConsensus(t *testing.T) {
 
 	// Create a set of nodes
 	nodes := make([]*node, numNodes)
+
 	for i := 0; i < numNodes; i++ {
 		nctx, cancelNode := context.WithCancel(ctx)
 		nodes[i] = newNode(nctx, assert, eb, rb, proxy, keys[i])
@@ -81,11 +82,13 @@ func TestConsensus(t *testing.T) {
 	// Let's make sure the consensus can survive for at least up to 10 rounds.
 	for i := 1; i <= numRounds; i++ {
 		counter := 0
+
 		for {
 			b := <-abChan
 			if b.Payload().(block.Block).Header.Height != uint64(i) {
 				t.Fatal("consensus was desynchronized")
 			}
+
 			counter++
 
 			// Once we get the same block `numNodes` times, we can expect the blocks

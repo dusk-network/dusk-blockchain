@@ -18,22 +18,22 @@ import (
 
 const (
 	// SanityCheckHeight is the suggested amount of blocks to check when
-	// calling Loader.PerformSanityCheck
+	// calling Loader.PerformSanityCheck.
 	SanityCheckHeight uint64 = 10
 )
 
-// DBLoader performs database prefetching and sanityChecks at node startup
+// DBLoader performs database prefetching and sanityChecks at node startup.
 type DBLoader struct {
 	db database.DB
 
-	// Unsure if the genesis block needs to be here
+	// Unsure if the genesis block needs to be here.
 	genesis *block.Block
 }
 
 // SanityCheckBlock will verify whether we have not seed the block before
 // (duplicate), perform a check on the block header and verifies the coinbase
 // transactions. It leaves the bulk of transaction verification to the executor
-// Return nil if the sanity check passes
+// Return nil if the sanity check passes.
 func (l *DBLoader) SanityCheckBlock(prevBlock block.Block, blk block.Block) error {
 	// 1. Check that we have not seen this block before
 	err := l.db.View(func(t database.Transaction) error {
@@ -45,6 +45,7 @@ func (l *DBLoader) SanityCheckBlock(prevBlock block.Block, blk block.Block) erro
 		if err == nil {
 			err = errors.New("block already exists")
 		}
+
 		return err
 	}
 
@@ -59,32 +60,35 @@ func (l *DBLoader) SanityCheckBlock(prevBlock block.Block, blk block.Block) erro
 	return nil
 }
 
-// NewDBLoader returns a Loader which gets the Chain Tip from the DB
+// NewDBLoader returns a Loader which gets the Chain Tip from the DB.
 func NewDBLoader(db database.DB, genesis *block.Block) *DBLoader {
 	return &DBLoader{db: db, genesis: genesis}
 }
 
-// Height returns the height of the blockchain stored in the DB
+// Height returns the height of the blockchain stored in the DB.
 func (l *DBLoader) Height() (uint64, error) {
 	var height uint64
+
 	err := l.db.View(func(t database.Transaction) error {
 		var err error
 		height, err = t.FetchCurrentHeight()
 		return err
 	})
+
 	return height, err
 }
 
-// Append stores a block in the DB
+// Append stores a block in the DB.
 func (l *DBLoader) Append(blk *block.Block) error {
 	return l.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(blk)
 	})
 }
 
-// BlockAt returns the block stored at a given height
+// BlockAt returns the block stored at a given height.
 func (l *DBLoader) BlockAt(searchingHeight uint64) (block.Block, error) {
 	var blk *block.Block
+
 	err := l.db.View(func(t database.Transaction) error {
 		hash, err := t.FetchBlockHashByHeight(searchingHeight)
 		if err != nil {
@@ -94,23 +98,24 @@ func (l *DBLoader) BlockAt(searchingHeight uint64) (block.Block, error) {
 		blk, err = t.FetchBlock(hash)
 		return err
 	})
-
 	if err != nil {
 		return block.Block{}, err
 	}
+
 	return *blk, err
 }
 
-// Clear the underlying DB
+// Clear the underlying DB.
 func (l *DBLoader) Clear() error {
 	return l.db.Update(func(t database.Transaction) error {
 		return t.ClearDatabase()
 	})
 }
 
-// Close the underlying DB usign the drivers
+// Close the underlying DB usign the drivers.
 func (l *DBLoader) Close(driver string) error {
 	log.Info("Close database")
+
 	drvr, err := database.From(driver)
 	if err != nil {
 		return err
@@ -120,7 +125,7 @@ func (l *DBLoader) Close(driver string) error {
 }
 
 // PerformSanityCheck checks the head and the tail of the blockchain to avoid
-// inconsistencies and a faulty bootstrap
+// inconsistencies and a faulty bootstrap.
 func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmount uint64) error {
 	var height uint64
 	var prevBlock *block.Block
@@ -136,7 +141,6 @@ func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmou
 	prevHeader := prevBlock.Header
 	// Verify first N blocks
 	err := l.db.View(func(t database.Transaction) error {
-
 		// This will most likely verify genesis, unless the startAt parameter
 		// is set to some other height. In case of genesis, failure here would mostly occur if mainnet node
 		// loads testnet blockchain
@@ -175,18 +179,18 @@ func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmou
 
 		return nil
 	})
-
 	if err != nil {
 		return err
 	}
 
-	//TODO: Verify lastBlockAmount blocks
+	// TODO: Verify lastBlockAmount blocks
 	return nil
 }
 
-// LoadTip returns the tip of the chain
+// LoadTip returns the tip of the chain.
 func (l *DBLoader) LoadTip() (*block.Block, error) {
 	var tip *block.Block
+
 	err := l.db.Update(func(t database.Transaction) error {
 		s, err := t.FetchState()
 		if err != nil {
@@ -198,8 +202,8 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 			if err != nil {
 				return err
 			}
-			tip = l.genesis
 
+			tip = l.genesis
 			return nil
 		}
 
@@ -217,7 +221,6 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 		tip = &block.Block{Header: h, Txs: txs}
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +228,7 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 	// Verify chain state. There shouldn't be any blocks higher than chainTip
 	err = l.db.View(func(t database.Transaction) error {
 		nextHeight := tip.Header.Height + 1
+
 		hash, e := t.FetchBlockHashByHeight(nextHeight)
 		// Check if error is nil and the hash is set
 		if e == nil && len(hash) > 0 {
@@ -235,6 +239,7 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 		//if e != nil {
 		//	return e
 		//}
+
 		return nil
 	})
 

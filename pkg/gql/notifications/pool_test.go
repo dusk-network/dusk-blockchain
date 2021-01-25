@@ -30,7 +30,6 @@ type mockWebsocketConn struct {
 }
 
 func (c *mockWebsocketConn) WriteMessage(messageType int, data []byte) error {
-
 	// Mimic connection consuming the json msg
 	var p BlockMsg
 	if err := json.Unmarshal(data, &p); err == nil {
@@ -41,15 +40,19 @@ func (c *mockWebsocketConn) WriteMessage(messageType int, data []byte) error {
 
 	return nil
 }
+
 func (c *mockWebsocketConn) WriteControl(messageType int, data []byte, deadline time.Time) error {
 	return nil
 }
+
 func (c *mockWebsocketConn) RemoteAddr() net.Addr {
 	return &mockAddr{addr: "0.0.0.0"}
 }
+
 func (c *mockWebsocketConn) SetWriteDeadline(t time.Time) error {
 	return nil
 }
+
 func (c *mockWebsocketConn) Close() error {
 	return nil
 }
@@ -65,13 +68,14 @@ type mockAddr struct {
 func (m *mockAddr) Network() string {
 	return "mocked"
 }
+
 func (m *mockAddr) String() string {
 	return m.addr
 }
 
 func TestPoolBasicScenario(t *testing.T) {
-
 	eb := eventbus.New()
+
 	pool := NewPool(eb, 10, 51)
 	defer pool.Close()
 
@@ -90,15 +94,17 @@ func TestPoolBasicScenario(t *testing.T) {
 
 	// Simulate eventBus publishing sample acceptedBlocks
 	ctxSentMsgs := make([]string, 0)
-	for height := 0; height < 5; height++ {
 
+	for height := 0; height < 5; height++ {
 		blk := helper.RandomBlock(uint64(height), 3)
 		hash, _ := blk.CalculateHash()
 		blk.Header.Hash = hash
 
 		msg := message.New(topics.AcceptedBlock, *blk)
+
 		errList := eb.Publish(topics.AcceptedBlock, msg)
 		require.Empty(t, errList)
+
 		ctxSentMsgs = append(ctxSentMsgs, hex.EncodeToString(blk.Header.Hash))
 	}
 
@@ -106,14 +112,15 @@ func TestPoolBasicScenario(t *testing.T) {
 
 	// Ensure all clients have received all published blocks
 	for i := 0; i < len(ctxSentMsgs); i++ {
-
 		sentMsg := ctxSentMsgs[i]
 		// Ensure sentMsg is received by each conn
 		for cInd := 0; cInd < len(ctxActiveConn); cInd++ {
 			conn := ctxActiveConn[cInd]
+
 			conn.mu.RLock()
 			_, ok := conn.msgBuf[sentMsg]
 			conn.mu.RUnlock()
+
 			if !ok {
 				t.Fatalf("Not all messages have been received by all clients")
 			}

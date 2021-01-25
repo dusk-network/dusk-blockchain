@@ -13,9 +13,8 @@ import (
 )
 
 // verifyIDNonce performs sha3 over concatenated id and nonce to ensure last
-// byte is zero
+// byte is zero.
 func verifyIDNonce(id [16]byte, nonce []byte) error {
-
 	if len(nonce) != 4 {
 		return errors.New("invalid nonce length")
 	}
@@ -28,12 +27,12 @@ func verifyIDNonce(id [16]byte, nonce []byte) error {
 	if (hash[31]) == 0 {
 		return nil
 	}
+
 	return errors.New("Id and Nonce are not valid parameters")
 }
 
-// MsgTypeToString translates wire message into string name
+// MsgTypeToString translates wire message into string name.
 func MsgTypeToString(t byte) (string, error) {
-
 	switch t {
 	case PingMsg:
 		return "PING", nil
@@ -56,14 +55,13 @@ func MsgTypeToString(t byte) (string, error) {
 // This operation is basically a PoW algorithm that ensures
 // that Sybil attacks are more costly.
 func ComputeNonce(id []byte) uint32 {
-
 	var nonce uint32 = 0
-	var hash [32]byte
 
+	var hash [32]byte
 	var nonceBytes [NonceLen]byte
 	var data [20]byte
-	for {
 
+	for {
 		byteOrder.PutUint32(nonceBytes[:], nonce)
 
 		copy(data[0:16], id[0:16])

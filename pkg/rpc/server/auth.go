@@ -29,14 +29,14 @@ const (
 
 type (
 	// Auth struct is a bit weird since it contains an array of known public keys,
-	// while the client should just be one. Oh well :)
+	// while the client should just be one. Oh well :).
 	Auth struct {
 		store  *hashset.SafeSet
 		jwtMan *JWTManager
 	}
 
 	// AuthInterceptor is the grpc interceptor to authenticate grpc calls
-	// before they get forwarded to the relevant services
+	// before they get forwarded to the relevant services.
 	AuthInterceptor struct {
 		jwtMan      *JWTManager
 		store       *hashset.SafeSet
@@ -44,9 +44,10 @@ type (
 	}
 )
 
-// NewAuth is the authorization service to manage the session with a client
+// NewAuth is the authorization service to manage the session with a client.
 func NewAuth(j *JWTManager) (*Auth, *AuthInterceptor) {
 	safeSet := hashset.NewSafe()
+
 	return &Auth{
 			store:  safeSet,
 			jwtMan: j,
@@ -57,9 +58,9 @@ func NewAuth(j *JWTManager) (*Auth, *AuthInterceptor) {
 		}
 }
 
-// CreateSession as defined from the grpc service
+// CreateSession as defined from the grpc service.
 // Calling createSession from an attached client should refreshes the
-// session token (i.e. drop the current one and create a new one)
+// session token (i.e. drop the current one and create a new one).
 func (a *Auth) CreateSession(ctx context.Context, req *node.SessionRequest) (*node.Session, error) {
 	edPk := req.GetEdPk()
 	edSig := req.GetEdSig()
@@ -70,6 +71,7 @@ func (a *Auth) CreateSession(ctx context.Context, req *node.SessionRequest) (*no
 
 	// delete the session key and recreate one
 	encoded := base64.StdEncoding.EncodeToString(edPk)
+
 	token, err := a.jwtMan.Generate(encoded)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "cannot generate token: %v", err)
@@ -82,13 +84,14 @@ func (a *Auth) CreateSession(ctx context.Context, req *node.SessionRequest) (*no
 	return res, nil
 }
 
-// DropSession as defined from the grpc service
+// DropSession as defined from the grpc service.
 func (a *Auth) DropSession(ctx context.Context, req *node.EmptyRequest) (*node.GenericResponse, error) {
 	// retrieve client public key from context
 	clientPk, ok := ctx.Value(edPkField).([]byte)
 	if !ok {
 		return nil, status.Error(codes.Internal, "unable to retrieve client pk from context")
 	}
+
 	// remove the PK to the set of known PKs
 	_ = a.store.Remove(clientPk)
 
@@ -96,7 +99,7 @@ func (a *Auth) DropSession(ctx context.Context, req *node.EmptyRequest) (*node.G
 	return res, nil
 }
 
-// Unary returns a UnaryServerInterceptor responsible for authentication
+// Unary returns a UnaryServerInterceptor responsible for authentication.
 func (ai *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		tag := "Unary call " + info.FullMethod
@@ -149,6 +152,7 @@ func (ai *AuthInterceptor) extractClientPK(a string) ([]byte, error) {
 
 	// extract the edPK of the client
 	b64EdPk := claims.ClientEdPk
+
 	edPk, err := base64.StdEncoding.DecodeString(b64EdPk)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not decode sender")

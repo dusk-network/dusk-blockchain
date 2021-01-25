@@ -74,8 +74,10 @@ func delayedWrite(c net.Conn) {
 	if _, err := c.Write([]byte{1, 2}); err != nil {
 		panic(err)
 	}
+
 	// Wait a bit, and write the other two
 	time.Sleep(100 * time.Millisecond)
+
 	if _, err := c.Write([]byte{3, 4}); err != nil {
 		panic(err)
 	}

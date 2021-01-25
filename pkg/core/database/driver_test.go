@@ -15,16 +15,18 @@ import (
 func unregisterAllDrivers() {
 	driversMu.Lock()
 	defer driversMu.Unlock()
+
 	// For tests.
 	drivers = make(map[string]Driver)
 }
 
-// Dummy DriverA
+// Dummy DriverA.
 type driverA struct{}
 
 func (d driverA) Open(path string, network protocol.Magic, readonly bool) (DB, error) {
 	return nil, nil
 }
+
 func (d driverA) Name() string {
 	return "driver_a"
 }
@@ -33,7 +35,7 @@ func (d driverA) Close() error {
 	return nil
 }
 
-// Dummy DriverB
+// Dummy DriverB.
 type driverB struct{}
 
 func (d driverB) Open(path string, network protocol.Magic, readonly bool) (DB, error) {
@@ -49,8 +51,8 @@ func (d driverB) Close() error {
 }
 
 func TestDuplicatedDriver(t *testing.T) {
-
 	unregisterAllDrivers()
+
 	err := Register(&driverA{})
 	if err != nil {
 		t.Fatal("Registering DB driver failed")
@@ -67,10 +69,9 @@ func TestDuplicatedDriver(t *testing.T) {
 }
 
 func TestListDriver(t *testing.T) {
-
 	unregisterAllDrivers()
-	err := Register(&driverB{})
 
+	err := Register(&driverB{})
 	if err != nil {
 		t.Fatal("Registering DB driverB failed")
 	}
@@ -93,10 +94,9 @@ func TestListDriver(t *testing.T) {
 }
 
 func TestRetrieveDriver(t *testing.T) {
-
 	unregisterAllDrivers()
-	err := Register(&driverB{})
 
+	err := Register(&driverB{})
 	if err != nil {
 		t.Fatal("Registering DB driverB failed")
 	}

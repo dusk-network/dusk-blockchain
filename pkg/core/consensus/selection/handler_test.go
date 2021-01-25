@@ -16,7 +16,6 @@ import (
 )
 
 func TestPriority(t *testing.T) {
-
 	// mock candidate
 	genesis := config.DecodeGenesis()
 

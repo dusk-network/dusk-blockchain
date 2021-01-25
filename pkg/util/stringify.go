@@ -11,9 +11,10 @@ import (
 	"strings"
 )
 
-// StringifyBytes returns a semi readable representation of a byte array
+// StringifyBytes returns a semi readable representation of a byte array.
 func StringifyBytes(b []byte) string {
 	var sb strings.Builder
+
 	if len(b) > 0 {
 		_, _ = sb.WriteString(hex.EncodeToString(b[0:5]))
 		_, _ = sb.WriteString("...")
@@ -21,5 +22,6 @@ func StringifyBytes(b []byte) string {
 	} else {
 		_, _ = sb.WriteString("<empty>")
 	}
+
 	return sb.String()
 }

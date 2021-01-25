@@ -25,9 +25,9 @@ import (
 )
 
 const (
-	// basePort all listeners derive from
+	// basePort all listeners derive from.
 	basePort = 10000
-	// Number of the TestNetwork nodes
+	// Number of the TestNetwork nodes.
 	networkSize = 10
 
 	enableProfiling = false
@@ -35,6 +35,7 @@ const (
 
 func kadcastRandomBlock(eventbus *eventbus.EventBus) (*block.Block, error) {
 	b := helper.RandomBlock(1, 3)
+
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, b); err != nil {
 		return b, err
@@ -46,12 +47,13 @@ func kadcastRandomBlock(eventbus *eventbus.EventBus) (*block.Block, error) {
 
 	header := []byte{kadcast.InitHeight}
 	m := message.NewWithHeader(topics.Block, *buf, header)
+
 	eventbus.Publish(topics.Kadcast, m)
 	return b, nil
 }
 
 // TestBroadcastChunksMsg boostrap a kadcast network and make an attempt to
-// broadcast a message to all network peers
+// broadcast a message to all network peers.
 func TestBroadcastChunksMsg(t *testing.T) {
 	// suppressing annoying INFO messages
 	logrus.SetLevel(logrus.ErrorLevel)
@@ -76,7 +78,6 @@ func TestBroadcastChunksMsg(t *testing.T) {
 					}).Infof(" profile saved")
 				}
 			}
-
 		}()
 	}
 

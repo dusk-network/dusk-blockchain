@@ -12,9 +12,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 )
 
-//const respAmount uint32 = 7
+// const respAmount uint32 = 7
 
-// RandomInput returns a random input for testing
+// RandomInput returns a random input for testing.
 func RandomInput(t *testing.T) *common.BlsScalar {
 	/*
 		amount := ristretto.Scalar{}
@@ -38,7 +38,7 @@ func RandomInput(t *testing.T) *common.BlsScalar {
 	return nil
 }
 
-// RandomInputs returns a slice of inputs of size `size` for testing
+// RandomInputs returns a slice of inputs of size `size` for testing.
 func RandomInputs(t *testing.T, size int) []*common.BlsScalar {
 	/*
 		var ins transactions.Inputs

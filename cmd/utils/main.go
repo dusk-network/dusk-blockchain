@@ -212,9 +212,8 @@ var (
 	}
 )
 
-// metricsAction will expose the metrics endpoint
+// metricsAction will expose the metrics endpoint.
 func metricsAction(ctx *cli.Context) error {
-
 	gqlPort := ctx.Int(gqlPortFlag.Name)
 	nodePort := ctx.Int(nodePortFlag.Name)
 	nodeAPIPort := ctx.Int(nodeAPIPortFlag.Name)
@@ -226,9 +225,8 @@ func metricsAction(ctx *cli.Context) error {
 	return nil
 }
 
-// transactionsAction will expose the metrics endpoint
+// transactionsAction will expose the metrics endpoint.
 func transactionsAction(ctx *cli.Context) error {
-
 	grpcHost := ctx.String(grpcHostFlag.Name)
 	amount := ctx.Uint64(amountFlag.Name)
 	lockTime := ctx.Uint64(lockTimeFlag.Name)
@@ -278,7 +276,6 @@ func mockRuskAction(ctx *cli.Context) error {
 }
 
 func walletAction(ctx *cli.Context) error {
-
 	grpcHost := ctx.String(grpcHostFlag.Name)
 	walletCMD := ctx.String(walletCMDFlag.Name)
 	walletPassword := ctx.String(walletPasswordFlag.Name)

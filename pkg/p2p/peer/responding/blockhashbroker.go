@@ -45,10 +45,12 @@ func (b *BlockHashBroker) AdvertiseMissingBlocks(m message.Message) ([]bytes.Buf
 	// Fill an inv message with all block hashes between the locator
 	// and the chain tip.
 	inv := &message.Inv{}
+
 	for {
 		height++
 
 		var hash []byte
+
 		err = b.db.View(func(t database.Transaction) error {
 			hash, err = t.FetchBlockHashByHeight(height)
 			return err
@@ -61,6 +63,7 @@ func (b *BlockHashBroker) AdvertiseMissingBlocks(m message.Message) ([]bytes.Buf
 		}
 
 		inv.AddItem(message.InvTypeBlock, hash)
+
 		if len(inv.InvList) >= cfg.MaxInvBlocks {
 			break
 		}
@@ -83,6 +86,7 @@ func (b *BlockHashBroker) fetchLocatorHeight(msg message.GetBlocks) (uint64, err
 	}
 
 	var height uint64
+
 	err := b.db.View(func(t database.Transaction) error {
 		header, err := t.FetchBlockHeader(msg.Locators[0])
 		if err != nil {

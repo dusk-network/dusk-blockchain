@@ -38,6 +38,7 @@ func newAccumulator(handler Handler, workerAmount int) *Accumulator {
 	}
 
 	a.CreateWorkers(workerAmount)
+
 	go a.Accumulate()
 	return a
 }
@@ -56,7 +57,7 @@ func (a *Accumulator) Process(ev message.Agreement) {
 	a.verificationChan <- ev
 }
 
-// Accumulate agreements per block hash until a quorum is reached or a stop is detected (by closing the internal event channel). Supposed to run in a goroutine
+// Accumulate agreements per block hash until a quorum is reached or a stop is detected (by closing the internal event channel). Supposed to run in a goroutine.
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
 		// FIXME: republish here to avoid race conditions for slower but safer
@@ -64,6 +65,7 @@ func (a *Accumulator) Accumulate() {
 		hdr := ev.State()
 		collected := a.store.Get(hdr.Step)
 		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
+
 		count := a.store.Insert(ev, weight)
 		if count == len(collected) {
 			lg.Warnln("Agreement was not accumulated since it is a duplicate")
@@ -76,6 +78,7 @@ func (a *Accumulator) Accumulate() {
 			"count":  count,
 			"quorum": a.handler.Quorum(hdr.Round),
 		}).Debugln("collected agreement")
+
 		if count >= a.handler.Quorum(hdr.Round) {
 			votes := a.store.Get(hdr.Step)
 			a.CollectedVotesChan <- votes
@@ -84,8 +87,8 @@ func (a *Accumulator) Accumulate() {
 	}
 }
 
-//CreateWorkers creates an amount of workers that verify Agreement messages
-//concurrently
+// CreateWorkers creates an amount of workers that verify Agreement messages
+// concurrently.
 func (a *Accumulator) CreateWorkers(amount int) {
 	var wg sync.WaitGroup
 
@@ -94,6 +97,7 @@ func (a *Accumulator) CreateWorkers(amount int) {
 	}
 
 	wg.Add(amount)
+
 	for i := 0; i < amount; i++ {
 		go verify(a.verificationChan, a.eventChan, a.handler.Verify, &wg, a.workersQuitChan)
 	}
@@ -105,7 +109,6 @@ func (a *Accumulator) CreateWorkers(amount int) {
 }
 
 func verify(verificationChan <-chan message.Agreement, eventChan chan<- message.Agreement, verifyFunc func(message.Agreement) error, wg *sync.WaitGroup, quit chan struct{}) {
-
 	defer wg.Done()
 
 	for {
@@ -125,7 +128,6 @@ func verify(verificationChan <-chan message.Agreement, eventChan chan<- message.
 			return
 		}
 	}
-
 }
 
 // Stop kills the thread pool and shuts down the Accumulator.

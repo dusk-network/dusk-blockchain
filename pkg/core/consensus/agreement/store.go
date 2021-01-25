@@ -31,13 +31,17 @@ func (s storedAgreements) Less(i, j int) bool {
 
 func (s storedAgreements) String() string {
 	var sb strings.Builder
+
 	_, _ = sb.WriteString("[\n")
+
 	for i, aggro := range s {
 		if i > 0 {
 			_, _ = sb.WriteString("\n")
 		}
+
 		_, _ = sb.WriteString(aggro.String())
 	}
+
 	_, _ = sb.WriteString("\n")
 	_, _ = sb.WriteString("]")
 	return sb.String()
@@ -56,29 +60,34 @@ func newStore() *store {
 
 func (s *store) String() string {
 	var sb strings.Builder
+
 	for k, v := range s.collected {
 		_, _ = sb.WriteString(strconv.Itoa(int(k)))
 		_, _ = sb.WriteString(": ")
 		_, _ = sb.WriteString(v.String())
 		_, _ = sb.WriteString("\n")
 	}
+
 	return sb.String()
 }
 
 func (s *store) Size() int {
 	var i int
+
 	for _, v := range s.collected {
 		i += len(v)
 	}
+
 	return i
 }
 
-// Put collects the Agreement and returns the number of agreement stored for a blockhash
+// Put collects the Agreement and returns the number of agreement stored for a blockhash.
 func (s *store) Insert(a message.Agreement, weight int) int {
 	s.Lock()
 	defer s.Unlock()
 
 	hdr := a.State()
+
 	idx := s.find(a)
 	if idx == -1 {
 		agreements := make([]message.Agreement, weight)
@@ -101,6 +110,7 @@ func (s *store) Insert(a message.Agreement, weight int) int {
 	for i := 0; i < weight; i++ {
 		stored = append(stored, message.Agreement{})
 		copy(stored[idx+1:], stored[idx:])
+
 		stored[idx] = a
 	}
 
@@ -121,9 +131,10 @@ func (s *store) Find(a message.Agreement) int {
 }
 
 // Find returns the index of an Agreement in the stored collection or, if the Agreement has not been stored, the index at which it would be stored.
-// In case no Agreement is stored for the blockHash specified, it returns -1
+// In case no Agreement is stored for the blockHash specified, it returns -1.
 func (s *store) find(a message.Agreement) int {
 	hdr := a.State()
+
 	stored := s.collected[hdr.Step]
 	if stored == nil {
 		return -1
@@ -137,6 +148,7 @@ func (s *store) find(a message.Agreement) int {
 func (s *store) Contains(a message.Agreement) bool {
 	s.RLock()
 	defer s.RUnlock()
+
 	idx := s.find(a)
 	return s.contains(idx, a)
 }
@@ -144,6 +156,7 @@ func (s *store) Contains(a message.Agreement) bool {
 func (s *store) contains(idx int, a message.Agreement) bool {
 	hdr := a.State()
 	stored := s.collected[hdr.Step]
+
 	if idx == -1 {
 		return false
 	}
@@ -158,6 +171,7 @@ func (s *store) contains(idx int, a message.Agreement) bool {
 func (s *store) Clear() {
 	s.Lock()
 	defer s.Unlock()
+
 	for k := range s.collected {
 		delete(s.collected, k)
 	}

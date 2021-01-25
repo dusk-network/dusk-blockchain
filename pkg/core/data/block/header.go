@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	// HeaderHashSize size of a block header hash in bytes
+	// HeaderHashSize size of a block header hash in bytes.
 	HeaderHashSize = 32
-	// HeightSize size of a block height field in bytes
+	// HeightSize size of a block height field in bytes.
 	HeightSize = 8
 )
 
@@ -34,7 +34,7 @@ type Header struct {
 	Hash         []byte               `json:"hash"` // Hash of all previous fields
 }
 
-// NewHeader creates a new Block Header
+// NewHeader creates a new Block Header.
 func NewHeader() *Header {
 	return &Header{
 		Certificate: EmptyCertificate(),
@@ -42,7 +42,7 @@ func NewHeader() *Header {
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
-// the message safe to publish to multiple subscribers
+// the message safe to publish to multiple subscribers.
 func (b *Header) Copy() *Header {
 	h := &Header{
 		Certificate: b.Certificate.Copy(),
@@ -73,9 +73,8 @@ func (b *Header) CalculateHash() ([]byte, error) {
 	return hash.Sha3256(buf.Bytes())
 }
 
-// Equals returns true if headers are equal
+// Equals returns true if headers are equal.
 func (b *Header) Equals(other *Header) bool {
-
 	if other == nil {
 		return false
 	}

@@ -33,32 +33,32 @@ import (
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
 
-// Verifier performs checks on the blockchain and potentially new incoming block
+// Verifier performs checks on the blockchain and potentially new incoming block.
 type Verifier interface {
-	// PerformSanityCheck on first N blocks and M last blocks
+	// PerformSanityCheck on first N blocks and M last blocks.
 	PerformSanityCheck(startAt uint64, firstBlocksAmount uint64, lastBlockAmount uint64) error
-	// SanityCheckBlock will verify whether a block is valid according to the rules of the consensus
+	// SanityCheckBlock will verify whether a block is valid according to the rules of the consensus.
 	SanityCheckBlock(prevBlock block.Block, blk block.Block) error
 }
 
 // Loader is an interface which abstracts away the storage used by the Chain to
-// store the blockchain
+// store the blockchain.
 type Loader interface {
-	// LoadTip of the chain
+	// LoadTip of the chain.
 	LoadTip() (*block.Block, error)
-	// Clear removes everything from the DB
+	// Clear removes everything from the DB.
 	Clear() error
-	// Close the Loader and finalizes any pending connection
+	// Close the Loader and finalizes any pending connection.
 	Close(driver string) error
-	// Height returns the current height as stored in the loader
+	// Height returns the current height as stored in the loader.
 	Height() (uint64, error)
-	// BlockAt returns the block at a given height
+	// BlockAt returns the block at a given height.
 	BlockAt(uint64) (block.Block, error)
-	// Append a block on the storage
+	// Append a block on the storage.
 	Append(*block.Block) error
 }
 
-// Ledger is the Chain interface used in tests
+// Ledger is the Chain interface used in tests.
 type Ledger interface {
 	CurrentHeight() uint64
 	ProcessSucceedingBlock(block.Block) error
@@ -67,31 +67,31 @@ type Ledger interface {
 	StopBlockProduction()
 }
 
-// Chain represents the nodes blockchain
+// Chain represents the nodes blockchain.
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 	db       database.DB
 
-	// loader abstracts away the persistence aspect of Block operations
+	// loader abstracts away the persistence aspect of Block operations.
 	loader Loader
 
-	// verifier performs verifications on the block
+	// verifier performs verifications on the block.
 	verifier Verifier
 
-	// current blockchain tip of local state
+	// current blockchain tip of local state.
 	lock sync.RWMutex
 	tip  *block.Block
 
-	// Current set of provisioners
+	// Current set of provisioners.
 	p *user.Provisioners
 
-	// Consensus loop
+	// Consensus loop.
 	loop           *loop.Consensus
 	CatchBlockChan chan consensus.Results
 
-	// rusk client
+	// rusk client.
 	proxy transactions.Proxy
 
 	ctx context.Context
@@ -118,12 +118,14 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		log.WithError(err).Error("Error in getting provisioners")
 		return nil, err
 	}
+
 	chain.p = &provisioners
 
 	prevBlock, err := loader.LoadTip()
 	if err != nil {
 		return nil, err
 	}
+
 	chain.tip = prevBlock
 
 	if prevBlock.Header.Height == 0 {
@@ -148,7 +150,7 @@ func (c *Chain) CurrentHeight() uint64 {
 	return c.tip.Header.Height
 }
 
-// GetRoundUpdate returns the current RoundUpdate
+// GetRoundUpdate returns the current RoundUpdate.
 func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -156,7 +158,7 @@ func (c *Chain) GetRoundUpdate() consensus.RoundUpdate {
 }
 
 // StopBlockProduction notifies the loop that it must return immediately. It
-// does that by pushing an error through the Block Result channel
+// does that by pushing an error through the Block Result channel.
 func (c *Chain) StopBlockProduction() {
 	// Kill the `ProduceBlock` goroutine.
 	select {
@@ -169,8 +171,10 @@ func (c *Chain) StopBlockProduction() {
 func (c *Chain) ProduceBlock() error {
 	ctx, cancel := context.WithCancel(c.ctx)
 	defer cancel()
+
 	for {
 		candidate := c.produceBlock(ctx)
+
 		block, err := candidate.Blk, candidate.Err
 		if err != nil {
 			return err
@@ -193,6 +197,7 @@ func (c *Chain) produceBlock(ctx context.Context) (winner consensus.Results) {
 		if err != nil {
 			// TODO: errors should be handled by the caller
 			log.WithError(err).Error("could not create consensus state machine")
+
 			winner.Err = err
 			return winner
 		}
@@ -240,11 +245,13 @@ func (c *Chain) ProcessSyncBlock(blk block.Block) error {
 // tip, and advertises it to the node's peers.
 func (c *Chain) AcceptSuccessiveBlock(blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
+
 	if err := c.AcceptBlock(blk); err != nil {
 		return err
 	}
 
 	log.Trace("gossiping block")
+
 	if err := c.advertiseBlock(blk); err != nil {
 		log.WithError(err).Error("block advertising failed")
 		return err
@@ -256,7 +263,7 @@ func (c *Chain) AcceptSuccessiveBlock(blk block.Block) error {
 // AcceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
-// Returns nil, if checks passed and block was successfully saved
+// Returns nil, if checks passed and block was successfully saved.
 func (c *Chain) AcceptBlock(blk block.Block) error {
 	field := logger.Fields{"process": "accept block", "height": blk.Header.Height}
 	l := log.WithFields(field)
@@ -277,6 +284,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
 	l.Trace("verifying block certificate")
+
 	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
 		l.WithError(err).Error("certificate verification failed")
 		return err
@@ -284,6 +292,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	// 3. Call ExecuteStateTransitionFunction
 	prov_num := c.p.Set.Len()
+
 	l.WithField("provisioners", prov_num).Info("calling ExecuteStateTransitionFunction")
 
 	// TODO: the context here should maybe used to set a timeout
@@ -307,6 +316,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	// 4. Store the approved block
 	l.Trace("storing block in db")
+
 	if err := c.loader.Append(&blk); err != nil {
 		l.WithError(err).Error("block storing failed")
 		return err
@@ -326,9 +336,10 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	msg := message.New(topics.AcceptedBlock, blk)
 	errList := c.eventBus.Publish(topics.AcceptedBlock, msg)
-	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
 
+	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
 	l.Trace("procedure ended")
+
 	return nil
 }
 
@@ -345,7 +356,7 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 	return err
 }
 
-// Send Inventory message to all peers
+// Send Inventory message to all peers.
 func (c *Chain) advertiseBlock(b block.Block) error {
 	// Disable gossiping messages if kadcast mode
 	if config.Get().Kadcast.Enabled {
@@ -353,23 +364,24 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	}
 
 	msg := &message.Inv{}
+
 	msg.AddItem(message.InvTypeBlock, b.Header.Hash)
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
-		//TODO: shall this really panic ?
+		// TODO: shall this really panic ?
 		log.Panic(err)
 	}
 
 	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		//TODO: shall this really panic ?
+		// TODO: shall this really panic ?
 		log.Panic(err)
 	}
 
 	m := message.New(topics.Inv, *buf)
 	errList := c.eventBus.Publish(topics.Gossip, m)
-	diagnostics.LogPublishErrors("chain/chain.go, topics.Gossip, topics.Inv", errList)
 
+	diagnostics.LogPublishErrors("chain/chain.go, topics.Gossip, topics.Inv", errList)
 	return nil
 }
 
@@ -394,9 +406,8 @@ func (c *Chain) kadcastBlock(m message.Message) error {
 		return err
 	}
 
-	m = message.NewWithHeader(topics.Block, *buf, []byte{kadHeight})
-	c.eventBus.Publish(topics.Kadcast, m)
-
+	c.eventBus.Publish(topics.Kadcast,
+		message.NewWithHeader(topics.Block, *buf, []byte{kadHeight}))
 	return nil
 }
 
@@ -428,7 +439,9 @@ func (c *Chain) RebuildChain(_ context.Context, e *node.EmptyRequest) (*node.Gen
 
 func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 	store := capi.GetStormDBInstance()
-	var members []*capi.Member
+	members := make([]*capi.Member, len(c.p.Members))
+	i := 0
+
 	for _, v := range c.p.Members {
 		var stakes []capi.Stake
 
@@ -438,6 +451,7 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 				StartHeight: s.StartHeight,
 				EndHeight:   s.EndHeight,
 			}
+
 			stakes = append(stakes, stake)
 		}
 
@@ -446,7 +460,8 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 			Stakes:       stakes,
 		}
 
-		members = append(members, &member)
+		members[i] = &member
+		i++
 	}
 
 	provisioner := capi.ProvisionerJSON{
@@ -454,6 +469,7 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 		Set:     c.p.Set,
 		Members: members,
 	}
+
 	err := store.Save(&provisioner)
 	if err != nil {
 		log.Warn("Could not store provisioners on memoryDB")

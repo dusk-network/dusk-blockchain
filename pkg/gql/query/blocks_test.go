@@ -261,7 +261,6 @@ func TestBlocksTxsQuery(t *testing.T) {
 }
 
 func TestBlocksByDate(t *testing.T) {
-
 	query := `
 	{
 	   blocks (since:  "1970-01-01T00:00:20+00:00" )     
