@@ -72,7 +72,7 @@ func (b *Broker) Run() {
 	defer func() {
 		// It's advisable to reset the broker state entirely.
 		// This would allow later to restart a broker without any leaks.
-		log.Infof("Terminating broker %d", b.id)
+		log.WithField("id", b.id).Info("closing")
 
 		// Unsubscribe from all eventBus events.
 		b.eventBus.Unsubscribe(topics.AcceptedBlock, b.acceptedBlockID)
@@ -135,18 +135,15 @@ func (b *Broker) handleConn(conn wsConn) {
 		}
 	}()
 
-	log.Tracef("handleConn %s", conn.RemoteAddr().String())
+	log.WithField("conn", conn.RemoteAddr().String()).Tracef("handle connection")
 
 	b.reap()
 
 	if b.clients.Len() >= int(b.maxClientsCount) {
-		log.Errorf("Too many connections %d", b.clients.Len())
-
-		// Free a slot by removing the oldest connection
-		e := b.clients.Front()
-		c := e.Value.(*wsClient)
-		close(c.msgChan)
-		b.clients.Remove(e)
+		log.WithField("clients_num", b.clients.Len()).Warn("too many connections")
+		// Discarding the connection
+		_ = conn.Close()
+		return
 	}
 
 	c := &wsClient{
@@ -170,7 +167,10 @@ func (b *Broker) handleConn(conn wsConn) {
 }
 
 func (b *Broker) handleIdle() {
-	log.Infof("Broker %d, active conn: %d", b.id, b.clients.Len())
+	log.
+		WithField("id", b.id).
+		WithField("clients_num", b.clients.Len()).
+		Debug("onidle")
 }
 
 // broadcastMessage propagates data to all active clients.
@@ -179,8 +179,10 @@ func (b *Broker) broadcastMessage(data string) {
 		return
 	}
 
-	log.Tracef("Broadcast message to %d clients", b.clients.Len())
-	log.Tracef("Message: %s ", data)
+	log.WithField("id", b.id).WithField("clients_num", b.clients.Len()).
+		Debug("notify ws clients")
+
+	log.WithField("body", data).Trace("broadcasted message")
 
 	for e := b.clients.Front(); e != nil; e = e.Next() {
 		c := e.Value.(*wsClient)
@@ -196,7 +198,6 @@ func (b *Broker) reap() {
 		if c.IsClosed() {
 			closedElm := e
 			e = e.Next()
-
 			b.clients.Remove(closedElm)
 		} else {
 			e = e.Next()

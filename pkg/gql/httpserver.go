@@ -176,6 +176,10 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 		clientsPerBroker = nc.ClientsPerBroker
 	}
 
+	log.WithField("brokers_num", nc.BrokersNum).
+		WithField("clients_per_broker", clientsPerBroker).
+		Info("Start graphql notification service")
+
 	s.pool = notifications.NewPool(s.eventBus, nc.BrokersNum, clientsPerBroker)
 
 	wsHandler := func(w http.ResponseWriter, r *http.Request) {

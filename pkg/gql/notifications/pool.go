@@ -9,6 +9,7 @@ package notifications
 import (
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -29,9 +30,11 @@ type wsConn interface {
 // BrokerPool is a set of broker workers to provide a simple load balancing.
 // Running multiple broker workers also could provide failover.
 type BrokerPool struct {
+	QuitChan chan bool
+	workers  []*Broker
+
 	ConnectionsChan chan wsConn
-	QuitChan        chan bool
-	workers         []*Broker
+	lock            sync.Mutex
 }
 
 // NewPool intantiates the specified amount of brokers and run them in separate
@@ -56,26 +59,30 @@ func NewPool(eventBus *eventbus.EventBus, brokersNum, clientsPerBroker uint) *Br
 	return bp
 }
 
-// PushConn pushes a websocket connection to the broker pool. If all brokers
-// are busy the connection gets discarded.
-// TODO: it appears that the connection is not actually discarded. Maybe the GC
-// finalizes it, but it should be checked what exactly happens to the
-// connection if all brokers are busy.
+// PushConn pushes a websocket connection to the broker pool.
 func (bp *BrokerPool) PushConn(conn *websocket.Conn) {
 	if conn == nil {
 		return
 	}
 
-	select {
-	case bp.ConnectionsChan <- conn:
-	default:
-		log.Errorf("Queue is full. Discarding connection from %s", conn.RemoteAddr().String())
+	bp.lock.Lock()
+	defer bp.lock.Unlock()
+
+	if bp.ConnectionsChan != nil {
+		bp.ConnectionsChan <- conn
+	} else {
+		// Broker is closing, cannot manage this connection
+		_ = conn.Close()
 	}
 }
 
 // Close the BrokerPool by closing the underlying connection channel.
 func (bp *BrokerPool) Close() {
+	bp.lock.Lock()
+	defer bp.lock.Unlock()
+
 	// Closing the shared chan will trigger a cascading teardown procedure for
 	// brokers and their clients.
 	close(bp.ConnectionsChan)
+	bp.ConnectionsChan = nil
 }
