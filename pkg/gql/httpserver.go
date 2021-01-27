@@ -7,8 +7,10 @@
 package gql
 
 import (
+	"context"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/didip/tollbooth"
@@ -36,10 +38,10 @@ const (
 
 // Server defines the HTTP server of the GraphQL service node.
 type Server struct {
-	started bool // Indicates whether or not server has started
+	started uint32 // Indicates whether or not server has started
 
-	listener net.Listener
-	lmt      *limiter.Limiter
+	httpServer *http.Server
+	lmt        *limiter.Limiter
 
 	// Graphql utility.
 	schema *graphql.Schema
@@ -69,7 +71,7 @@ func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server,
 // Start the GraphQL HTTP Server and begin listening on specified port.
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
-	httpServer := &http.Server{
+	s.httpServer = &http.Server{
 		Handler:     mux,
 		ReadTimeout: time.Second * 10,
 	}
@@ -92,16 +94,14 @@ func (s *Server) Start() error {
 		return err
 	}
 
-	s.listener = l
-	go s.listenOnHTTPServer(httpServer)
+	go s.listenOnHTTPServer(l)
 
-	s.started = true
-
+	atomic.StoreUint32(&s.started, 1)
 	return nil
 }
 
 // Listen on the http server.
-func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
+func (s *Server) listenOnHTTPServer(l net.Listener) {
 	conf := cfg.Get().Gql
 
 	log.WithField("net", conf.Network).
@@ -110,13 +110,13 @@ func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
 
 	var err error
 	if conf.EnableTLS {
-		err = httpServer.ServeTLS(s.listener, conf.CertFile, conf.KeyFile)
+		err = s.httpServer.ServeTLS(l, conf.CertFile, conf.KeyFile)
 	} else {
-		err = httpServer.Serve(s.listener)
+		err = s.httpServer.Serve(l)
 	}
 
 	if err != nil && err != http.ErrServerClosed {
-		log.Errorf("HTTP server stopped with error %v", err)
+		log.WithError(err).Warn("HTTP server stopped with error")
 	} else {
 		log.Info("HTTP server stopped listening")
 	}
@@ -127,7 +127,7 @@ func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
 func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
 	// GraphQL service
 	gqlHandler := func(w http.ResponseWriter, r *http.Request) {
-		if !s.started {
+		if atomic.LoadUint32(&s.started) == 0 {
 			return
 		}
 
@@ -135,7 +135,6 @@ func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
 		w.Header().Set("Content-Type", "application/json")
 
 		r.Close = true
-
 		handleQuery(s.schema, w, r, s.db)
 	}
 
@@ -176,10 +175,14 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 		clientsPerBroker = nc.ClientsPerBroker
 	}
 
+	log.WithField("brokers_num", nc.BrokersNum).
+		WithField("clients_per_broker", clientsPerBroker).
+		Info("Start graphql notification service")
+
 	s.pool = notifications.NewPool(s.eventBus, nc.BrokersNum, clientsPerBroker)
 
 	wsHandler := func(w http.ResponseWriter, r *http.Request) {
-		if !s.started {
+		if atomic.LoadUint32(&s.started) == 0 {
 			return
 		}
 
@@ -200,12 +203,17 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 
 // Stop the server.
 func (s *Server) Stop() error {
-	s.started = false
+	atomic.StoreUint32(&s.started, 0)
 
+	// Close pool of notification brokers
 	s.pool.Close()
 
-	if err := s.listener.Close(); err != nil {
-		log.WithError(err).Error("error shutting down")
+	// Close graphql http server
+	dialCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	if err := s.httpServer.Shutdown(dialCtx); err != nil {
+		log.WithError(err).Warn("error shutting down")
 		return err
 	}
 

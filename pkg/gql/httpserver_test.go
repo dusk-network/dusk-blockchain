@@ -9,13 +9,13 @@ package gql
 import (
 	"context"
 	"net/url"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/gql/notifications"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -25,70 +25,102 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
-func TestWebsocketEndpoint(t *testing.T) {
-	logrus.SetLevel(logrus.FatalLevel)
+const (
+	// clientsNum number of ws clients to try to connect to Notification service.
+	clientsNum = 2*1000 + 500
+
+	// maxAllowedClients is max connections the service is configured to handle.
+	maxAllowedClients = uint(2 * 500)
+	brokersNum        = uint(2)
+
+	// srvAddr Notification service address.
+	srvAddr = "127.0.0.1:22222"
+
+	maxOpenFiles = 10 * 1000
+)
+
+// TestMultiClient ensures Notification service is capable of handling up to
+// broker * clients connections concurrently.
+func TestMultiClient(t *testing.T) {
+	logrus.SetLevel(logrus.ErrorLevel)
 
 	assert := assert.New(t)
 
+	increaseFDLimit(maxOpenFiles)
+
 	// Set up HTTP server with notifications enabled
 	// config
-	s, eb, err := setupServer("127.0.0.1:22222")
+	s, eb, err := createServer(srvAddr, brokersNum, maxAllowedClients/brokersNum)
 	assert.NoError(err)
 
 	defer s.Stop()
 
-	dialCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// Set up a list of ws clients
+	resp := make(chan string, clientsNum)
+
+	for i := 0; i < clientsNum; i++ {
+		if err := createClient(srvAddr, resp); err != nil {
+			assert.NoError(err)
+		}
+	}
+
+	// Simulate eventBus publishing an acceptedBlocks message
+	publishRandBlock(eb, assert)
+
+	// Run a simple monitor to ensure a condition is satisfied
+	respCount := uint(0)
+	done := make(chan bool)
+
+	go func(ch chan bool, c *uint) {
+		for {
+			<-resp
+			*c++
+			// Ensure that the count of ws connections that received a
+			// Block Update Message is neither more nor less than
+			// maxAllowedClients
+			if *c == maxAllowedClients {
+				ch <- true
+				return
+			}
+		}
+	}(done, &respCount)
+
+	// Within up to 10 sec, we expect all ws clients have received a Block Update Message
+	select {
+	case <-done:
+		break
+	case <-time.After(10 * time.Second):
+		assert.Failf("could not receive all responses", "number of responses", respCount)
+	}
+}
+
+func createClient(addr string, resp chan string) error {
+	dialCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	// Set up a websocket client
-	u := url.URL{Scheme: "ws", Host: "127.0.0.1:22222", Path: "/ws"}
-	c, _, e := websocket.DefaultDialer.DialContext(dialCtx, u.String(), nil)
-	assert.NoError(e)
+	u := url.URL{Scheme: "ws", Host: addr, Path: "/ws"}
 
-	defer func() {
-		_ = c.Close()
-	}()
-
-	response := make(chan string)
+	c, _, err := websocket.DefaultDialer.DialContext(dialCtx, u.String(), nil)
+	if err != nil {
+		return err
+	}
 
 	go func() {
-		_, msg, readErr := c.ReadMessage()
-		if readErr != nil {
-			return
+		for {
+			_, msg, readErr := c.ReadMessage()
+			if readErr != nil {
+				c.Close()
+				break
+			}
+			resp <- string(msg)
 		}
-		response <- string(msg)
 	}()
 
-	// Unblock test if no response sent for N seconds
-	go func() {
-		time.Sleep(7 * time.Second)
-		response <- "no response"
-	}()
-
-	// Simulate eventBus publishing a acceptedBlocks message
-
-	time.Sleep(time.Second)
-
-	blk := helper.RandomBlock(uint64(0), 4)
-	hash, _ := blk.CalculateHash()
-	blk.Header.Hash = hash
-	msg := message.New(topics.AcceptedBlock, *blk)
-
-	errList := eb.Publish(topics.AcceptedBlock, msg)
-	assert.Empty(errList)
-
-	message := <-response
-
-	assert.Greater(len(message), 0)
-
-	expMsg, err := notifications.MarshalBlockMsg(*blk)
-	assert.NoError(err)
-
-	assert.NotEqual("no response", expMsg)
-	assert.NotEqual("malformed message received", expMsg)
+	return nil
 }
 
-func setupServer(addr string) (*Server, *eventbus.EventBus, error) {
+func createServer(addr string, brokerNum, clientsPerBroker uint) (*Server, *eventbus.EventBus, error) {
 	// Set up HTTP server with notifications enabled
 	// config
 	r := config.Registry{}
@@ -96,7 +128,8 @@ func setupServer(addr string) (*Server, *eventbus.EventBus, error) {
 	r.Gql.Address = addr
 	r.Gql.Enabled = true
 	r.Gql.EnableTLS = false
-	r.Gql.Notification.BrokersNum = 1
+	r.Gql.Notification.BrokersNum = brokerNum
+	r.Gql.Notification.ClientsPerBroker = clientsPerBroker
 	r.Database.Driver = lite.DriverName
 	r.General.Network = "testnet"
 	config.Mock(&r)
@@ -110,4 +143,26 @@ func setupServer(addr string) (*Server, *eventbus.EventBus, error) {
 	}
 
 	return s, eb, s.Start()
+}
+
+func publishRandBlock(eb *eventbus.EventBus, assert *assert.Assertions) {
+	blk := helper.RandomBlock(uint64(0), 4)
+	hash, _ := blk.CalculateHash()
+	blk.Header.Hash = hash
+	msg := message.New(topics.AcceptedBlock, *blk)
+
+	errList := eb.Publish(topics.AcceptedBlock, msg)
+	assert.Empty(errList)
+}
+
+func increaseFDLimit(l uint64) {
+	var limit syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+		panic(err)
+	}
+
+	limit.Cur = l
+	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+		panic(err)
+	}
 }

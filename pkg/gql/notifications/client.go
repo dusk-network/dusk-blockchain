@@ -33,25 +33,34 @@ func (c *wsClient) writeLoop() {
 		// proxies and other intermediaries.
 		_ = c.conn.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(time.Second))
 
-		_ = c.conn.Close()
-
-		log.Tracef("Close websocket client %s", c.id)
+		err := c.conn.Close()
+		if err != nil {
+			log.WithError(err).
+				WithField("conn_addr", c.id).
+				Error("could not close connection")
+		} else {
+			log.WithField("conn_addr", c.id).Trace("close websocket client")
+		}
 	}()
 
 	for msg := range c.msgChan {
-		log.Tracef("Write message of %d bytes to %s", len(msg), c.id)
+		log.WithField("conn_addr", c.id).
+			WithField("msg_len", len(msg)).Trace("send ws message")
 
 		if err := c.conn.SetWriteDeadline(time.Now().Add(writeDeadline)); err != nil {
-			log.Errorf("client %s could not set writedeadline: %v", c.id, err)
+			log.WithField("client_id", c.id).
+				WithError(err).
+				Warn("could not set write deadline")
 			break
 		}
 
 		// NB: Use websocket.BinaryMessage + Compression if reducing frame size is a thing
 		if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-			log.Tracef("client %s exiting due to: %v", c.id, err)
+			log.WithField("conn_addr", c.id).
+				WithError(err).Trace("close websocket client")
 			// Instead of using a websocket.PingMessage to check client is alive,
 			// we rely here on message sending as it's on regular base. If it fails,
-			// the client is removed from the ist of active clients
+			// the client is removed from the list of active clients
 			break
 		}
 	}
