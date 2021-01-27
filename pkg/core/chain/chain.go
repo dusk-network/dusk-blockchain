@@ -168,6 +168,8 @@ func (c *Chain) StopBlockProduction(blk block.Block) {
 }
 
 // ProduceBlock ...
+// TODO: Review this design and devise a more readable, and possibly more synchronized
+// way of running this pipeline between the synchronizer and the consensus.
 func (c *Chain) ProduceBlock() error {
 	ctx, cancel := context.WithCancel(c.ctx)
 	defer cancel()
@@ -181,6 +183,13 @@ func (c *Chain) ProduceBlock() error {
 		}
 
 		// Otherwise, accept the block directly.
+		// NOTE: The error is not checked for relevance here, since this is
+		// already done in the Agreement. The Agreement has direct access
+		// to `CatchBlockChan` during consensus, and will be the first one
+		// to receive such messages. There, the error is checked for relevance
+		// by comparing the block height to the current round. This makes sure
+		// that an irrelevant error is never bubbled up to this function, and
+		// thus, we don't need to check it here.
 		if !block.IsEmpty() && block.Header.Height == c.CurrentHeight()+1 {
 			if err = c.AcceptSuccessiveBlock(block); err != nil {
 				return err
