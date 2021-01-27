@@ -198,6 +198,7 @@ func (b *Broker) reap() {
 		if c.IsClosed() {
 			closedElm := e
 			e = e.Next()
+
 			b.clients.Remove(closedElm)
 		} else {
 			e = e.Next()
