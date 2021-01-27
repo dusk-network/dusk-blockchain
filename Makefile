@@ -8,6 +8,8 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 all: build
 lint: ## Lint the files
 	GOBIN=$(PWD)/bin go run scripts/build.go lint
+go-analyzer: ## Run go-analyzer
+	GOBIN=$(PWD)/bin go run scripts/build.go go-analyzer
 test: ## Run unittests
 	@go test $(TFLAGS) -short ${PKG_LIST}
 test-harness: ## Run harness tests

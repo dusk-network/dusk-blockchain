@@ -20,6 +20,8 @@ import (
 const (
 	// GOLANGCI_VERSION to be used for linting.
 	GOLANGCI_VERSION = "github.com/golangci/golangci-lint/cmd/golangci-lint@v1.31.0"
+	// GO_ANALYZER_VERSION to be used for go-analyzer.
+	GO_ANALYZER_VERSION = "github.com/dusk-network/go-analyzer/cmd/go-analyzer"
 )
 
 // GOBIN environment variable.
@@ -47,6 +49,8 @@ func main() {
 		install(os.Args[2:])
 	case "lint":
 		lint()
+	case "go-analyzer":
+		goAnalyzer()
 	default:
 		log.Fatal("cmd not found: ", os.Args[1])
 	}
@@ -124,5 +128,27 @@ func lint() {
 
 	if err := cmd.Run(); err != nil {
 		log.Fatal("Error: Could not Lint Dusk ... ", "error: ", err, ", cmd: ", cmd)
+	}
+}
+
+//nolint:gosec
+func goAnalyzer() {
+	// Make sure go-analyzer is downloaded and available.
+	argsGet := []string{"get", GO_ANALYZER_VERSION}
+	cmd := exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), argsGet...)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("could not list pkgs: %v\n%s", err, string(out))
+	}
+
+	cmd = exec.Command(filepath.Join(GOBIN(), "go-analyzer"))
+	cmd.Args = append(cmd.Args, "-a")
+
+	fmt.Println("Analyzing Dusk ...", strings.Join(cmd.Args, " \\\n"))
+	cmd.Stderr, cmd.Stdout = os.Stderr, os.Stdout
+
+	if err := cmd.Run(); err != nil {
+		log.Fatal("Error: Could not Analyze Dusk ... ", "error: ", err, ", cmd: ", cmd)
 	}
 }
