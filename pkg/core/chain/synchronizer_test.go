@@ -137,5 +137,5 @@ func (m *mockChain) ProduceBlock() error {
 	return nil
 }
 
-func (m *mockChain) StopBlockProduction() {
+func (m *mockChain) StopBlockProduction(block.Block) {
 }
