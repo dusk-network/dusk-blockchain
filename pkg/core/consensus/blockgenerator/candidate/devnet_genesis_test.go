@@ -20,7 +20,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
@@ -82,16 +81,16 @@ func TestGenerateDevNetGenesis(t *testing.T) {
 	}
 
 	stake := transactions.NewTransaction()
-	stake.TxPayload.CallData = buf.Bytes()
+	stake.Payload.CallData = buf.Bytes()
 	amount := 10000 * wallet.DUSK
 	amountBytes := make([]byte, 32)
 	binary.LittleEndian.PutUint64(amountBytes[0:8], amount)
-	stake.TxPayload.Notes = append(stake.TxPayload.Notes, &transactions.Note{
-		Randomness:    &common.JubJubCompressed{Data: make([]byte, 32)},
-		PkR:           &common.JubJubCompressed{Data: wallets[0].PublicKey.AG.Data},
-		Commitment:    &common.JubJubCompressed{Data: amountBytes},
-		Nonce:         &common.BlsScalar{Data: make([]byte, 32)},
-		EncryptedData: &common.PoseidonCipher{Data: make([]byte, 96)},
+	stake.Payload.Notes = append(stake.Payload.Notes, &transactions.Note{
+		Randomness:    make([]byte, 32),
+		PkR:           wallets[0].PublicKey.AG,
+		Commitment:    amountBytes,
+		Nonce:         make([]byte, 32),
+		EncryptedData: make([]byte, 96),
 	})
 
 	stake.TxType = transactions.Stake
@@ -108,13 +107,13 @@ func TestGenerateDevNetGenesis(t *testing.T) {
 	}
 
 	bid := transactions.NewTransaction()
-	bid.TxPayload.CallData = buf.Bytes()
-	bid.TxPayload.Notes = append(bid.TxPayload.Notes, &transactions.Note{
-		Randomness:    &common.JubJubCompressed{Data: make([]byte, 32)},
-		PkR:           &common.JubJubCompressed{Data: wallets[0].PublicKey.AG.Data},
-		Commitment:    &common.JubJubCompressed{Data: amountBytes},
-		Nonce:         &common.BlsScalar{Data: make([]byte, 32)},
-		EncryptedData: &common.PoseidonCipher{Data: make([]byte, 96)},
+	bid.Payload.CallData = buf.Bytes()
+	bid.Payload.Notes = append(bid.Payload.Notes, &transactions.Note{
+		Randomness:    make([]byte, 32),
+		PkR:           wallets[0].PublicKey.AG,
+		Commitment:    amountBytes,
+		Nonce:         make([]byte, 32),
+		EncryptedData: make([]byte, 96),
 	})
 	bid.TxType = transactions.Bid
 	b.AddTx(bid)
@@ -126,13 +125,13 @@ func TestGenerateDevNetGenesis(t *testing.T) {
 		}
 
 		coinbase := transactions.NewTransaction()
-		coinbase.TxPayload.CallData = buf.Bytes()
-		coinbase.TxPayload.Notes = append(coinbase.TxPayload.Notes, &transactions.Note{
-			Randomness:    &common.JubJubCompressed{Data: make([]byte, 32)},
-			PkR:           &common.JubJubCompressed{Data: w.PublicKey.AG.Data},
-			Commitment:    &common.JubJubCompressed{Data: amountBytes},
-			Nonce:         &common.BlsScalar{Data: make([]byte, 32)},
-			EncryptedData: &common.PoseidonCipher{Data: make([]byte, 96)},
+		coinbase.Payload.CallData = buf.Bytes()
+		coinbase.Payload.Notes = append(coinbase.Payload.Notes, &transactions.Note{
+			Randomness:    make([]byte, 32),
+			PkR:           w.PublicKey.AG,
+			Commitment:    amountBytes,
+			Nonce:         make([]byte, 32),
+			EncryptedData: make([]byte, 96),
 		})
 		coinbase.TxType = transactions.Distribute
 		b.AddTx(coinbase)

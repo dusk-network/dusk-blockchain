@@ -14,7 +14,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
@@ -79,16 +78,16 @@ func (sh *ScoreHandler) Verify(ctx context.Context, round uint64, step uint8, m 
 	sh.lock.RLock()
 	defer sh.lock.RUnlock()
 
-	score := &common.BlsScalar{Data: m.Score}
+	score := m.Score
 	if sh.threshold.Exceeds(score) {
 		return errors.New("threshold exceeds score")
 	}
 
 	return sh.scoreVerifier.VerifyScore(ctx, round, step, blindbid.VerifyScoreRequest{
-		Proof:    &common.Proof{Data: m.Proof},
+		Proof:    m.Proof,
 		Score:    score,
-		Seed:     &common.BlsScalar{Data: m.Seed},
-		ProverID: &common.BlsScalar{Data: m.Identity},
+		Seed:     m.Seed,
+		ProverID: m.Identity,
 		Round:    round,
 		Step:     uint32(step),
 	})

@@ -56,6 +56,7 @@ func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, srv *grpc.Server) *
 	if srv != nil {
 		node.RegisterProvisionerServer(srv, a)
 	}
+
 	return a
 }
 

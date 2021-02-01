@@ -36,13 +36,9 @@ func TestStandardTxIntegrity(t *testing.T) {
 
 	c, _ := client.CreateTransferClient(ctx, "localhost:10000")
 
-	sa := new(rusk.StealthAddress)
-	sa.RG = &rusk.JubJubCompressed{}
-	sa.PkR = &rusk.JubJubCompressed{}
-
 	resp, err := c.NewTransfer(ctx, &rusk.TransferTransactionRequest{
 		Value:     100,
-		Recipient: sa,
+		Recipient: make([]byte, 64),
 	})
 	assert.NoError(t, err)
 
@@ -76,7 +72,7 @@ func TestBidTxIntegrity(t *testing.T) {
 	k.Rand()
 
 	resp, err := c.NewBid(ctx, &rusk.BidTransactionRequest{
-		K:     &rusk.BlsScalar{Data: k.Bytes()},
+		K:     k.Bytes(),
 		Value: 100,
 	})
 	assert.NoError(t, err)
@@ -138,10 +134,10 @@ func TestCoinbaseIntegrity(t *testing.T) {
 	legacyTx, err := legacy.RuskDistributeToCoinbase(rtx)
 	assert.NoError(t, err)
 
-	reward := binary.LittleEndian.Uint64(tx.TxPayload.CallData)
+	reward := binary.LittleEndian.Uint64(tx.Payload.CallData)
 	assert.Equal(t, uint64(100), reward)
 	assert.Equal(t, uint64(100), legacyTx.Rewards[0].EncryptedAmount.BigInt().Uint64())
-	assert.Equal(t, tx.TxPayload.Notes[0].PkR.Data, legacyTx.Rewards[0].EncryptedMask.Bytes())
+	assert.Equal(t, tx.Payload.Notes[0].PkR, legacyTx.Rewards[0].EncryptedMask.Bytes())
 }
 
 func TestBlockIntegrity(t *testing.T) {

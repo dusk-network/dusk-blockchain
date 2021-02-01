@@ -29,7 +29,9 @@ func NewBlockToOldBlock(b *newblock.Block) (*block.Block, error) {
 
 	for i, call := range b.Txs {
 		tx := new(rusk.Transaction)
-		newtx.MTransaction(tx, call.(*newtx.Transaction))
+		if err := newtx.MTransaction(tx, call.(*newtx.Transaction)); err != nil {
+			return nil, err
+		}
 
 		rtxs[i] = tx
 	}
@@ -146,7 +148,9 @@ func txsToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, e
 			call.Type = 0
 
 			tx := newtx.NewTransaction()
-			newtx.UTransaction(call, tx)
+			if err := newtx.UTransaction(call, tx); err != nil {
+				return nil, err
+			}
 
 			calls[i] = tx
 		case transactions.StakeType:
@@ -156,7 +160,9 @@ func txsToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, e
 			}
 
 			tx := newtx.NewTransaction()
-			newtx.UTransaction(call, tx)
+			if err := newtx.UTransaction(call, tx); err != nil {
+				return nil, err
+			}
 
 			calls[i] = tx
 		case transactions.BidType:
@@ -166,7 +172,9 @@ func txsToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, e
 			}
 
 			tx := newtx.NewTransaction()
-			newtx.UTransaction(call.Tx, tx)
+			if err := newtx.UTransaction(call.Tx, tx); err != nil {
+				return nil, err
+			}
 
 			calls[i] = tx
 		}
@@ -219,8 +227,7 @@ func ContractCallsToTxs(calls []*rusk.Transaction) ([]transactions.Transaction, 
 	return txs, nil
 }
 
-// TxToRuskTx turns a legacy transaction into a rusk transaction.
-func TxToRuskTx(tx transactions.Transaction) (*rusk.Transaction, error) {
+func txToRuskTx(tx transactions.Transaction) (*newtx.Transaction, error) {
 	buf := new(bytes.Buffer)
 
 	if tx.Type() != transactions.CoinbaseType {
@@ -236,21 +243,39 @@ func TxToRuskTx(tx transactions.Transaction) (*rusk.Transaction, error) {
 
 	outputs := outputsToRuskOutputs(tx.StandardTx().Outputs)
 
+	pl := &newtx.TransactionPayload{
+		Anchor:        tx.StandardTx().R.Bytes(),
+		Nullifiers:    inputs,
+		Notes:         outputs,
+		Crossover:     newtx.MockCrossover(false),
+		Fee:           newtx.MockFee(false),
+		SpendingProof: buf.Bytes(),
+		CallData:      make([]byte, 0),
+	}
+
+	return &newtx.Transaction{
+		Version: 0,
+		TxType:  newtx.TxType(0),
+		Payload: pl,
+	}, nil
+}
+
+// TxToRuskTx turns a legacy transaction into a rusk transaction.
+func TxToRuskTx(tx transactions.Transaction) (*rusk.Transaction, error) {
+	ntx, err := txToRuskTx(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	plBuf := new(bytes.Buffer)
+	if err := newtx.MarshalTransactionPayload(plBuf, ntx.Payload); err != nil {
+		return nil, err
+	}
+
 	return &rusk.Transaction{
 		Version: 0,
 		Type:    uint32(tx.Type()),
-		TxPayload: &rusk.TransactionPayload{
-			Anchor: &rusk.BlsScalar{Data: tx.StandardTx().R.Bytes()},
-			// XXX: fix typo in rusk-schema
-			Nullifier: inputs,
-			Notes:     outputs,
-			Crossover: newtx.MockRuskCrossover(false),
-			Fee:       newtx.MockRuskFee(false),
-			SpendingProof: &rusk.Proof{
-				Data: buf.Bytes(),
-			},
-			CallData: make([]byte, 0),
-		},
+		Payload: plBuf.Bytes(),
 	}, nil
 }
 
@@ -260,18 +285,22 @@ func RuskTxToTx(tx *rusk.Transaction) (*transactions.Standard, error) {
 	var rPoint ristretto.Point
 	var dataArr [32]byte
 
-	copy(dataArr[:], tx.TxPayload.Anchor.Data[0:32])
+	ntx := newtx.NewTransaction()
+	if err := newtx.UTransaction(tx, ntx); err != nil {
+		return nil, err
+	}
 
-	feeScalar.SetBigInt(big.NewInt(int64(tx.TxPayload.Fee.GasLimit)))
+	copy(dataArr[:], ntx.Payload.Anchor[0:32])
+
+	feeScalar.SetBigInt(big.NewInt(int64(ntx.Payload.Fee.GasLimit)))
 	rPoint.SetBytes(&dataArr)
 
-	// XXX: fix typo in rusk-schema
-	inputs, err := ruskInputsToInputs(tx.TxPayload.Nullifier)
+	inputs, err := ruskInputsToInputs(ntx.Payload.Nullifiers)
 	if err != nil {
 		return nil, err
 	}
 
-	outputs := ruskOutputsToOutputs(tx.TxPayload.Notes)
+	outputs := ruskOutputsToOutputs(ntx.Payload.Notes)
 	stx := &transactions.Standard{
 		TxType:  transactions.StandardType,
 		R:       rPoint,
@@ -281,8 +310,8 @@ func RuskTxToTx(tx *rusk.Transaction) (*transactions.Standard, error) {
 		Fee:     feeScalar,
 	}
 
-	if len(tx.TxPayload.SpendingProof.Data) != 0 {
-		if err := stx.RangeProof.Decode(bytes.NewBuffer(tx.TxPayload.SpendingProof.Data), true); err != nil {
+	if len(ntx.Payload.SpendingProof) != 0 {
+		if err := stx.RangeProof.Decode(bytes.NewBuffer(ntx.Payload.SpendingProof), true); err != nil {
 			return nil, err
 		}
 	}
@@ -292,7 +321,7 @@ func RuskTxToTx(tx *rusk.Transaction) (*transactions.Standard, error) {
 
 // StakeToRuskStake turns a legacy stake into a rusk stake.
 func StakeToRuskStake(tx *transactions.Stake) (*rusk.Transaction, error) {
-	rtx, err := TxToRuskTx(tx.StandardTx())
+	rtx, err := txToRuskTx(tx.StandardTx())
 	if err != nil {
 		return nil, err
 	}
@@ -306,9 +335,18 @@ func StakeToRuskStake(tx *transactions.Stake) (*rusk.Transaction, error) {
 		return nil, err
 	}
 
-	rtx.TxPayload.CallData = buf.Bytes()
-	rtx.Type = 4
-	return rtx, nil
+	rtx.Payload.CallData = buf.Bytes()
+
+	plBuf := new(bytes.Buffer)
+	if err := newtx.MarshalTransactionPayload(plBuf, rtx.Payload); err != nil {
+		return nil, err
+	}
+
+	return &rusk.Transaction{
+		Version: 0,
+		Type:    4,
+		Payload: plBuf.Bytes(),
+	}, nil
 }
 
 // RuskStakeToStake turns a rusk stake into a legacy stake.
@@ -319,7 +357,14 @@ func RuskStakeToStake(tx *rusk.Transaction) (*transactions.Stake, error) {
 	}
 
 	stx.TxType = transactions.StakeType
-	buf := bytes.NewBuffer(tx.TxPayload.CallData)
+	plBuf := bytes.NewBuffer(tx.Payload)
+
+	pl := newtx.NewTransactionPayload()
+	if err := newtx.UnmarshalTransactionPayload(plBuf, pl); err != nil {
+		return nil, err
+	}
+
+	buf := bytes.NewBuffer(pl.CallData)
 
 	var expirationHeight uint64
 	if err := encoding.ReadUint64LE(buf, &expirationHeight); err != nil {
@@ -342,7 +387,7 @@ func RuskStakeToStake(tx *rusk.Transaction) (*transactions.Stake, error) {
 
 // BidToRuskBid turns a legacy bid into a rusk bid.
 func BidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
-	rtx, err := TxToRuskTx(tx.StandardTx())
+	rtx, err := txToRuskTx(tx.StandardTx())
 	if err != nil {
 		return nil, err
 	}
@@ -356,10 +401,20 @@ func BidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
 		return nil, err
 	}
 
-	rtx.TxPayload.CallData = buf.Bytes()
-	rtx.Type = 3
+	rtx.Payload.CallData = buf.Bytes()
+
+	plBuf := new(bytes.Buffer)
+	if err := newtx.MarshalTransactionPayload(plBuf, rtx.Payload); err != nil {
+		return nil, err
+	}
+
 	return &rusk.BidTransaction{
-		Tx: rtx,
+		BidTreeStorageIndex: 0,
+		Tx: &rusk.Transaction{
+			Version: 0,
+			Type:    3,
+			Payload: plBuf.Bytes(),
+		},
 	}, nil
 }
 
@@ -371,7 +426,14 @@ func RuskBidToBid(tx *rusk.Transaction) (*transactions.Bid, error) {
 	}
 
 	stx.TxType = transactions.BidType
-	buf := bytes.NewBuffer(tx.TxPayload.CallData)
+	plBuf := bytes.NewBuffer(tx.Payload)
+
+	pl := newtx.NewTransactionPayload()
+	if err := newtx.UnmarshalTransactionPayload(plBuf, pl); err != nil {
+		return nil, err
+	}
+
+	buf := bytes.NewBuffer(pl.CallData)
 
 	var expirationHeight uint64
 	if err := encoding.ReadUint64LE(buf, &expirationHeight); err != nil {
@@ -395,7 +457,14 @@ func RuskBidToBid(tx *rusk.Transaction) (*transactions.Bid, error) {
 // RuskDistributeToCoinbase turns a rusk distribute call to an equivalent legacy coinbase.
 func RuskDistributeToCoinbase(tx *rusk.Transaction) (*transactions.Coinbase, error) {
 	c := transactions.NewCoinbase(make([]byte, 10), make([]byte, 10), byte(2))
-	buf := bytes.NewBuffer(tx.TxPayload.CallData)
+	plBuf := bytes.NewBuffer(tx.Payload)
+
+	pl := newtx.NewTransactionPayload()
+	if err := newtx.UnmarshalTransactionPayload(plBuf, pl); err != nil {
+		return nil, err
+	}
+
+	buf := bytes.NewBuffer(pl.CallData)
 
 	var amount uint64
 	if err := encoding.ReadUint64LE(buf, &amount); err != nil {
@@ -406,7 +475,7 @@ func RuskDistributeToCoinbase(tx *rusk.Transaction) (*transactions.Coinbase, err
 	var pk ristretto.Scalar
 
 	amountScalar.SetBigInt(new(big.Int).SetUint64(amount))
-	pk.SetBigInt(new(big.Int).SetBytes(tx.TxPayload.Notes[0].PkR.Data))
+	pk.SetBigInt(new(big.Int).SetBytes(pl.Notes[0].PkR))
 
 	c.Rewards = append(c.Rewards, &transactions.Output{
 		EncryptedAmount: amountScalar,
@@ -416,8 +485,8 @@ func RuskDistributeToCoinbase(tx *rusk.Transaction) (*transactions.Coinbase, err
 	return c, nil
 }
 
-func inputsToRuskInputs(inputs transactions.Inputs) ([]*rusk.BlsScalar, error) {
-	rInputs := make([]*rusk.BlsScalar, len(inputs))
+func inputsToRuskInputs(inputs transactions.Inputs) ([][]byte, error) {
+	rInputs := make([][]byte, len(inputs))
 
 	for i, input := range inputs {
 		buf := new(bytes.Buffer)
@@ -437,20 +506,18 @@ func inputsToRuskInputs(inputs transactions.Inputs) ([]*rusk.BlsScalar, error) {
 			return nil, err
 		}
 
-		rInputs[i] = &rusk.BlsScalar{
-			Data: buf.Bytes(),
-		}
+		rInputs[i] = buf.Bytes()
 	}
 
 	return rInputs, nil
 }
 
-func ruskInputsToInputs(inputs []*rusk.BlsScalar) (transactions.Inputs, error) {
+func ruskInputsToInputs(inputs [][]byte) (transactions.Inputs, error) {
 	sInputs := make(transactions.Inputs, len(inputs))
 
 	for i, input := range inputs {
 		sInputs[i] = new(transactions.Input)
-		buf := bytes.NewBuffer(input.Data)
+		buf := bytes.NewBuffer(input)
 
 		keyImageBytes := make([]byte, 32)
 		if err := encoding.Read256(buf, keyImageBytes); err != nil {
@@ -482,42 +549,31 @@ func ruskInputsToInputs(inputs []*rusk.BlsScalar) (transactions.Inputs, error) {
 	return sInputs, nil
 }
 
-func outputsToRuskOutputs(outputs transactions.Outputs) []*rusk.Note {
-	rOutputs := make([]*rusk.Note, len(outputs))
+func outputsToRuskOutputs(outputs transactions.Outputs) []*newtx.Note {
+	rOutputs := make([]*newtx.Note, len(outputs))
 
 	for i, output := range outputs {
-		rOutputs[i] = &rusk.Note{
-			Randomness: &rusk.JubJubCompressed{
-				Data: output.Commitment.Bytes(),
-			},
-			PkR: &rusk.JubJubCompressed{
-				Data: output.PubKey.P.Bytes(),
-			},
-			Commitment: &rusk.JubJubCompressed{
-				Data: output.EncryptedAmount.Bytes(),
-			},
-			Nonce: &rusk.BlsScalar{
-				Data: output.EncryptedMask.Bytes(),
-			},
-			// XXX: fix typo in rusk-schema
-			EncyptedData: &rusk.PoseidonCipher{
-				Data: make([]byte, 96),
-			},
+		rOutputs[i] = &newtx.Note{
+			Randomness:    output.Commitment.Bytes(),
+			PkR:           output.PubKey.P.Bytes(),
+			Commitment:    output.EncryptedAmount.Bytes(),
+			Nonce:         output.EncryptedMask.Bytes(),
+			EncryptedData: make([]byte, 96),
 		}
 	}
 
 	return rOutputs
 }
 
-func ruskOutputsToOutputs(outputs []*rusk.Note) transactions.Outputs {
+func ruskOutputsToOutputs(outputs []*newtx.Note) transactions.Outputs {
 	sOutputs := make(transactions.Outputs, len(outputs))
 
 	for i, output := range outputs {
 		sOutputs[i] = new(transactions.Output)
-		_ = sOutputs[i].Commitment.UnmarshalBinary(output.Randomness.Data)
-		_ = sOutputs[i].PubKey.P.UnmarshalBinary(output.PkR.Data)
-		_ = sOutputs[i].EncryptedAmount.UnmarshalBinary(output.Commitment.Data)
-		_ = sOutputs[i].EncryptedMask.UnmarshalBinary(output.Nonce.Data)
+		_ = sOutputs[i].Commitment.UnmarshalBinary(output.Randomness)
+		_ = sOutputs[i].PubKey.P.UnmarshalBinary(output.PkR)
+		_ = sOutputs[i].EncryptedAmount.UnmarshalBinary(output.Commitment)
+		_ = sOutputs[i].EncryptedMask.UnmarshalBinary(output.Nonce)
 	}
 
 	return sOutputs

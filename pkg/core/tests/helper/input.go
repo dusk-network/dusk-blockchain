@@ -8,14 +8,12 @@ package helper
 
 import (
 	"testing"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 )
 
 // const respAmount uint32 = 7
 
 // RandomInput returns a random input for testing.
-func RandomInput(t *testing.T) *common.BlsScalar {
+func RandomInput(t *testing.T) []byte {
 	/*
 		amount := ristretto.Scalar{}
 		amount.Rand()
@@ -39,7 +37,7 @@ func RandomInput(t *testing.T) *common.BlsScalar {
 }
 
 // RandomInputs returns a slice of inputs of size `size` for testing.
-func RandomInputs(t *testing.T, size int) []*common.BlsScalar {
+func RandomInputs(t *testing.T, size int) [][]byte {
 	/*
 		var ins transactions.Inputs
 

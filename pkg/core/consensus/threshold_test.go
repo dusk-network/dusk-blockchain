@@ -10,15 +10,14 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/stretchr/testify/assert"
 )
 
-var score = &common.BlsScalar{Data: []byte{
+var score = []byte{
 	120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120,
 	120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120,
 	120, 120, 120, 120, 120, 120,
-}}
+}
 
 func TestThresholdCheck(t *testing.T) {
 	threshold := consensus.NewThreshold()
