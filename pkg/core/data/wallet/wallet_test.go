@@ -85,8 +85,8 @@ func TestNewWallet(t *testing.T) {
 	sk := keys.NewSecretKey()
 	keys.USecretKey(secretKey.Sk, sk)
 	assert.NotNil(sk)
-	assert.NotNil(sk.A.Data)
-	assert.NotNil(sk.B.Data)
+	assert.NotNil(sk.A)
+	assert.NotNil(sk.B)
 
 	w, err := New(nil, seed, netPrefix, db, "pass", seedFile, sk)
 	assert.NoError(err)
@@ -100,8 +100,8 @@ func TestNewWallet(t *testing.T) {
 	loadedWallet, err = LoadFromFile(netPrefix, db, "pass", seedFile)
 	assert.Nil(err)
 
-	assert.Equal(w.SecretKey.A.Data, loadedWallet.SecretKey.A.Data)
-	assert.Equal(w.SecretKey.B.Data, loadedWallet.SecretKey.B.Data)
+	assert.Equal(w.SecretKey.A, loadedWallet.SecretKey.A)
+	assert.Equal(w.SecretKey.B, loadedWallet.SecretKey.B)
 
 	assert.Equal(w.consensusKeys.BLSSecretKey, loadedWallet.consensusKeys.BLSSecretKey)
 	assert.True(bytes.Equal(w.consensusKeys.BLSPubKeyBytes, loadedWallet.consensusKeys.BLSPubKeyBytes))
@@ -147,13 +147,13 @@ func fillSecretKey(sk *rusk.SecretKey) error {
 		return err
 	}
 
-	sk.A.Data = bs
+	sk.A = bs
 	bs2 := make([]byte, 32)
 
 	if _, err := rand.Read(bs); err != nil {
 		return err
 	}
 
-	sk.B.Data = bs2
+	sk.B = bs2
 	return nil
 }

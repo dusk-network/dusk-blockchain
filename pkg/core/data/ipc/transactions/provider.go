@@ -7,13 +7,13 @@
 package transactions
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -60,7 +60,7 @@ type Provider interface {
 	NewStake(context.Context, []byte, uint64) (*Transaction, error)
 
 	// NewBid creates a new bidding transaction.
-	NewBid(context.Context, *common.BlsScalar, uint64, *common.JubJubCompressed, *keys.StealthAddress, *common.BlsScalar, uint64, uint64) (*BidTransaction, error)
+	NewBid(context.Context, []byte, uint64, []byte, *keys.StealthAddress, []byte, uint64, uint64) (*BidTransaction, error)
 
 	// NewTransaction creates a new transaction using the user's PrivateKey
 	// It accepts the PublicKey of the recipient, a value, a fee and whether
@@ -234,30 +234,23 @@ func (p *provider) NewStake(ctx context.Context, pubKeyBLS []byte, value uint64)
 	}
 
 	trans := NewTransaction()
-	UTransaction(res, trans)
-	return trans, nil
+	err = UTransaction(res, trans)
+	return trans, err
 }
 
 // NewBid creates a new transaction using the user's PrivateKey
 // It accepts the PublicKey of the recipient, a value, a fee and whether
 // the transaction should be obfuscated or otherwise.
-func (p *provider) NewBid(ctx context.Context, k *common.BlsScalar, value uint64, secret *common.JubJubCompressed, pkR *keys.StealthAddress, seed *common.BlsScalar, round uint64, step uint64) (*BidTransaction, error) {
+func (p *provider) NewBid(ctx context.Context, k []byte, value uint64, secret []byte, pkR *keys.StealthAddress, seed []byte, round uint64, step uint64) (*BidTransaction, error) {
 	tr := new(rusk.BidTransactionRequest)
-
-	tr.K = new(rusk.BlsScalar)
-	common.MBlsScalar(tr.K, k)
-
+	tr.K = k
 	tr.Value = value
+	tr.Secret = secret
 
-	tr.Secret = new(rusk.JubJubCompressed)
-	common.MJubJubCompressed(tr.Secret, secret)
+	tr.StealthAddress = new(rusk.StealthAddress)
+	keys.MStealthAddress(tr.StealthAddress, pkR)
 
-	tr.PkR = new(rusk.StealthAddress)
-	keys.MStealthAddress(tr.PkR, pkR)
-
-	tr.Seed = new(rusk.BlsScalar)
-	common.MBlsScalar(tr.Seed, seed)
-
+	tr.Seed = seed
 	tr.LatestConsensusRound = round
 	tr.LatestConsensusStep = step
 
@@ -270,8 +263,8 @@ func (p *provider) NewBid(ctx context.Context, k *common.BlsScalar, value uint64
 	}
 
 	trans := NewBidTransaction()
-	UBidTransaction(res, trans)
-	return trans, nil
+	err = UBidTransaction(res, trans)
+	return trans, err
 }
 
 // NewTransfer creates a new transaction using the user's PrivateKey
@@ -281,8 +274,15 @@ func (p *provider) NewTransfer(ctx context.Context, value uint64, sa *keys.Steal
 	tr := new(rusk.TransferTransactionRequest)
 	tr.Value = value
 
-	tr.Recipient = new(rusk.StealthAddress)
-	keys.MStealthAddress(tr.Recipient, sa)
+	// XXX: In the schema, this is denoted as `bytes`, however, in the
+	// `BidTransactionRequest` it is denoted as a `StealthAddress`. This should be
+	// homogenized.
+	buf := new(bytes.Buffer)
+	if err := keys.MarshalStealthAddress(buf, sa); err != nil {
+		return nil, err
+	}
+
+	tr.Recipient = buf.Bytes()
 
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
 	defer cancel()
@@ -293,8 +293,8 @@ func (p *provider) NewTransfer(ctx context.Context, value uint64, sa *keys.Steal
 	}
 
 	trans := NewTransaction()
-	UTransaction(res, trans)
-	return trans, nil
+	err = UTransaction(res, trans)
+	return trans, err
 }
 
 type keymaster struct {
@@ -335,7 +335,10 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
-		MTransaction(tx, call.(*Transaction))
+		if err := MTransaction(tx, call.(*Transaction)); err != nil {
+			return nil, err
+		}
+
 		vstr.Txs[i] = tx
 	}
 
@@ -366,7 +369,10 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
-		MTransaction(tx, call.(*Transaction))
+		if err := MTransaction(tx, call.(*Transaction)); err != nil {
+			return user.Provisioners{}, err
+		}
+
 		vstr.Txs[i] = tx
 	}
 

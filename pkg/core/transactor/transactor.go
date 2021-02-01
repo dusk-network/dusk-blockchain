@@ -22,7 +22,7 @@ import (
 )
 
 // Transactor is the implementation of both the Waller and the Transactor GRPC servers.
-type Transactor struct { // TODO: rename
+type Transactor struct {
 	db database.DB
 	eb *eventbus.EventBus
 	rb *rpcbus.RPCBus
@@ -32,9 +32,6 @@ type Transactor struct { // TODO: rename
 	bidChan   <-chan rpcbus.Request
 
 	// Passed to the consensus component startup
-	// c                 *chainsync.Counter
-	// acceptedBlockChan <-chan block.Block
-
 	proxy transactions.Proxy
 
 	w *wallet.Wallet
@@ -113,24 +110,6 @@ func (t *Transactor) GetTxHistory(ctx context.Context, e *node.EmptyRequest) (*n
 	return t.handleGetTxHistory()
 }
 
-// CreateWallet creates a new wallet from a password or seed.
-// XXX: DEPRECATED.
-func (t *Transactor) CreateWallet(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
-	return nil, nil
-}
-
-// LoadWallet from a password.
-// XXX: DEPRECATED.
-func (t *Transactor) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node.LoadResponse, error) {
-	return nil, nil
-}
-
-// CreateFromSeed creates a wallet from a seed.
-// XXX: DEPRECATED.
-func (t *Transactor) CreateFromSeed(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
-	return nil, nil
-}
-
 // ClearWalletDatabase clears the wallet database, containing the unspent outputs.
 func (t *Transactor) ClearWalletDatabase(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	return t.handleClearWalletDatabase()
@@ -154,12 +133,6 @@ func (t *Transactor) Bid(ctx context.Context, c *node.BidRequest) (*node.Transac
 // Stake will create a staking transaction.
 func (t *Transactor) Stake(ctx context.Context, c *node.StakeRequest) (*node.TransactionResponse, error) {
 	return t.handleSendStakeTx(c)
-}
-
-// GetWalletStatus returns whether or not the wallet is currently loaded.
-// XXX: DEPRECATED.
-func (t *Transactor) GetWalletStatus(ctx context.Context, e *node.EmptyRequest) (*node.WalletStatusResponse, error) {
-	return nil, nil
 }
 
 // GetAddress returns the address of the loaded wallet.

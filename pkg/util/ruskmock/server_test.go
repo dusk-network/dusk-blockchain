@@ -170,9 +170,9 @@ func TestGenerateScore(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Ensure the returned score has all fields populated
-	assert.NotEmpty(t, resp.BlindbidProof.Data)
-	assert.NotEmpty(t, resp.Score.Data)
-	assert.NotEmpty(t, resp.ProverIdentity.Data)
+	assert.NotEmpty(t, resp.BlindbidProof)
+	assert.NotEmpty(t, resp.Score)
+	assert.NotEmpty(t, resp.ProverIdentity)
 }
 
 func TestVerifyScore(t *testing.T) {
@@ -230,7 +230,7 @@ func TestGenerateStealthAddress(t *testing.T) {
 	var pBytes [32]byte
 	var p ristretto.Point
 
-	copy(pBytes[:], resp.RG.Data[:])
+	copy(pBytes[:], resp.RG[:])
 	assert.True(t, p.SetBytes(&pBytes))
 }
 
@@ -249,7 +249,7 @@ func TestGenerateKeys(t *testing.T) {
 	var spendBytes [32]byte
 	var pSpend ristretto.Scalar
 
-	copy(spendBytes[:], resp.Sk.A.Data[:])
+	copy(spendBytes[:], resp.Sk.A[:])
 	pSpend.SetBytes(&spendBytes)
 
 	sPSpendBytes, err := s.w.PrivateSpend()
@@ -266,7 +266,7 @@ func TestGenerateKeys(t *testing.T) {
 	var pBytes [32]byte
 	var p ristretto.Point
 
-	copy(pBytes[:], resp.Pk.AG.Data[:])
+	copy(pBytes[:], resp.Pk.AG[:])
 	assert.True(t, p.SetBytes(&pBytes))
 }
 
@@ -289,15 +289,10 @@ func TestNewTransfer(t *testing.T) {
 	r.Rand()
 
 	pk := s.w.PublicKey()
-	sa := new(rusk.StealthAddress)
-	sa.RG = &rusk.JubJubCompressed{}
-	sa.PkR = &rusk.JubJubCompressed{}
-	sa.RG.Data = pk.PubSpend.Bytes()
-	sa.PkR.Data = pk.PubView.Bytes()
 
 	_, err := c.NewTransfer(ctx, &rusk.TransferTransactionRequest{
 		Value:     100,
-		Recipient: sa,
+		Recipient: append(pk.PubSpend.Bytes(), pk.PubView.Bytes()...),
 	})
 	assert.NoError(t, err)
 }
@@ -320,7 +315,12 @@ func TestNewStake(t *testing.T) {
 	// The bls public key and locktime should be included in the calldata.
 	var locktime uint64
 
-	buf := bytes.NewBuffer(resp.TxPayload.CallData)
+	plBuf := bytes.NewBuffer(resp.Payload)
+
+	pl := transactions.NewTransactionPayload()
+	assert.NoError(t, transactions.UnmarshalTransactionPayload(plBuf, pl))
+
+	buf := bytes.NewBuffer(pl.CallData)
 
 	err = encoding.ReadUint64LE(buf, &locktime)
 	assert.NoError(t, err)
@@ -350,7 +350,7 @@ func TestNewBid(t *testing.T) {
 	k.Rand()
 
 	resp, err := c.NewBid(ctx, &rusk.BidTransactionRequest{
-		K:     &rusk.BlsScalar{Data: k.Bytes()},
+		K:     k.Bytes(),
 		Value: 100,
 	})
 	assert.NoError(t, err)
@@ -358,7 +358,12 @@ func TestNewBid(t *testing.T) {
 	// The M and locktime should be encoded in the call data
 	var locktime uint64
 
-	buf := bytes.NewBuffer(resp.Tx.TxPayload.CallData)
+	plBuf := bytes.NewBuffer(resp.Tx.Payload)
+
+	pl := transactions.NewTransactionPayload()
+	assert.NoError(t, transactions.UnmarshalTransactionPayload(plBuf, pl))
+
+	buf := bytes.NewBuffer(pl.CallData)
 
 	err = encoding.ReadUint64LE(buf, &locktime)
 	assert.NoError(t, err)

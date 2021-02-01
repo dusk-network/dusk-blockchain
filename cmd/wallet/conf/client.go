@@ -25,6 +25,7 @@ type NodeClient struct {
 	BlockGeneratorClient node.BlockGeneratorClient
 	ChainClient          node.ChainClient
 	MempoolClient        node.MempoolClient
+	SynchronizerClient   node.SynchronizerClient
 	conn                 *grpc.ClientConn
 }
 
@@ -101,6 +102,7 @@ func (c *NodeClient) Connect(conf rpcConfiguration) error {
 	c.BlockGeneratorClient = node.NewBlockGeneratorClient(conn)
 	c.ChainClient = node.NewChainClient(conn)
 	c.MempoolClient = node.NewMempoolClient(conn)
+	c.SynchronizerClient = node.NewSynchronizerClient(conn)
 
 	return nil
 }

@@ -25,7 +25,7 @@ import (
 func WalletMenu(client *conf.NodeClient) error {
 	for {
 		// Get sync progress first and print it
-		resp, err := client.ChainClient.GetSyncProgress(context.Background(), &node.EmptyRequest{})
+		resp, err := client.SynchronizerClient.GetSyncProgress(context.Background(), &node.EmptyRequest{})
 		if err != nil {
 			return err
 		}

@@ -225,15 +225,9 @@ func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreReque
 	}
 
 	return &rusk.GenerateScoreResponse{
-		BlindbidProof: &rusk.Proof{
-			Data: proof,
-		},
-		Score: &rusk.BlsScalar{
-			Data: score,
-		},
-		ProverIdentity: &rusk.BlsScalar{
-			Data: identity,
-		},
+		BlindbidProof:  proof,
+		Score:          score,
+		ProverIdentity: identity,
 	}, nil
 }
 
@@ -261,28 +255,16 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 
 	return &rusk.GenerateKeysResponse{
 		Sk: &rusk.SecretKey{
-			A: &rusk.JubJubScalar{
-				Data: pSpend,
-			},
-			B: &rusk.JubJubScalar{
-				Data: make([]byte, 32),
-			},
+			A: pSpend,
+			B: make([]byte, 32),
 		},
 		Vk: &rusk.ViewKey{
-			A: &rusk.JubJubScalar{
-				Data: make([]byte, 32),
-			},
-			BG: &rusk.JubJubCompressed{
-				Data: make([]byte, 32),
-			},
+			A:  make([]byte, 32),
+			BG: make([]byte, 32),
 		},
 		Pk: &rusk.PublicKey{
-			AG: &rusk.JubJubCompressed{
-				Data: addr.P.Bytes(),
-			},
-			BG: &rusk.JubJubCompressed{
-				Data: make([]byte, 32),
-			},
+			AG: addr.P.Bytes(),
+			BG: make([]byte, 32),
 		},
 	}, nil
 }
@@ -298,12 +280,8 @@ func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey
 	addr := pk.StealthAddress(r, 0)
 
 	return &rusk.StealthAddress{
-		RG: &rusk.JubJubCompressed{
-			Data: addr.P.Bytes(),
-		},
-		PkR: &rusk.JubJubCompressed{
-			Data: make([]byte, 0),
-		},
+		RG:  addr.P.Bytes(),
+		PkR: make([]byte, 0),
 	}, nil
 }
 
@@ -317,8 +295,8 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 	var spend ristretto.Point
 	var view ristretto.Point
 
-	_ = spend.UnmarshalBinary(req.Recipient.RG.Data)
-	_ = view.UnmarshalBinary(req.Recipient.PkR.Data)
+	_ = spend.UnmarshalBinary(req.Recipient[:32])
+	_ = view.UnmarshalBinary(req.Recipient[32:])
 	sp := key.PublicSpend(spend)
 	v := key.PublicView(view)
 
@@ -368,7 +346,7 @@ func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest
 func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*rusk.BidTransaction, error) {
 	var k ristretto.Scalar
 
-	_ = k.UnmarshalBinary(req.K.Data)
+	_ = k.UnmarshalBinary(req.K)
 	m := zkproof.CalculateM(k)
 
 	bid, err := transactions.NewBid(0, byte(2), int64(0), 250000, m.Bytes())
@@ -386,6 +364,12 @@ func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*
 // FindBid will return all of the bids for a given stealth address.
 // TODO: implement.
 func (s *Server) FindBid(ctx context.Context, req *rusk.FindBidRequest) (*rusk.BidList, error) {
+	return nil, nil
+}
+
+// FindStake will return a stake for a given public key.
+// TODO: Implement.
+func (s *Server) FindStake(ctx context.Context, req *rusk.FindStakeRequest) (*rusk.FindStakeResponse, error) {
 	return nil, nil
 }
 

@@ -70,13 +70,12 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 			continue
 		}
 
-		qd.Outputs = append(qd.Outputs, queryOutput{output.PkR.Data})
+		qd.Outputs = append(qd.Outputs, queryOutput{output.PkR})
 	}
 
 	qd.Inputs = make([]queryInput, 0)
 	for _, input := range tx.StandardTx().Nullifiers {
-		keyimage := input.Data
-		qd.Inputs = append(qd.Inputs, queryInput{keyimage})
+		qd.Inputs = append(qd.Inputs, queryInput{input})
 	}
 
 	qd.BlockHash = blockHash
@@ -94,7 +93,7 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 
 // IsNil will check for nil in a output.
 func IsNil(output *core.Note) bool {
-	return output.PkR.Data == nil
+	return output.PkR == nil
 }
 
 func (t transactions) getQuery() *graphql.Field {

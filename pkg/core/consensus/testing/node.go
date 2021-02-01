@@ -14,7 +14,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -48,8 +47,8 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 	writeArbitraryBidValues(assert, db)
 
 	pk := keys.PublicKey{
-		AG: &common.JubJubCompressed{Data: make([]byte, 32)},
-		BG: &common.JubJubCompressed{Data: make([]byte, 32)},
+		AG: make([]byte, 32),
+		BG: make([]byte, 32),
 	}
 
 	e := &consensus.Emitter{

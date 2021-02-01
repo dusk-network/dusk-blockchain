@@ -13,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -34,8 +33,8 @@ type Generator interface {
 
 type generator struct {
 	*consensus.Emitter
-	d              *common.JubJubCompressed
-	k              *common.BlsScalar
+	d              []byte
+	k              []byte
 	indexStoredBid uint64
 
 	// d, edPk []byte
@@ -61,8 +60,8 @@ func New(e *consensus.Emitter, db database.DB) (Generator, error) {
 	return &generator{
 		Emitter:        e,
 		scoreGenerator: e.Proxy.BlockGenerator(),
-		d:              &common.JubJubCompressed{Data: d},
-		k:              &common.BlsScalar{Data: k},
+		d:              d,
+		k:              k,
 		threshold:      consensus.NewThreshold(),
 		indexStoredBid: indexStoredBid,
 	}, nil
@@ -98,9 +97,9 @@ func (p *generator) Generate(ctx context.Context, r consensus.RoundUpdate, step 
 	}
 
 	sr := blindbid.GenerateScoreRequest{
-		Commitment:     p.d,
 		K:              p.k,
-		Seed:           &common.BlsScalar{Data: seed},
+		Seed:           seed,
+		Secret:         p.d,
 		Round:          uint32(r.Round),
 		Step:           uint32(step),
 		IndexStoredBid: p.indexStoredBid,

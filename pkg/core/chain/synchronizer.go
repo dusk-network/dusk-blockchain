@@ -115,6 +115,7 @@ func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus,
 		ctx:       ctx,
 		chain:     chain,
 	}
+
 	s.state = s.inSync
 	return s
 }
@@ -147,7 +148,6 @@ func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err 
 	var newState syncState
 	newState, res, err = currState(currentHeight, blk)
 	s.setState(newState)
-
 	return
 }
 
