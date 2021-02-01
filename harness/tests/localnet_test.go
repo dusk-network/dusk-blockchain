@@ -137,6 +137,10 @@ func monitorNetwork() {
 // by all nodes in the network within a particular time frame and within the
 // same block.
 func TestSendBidTransaction(t *testing.T) {
+	t.Log("wait until we are at height 1")
+
+	localNet.WaitUntil(t, 0, 1, 3*time.Minute, 5*time.Second)
+
 	t.Log("Send request to node 0 to generate and process a Bid transaction")
 
 	txidBytes, err := localNet.SendBidCmd(0, 10, 10)

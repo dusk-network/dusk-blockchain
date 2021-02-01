@@ -8,7 +8,9 @@ package transactor
 
 import (
 	"context"
+	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -71,6 +73,24 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 
 	go t.Listen()
 	return t, nil
+}
+
+func (t *Transactor) getSyncProgress() (*node.SyncProgressResponse, error) {
+	// Create sync client connection
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, "unix://"+config.Get().RPC.Address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	syncClient := node.NewSynchronizerClient(conn)
+	return syncClient.GetSyncProgress(ctx, &node.EmptyRequest{})
 }
 
 // Listen to the stake and bid channels and trigger a stake and bid transaction

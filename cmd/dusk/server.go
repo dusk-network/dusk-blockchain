@@ -228,7 +228,7 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
-	sync := chain.NewSynchronizer(ctx, eventBus, rpcBus, db, c)
+	sync := chain.NewSynchronizer(ctx, eventBus, rpcBus, db, c, grpcServer)
 
 	processor.Register(topics.Block, sync.ProcessBlock)
 

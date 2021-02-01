@@ -430,14 +430,6 @@ func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 	}
 }
 
-// GetSyncProgress returns how close the node is to being synced to the tip,
-// as a percentage value.
-// NOTE: this is just here to satisfy the grpc interface. It should be removed
-// and the method should be moved to a synchronizer service.
-func (c *Chain) GetSyncProgress(_ context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
-	return &node.SyncProgressResponse{Progress: float32(100.0)}, nil
-}
-
 // RebuildChain will delete all blocks except for the genesis block,
 // to allow for a full re-sync.
 // NOTE: This function no longer does anything, but is still here to conform to the

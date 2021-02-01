@@ -19,6 +19,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"google.golang.org/grpc"
 )
 
 // Synchronizer acts as the gateway for incoming blocks from the network.
@@ -106,7 +107,7 @@ func (s *Synchronizer) outSync(currentHeight uint64, blk block.Block) (syncState
 }
 
 // NewSynchronizer returns an initialized Synchronizer, ready for use.
-func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, chain Ledger) *Synchronizer {
+func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, chain Ledger, srv *grpc.Server) *Synchronizer {
 	s := &Synchronizer{
 		eb:        eb,
 		rb:        rb,
@@ -117,7 +118,23 @@ func NewSynchronizer(ctx context.Context, eb eventbus.Broker, rb *rpcbus.RPCBus,
 	}
 
 	s.state = s.inSync
+
+	if srv != nil {
+		node.RegisterSynchronizerServer(srv, s)
+	}
+
+	l := eventbus.NewCallbackListener(s.setHighestSeenFromBlock)
+	eb.Subscribe(topics.AcceptedBlock, l)
+
 	return s
+}
+
+func (s *Synchronizer) setHighestSeenFromBlock(m message.Message) {
+	blk := m.Payload().(block.Block)
+
+	if blk.Header.Height > s.highestSeen() {
+		s.setHighestSeen(blk.Header.Height)
+	}
 }
 
 // ProcessBlock handles an incoming block from the network.
@@ -135,15 +152,11 @@ func (s *Synchronizer) ProcessBlock(m message.Message) (res []bytes.Buffer, err 
 		return
 	}
 
-	s.lock.Lock()
-
-	currState := s.state
+	currState := s.getState()
 
 	if blk.Header.Height > s.highestSeenHeight {
-		s.highestSeenHeight = blk.Header.Height
+		s.setHighestSeen(blk.Header.Height)
 	}
-
-	s.lock.Unlock()
 
 	var newState syncState
 	newState, res, err = currState(currentHeight, blk)
@@ -193,6 +206,20 @@ func (s *Synchronizer) highestSeen() uint64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.highestSeenHeight
+}
+
+func (s *Synchronizer) setHighestSeen(n uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.highestSeenHeight = n
+}
+
+func (s *Synchronizer) getState() syncState {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	currState := s.state
+	return currState
 }
 
 func (s *Synchronizer) setState(newState syncState) {

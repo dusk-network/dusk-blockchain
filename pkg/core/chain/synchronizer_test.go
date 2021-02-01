@@ -112,7 +112,7 @@ func setupSynchronizerTest() (*Synchronizer, chan consensus.Results, *mockChain)
 		panic(err)
 	}
 
-	return NewSynchronizer(ctx, eb, rb, db, m), catchBlockChan, m
+	return NewSynchronizer(ctx, eb, rb, db, m, nil), catchBlockChan, m
 }
 
 type mockChain struct {

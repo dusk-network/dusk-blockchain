@@ -78,6 +78,17 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 		return nil, errWalletNotLoaded
 	}
 
+	// Are we allowed to send a transaction?
+	// TODO: use a parent context
+	progress, err := t.getSyncProgress()
+	if err != nil {
+		return nil, err
+	}
+
+	if progress.Progress != 100 {
+		return nil, errors.New("can not send transactions when node is not synchronized")
+	}
+
 	// create and sign transaction
 	log.
 		WithField("amount", req.Amount).
@@ -92,12 +103,12 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	// Create the Ed25519 Keypair
 	// XXX: We need to get the proper values, and not just make some up out of thin air.
 	k := make([]byte, 32)
-	if _, err := rand.Read(k); err != nil {
+	if _, err = rand.Read(k); err != nil {
 		return nil, err
 	}
 
 	secret := make([]byte, 32)
-	if _, err := rand.Read(secret); err != nil {
+	if _, err = rand.Read(secret); err != nil {
 		return nil, err
 	}
 
@@ -106,16 +117,16 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 		PkR: make([]byte, 32),
 	}
 
-	if _, err := rand.Read(pkR.RG); err != nil {
+	if _, err = rand.Read(pkR.RG); err != nil {
 		return nil, err
 	}
 
-	if _, err := rand.Read(pkR.PkR); err != nil {
+	if _, err = rand.Read(pkR.PkR); err != nil {
 		return nil, err
 	}
 
 	seed := make([]byte, 32)
-	if _, err := rand.Read(seed); err != nil {
+	if _, err = rand.Read(seed); err != nil {
 		return nil, err
 	}
 
@@ -164,6 +175,17 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 		return nil, errWalletNotLoaded
 	}
 
+	// Are we allowed to send a transaction?
+	// TODO: use a parent context
+	progress, err := t.getSyncProgress()
+	if err != nil {
+		return nil, err
+	}
+
+	if progress.Progress != 100 {
+		return nil, errors.New("can not send transactions when node is not synchronized")
+	}
+
 	// create and sign transaction
 	log.
 		WithField("amount", req.Amount).
@@ -204,6 +226,17 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.TransactionResponse, error) {
 	if t.w == nil {
 		return nil, errWalletNotLoaded
+	}
+
+	// Are we allowed to send a transaction?
+	// TODO: use a parent context
+	progress, err := t.getSyncProgress()
+	if err != nil {
+		return nil, err
+	}
+
+	if progress.Progress != 100 {
+		return nil, errors.New("can not send transactions when node is not synchronized")
 	}
 
 	// create and sign transaction
