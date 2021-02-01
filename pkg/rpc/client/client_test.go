@@ -93,7 +93,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	conf := server.Setup{Network: "unix", Address: address}
+	conf := server.Setup{Network: "unix", Address: address, SessionDurationMins: 1}
 	// forcing session on the configuration
 	conf.RequireSession = true
 	// create the GRPC server here
