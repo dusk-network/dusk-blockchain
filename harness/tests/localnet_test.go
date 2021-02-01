@@ -250,24 +250,47 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 
 	defaultLocktime := uint64(100000)
 
-	// Load Bidders and Provisioners
-	for i := 0; i < localNet.Size(); i++ {
+	// Send a bunch of Bid transactions
+	// All nodes are Block Generators
+	for i := uint(0); i < uint(localNet.Size()); i++ {
 		time.Sleep(100 * time.Millisecond)
+		t.Logf("Node %d sending a Bid transaction", i)
 
-		if i%2 == 0 {
-			t.Logf("Send request to node %d to generate and process a Bid transaction", i)
-
-			if _, err := localNet.SendBidCmd(uint(i), 10, defaultLocktime); err != nil {
-				t.Error(err)
-			}
-		} else {
-			t.Logf("Send request to node %d to generate and process a Stake transaction", i)
-
-			if _, err := localNet.SendStakeCmd(uint(i), 10, defaultLocktime); err != nil {
-				t.Error(err)
-			}
+		if _, err := localNet.SendBidCmd(i, 100, defaultLocktime); err != nil {
+			t.Log(err.Error())
 		}
 	}
+
+	// Send a bunch of Stake transactions
+	// All nodes are Provisioners
+	for i := uint(0); i < uint(localNet.Size()); i++ {
+		time.Sleep(100 * time.Millisecond)
+		t.Logf("Node %d sending a Stake transaction", i)
+
+		if _, err := localNet.SendStakeCmd(i, 100, defaultLocktime); err != nil {
+			t.Log(err.Error())
+		}
+	}
+
+	// Send a bunch of Transfer transactions
+	for i := uint(0); i < uint(localNet.Size())-1; i++ {
+		time.Sleep(100 * time.Millisecond)
+		t.Logf("Node %d sending a Transfer transaction", i)
+
+		if _, err := localNet.SendTransferTxCmd(i, i+1, 1000*uint64(i+1), 100); err != nil {
+			t.Log(err.Error())
+		}
+	}
+
+	targetRound := uint64(7)
+	// Wait until round targetRound and print wallet information.
+	//
+	// NB Later on, ensure here that all Transfer,Bid and Stake transactions
+	// have been accepted by any round up to targetRound.
+	//
+	// Ensure also that balance of each wallet has been updated correctly
+	localNet.WaitUntil(t, 0, targetRound, 2*time.Minute, 5*time.Second)
+	localNet.PrintWalletsInfo(t)
 
 	deployNewNode := func() {
 		ind := localNetSize

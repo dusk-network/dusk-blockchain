@@ -141,6 +141,10 @@ func txsToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, e
 				return nil, err
 			}
 
+			// Replace the default type value (StandardType 0x03) with
+			// Transfer Type (0x00)
+			call.Type = 0
+
 			tx := newtx.NewTransaction()
 			newtx.UTransaction(call, tx)
 

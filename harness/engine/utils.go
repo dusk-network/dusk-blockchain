@@ -20,6 +20,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -345,4 +346,118 @@ func (n *Network) IsSynced(threshold uint64) (uint64, error) {
 	}
 
 	return primaryHeight, nil
+}
+
+// GetWalletAddress makes an attempt to get wallet address of a specified node.
+func (n *Network) GetWalletAddress(ind uint) (string, []byte, error) {
+	c := n.grpcClients[n.nodes[ind].Id]
+
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return "", nil, err
+	}
+
+	defer c.GracefulClose()
+
+	client := pb.NewWalletClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	resp, err := client.GetAddress(ctx, &node.EmptyRequest{})
+	if err != nil {
+		return "", nil, err
+	}
+
+	return string(resp.Key.PublicKey[0:10]) + "...", resp.Key.PublicKey, nil
+}
+
+// GetBalance makes an attempt to get wallet balance of a specified node.
+// Returns both UnlockedBalance and LockedBalance.
+func (n *Network) GetBalance(ind uint) (uint64, uint64, error) {
+	c := n.grpcClients[n.nodes[ind].Id]
+
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return 0, 0, err
+	}
+
+	defer c.GracefulClose()
+
+	client := pb.NewWalletClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	resp, err := client.GetBalance(ctx, &node.EmptyRequest{})
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return resp.UnlockedBalance, resp.LockedBalance, nil
+}
+
+// PrintWalletsInfo prints wallet address and balance of all network nodes.
+func (n *Network) PrintWalletsInfo(t *testing.T) {
+	for i := uint(0); i < uint(n.Size()); i++ {
+		addr, _, err := n.GetWalletAddress(i)
+		if err != nil {
+			logrus.WithField("node", i).WithError(err).Error("Could not get wallet address")
+		} else {
+			logrus.WithField("node", i).WithField("address", addr).
+				Infof("Pubkey")
+		}
+
+		ub, lb, err := n.GetBalance(i)
+		if err != nil {
+			logrus.WithField("node", i).WithError(err).Error("Could not get wallet balance")
+		} else {
+			logrus.WithField("node", i).WithField("locked", lb).WithField("unlocked", ub).
+				Info("Balance")
+		}
+	}
+}
+
+// SendTransferTxCmd sends gRPC command SendTransfer and returns tx hash.
+func (n *Network) SendTransferTxCmd(senderNodeInd, recvNodeInd uint, amount, fee uint64) ([]byte, error) {
+	// Get wallet address of sender
+	senderAddr, _, err := n.GetWalletAddress(senderNodeInd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get wallet address of receiver
+	recvAddr, pubKey, err := n.GetWalletAddress(recvNodeInd)
+	if err != nil {
+		return nil, err
+	}
+
+	logrus.
+		WithField("s_wallet", senderAddr).
+		WithField("r_wallet", recvAddr).
+		WithField("amount", amount).
+		WithField("fee", fee).
+		Info("Sending transfer")
+
+	// Send Transfer grpc command
+	c := n.grpcClients[n.nodes[senderNodeInd].Id]
+
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return nil, err
+	}
+
+	client := pb.NewTransactorClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req := pb.TransferRequest{Amount: amount, Address: pubKey, Fee: fee}
+
+	resp, err := client.Transfer(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Hash, nil
 }
