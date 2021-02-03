@@ -54,7 +54,7 @@ type UnconfirmedTxProber interface {
 type Provider interface {
 	// GetBalance returns the balance of the client expressed in (unit?) of
 	// DUSK. It accepts the ViewKey as parameter.
-	GetBalance(context.Context, keys.ViewKey) (uint64, error)
+	GetBalance(context.Context, keys.ViewKey) (uint64, uint64, error)
 
 	// NewStake creates a staking transaction.
 	NewStake(context.Context, []byte, uint64) (*Transaction, error)
@@ -121,12 +121,15 @@ type proxy struct {
 	bidClient      rusk.BidServiceClient
 	transferClient rusk.TransferClient
 	stakeClient    rusk.StakeServiceClient
+	walletClient   rusk.WalletServiceClient
 	txTimeout      time.Duration
 	timeout        time.Duration
 }
 
 // NewProxy creates a new Proxy.
-func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, blindbidClient rusk.BlindBidServiceClient, bidClient rusk.BidServiceClient, transferClient rusk.TransferClient, stakeClient rusk.StakeServiceClient, txTimeout, defaultTimeout time.Duration) Proxy {
+func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, blindbidClient rusk.BlindBidServiceClient,
+	bidClient rusk.BidServiceClient, transferClient rusk.TransferClient, stakeClient rusk.StakeServiceClient, walletClient rusk.WalletServiceClient,
+	txTimeout, defaultTimeout time.Duration) Proxy {
 	return &proxy{
 		stateClient:    stateClient,
 		keysClient:     keysClient,
@@ -134,6 +137,7 @@ func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, blindbid
 		bidClient:      bidClient,
 		transferClient: transferClient,
 		stakeClient:    stakeClient,
+		walletClient:   walletClient,
 		txTimeout:      txTimeout,
 		timeout:        defaultTimeout,
 	}
@@ -202,19 +206,17 @@ type provider struct {
 
 // GetBalance returns the balance of the client expressed in (unit?) of
 // DUSK. It accepts the ViewKey as parameter.
-func (p *provider) GetBalance(ctx context.Context, vk keys.ViewKey) (uint64, error) {
-	/*
-		rvk := new(rusk.ViewKey)
-		keys.MViewKey(rvk, &vk)
-		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
-		defer cancel()
-		res, err := p.client.GetBalance(ctx, &rusk.GetBalanceRequest{Vk: rvk})
-		if err != nil {
-			return 0, err
-		}
+func (p *provider) GetBalance(ctx context.Context, vk keys.ViewKey) (uint64, uint64, error) {
+	emptyReq := new(rusk.EmptyRequest)
 
-	*/
-	return 0, nil
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
+	defer cancel()
+
+	res, err := p.walletClient.GetBalance(ctx, emptyReq)
+	if err != nil {
+		return 0, 0, err
+	}
+	return res.UnlockedBalance, res.LockedBalance, nil
 }
 
 // NewStake creates a new transaction using the user's PrivateKey

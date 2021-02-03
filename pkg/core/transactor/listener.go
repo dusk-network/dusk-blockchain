@@ -283,13 +283,13 @@ func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
 	// This call should be updated in that case
 	ctx := context.Background()
 
-	balance, err := t.proxy.Provider().GetBalance(ctx, t.w.ViewKey)
+	ub, lb, err := t.proxy.Provider().GetBalance(ctx, t.w.ViewKey)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Tracef("wallet balance: %d, mempool balance: %d", balance, 0)
-	return &node.BalanceResponse{UnlockedBalance: balance, LockedBalance: 0}, nil
+	log.Tracef("wallet balance: %d, mempool balance: %d", ub, 0)
+	return &node.BalanceResponse{UnlockedBalance: ub, LockedBalance: lb}, nil
 }
 
 func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) {
