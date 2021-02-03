@@ -29,18 +29,16 @@ var WorkerAmount = 4
 // change during the consensus loop.
 type Loop struct {
 	*consensus.Emitter
-	db           database.DB
-	newBlockChan chan consensus.Results
-	requestor    *candidate.Requestor
+	db        database.DB
+	requestor *candidate.Requestor
 }
 
 // New creates a round-specific agreement step.
-func New(e *consensus.Emitter, db database.DB, newBlockChan chan consensus.Results, requestor *candidate.Requestor) *Loop {
+func New(e *consensus.Emitter, db database.DB, requestor *candidate.Requestor) *Loop {
 	return &Loop{
-		Emitter:      e,
-		db:           db,
-		newBlockChan: newBlockChan,
-		requestor:    requestor,
+		Emitter:   e,
+		db:        db,
+		requestor: requestor,
 	}
 }
 
@@ -83,12 +81,6 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 			cert := evs[0].GenerateCertificate()
 			blk, err := s.createWinningBlock(ctx, evs[0].State().BlockHash, cert)
 			return consensus.Results{Blk: blk, Err: err}
-		case newBlockResult := <-s.newBlockChan:
-			if newBlockResult.Blk.Header != nil && newBlockResult.Blk.Header.Height != r.Round {
-				continue
-			}
-
-			return newBlockResult
 		case <-ctx.Done():
 			// finalize the worker pool
 			return consensus.Results{Blk: block.Block{}, Err: context.Canceled}

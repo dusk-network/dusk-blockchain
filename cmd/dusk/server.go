@@ -228,9 +228,7 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
-	sync := chain.NewSynchronizer(ctx, eventBus, rpcBus, db, c)
-
-	processor.Register(topics.Block, sync.ProcessBlock)
+	processor.Register(topics.Block, c.ProcessBlockFromNetwork)
 
 	dupeBlacklist := dupemap.Launch(eventBus)
 

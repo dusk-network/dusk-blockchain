@@ -55,7 +55,7 @@ type Consensus struct {
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing.
-func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc, requestor *candidate.Requestor, newBlockChan chan consensus.Results) (consensus.Phase, consensus.Controller, error) {
+func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc, requestor *candidate.Requestor) (consensus.Phase, consensus.Controller, error) {
 	generator, err := blockgenerator.New(e, pubKey, db)
 	if err != nil {
 		// This error means (in all cases) that there are no bid values present
@@ -65,7 +65,7 @@ func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut t
 	}
 
 	selectionStep := CreateInitialStep(e, consensusTimeOut, generator, verifyFn, db, requestor)
-	agreementStep := agreement.New(e, db, newBlockChan, requestor)
+	agreementStep := agreement.New(e, db, requestor)
 	return selectionStep, agreementStep, nil
 }
 
@@ -113,8 +113,8 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 
 // CreateStateMachine uses Consensus parameters as a shorthand for the static
 // CreateStateMachine.
-func (c *Consensus) CreateStateMachine(db database.DB, consensusTimeOut time.Duration, verifyFn consensus.CandidateVerificationFunc, newBlockChan chan consensus.Results) (consensus.Phase, consensus.Controller, error) {
-	return CreateStateMachine(c.Emitter, db, consensusTimeOut, c.pubKey.Copy(), verifyFn, c.Requestor, newBlockChan)
+func (c *Consensus) CreateStateMachine(db database.DB, consensusTimeOut time.Duration, verifyFn consensus.CandidateVerificationFunc) (consensus.Phase, consensus.Controller, error) {
+	return CreateStateMachine(c.Emitter, db, consensusTimeOut, c.pubKey.Copy(), verifyFn, c.Requestor)
 }
 
 //nolint:wsl

@@ -117,7 +117,7 @@ func TestAcceptFromPeer(t *testing.T) {
 
 	blk := mockAcceptableBlock(*c.tip)
 
-	c.ProcessSucceedingBlock(*blk)
+	c.ProcessSuccessiveBlock(*blk)
 
 	// the order of received stuff cannot be guaranteed. So we just search for
 	// getRoundResult topic. If it hasn't been received the test fails.
@@ -174,44 +174,6 @@ func TestAcceptBlock(t *testing.T) {
 	decodedBlk := blkMsg.Payload().(block.Block)
 
 	assert.True(decodedBlk.Equals(c.tip))
-}
-
-// This test makes sure that consensus does not halt when an outdated error
-// is sent to the chain.
-func TestNoHaltOnOutdatedError(t *testing.T) {
-	assert := assert.New(t)
-	startingHeight := uint64(1)
-
-	eb, c := setupChainTest(t, startingHeight)
-
-	acceptedBlockChan := make(chan message.Message, 1)
-	eb.Subscribe(topics.AcceptedBlock, eventbus.NewChanListener(acceptedBlockChan))
-
-	// Make a 'winning' block from the past
-	blk := helper.RandomBlock(0, 1)
-
-	// Attempt to stop block production
-	c.StopBlockProduction(*blk)
-
-	// If block production stopped, we can no longer accept a block through
-	// `ProcessSuccessiveBlock` until we restart the consensus loop.
-	// So let's see if we can increment the height.
-	blk = helper.RandomBlock(startingHeight, 1)
-	cert := block.EmptyCertificate()
-	cert.Step = 5
-	blk.Header.Certificate = cert
-	assert.NoError(c.ProcessSucceedingBlock(*blk))
-
-	// Should have gotten `blk` over topics.AcceptBlock
-	blkMsg := <-acceptedBlockChan
-	decodedBlk := blkMsg.Payload().(block.Block)
-
-	assert.True(decodedBlk.Equals(c.tip))
-
-	assert.True(bytes.Equal(blk.Header.Hash, c.tip.Header.Hash))
-
-	// lastCertificate should be `cert`
-	assert.True(cert.Equals(c.tip.Header.Certificate))
 }
 
 func createLoader(db database.DB) *DBLoader {
@@ -283,6 +245,6 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 		return tx.StoreBidValues(make([]byte, 32), make([]byte, 32), 0, 100000)
 	}))
 
-	go c.ProduceBlock()
+	c.ProduceBlock()
 	return eb, c
 }
