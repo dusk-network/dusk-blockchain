@@ -98,12 +98,12 @@ func (m *mockChain) CurrentHeight() uint64 {
 	return m.tipHeight
 }
 
-func (m *mockChain) ProcessSuccessiveBlock(blk block.Block) error {
+func (m *mockChain) TryNextConsecutiveBlockInSync(blk block.Block) error {
 	m.catchBlockChan <- consensus.Results{Blk: blk, Err: nil}
 	return nil
 }
 
-func (m *mockChain) ProcessSyncBlock(_ block.Block) error {
+func (m *mockChain) TryNextConsecutiveBlockOutSync(_ block.Block) error {
 	return nil
 }
 

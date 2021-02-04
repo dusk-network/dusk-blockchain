@@ -60,8 +60,8 @@ type Loader interface {
 
 // Ledger is the Chain interface used in tests.
 type Ledger interface {
-	ProcessSuccessiveBlock(block.Block) error
-	ProcessSyncBlock(block.Block) error
+	TryNextConsecutiveBlockInSync(block.Block) error
+	TryNextConsecutiveBlockOutSync(block.Block) error
 	ProduceBlock() error
 	StopBlockProduction()
 }
@@ -154,10 +154,10 @@ func (c *Chain) StopBlockProduction() {
 	select {
 	case c.stopConsensusChan <- struct{}{}:
 	// If there is nobody listening on the other end, it could very well be that
-	// `crunchBlocks` is attempting to take control of the mutex. In this instance,
-	// we can forego the channel send here, as the release of the mutex will result
-	// in a bump to the tip height, making the consensus results obsolete, and
-	// ending the lifetime of that goroutine.
+	// `acceptConsensusResults` is attempting to take control of the mutex.
+	// In this instance, we can forego the channel send here, as the release of
+	// the mutex will result in a bump to the tip height, making the consensus
+	// results obsolete, and ending the lifetime of that goroutine.
 	default:
 	}
 }
@@ -204,13 +204,13 @@ func (c *Chain) ProduceBlock() error {
 
 	go func(ctx context.Context, cancel context.CancelFunc, winnerChan chan consensus.Results) {
 		defer cancel()
-		c.crunchBlocks(ctx, winnerChan)
+		c.acceptConsensusResults(ctx, winnerChan)
 	}(ctx, cancel, winnerChan)
 
 	return nil
 }
 
-func (c *Chain) crunchBlocks(ctx context.Context, winnerChan chan consensus.Results) {
+func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan consensus.Results) {
 	for {
 		select {
 		case candidate := <-winnerChan:
@@ -270,16 +270,16 @@ func (c *Chain) produceBlock(ctx context.Context, winnerChan chan consensus.Resu
 	return errors.New("no consensus loop present")
 }
 
-// ProcessSyncBlock is the processing path for accepting a block from the network
-// during out-of-sync state.
-func (c *Chain) ProcessSyncBlock(blk block.Block) error {
+// TryNextConsecutiveBlockOutSync is the processing path for accepting a block
+// from the network during out-of-sync state.
+func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting sync block")
 	return c.AcceptBlock(blk)
 }
 
-// ProcessSuccessiveBlock is the processing path for accepting a block from the
-// network during in-sync state.
-func (c *Chain) ProcessSuccessiveBlock(blk block.Block) error {
+// TryNextConsecutiveBlockInSync is the processing path for accepting a block
+// from the network during in-sync state.
+func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block) error {
 	c.StopBlockProduction()
 
 	if err := c.AcceptSuccessiveBlock(blk); err != nil {

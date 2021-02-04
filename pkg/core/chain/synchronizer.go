@@ -30,7 +30,7 @@ func (s *synchronizer) inSync(currentHeight uint64, blk block.Block) ([]bytes.Bu
 	}
 
 	// Otherwise notify the chain (and the consensus loop).
-	if err := s.chain.ProcessSuccessiveBlock(blk); err != nil {
+	if err := s.chain.TryNextConsecutiveBlockInSync(blk); err != nil {
 		return nil, err
 	}
 
@@ -55,7 +55,7 @@ func (s *synchronizer) outSync(currentHeight uint64, blk block.Block) ([]bytes.B
 
 	for _, blk := range blks {
 		// append them all to the ledger
-		if err = s.chain.ProcessSyncBlock(blk); err != nil {
+		if err = s.chain.TryNextConsecutiveBlockOutSync(blk); err != nil {
 			log.WithError(err).Debug("could not AcceptBlock")
 			return nil, err
 		}
