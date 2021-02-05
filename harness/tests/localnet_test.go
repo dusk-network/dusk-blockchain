@@ -246,6 +246,7 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 		t.SkipNow()
 	}
 
+	localNet.PrintWalletsInfo(t)
 	logrus.Infof("TestMultipleBiddersProvisioners with staking")
 
 	defaultLocktime := uint64(100000)

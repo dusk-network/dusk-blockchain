@@ -114,6 +114,7 @@ func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
 	rusk.RegisterBidServiceServer(grpcServer, srv)
 	rusk.RegisterTransferServer(grpcServer, srv)
 	rusk.RegisterStakeServiceServer(grpcServer, srv)
+	rusk.RegisterWalletServer(grpcServer, srv)
 }
 
 // Serve will start listening on a hardcoded IP and port. The server will then accept
@@ -411,6 +412,20 @@ func fetchDecoys(numMixins int) []mlsag.PubKeys {
 	}
 
 	return pubKeys
+}
+
+// GetBalance locked and unlocked balance values per a ViewKey.
+func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*rusk.GetWalletBalanceResponse, error) {
+	resp := new(rusk.GetWalletBalanceResponse)
+
+	unlockedBalance, lockedBalance, err := s.w.Balance()
+	if err != nil {
+		return resp, err
+	}
+
+	resp.LockedBalance = lockedBalance
+	resp.UnlockedBalance = unlockedBalance
+	return resp, nil
 }
 
 // Stop the rusk mock server.
