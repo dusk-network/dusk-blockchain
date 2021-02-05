@@ -40,9 +40,10 @@ func ReconstructCommittee(p *user.Provisioners, b *block.Block) error {
 		t := tx.Type()
 		switch t {
 		case transactions.Stake:
-			amountBytes := tx.(*transactions.Transaction).TxPayload.Notes[0].Commitment.Data
+			amountBytes := tx.(*transactions.Transaction).Payload.Notes[0].Commitment
 			amount := binary.LittleEndian.Uint64(amountBytes[0:8])
-			buf := bytes.NewBuffer(tx.(*transactions.Transaction).TxPayload.CallData)
+			buf := bytes.NewBuffer(tx.(*transactions.Transaction).Payload.CallData)
+
 			var expirationHeight uint64
 			if err := encoding.ReadUint64LE(buf, &expirationHeight); err != nil {
 				return err

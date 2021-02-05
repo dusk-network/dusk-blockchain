@@ -11,8 +11,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dusk-network/dusk-blockchain/cmd/utils/walletutils"
-
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/mock"
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/transactions"
@@ -33,7 +31,6 @@ func main() {
 		transactionsCMD,
 		mockCMD,
 		mockRUSKCMD,
-		walletUtilsCMD,
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -128,15 +125,12 @@ var (
 	walletFileFlag = cli.StringFlag{
 		Name:  "walletfile",
 		Usage: "Dusk hostname , eg: --walletfile=./data/wallet-9000.dat",
-		Value: "./harness/data/wallet-9000.dat",
+		Value: "./devnet-wallets/wallet0.dat",
 	}
 
-	walletCMDFlag = cli.StringFlag{
-		Name:  "walletcmd",
-		Usage: "Dusk WalletCmd , eg: --walletcmd=loadwallet",
-		Value: "loadwallet",
-	}
-
+	// XXX: This seems unused now. We should figure out if that's alright,
+	// or if we need to update some of the logic on wallet creation.
+	//nolint
 	walletPasswordFlag = cli.StringFlag{
 		Name:  "walletpassword",
 		Usage: "Dusk Wallet Password, eg: --walletpassword=password",
@@ -196,19 +190,6 @@ var (
 			walletFileFlag,
 		},
 		Description: `Execute/Query transactions for a Dusk node`,
-	}
-
-	walletUtilsCMD = cli.Command{
-		Name:      "walletutils",
-		Usage:     "execute cmd to a Dusk wallet",
-		Action:    walletAction,
-		ArgsUsage: "",
-		Flags: []cli.Flag{
-			grpcHostFlag,
-			walletCMDFlag,
-			walletPasswordFlag,
-		},
-		Description: `Execute/Query a Dusk wallet`,
 	}
 )
 
@@ -272,20 +253,5 @@ func mockRuskAction(ctx *cli.Context) error {
 	walletFile := ctx.String(walletFileFlag.Name)
 
 	err := mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
-	return err
-}
-
-func walletAction(ctx *cli.Context) error {
-	grpcHost := ctx.String(grpcHostFlag.Name)
-	walletCMD := ctx.String(walletCMDFlag.Name)
-	walletPassword := ctx.String(walletPasswordFlag.Name)
-
-	log.WithField("walletCMD", walletCMD).
-		Info("wallet Action started")
-
-	resp, err := walletutils.RunWallet(grpcHost, walletCMD, walletPassword)
-
-	log.WithField("resp", resp).
-		Info("wallet Action completed")
 	return err
 }

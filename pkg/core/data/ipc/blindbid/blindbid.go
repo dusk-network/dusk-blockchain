@@ -9,7 +9,6 @@ package blindbid
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -17,21 +16,38 @@ import (
 // GenerateScoreRequest is used by block generators to generate a score
 // and a proof of blind bid, in order to propose a block.
 type GenerateScoreRequest struct {
-	K              *common.BlsScalar        `json:"k"`
-	Commitment     *common.JubJubCompressed `json:"secret"`
-	Seed           *common.BlsScalar        `json:"seed"`
-	Round          uint32                   `json:"round"`
-	Step           uint32                   `json:"step"`
-	IndexStoredBid uint64                   `json:"index_stored_bid"`
+	K              []byte `json:"k"`
+	Seed           []byte `json:"seed"`
+	Secret         []byte `json:"secret"`
+	Round          uint32 `json:"round"`
+	Step           uint32 `json:"step"`
+	IndexStoredBid uint64 `json:"index_stored_bid"`
+}
+
+// NewGenerateScoreRequest returns a new empty GenerateScoreRequest struct.
+func NewGenerateScoreRequest() *GenerateScoreRequest {
+	return &GenerateScoreRequest{
+		K:      make([]byte, 32),
+		Seed:   make([]byte, 32),
+		Secret: make([]byte, 32),
+	}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (g *GenerateScoreRequest) Copy() *GenerateScoreRequest {
+	k := make([]byte, len(g.K))
+	seed := make([]byte, len(g.Seed))
+	secret := make([]byte, len(g.Secret))
+
+	copy(k, g.K)
+	copy(seed, g.Seed)
+	copy(secret, g.Secret)
+
 	return &GenerateScoreRequest{
-		K:              g.K.Copy(),
-		Seed:           g.Seed.Copy(),
-		Commitment:     g.Commitment.Copy(),
+		K:              k,
+		Seed:           seed,
+		Secret:         secret,
 		Round:          g.Round,
 		Step:           g.Step,
 		IndexStoredBid: g.IndexStoredBid,
@@ -40,12 +56,9 @@ func (g *GenerateScoreRequest) Copy() *GenerateScoreRequest {
 
 // MGenerateScoreRequest copies the GenerateScoreRequest structure into the Rusk equivalent.
 func MGenerateScoreRequest(r *rusk.GenerateScoreRequest, f *GenerateScoreRequest) {
-	r.K = new(rusk.BlsScalar)
-	common.MBlsScalar(r.K, f.K)
-	r.Seed = new(rusk.BlsScalar)
-	common.MBlsScalar(r.Seed, f.Seed)
-	r.Secret = new(rusk.JubJubCompressed)
-	common.MJubJubCompressed(r.Secret, f.Commitment)
+	copy(r.K, f.K)
+	copy(r.Seed, f.Seed)
+	copy(r.Secret, f.Secret)
 	r.Round = f.Round
 	r.Step = f.Step
 	r.IndexStoredBid = f.IndexStoredBid
@@ -53,9 +66,9 @@ func MGenerateScoreRequest(r *rusk.GenerateScoreRequest, f *GenerateScoreRequest
 
 // UGenerateScoreRequest copies the Rusk GenerateScoreRequest structure into the native equivalent.
 func UGenerateScoreRequest(r *rusk.GenerateScoreRequest, f *GenerateScoreRequest) {
-	common.UBlsScalar(r.K, f.K)
-	common.UBlsScalar(r.Seed, f.Seed)
-	common.UJubJubCompressed(r.Secret, f.Commitment)
+	copy(f.K, r.K)
+	copy(f.Seed, r.Seed)
+	copy(f.Secret, r.Secret)
 	f.Round = r.Round
 	f.Step = r.Step
 	f.IndexStoredBid = r.IndexStoredBid
@@ -63,15 +76,15 @@ func UGenerateScoreRequest(r *rusk.GenerateScoreRequest, f *GenerateScoreRequest
 
 // MarshalGenerateScoreRequest writes the GenerateScoreRequest struct into a bytes.Buffer.
 func MarshalGenerateScoreRequest(r *bytes.Buffer, f *GenerateScoreRequest) error {
-	if err := common.MarshalBlsScalar(r, f.K); err != nil {
+	if err := encoding.Write256(r, f.K); err != nil {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.Seed); err != nil {
+	if err := encoding.Write256(r, f.Seed); err != nil {
 		return err
 	}
 
-	if err := common.MarshalJubJubCompressed(r, f.Commitment); err != nil {
+	if err := encoding.Write256(r, f.Secret); err != nil {
 		return err
 	}
 
@@ -88,15 +101,15 @@ func MarshalGenerateScoreRequest(r *bytes.Buffer, f *GenerateScoreRequest) error
 
 // UnmarshalGenerateScoreRequest reads a GenerateScoreRequest struct from a bytes.Buffer.
 func UnmarshalGenerateScoreRequest(r *bytes.Buffer, f *GenerateScoreRequest) error {
-	if err := common.UnmarshalBlsScalar(r, f.K); err != nil {
+	if err := encoding.Read256(r, f.K); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.Seed); err != nil {
+	if err := encoding.Read256(r, f.Seed); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalJubJubCompressed(r, f.Commitment); err != nil {
+	if err := encoding.Read256(r, f.Secret); err != nil {
 		return err
 	}
 
@@ -114,89 +127,107 @@ func UnmarshalGenerateScoreRequest(r *bytes.Buffer, f *GenerateScoreRequest) err
 // GenerateScoreResponse contains the resulting proof of blind bid, score,
 // and the prover identity, to be used for proposing a block.
 type GenerateScoreResponse struct {
-	BlindbidProof  *common.Proof     `json:"blindbid_proof"`
-	Score          *common.BlsScalar `json:"score"`
-	ProverIdentity *common.BlsScalar `json:"prover_identity"`
+	BlindbidProof  []byte `json:"blindbid_proof"`
+	Score          []byte `json:"score"`
+	ProverIdentity []byte `json:"prover_identity"`
 }
 
 // NewGenerateScoreResponse returns a new empty GenerateScoreResponse struct.
 func NewGenerateScoreResponse() *GenerateScoreResponse {
 	return &GenerateScoreResponse{
-		BlindbidProof:  common.NewProof(),
-		Score:          common.NewBlsScalar(),
-		ProverIdentity: common.NewBlsScalar(),
+		BlindbidProof:  make([]byte, 0),
+		Score:          make([]byte, 32),
+		ProverIdentity: make([]byte, 32),
 	}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (g *GenerateScoreResponse) Copy() *GenerateScoreResponse {
+	proof := make([]byte, len(g.BlindbidProof))
+	score := make([]byte, len(g.Score))
+	identity := make([]byte, len(g.ProverIdentity))
+
+	copy(proof, g.BlindbidProof)
+	copy(score, g.Score)
+	copy(identity, g.ProverIdentity)
+
 	return &GenerateScoreResponse{
-		BlindbidProof:  g.BlindbidProof.Copy(),
-		Score:          g.Score.Copy(),
-		ProverIdentity: g.ProverIdentity.Copy(),
+		BlindbidProof:  proof,
+		Score:          score,
+		ProverIdentity: identity,
 	}
 }
 
 // MGenerateScoreResponse copies the GenerateScoreResponse structure into the Rusk equivalent.
 func MGenerateScoreResponse(r *rusk.GenerateScoreResponse, f *GenerateScoreResponse) {
-	common.MProof(r.BlindbidProof, f.BlindbidProof)
-	common.MBlsScalar(r.Score, f.Score)
-	common.MBlsScalar(r.ProverIdentity, f.ProverIdentity)
+	copy(r.BlindbidProof, f.BlindbidProof)
+	copy(r.Score, f.Score)
+	copy(r.ProverIdentity, f.ProverIdentity)
 }
 
 // UGenerateScoreResponse copies the Rusk GenerateScoreResponse structure into the native equivalent.
 func UGenerateScoreResponse(r *rusk.GenerateScoreResponse, f *GenerateScoreResponse) {
-	common.UProof(r.BlindbidProof, f.BlindbidProof)
-	common.UBlsScalar(r.Score, f.Score)
-	common.UBlsScalar(r.ProverIdentity, f.ProverIdentity)
+	copy(f.BlindbidProof, r.BlindbidProof)
+	copy(f.Score, r.Score)
+	copy(f.ProverIdentity, r.ProverIdentity)
 }
 
 // MarshalGenerateScoreResponse writes the GenerateScoreResponse struct into a bytes.Buffer.
 func MarshalGenerateScoreResponse(r *bytes.Buffer, f *GenerateScoreResponse) error {
-	if err := common.MarshalProof(r, f.BlindbidProof); err != nil {
+	if err := encoding.WriteVarBytes(r, f.BlindbidProof); err != nil {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.Score); err != nil {
+	if err := encoding.Write256(r, f.Score); err != nil {
 		return err
 	}
 
-	return common.MarshalBlsScalar(r, f.ProverIdentity)
+	return encoding.Write256(r, f.ProverIdentity)
 }
 
 // UnmarshalGenerateScoreResponse reads a GenerateScoreResponse struct from a bytes.Buffer.
 func UnmarshalGenerateScoreResponse(r *bytes.Buffer, f *GenerateScoreResponse) error {
-	if err := common.UnmarshalProof(r, f.BlindbidProof); err != nil {
+	if err := encoding.ReadVarBytes(r, &f.BlindbidProof); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.Score); err != nil {
+	if err := encoding.Read256(r, f.Score); err != nil {
 		return err
 	}
 
-	return common.UnmarshalBlsScalar(r, f.ProverIdentity)
+	return encoding.Read256(r, f.ProverIdentity)
 }
 
 // VerifyScoreRequest is used by provisioners to ensure that a given
 // blind bid proof is valid.
 type VerifyScoreRequest struct {
-	Proof    *common.Proof     `json:"proof"`
-	Score    *common.BlsScalar `json:"score"`
-	Seed     *common.BlsScalar `json:"seed"`
-	ProverID *common.BlsScalar `json:"prover_id"`
-	Round    uint64            `json:"round"`
-	Step     uint32            `json:"step"`
+	Proof    []byte `json:"proof"`
+	Score    []byte `json:"score"`
+	Seed     []byte `json:"seed"`
+	ProverID []byte `json:"prover_id"`
+	Round    uint64 `json:"round"`
+	Step     uint32 `json:"step"`
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (v *VerifyScoreRequest) Copy() *VerifyScoreRequest {
+	proof := make([]byte, len(v.Proof))
+	score := make([]byte, len(v.Score))
+	seed := make([]byte, len(v.Seed))
+	proverID := make([]byte, len(v.ProverID))
+
+	copy(proof, v.Proof)
+	copy(score, v.Score)
+	copy(seed, v.Seed)
+	copy(proverID, v.ProverID)
+
 	return &VerifyScoreRequest{
-		Proof:    v.Proof.Copy(),
-		Score:    v.Score.Copy(),
-		Seed:     v.Seed.Copy(),
-		ProverID: v.ProverID.Copy(),
+		Proof:    proof,
+		Score:    score,
+		Seed:     seed,
+		ProverID: proverID,
 		Round:    v.Round,
 		Step:     v.Step,
 	}
@@ -204,43 +235,39 @@ func (v *VerifyScoreRequest) Copy() *VerifyScoreRequest {
 
 // MVerifyScoreRequest copies the VerifyScoreRequest structure into the Rusk equivalent.
 func MVerifyScoreRequest(r *rusk.VerifyScoreRequest, f *VerifyScoreRequest) {
-	r.Proof = new(rusk.Proof)
-	common.MProof(r.Proof, f.Proof)
-	r.Score = new(rusk.BlsScalar)
-	common.MBlsScalar(r.Score, f.Score)
-	r.Seed = new(rusk.BlsScalar)
-	common.MBlsScalar(r.Seed, f.Seed)
-	r.ProverId = new(rusk.BlsScalar)
-	common.MBlsScalar(r.ProverId, f.ProverID)
+	copy(r.Proof, f.Proof)
+	copy(r.Score, f.Score)
+	copy(r.Seed, f.Seed)
+	copy(r.ProverId, f.ProverID)
 	r.Round = f.Round
 	r.Step = f.Step
 }
 
 // UVerifyScoreRequest copies the Rusk VerifyScoreRequest structure into the native equivalent.
 func UVerifyScoreRequest(r *rusk.VerifyScoreRequest, f *VerifyScoreRequest) {
-	common.UProof(r.Proof, f.Proof)
-	common.UBlsScalar(r.Score, f.Score)
-	common.UBlsScalar(r.Seed, f.Seed)
-	common.UBlsScalar(r.ProverId, f.ProverID)
+	copy(f.Proof, r.Proof)
+	copy(f.Score, r.Score)
+	copy(f.Seed, r.Seed)
+	copy(f.ProverID, r.ProverId)
 	f.Round = r.Round
 	f.Step = r.Step
 }
 
 // MarshalVerifyScoreRequest writes the VerifyScoreRequest struct into a bytes.Buffer.
 func MarshalVerifyScoreRequest(r *bytes.Buffer, f *VerifyScoreRequest) error {
-	if err := common.MarshalProof(r, f.Proof); err != nil {
+	if err := encoding.WriteVarBytes(r, f.Proof); err != nil {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.Score); err != nil {
+	if err := encoding.Write256(r, f.Score); err != nil {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.Seed); err != nil {
+	if err := encoding.Write256(r, f.Seed); err != nil {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.ProverID); err != nil {
+	if err := encoding.Write256(r, f.ProverID); err != nil {
 		return err
 	}
 
@@ -253,19 +280,19 @@ func MarshalVerifyScoreRequest(r *bytes.Buffer, f *VerifyScoreRequest) error {
 
 // UnmarshalVerifyScoreRequest reads a VerifyScoreRequest struct from a bytes.Buffer.
 func UnmarshalVerifyScoreRequest(r *bytes.Buffer, f *VerifyScoreRequest) error {
-	if err := common.UnmarshalProof(r, f.Proof); err != nil {
+	if err := encoding.ReadVarBytes(r, &f.Proof); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.Score); err != nil {
+	if err := encoding.Read256(r, f.Score); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.Seed); err != nil {
+	if err := encoding.Read256(r, f.Seed); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.ProverID); err != nil {
+	if err := encoding.Read256(r, f.ProverID); err != nil {
 		return err
 	}
 

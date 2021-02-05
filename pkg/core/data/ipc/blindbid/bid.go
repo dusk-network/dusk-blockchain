@@ -9,7 +9,6 @@ package blindbid
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -17,161 +16,191 @@ import (
 
 // Bid represents a blind bid, made by a block generator.
 type Bid struct {
-	EncryptedData *common.PoseidonCipher   `json:"encrypted_data"`
-	HashedSecret  *common.BlsScalar        `json:"hashed_secret"`
-	Nonce         *common.BlsScalar        `json:"nonce"`
-	PkR           *keys.StealthAddress     `json:"stealth_address"`
-	Commitment    *common.JubJubCompressed `json:"commitment"`
-	EligibilityTS *common.BlsScalar        `json:"eligibility_ts"`
-	ExpirationTS  *common.BlsScalar        `json:"expiration_ts"`
+	EncryptedData  []byte               `json:"encrypted_data"`
+	HashedSecret   []byte               `json:"hashed_secret"`
+	Nonce          []byte               `json:"nonce"`
+	StealthAddress *keys.StealthAddress `json:"stealth_address"`
+	Commitment     []byte               `json:"commitment"`
+	Eligibility    []byte               `json:"eligibility"`
+	Expiration     []byte               `json:"expiration"`
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (b *Bid) Copy() *Bid {
+	encData := make([]byte, len(b.EncryptedData))
+	hashedSecret := make([]byte, len(b.HashedSecret))
+	nonce := make([]byte, len(b.Nonce))
+	commitment := make([]byte, len(b.Commitment))
+	eligibility := make([]byte, len(b.Eligibility))
+	expiration := make([]byte, len(b.Expiration))
+
+	copy(encData, b.EncryptedData)
+	copy(hashedSecret, b.HashedSecret)
+	copy(nonce, b.Nonce)
+	copy(commitment, b.Commitment)
+	copy(eligibility, b.Eligibility)
+	copy(expiration, b.Expiration)
+
 	return &Bid{
-		EncryptedData: b.EncryptedData.Copy(),
-		HashedSecret:  b.HashedSecret.Copy(),
-		Nonce:         b.Nonce.Copy(),
-		PkR:           b.PkR.Copy(),
-		Commitment:    b.Commitment.Copy(),
-		EligibilityTS: b.EligibilityTS.Copy(),
-		ExpirationTS:  b.ExpirationTS.Copy(),
+		EncryptedData:  encData,
+		HashedSecret:   hashedSecret,
+		Nonce:          nonce,
+		StealthAddress: b.StealthAddress.Copy(),
+		Commitment:     commitment,
+		Eligibility:    eligibility,
+		Expiration:     expiration,
 	}
 }
 
 // MBid copies the Bid structure into the Rusk equivalent.
 func MBid(r *rusk.Bid, f *Bid) {
-	common.MPoseidonCipher(r.EncryptedData, f.EncryptedData)
-	common.MBlsScalar(r.HashedSecret, f.HashedSecret)
-	common.MBlsScalar(r.Nonce, f.Nonce)
-	keys.MStealthAddress(r.PkR, f.PkR)
-	common.MJubJubCompressed(r.Commitment, f.Commitment)
+	copy(r.EncryptedData, f.EncryptedData)
+	copy(r.HashedSecret, f.HashedSecret)
+	copy(r.Nonce, f.Nonce)
+	keys.MStealthAddress(r.StealthAddress, f.StealthAddress)
+	copy(r.Commitment, f.Commitment)
 	// XXX: fix typo in rusk-schema
-	common.MBlsScalar(r.ElegibilityTs, f.EligibilityTS)
-	common.MBlsScalar(r.ExpirationTs, f.ExpirationTS)
+	copy(r.Elegibility, f.Eligibility)
+	copy(r.Expiration, f.Expiration)
 }
 
 // UBid copies the Rusk Bid structure into the native equivalent.
 func UBid(r *rusk.Bid, f *Bid) {
-	common.UPoseidonCipher(r.EncryptedData, f.EncryptedData)
-	common.UBlsScalar(r.HashedSecret, f.HashedSecret)
-	common.UBlsScalar(r.Nonce, f.Nonce)
-	keys.UStealthAddress(r.PkR, f.PkR)
-	common.UJubJubCompressed(r.Commitment, f.Commitment)
+	copy(f.EncryptedData, r.EncryptedData)
+	copy(f.HashedSecret, r.HashedSecret)
+	copy(f.Nonce, r.Nonce)
+	keys.UStealthAddress(r.StealthAddress, f.StealthAddress)
+	copy(f.Commitment, r.Commitment)
 	// XXX: fix typo in rusk-schema
-	common.UBlsScalar(r.ElegibilityTs, f.EligibilityTS)
-	common.UBlsScalar(r.ExpirationTs, f.ExpirationTS)
+	copy(f.Eligibility, r.Elegibility)
+	copy(f.Expiration, r.Expiration)
 }
 
 // MarshalBid writes the Bid struct into a bytes.Buffer.
 func MarshalBid(r *bytes.Buffer, f *Bid) error {
-	if err := common.MarshalPoseidonCipher(r, f.EncryptedData); err != nil {
+	if err := encoding.WriteVarBytes(r, f.EncryptedData); err != nil {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.HashedSecret); err != nil {
+	if err := encoding.Write256(r, f.HashedSecret); err != nil {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.Nonce); err != nil {
+	if err := encoding.Write256(r, f.Nonce); err != nil {
 		return err
 	}
 
-	if err := keys.MarshalStealthAddress(r, f.PkR); err != nil {
+	if err := keys.MarshalStealthAddress(r, f.StealthAddress); err != nil {
 		return err
 	}
 
-	if err := common.MarshalJubJubCompressed(r, f.Commitment); err != nil {
+	if err := encoding.Write256(r, f.Commitment); err != nil {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.EligibilityTS); err != nil {
+	if err := encoding.Write256(r, f.Eligibility); err != nil {
 		return err
 	}
 
-	return common.MarshalBlsScalar(r, f.ExpirationTS)
+	return encoding.Write256(r, f.Expiration)
 }
 
 // UnmarshalBid reads a Bid struct from a bytes.Buffer.
 func UnmarshalBid(r *bytes.Buffer, f *Bid) error {
-	if err := common.UnmarshalPoseidonCipher(r, f.EncryptedData); err != nil {
+	if err := encoding.ReadVarBytes(r, &f.EncryptedData); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.HashedSecret); err != nil {
+	if err := encoding.Read256(r, f.HashedSecret); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.Nonce); err != nil {
+	if err := encoding.Read256(r, f.Nonce); err != nil {
 		return err
 	}
 
-	if err := keys.UnmarshalStealthAddress(r, f.PkR); err != nil {
+	if err := keys.UnmarshalStealthAddress(r, f.StealthAddress); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalJubJubCompressed(r, f.Commitment); err != nil {
+	if err := encoding.Read256(r, f.Commitment); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.EligibilityTS); err != nil {
+	if err := encoding.Read256(r, f.Eligibility); err != nil {
 		return err
 	}
 
-	return common.UnmarshalBlsScalar(r, f.ExpirationTS)
+	return encoding.Read256(r, f.Expiration)
 }
 
 // BidTransactionRequest is used to construct a Bid transaction.
 type BidTransactionRequest struct {
-	K                    *common.BlsScalar        `json:"k"`
-	Value                uint64                   `json:"value"`
-	Secret               *common.JubJubCompressed `json:"secret"`
-	PkR                  *keys.StealthAddress     `json:"pk_r"`
-	Seed                 *common.BlsScalar        `json:"seed"`
-	LatestConsensusRound uint64                   `json:"latest_consensus_round"`
-	LatestConsensusStep  uint64                   `json:"latest_consensus_step"`
+	K                    []byte               `json:"k"`
+	Value                uint64               `json:"value"`
+	Secret               []byte               `json:"secret"`
+	StealthAddress       *keys.StealthAddress `json:"stealth_address"`
+	Seed                 []byte               `json:"seed"`
+	LatestConsensusRound uint64               `json:"latest_consensus_round"`
+	LatestConsensusStep  uint64               `json:"latest_consensus_step"`
+	GasLimit             uint64               `json:"gas_limit"`
+	GasPrice             uint64               `json:"gas_price"`
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (b *BidTransactionRequest) Copy() *BidTransactionRequest {
+	k := make([]byte, len(b.K))
+	secret := make([]byte, len(b.Secret))
+	seed := make([]byte, len(b.Seed))
+
+	copy(k, b.K)
+	copy(secret, b.Secret)
+	copy(seed, b.Seed)
+
 	return &BidTransactionRequest{
-		K:                    b.K.Copy(),
+		K:                    k,
 		Value:                b.Value,
-		Secret:               b.Secret.Copy(),
-		PkR:                  b.PkR.Copy(),
-		Seed:                 b.Seed.Copy(),
+		Secret:               secret,
+		StealthAddress:       b.StealthAddress.Copy(),
+		Seed:                 seed,
 		LatestConsensusRound: b.LatestConsensusRound,
 		LatestConsensusStep:  b.LatestConsensusStep,
+		GasLimit:             b.GasLimit,
+		GasPrice:             b.GasPrice,
 	}
 }
 
 // MBidTransactionRequest copies the BidTransactionRequest structure into the Rusk equivalent.
 func MBidTransactionRequest(r *rusk.BidTransactionRequest, f *BidTransactionRequest) {
-	common.MBlsScalar(r.K, f.K)
+	copy(r.K, f.K)
 	r.Value = f.Value
-	common.MJubJubCompressed(r.Secret, f.Secret)
-	keys.MStealthAddress(r.PkR, f.PkR)
-	common.MBlsScalar(r.Seed, f.Seed)
+	copy(r.Secret, f.Secret)
+	keys.MStealthAddress(r.StealthAddress, f.StealthAddress)
+	copy(r.Seed, f.Seed)
 	r.LatestConsensusRound = f.LatestConsensusRound
 	r.LatestConsensusStep = f.LatestConsensusStep
+	r.GasLimit = f.GasLimit
+	r.GasPrice = f.GasPrice
 }
 
 // UBidTransactionRequest copies the Rusk BidTransactionRequest structure into the native equivalent.
 func UBidTransactionRequest(r *rusk.BidTransactionRequest, f *BidTransactionRequest) {
-	common.UBlsScalar(r.K, f.K)
+	copy(f.K, r.K)
 	f.Value = r.Value
-	common.UJubJubCompressed(r.Secret, f.Secret)
-	keys.UStealthAddress(r.PkR, f.PkR)
-	common.UBlsScalar(r.Seed, f.Seed)
+	copy(f.Secret, r.Secret)
+	keys.UStealthAddress(r.StealthAddress, f.StealthAddress)
+	copy(f.Seed, r.Seed)
 	f.LatestConsensusRound = r.LatestConsensusRound
 	f.LatestConsensusStep = r.LatestConsensusStep
+	f.GasLimit = r.GasLimit
+	f.GasPrice = r.GasPrice
 }
 
 // MarshalBidTransactionRequest writes the BidTransactionRequest struct into a bytes.Buffer.
 func MarshalBidTransactionRequest(r *bytes.Buffer, f *BidTransactionRequest) error {
-	if err := common.MarshalBlsScalar(r, f.K); err != nil {
+	if err := encoding.Write256(r, f.K); err != nil {
 		return err
 	}
 
@@ -179,15 +208,15 @@ func MarshalBidTransactionRequest(r *bytes.Buffer, f *BidTransactionRequest) err
 		return err
 	}
 
-	if err := common.MarshalJubJubCompressed(r, f.Secret); err != nil {
+	if err := encoding.Write256(r, f.Secret); err != nil {
 		return err
 	}
 
-	if err := keys.MarshalStealthAddress(r, f.PkR); err != nil {
+	if err := keys.MarshalStealthAddress(r, f.StealthAddress); err != nil {
 		return err
 	}
 
-	if err := common.MarshalBlsScalar(r, f.Seed); err != nil {
+	if err := encoding.Write256(r, f.Seed); err != nil {
 		return err
 	}
 
@@ -195,12 +224,20 @@ func MarshalBidTransactionRequest(r *bytes.Buffer, f *BidTransactionRequest) err
 		return err
 	}
 
-	return encoding.WriteUint64LE(r, f.LatestConsensusStep)
+	if err := encoding.WriteUint64LE(r, f.LatestConsensusStep); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64LE(r, f.GasLimit); err != nil {
+		return err
+	}
+
+	return encoding.WriteUint64LE(r, f.GasPrice)
 }
 
 // UnmarshalBidTransactionRequest reads a BidTransactionRequest struct from a bytes.Buffer.
 func UnmarshalBidTransactionRequest(r *bytes.Buffer, f *BidTransactionRequest) error {
-	if err := common.UnmarshalBlsScalar(r, f.K); err != nil {
+	if err := encoding.Read256(r, f.K); err != nil {
 		return err
 	}
 
@@ -208,15 +245,15 @@ func UnmarshalBidTransactionRequest(r *bytes.Buffer, f *BidTransactionRequest) e
 		return err
 	}
 
-	if err := common.UnmarshalJubJubCompressed(r, f.Secret); err != nil {
+	if err := encoding.Read256(r, f.Secret); err != nil {
 		return err
 	}
 
-	if err := keys.UnmarshalStealthAddress(r, f.PkR); err != nil {
+	if err := keys.UnmarshalStealthAddress(r, f.StealthAddress); err != nil {
 		return err
 	}
 
-	if err := common.UnmarshalBlsScalar(r, f.Seed); err != nil {
+	if err := encoding.Read256(r, f.Seed); err != nil {
 		return err
 	}
 
@@ -224,46 +261,54 @@ func UnmarshalBidTransactionRequest(r *bytes.Buffer, f *BidTransactionRequest) e
 		return err
 	}
 
-	return encoding.ReadUint64LE(r, &f.LatestConsensusStep)
+	if err := encoding.ReadUint64LE(r, &f.LatestConsensusStep); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint64LE(r, &f.GasLimit); err != nil {
+		return err
+	}
+
+	return encoding.ReadUint64LE(r, &f.GasPrice)
 }
 
 // FindBidRequest is used to find a specific Bid belonging to a public key.
 type FindBidRequest struct {
-	Addr *keys.StealthAddress `json:"addr"`
+	StealthAddress *keys.StealthAddress `json:"stealth_address"`
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (f *FindBidRequest) Copy() *FindBidRequest {
 	return &FindBidRequest{
-		Addr: f.Addr.Copy(),
+		StealthAddress: f.StealthAddress.Copy(),
 	}
 }
 
 // MFindBidRequest copies the FindBidRequest structure into the Rusk equivalent.
 func MFindBidRequest(r *rusk.FindBidRequest, f *FindBidRequest) {
-	keys.MStealthAddress(r.Addr, f.Addr)
+	keys.MStealthAddress(r.StealthAddress, f.StealthAddress)
 }
 
 // UFindBidRequest copies the Rusk FindBidRequest structure into the native equivalent.
 func UFindBidRequest(r *rusk.FindBidRequest, f *FindBidRequest) {
-	keys.UStealthAddress(r.Addr, f.Addr)
+	keys.UStealthAddress(r.StealthAddress, f.StealthAddress)
 }
 
 // MarshalFindBidRequest writes the FindBidRequest struct into a bytes.Buffer.
 func MarshalFindBidRequest(r *bytes.Buffer, f *FindBidRequest) error {
-	return keys.MarshalStealthAddress(r, f.Addr)
+	return keys.MarshalStealthAddress(r, f.StealthAddress)
 }
 
 // UnmarshalFindBidRequest reads a FindBidRequest struct from a bytes.Buffer.
 func UnmarshalFindBidRequest(r *bytes.Buffer, f *FindBidRequest) error {
-	return keys.UnmarshalStealthAddress(r, f.Addr)
+	return keys.UnmarshalStealthAddress(r, f.StealthAddress)
 }
 
 // BidList is the collection of all blind bids.
 type BidList struct {
-	BidList     []*Bid              `json:"bid_list"`
-	BidHashList []*common.BlsScalar `json:"bid_hash_list"`
+	BidList     []*Bid   `json:"bid_list"`
+	BidHashList [][]byte `json:"bid_hash_list"`
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
@@ -274,9 +319,10 @@ func (b *BidList) Copy() *BidList {
 		bidList[i] = b.BidList[i].Copy()
 	}
 
-	bidHashList := make([]*common.BlsScalar, len(b.BidHashList))
+	bidHashList := make([][]byte, len(b.BidHashList))
 	for i := range bidHashList {
-		bidHashList[i] = b.BidHashList[i].Copy()
+		bidHashList[i] = make([]byte, 32)
+		copy(bidHashList[i], b.BidHashList[i])
 	}
 
 	return &BidList{
@@ -292,9 +338,10 @@ func MBidList(r *rusk.BidList, f *BidList) {
 		MBid(bid, f.BidList[i])
 	}
 
-	r.BidHashList = make([]*rusk.BlsScalar, len(f.BidHashList))
-	for i, bidHash := range r.BidHashList {
-		common.MBlsScalar(bidHash, f.BidHashList[i])
+	r.BidHashList = make([][]byte, len(f.BidHashList))
+	for i := range r.BidHashList {
+		r.BidHashList[i] = make([]byte, 32)
+		copy(r.BidHashList[i], f.BidHashList[i])
 	}
 }
 
@@ -305,9 +352,10 @@ func UBidList(r *rusk.BidList, f *BidList) {
 		UBid(r.BidList[i], bid)
 	}
 
-	f.BidHashList = make([]*common.BlsScalar, len(r.BidHashList))
-	for i, bidHash := range f.BidHashList {
-		common.UBlsScalar(r.BidHashList[i], bidHash)
+	f.BidHashList = make([][]byte, len(r.BidHashList))
+	for i := range f.BidHashList {
+		f.BidHashList[i] = make([]byte, 32)
+		copy(f.BidHashList[i], r.BidHashList[i])
 	}
 }
 
@@ -328,7 +376,7 @@ func MarshalBidList(r *bytes.Buffer, f *BidList) error {
 	}
 
 	for _, bidHash := range f.BidHashList {
-		if err := common.MarshalBlsScalar(r, bidHash); err != nil {
+		if err := encoding.Write256(r, bidHash); err != nil {
 			return err
 		}
 	}
@@ -355,9 +403,9 @@ func UnmarshalBidList(r *bytes.Buffer, f *BidList) error {
 		return err
 	}
 
-	f.BidHashList = make([]*common.BlsScalar, lenBidHashList)
+	f.BidHashList = make([][]byte, lenBidHashList)
 	for _, bidHash := range f.BidHashList {
-		if err = common.UnmarshalBlsScalar(r, bidHash); err != nil {
+		if err = encoding.Read256(r, bidHash); err != nil {
 			return err
 		}
 	}

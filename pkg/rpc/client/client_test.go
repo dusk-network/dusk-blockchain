@@ -28,21 +28,6 @@ func (t *WalletSrvMock) GetTxHistory(ctx context.Context, e *node.EmptyRequest) 
 	return &node.TxHistoryResponse{}, nil
 }
 
-// CreateWallet creates a new wallet from a password or seed.
-func (t *WalletSrvMock) CreateWallet(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
-	return &node.LoadResponse{}, nil
-}
-
-// LoadWallet from a password.
-func (t *WalletSrvMock) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node.LoadResponse, error) {
-	return &node.LoadResponse{}, nil
-}
-
-// CreateFromSeed creates a wallet from a seed.
-func (t *WalletSrvMock) CreateFromSeed(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
-	return &node.LoadResponse{}, nil
-}
-
 // ClearWalletDatabase clears the wallet database, containing the unspent outputs.
 func (t *WalletSrvMock) ClearWalletDatabase(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	return &node.GenericResponse{}, nil
@@ -66,11 +51,6 @@ func (t *WalletSrvMock) Bid(ctx context.Context, c *node.BidRequest) (*node.Tran
 // Stake will create a staking transaction.
 func (t *WalletSrvMock) Stake(ctx context.Context, c *node.StakeRequest) (*node.TransactionResponse, error) {
 	return &node.TransactionResponse{}, nil
-}
-
-// GetWalletStatus returns whether or not the wallet is currently loaded.
-func (t *WalletSrvMock) GetWalletStatus(ctx context.Context, e *node.EmptyRequest) (*node.WalletStatusResponse, error) {
-	return &node.WalletStatusResponse{}, nil
 }
 
 // GetAddress returns the address of the loaded wallet.

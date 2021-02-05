@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-var txHash = "abff217058b7d30a8340cbcaddf97e0c90834323e88556dcf43c5cea9cfaeaa6"
+var txHash = "214e7c972873d8ebcb1791e1d6f41dde7c9060ed54ff7a3865602b4b69274ffb"
 
 func TestBlocksByHeight(t *testing.T) {
 	query := `

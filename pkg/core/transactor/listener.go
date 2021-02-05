@@ -13,7 +13,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -92,35 +91,31 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	// an ExpirationHeight (most likely the last 2 should be retrieved from he DB)
 	// Create the Ed25519 Keypair
 	// XXX: We need to get the proper values, and not just make some up out of thin air.
-	k := &common.BlsScalar{Data: make([]byte, 32)}
-	if _, err := rand.Read(k.Data); err != nil {
+	k := make([]byte, 32)
+	if _, err := rand.Read(k); err != nil {
 		return nil, err
 	}
 
-	secret := &common.JubJubCompressed{Data: make([]byte, 32)}
-	if _, err := rand.Read(secret.Data); err != nil {
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
 		return nil, err
 	}
 
 	pkR := &keys.StealthAddress{
-		RG: &common.JubJubCompressed{
-			Data: make([]byte, 32),
-		},
-		PkR: &common.JubJubCompressed{
-			Data: make([]byte, 32),
-		},
+		RG:  make([]byte, 32),
+		PkR: make([]byte, 32),
 	}
 
-	if _, err := rand.Read(pkR.RG.Data); err != nil {
+	if _, err := rand.Read(pkR.RG); err != nil {
 		return nil, err
 	}
 
-	if _, err := rand.Read(pkR.PkR.Data); err != nil {
+	if _, err := rand.Read(pkR.PkR); err != nil {
 		return nil, err
 	}
 
-	seed := &common.BlsScalar{Data: make([]byte, 32)}
-	if _, err := rand.Read(seed.Data); err != nil {
+	seed := make([]byte, 32)
+	if _, err := rand.Read(seed); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +135,7 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 			return err
 		}
 
-		return t.StoreBidValues(secret.Data, k.Data, tx.BidTreeStorageIndex, height+250000)
+		return t.StoreBidValues(secret, k, tx.BidTreeStorageIndex, height+250000)
 	}); err != nil {
 		log.
 			WithField("amount", req.Amount).

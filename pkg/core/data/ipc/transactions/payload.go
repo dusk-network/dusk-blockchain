@@ -9,31 +9,29 @@ package transactions
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 // TransactionPayload carries the common data contained in all transaction types.
 type TransactionPayload struct {
-	Anchor        *common.BlsScalar   `json:"anchor"`
-	Nullifiers    []*common.BlsScalar `json:"nullifier"`
+	Anchor        []byte   `json:"anchor"`
+	Nullifiers    [][]byte `json:"nullifier"`
 	*Crossover    `json:"crossover"`
 	Notes         []*Note `json:"notes"`
 	*Fee          `json:"fee"`
-	SpendingProof *common.Proof `json:"spending_proof"`
-	CallData      []byte        `json:"call_data"`
+	SpendingProof []byte `json:"spending_proof"`
+	CallData      []byte `json:"call_data"`
 }
 
 // NewTransactionPayload returns a new empty TransactionPayload struct.
 func NewTransactionPayload() *TransactionPayload {
 	return &TransactionPayload{
-		Anchor:        common.NewBlsScalar(),
-		Nullifiers:    make([]*common.BlsScalar, 0),
+		Anchor:        make([]byte, 32),
+		Nullifiers:    make([][]byte, 0),
 		Crossover:     NewCrossover(),
 		Notes:         make([]*Note, 0),
 		Fee:           NewFee(),
-		SpendingProof: common.NewProof(),
+		SpendingProof: make([]byte, 0),
 		CallData:      make([]byte, 0),
 	}
 }
@@ -41,9 +39,13 @@ func NewTransactionPayload() *TransactionPayload {
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (t *TransactionPayload) Copy() *TransactionPayload {
-	inputs := make([]*common.BlsScalar, len(t.Nullifiers))
+	anchor := make([]byte, len(t.Anchor))
+	copy(anchor, t.Anchor)
+
+	inputs := make([][]byte, len(t.Nullifiers))
 	for i := range inputs {
-		inputs[i] = t.Nullifiers[i].Copy()
+		inputs[i] = make([]byte, len(t.Nullifiers[i]))
+		copy(inputs[i], t.Nullifiers[i])
 	}
 
 	notes := make([]*Note, len(t.Notes))
@@ -51,73 +53,26 @@ func (t *TransactionPayload) Copy() *TransactionPayload {
 		notes[i] = t.Notes[i].Copy()
 	}
 
+	spendingProof := make([]byte, len(t.SpendingProof))
+	copy(spendingProof, t.SpendingProof)
+
 	callData := make([]byte, len(t.CallData))
 	copy(callData, t.CallData)
 
 	return &TransactionPayload{
-		Anchor:        t.Anchor.Copy(),
+		Anchor:        anchor,
 		Nullifiers:    inputs,
 		Crossover:     t.Crossover.Copy(),
 		Notes:         notes,
 		Fee:           t.Fee.Copy(),
-		SpendingProof: t.SpendingProof.Copy(),
+		SpendingProof: spendingProof,
 		CallData:      callData,
 	}
 }
 
-// MTransactionPayload copies the TransactionPayload structure into the Rusk equivalent.
-func MTransactionPayload(r *rusk.TransactionPayload, f *TransactionPayload) {
-	common.MBlsScalar(r.Anchor, f.Anchor)
-
-	r.Nullifier = make([]*rusk.BlsScalar, len(f.Nullifiers))
-	for i := range r.Nullifier {
-		r.Nullifier[i] = new(rusk.BlsScalar)
-		common.MBlsScalar(r.Nullifier[i], f.Nullifiers[i])
-	}
-
-	MCrossover(r.Crossover, f.Crossover)
-
-	r.Notes = make([]*rusk.Note, len(f.Notes))
-	for i := range r.Notes {
-		r.Notes[i] = new(rusk.Note)
-		MNote(r.Notes[i], f.Notes[i])
-	}
-
-	MFee(r.Fee, f.Fee)
-	common.MProof(r.SpendingProof, f.SpendingProof)
-	callData := make([]byte, len(f.CallData))
-	copy(callData, f.CallData)
-	r.CallData = callData
-}
-
-// UTransactionPayload copies the Rusk TransactionPayload structure into the native equivalent.
-func UTransactionPayload(r *rusk.TransactionPayload, f *TransactionPayload) {
-	common.UBlsScalar(r.Anchor, f.Anchor)
-
-	f.Nullifiers = make([]*common.BlsScalar, len(r.Nullifier))
-	for i := range f.Nullifiers {
-		f.Nullifiers[i] = common.NewBlsScalar()
-		common.UBlsScalar(r.Nullifier[i], f.Nullifiers[i])
-	}
-
-	UCrossover(r.Crossover, f.Crossover)
-
-	f.Notes = make([]*Note, len(r.Notes))
-	for i := range f.Notes {
-		f.Notes[i] = NewNote()
-		UNote(r.Notes[i], f.Notes[i])
-	}
-
-	UFee(r.Fee, f.Fee)
-	common.UProof(r.SpendingProof, f.SpendingProof)
-	callData := make([]byte, len(r.CallData))
-	copy(callData, r.CallData)
-	f.CallData = callData
-}
-
 // MarshalTransactionPayload writes the TransactionPayload struct into a bytes.Buffer.
 func MarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
-	if err := common.MarshalBlsScalar(r, f.Anchor); err != nil {
+	if err := encoding.Write256(r, f.Anchor); err != nil {
 		return err
 	}
 
@@ -126,7 +81,10 @@ func MarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 	}
 
 	for _, input := range f.Nullifiers {
-		if err := common.MarshalBlsScalar(r, input); err != nil {
+		// XXX: We are using variable size bytes here, because we abuse the
+		// input when mocking RUSK, to fill it with lots of data.
+		// This should be fixed when we integrate the actual RUSK server.
+		if err := encoding.WriteVarBytes(r, input); err != nil {
 			return err
 		}
 	}
@@ -149,7 +107,7 @@ func MarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 		return err
 	}
 
-	if err := common.MarshalProof(r, f.SpendingProof); err != nil {
+	if err := encoding.WriteVarBytes(r, f.SpendingProof); err != nil {
 		return err
 	}
 
@@ -158,7 +116,7 @@ func MarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 
 // UnmarshalTransactionPayload reads a TransactionPayload struct from a bytes.Buffer.
 func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
-	if err := common.UnmarshalBlsScalar(r, f.Anchor); err != nil {
+	if err := encoding.Read256(r, f.Anchor); err != nil {
 		return err
 	}
 
@@ -167,10 +125,11 @@ func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 		return err
 	}
 
-	f.Nullifiers = make([]*common.BlsScalar, lenInputs)
+	f.Nullifiers = make([][]byte, lenInputs)
 	for i := range f.Nullifiers {
-		f.Nullifiers[i] = common.NewBlsScalar()
-		if err = common.UnmarshalBlsScalar(r, f.Nullifiers[i]); err != nil {
+		// XXX: Change back to normal once RUSK is integrated.
+		f.Nullifiers[i] = make([]byte, 0)
+		if err = encoding.ReadVarBytes(r, &f.Nullifiers[i]); err != nil {
 			return err
 		}
 	}
@@ -196,7 +155,7 @@ func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 		return err
 	}
 
-	if err = common.UnmarshalProof(r, f.SpendingProof); err != nil {
+	if err = encoding.ReadVarBytes(r, &f.SpendingProof); err != nil {
 		return err
 	}
 
@@ -205,7 +164,7 @@ func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 
 // Equal returns whether or not two TransactionPayloads are equal.
 func (t *TransactionPayload) Equal(other *TransactionPayload) bool {
-	if !t.Anchor.Equal(other.Anchor) {
+	if !bytes.Equal(t.Anchor, other.Anchor) {
 		return false
 	}
 
@@ -214,7 +173,7 @@ func (t *TransactionPayload) Equal(other *TransactionPayload) bool {
 	}
 
 	for i := range t.Nullifiers {
-		if !t.Nullifiers[i].Equal(other.Nullifiers[i]) {
+		if !bytes.Equal(t.Nullifiers[i], other.Nullifiers[i]) {
 			return false
 		}
 	}
@@ -233,7 +192,7 @@ func (t *TransactionPayload) Equal(other *TransactionPayload) bool {
 		}
 	}
 
-	if !t.SpendingProof.Equal(other.SpendingProof) {
+	if !bytes.Equal(t.SpendingProof, other.SpendingProof) {
 		return false
 	}
 

@@ -8,8 +8,6 @@ package consensus
 
 import (
 	"math/big"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 )
 
 // Threshold is a number which proof scores should be compared against.
@@ -37,7 +35,7 @@ func (t *Threshold) Lower() {
 }
 
 // Exceeds checks whether the Threshold exceeds a given score.
-func (t *Threshold) Exceeds(score *common.BlsScalar) bool {
-	scoreInt := big.NewInt(0).SetBytes(score.Data)
+func (t *Threshold) Exceeds(score []byte) bool {
+	scoreInt := big.NewInt(0).SetBytes(score)
 	return scoreInt.Cmp(t.limit) == -1
 }

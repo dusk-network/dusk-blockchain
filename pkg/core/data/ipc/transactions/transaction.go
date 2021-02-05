@@ -44,15 +44,15 @@ const (
 
 // Transaction is a Phoenix transaction.
 type Transaction struct {
-	Version   uint32 `json:"version"`
-	TxType    `json:"type"`
-	TxPayload *TransactionPayload `json:"tx_payload"`
+	Version uint32 `json:"version"`
+	TxType  `json:"type"`
+	Payload *TransactionPayload `json:"payload"`
 }
 
 // NewTransaction returns a new empty Transaction struct.
 func NewTransaction() *Transaction {
 	t := new(Transaction)
-	t.TxPayload = NewTransactionPayload()
+	t.Payload = NewTransactionPayload()
 	return t
 }
 
@@ -60,31 +60,34 @@ func NewTransaction() *Transaction {
 // the message safe to publish to multiple subscribers.
 func (t Transaction) Copy() payload.Safe {
 	return &Transaction{
-		Version:   t.Version,
-		TxType:    t.TxType,
-		TxPayload: t.TxPayload.Copy(),
+		Version: t.Version,
+		TxType:  t.TxType,
+		Payload: t.Payload.Copy(),
 	}
 }
 
 // MTransaction copies the Transaction structure into the Rusk equivalent.
-func MTransaction(r *rusk.Transaction, f *Transaction) {
-	r.TxPayload = new(rusk.TransactionPayload)
-	r.TxPayload.Anchor = new(rusk.BlsScalar)
-	r.TxPayload.Crossover = new(rusk.Crossover)
-	r.TxPayload.Fee = new(rusk.Fee)
-	r.TxPayload.SpendingProof = new(rusk.Proof)
+func MTransaction(r *rusk.Transaction, f *Transaction) error {
 	r.Version = f.Version
 	r.Type = uint32(f.TxType)
 
-	MTransactionPayload(r.TxPayload, f.TxPayload)
+	buf := new(bytes.Buffer)
+	if err := MarshalTransactionPayload(buf, f.Payload); err != nil {
+		return err
+	}
+
+	r.Payload = buf.Bytes()
+	return nil
 }
 
 // UTransaction copies the Rusk Transaction structure into the native equivalent.
-func UTransaction(r *rusk.Transaction, f *Transaction) {
+func UTransaction(r *rusk.Transaction, f *Transaction) error {
 	f.Version = r.Version
 	f.TxType = TxType(r.Type)
+	f.Payload = NewTransactionPayload()
 
-	UTransactionPayload(r.TxPayload, f.TxPayload)
+	buf := bytes.NewBuffer(r.Payload)
+	return UnmarshalTransactionPayload(buf, f.Payload)
 }
 
 // MarshalTransaction writes the Transaction struct into a bytes.Buffer.
@@ -97,7 +100,7 @@ func MarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 		return err
 	}
 
-	return MarshalTransactionPayload(r, f.TxPayload)
+	return MarshalTransactionPayload(r, f.Payload)
 }
 
 // UnmarshalTransaction reads a Transaction struct from a bytes.Buffer.
@@ -112,7 +115,7 @@ func UnmarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 	}
 
 	f.TxType = TxType(t)
-	return UnmarshalTransactionPayload(r, f.TxPayload)
+	return UnmarshalTransactionPayload(r, f.Payload)
 }
 
 // ContractCall is the transaction that embodies the execution parameter for a
@@ -158,7 +161,7 @@ func Unmarshal(r *bytes.Buffer, f ContractCall) error {
 
 // StandardTx returns the transaction payload.
 func (t Transaction) StandardTx() *TransactionPayload {
-	return t.TxPayload
+	return t.Payload
 }
 
 // CalculateHash returns the SHA3-256 hash digest of the transaction.
@@ -223,17 +226,17 @@ func (b *BidTransaction) Copy() *BidTransaction {
 }
 
 // MBidTransaction copies the BidTransaction structure into the Rusk equivalent.
-func MBidTransaction(r *rusk.BidTransaction, f *BidTransaction) {
+func MBidTransaction(r *rusk.BidTransaction, f *BidTransaction) error {
 	r.BidTreeStorageIndex = f.BidTreeStorageIndex
 
-	MTransaction(r.Tx, f.Tx)
+	return MTransaction(r.Tx, f.Tx)
 }
 
 // UBidTransaction copies the Rusk BidTransaction structure into the native equivalent.
-func UBidTransaction(r *rusk.BidTransaction, f *BidTransaction) {
+func UBidTransaction(r *rusk.BidTransaction, f *BidTransaction) error {
 	f.BidTreeStorageIndex = r.BidTreeStorageIndex
 
-	UTransaction(r.Tx, f.Tx)
+	return UTransaction(r.Tx, f.Tx)
 }
 
 // MarshalBidTransaction writes the BidTransaction struct into a bytes.Buffer.

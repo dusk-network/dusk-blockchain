@@ -9,7 +9,6 @@ package transactor
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 )
 
@@ -23,16 +22,14 @@ func DecodeAddressToPublicKey(in []byte) (*keys.StealthAddress, error) {
 		return pk, err
 	}
 
-	pk.RG = new(common.JubJubCompressed)
-	pk.PkR = new(common.JubJubCompressed)
-	pk.RG.Data = make([]byte, 32)
-	pk.PkR.Data = make([]byte, 32)
+	pk.RG = make([]byte, 32)
+	pk.PkR = make([]byte, 32)
 
-	if _, err = buf.Read(pk.RG.Data); err != nil {
+	if _, err = buf.Read(pk.RG); err != nil {
 		return pk, err
 	}
 
-	if _, err = buf.Read(pk.PkR.Data); err != nil {
+	if _, err = buf.Read(pk.PkR); err != nil {
 		return pk, err
 	}
 

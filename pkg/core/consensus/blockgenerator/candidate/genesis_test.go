@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -39,12 +38,8 @@ func TestGenerateGenesis(t *testing.T) {
 	require.Nil(t, err)
 
 	publicKey := &keys.PublicKey{
-		AG: &common.JubJubCompressed{
-			Data: pkBytes[0:32],
-		},
-		BG: &common.JubJubCompressed{
-			Data: pkBytes[32:64],
-		},
+		AG: pkBytes[0:32],
+		BG: pkBytes[32:64],
 	}
 
 	// Generate a new genesis block with new wallet pubkey

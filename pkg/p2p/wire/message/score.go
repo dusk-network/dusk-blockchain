@@ -52,10 +52,10 @@ func EmptyScoreProposal(hdr header.Header) ScoreProposal {
 func NewScoreProposal(hdr header.Header, seed []byte, score blindbid.GenerateScoreResponse) ScoreProposal {
 	return ScoreProposal{
 		hdr:      hdr,
-		Score:    score.Score.Data,
-		Proof:    score.BlindbidProof.Data,
+		Score:    score.Score,
+		Proof:    score.BlindbidProof,
 		Seed:     seed,
-		Identity: score.ProverIdentity.Data,
+		Identity: score.ProverIdentity,
 	}
 }
 

@@ -16,7 +16,6 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/common"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -47,8 +46,8 @@ func TestGenerate(t *testing.T) {
 	scoreInstance := generator{
 		Emitter:        e,
 		scoreGenerator: e.Proxy.BlockGenerator(),
-		d:              &common.JubJubCompressed{Data: d},
-		k:              &common.BlsScalar{Data: k},
+		d:              d,
+		k:              k,
 		indexStoredBid: indexStoredBid,
 		threshold:      consensus.NewThreshold(),
 	}
