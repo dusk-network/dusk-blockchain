@@ -132,26 +132,6 @@ func (s *synchronizer) setSyncTarget(tipHeight, maxHeight uint64) {
 	}
 }
 
-// GetSyncProgress returns how close the node is to being synced to the tip,
-// as a percentage value.
-// func (s *synchronizer) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
-// 	if s.highestSeen() == 0 {
-// 		return &node.SyncProgressResponse{Progress: 0}, nil
-// 	}
-//
-// 	prevBlockHeight := s.chain.CurrentHeight()
-// 	progressPercentage := (float64(prevBlockHeight) / float64(s.highestSeen())) * 100
-//
-// 	// Avoiding strange output when the chain can be ahead of the highest
-// 	// seen block, as in most cases, consensus terminates before we see
-// 	// the new block from other peers.
-// 	if progressPercentage > 100 {
-// 		progressPercentage = 100
-// 	}
-//
-// 	return &node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil
-// }
-
 func createGetBlocksMsg(latestHash []byte) *message.GetBlocks {
 	msg := &message.GetBlocks{}
 	msg.Locators = append(msg.Locators, latestHash)

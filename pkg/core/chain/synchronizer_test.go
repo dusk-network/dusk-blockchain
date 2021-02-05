@@ -50,29 +50,6 @@ func TestFutureBlocks(t *testing.T) {
 	assert.NotEmpty(s.sequencer.blockPool[height])
 }
 
-// TODO: this needs to be moved to the chain.
-// func TestSyncProgress(t *testing.T) {
-// 	assert := assert.New(t)
-// 	s, m := setupSynchronizerTest()
-//
-// 	// SyncProgress should be 0% right now
-// 	resp, err := s.GetSyncProgress(context.Background(), &node.EmptyRequest{})
-// 	assert.NoError(err)
-//
-// 	assert.Equal(resp.Progress, float32(0.0))
-//
-// 	// Change tipHeight and then give the synchronizer a block from far in the future
-// 	m.tipHeight = 50
-// 	blk := helper.RandomBlock(100, 1)
-// 	s.processBlock(*blk)
-//
-// 	// SyncProgress should be 50%
-// 	resp, err = s.GetSyncProgress(context.Background(), &node.EmptyRequest{})
-// 	assert.NoError(err)
-//
-// 	assert.Equal(resp.Progress, float32(50.0))
-// }
-
 func setupSynchronizerTest() (*synchronizer, chan consensus.Results) {
 	c := make(chan consensus.Results, 1)
 	m := &mockChain{tipHeight: 0, catchBlockChan: c}
