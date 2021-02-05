@@ -52,7 +52,7 @@ func TestAgreement(t *testing.T) {
 		return t.StoreCandidateMessage(*blk)
 	}))
 
-	loop := agreement.New(hlp.Emitter, db, make(chan consensus.Results, 1), nil)
+	loop := agreement.New(hlp.Emitter, db, nil)
 
 	agreementEvs := hlp.Spawn(blk.Header.Hash)
 	agreementChan := make(chan message.Message, 100)
@@ -80,7 +80,7 @@ func TestRequestor(t *testing.T) {
 	l := eventbus.NewChanListener(c)
 	hlp.Emitter.EventBus.Subscribe(topics.Gossip, l)
 
-	loop := agreement.New(hlp.Emitter, db, make(chan consensus.Results, 1), req)
+	loop := agreement.New(hlp.Emitter, db, req)
 
 	agreementEvs := hlp.Spawn(blk.Header.Hash)
 	agreementChan := make(chan message.Message, 100)

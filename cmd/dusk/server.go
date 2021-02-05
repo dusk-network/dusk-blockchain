@@ -228,9 +228,7 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
-	sync := chain.NewSynchronizer(ctx, eventBus, rpcBus, db, c)
-
-	processor.Register(topics.Block, sync.ProcessBlock)
+	processor.Register(topics.Block, c.ProcessBlockFromNetwork)
 
 	dupeBlacklist := dupemap.Launch(eventBus)
 
@@ -290,11 +288,11 @@ func Setup() *Server {
 		}
 	}()
 
-	go func() {
-		if err := c.ProduceBlock(); err != nil {
-			log.WithError(err).Warn("ProduceBlock returned err")
-		}
-	}()
+	if err := c.ProduceBlock(); err != nil {
+		log.WithError(err).Warn("ProduceBlock returned err")
+		// If we can not start consensus, we shouldn't be able to start at all.
+		panic(err)
+	}
 
 	return srv
 }

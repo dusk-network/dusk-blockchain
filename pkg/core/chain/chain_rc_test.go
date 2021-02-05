@@ -17,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -25,7 +26,7 @@ func TestConcurrentBlock(t *testing.T) {
 	// Set up a chain instance with mocking verifiers
 	startingHeight := uint64(1)
 	_, chain := setupChainTest(t, startingHeight)
-	go chain.ProduceBlock()
+	chain.ProduceBlock()
 
 	var wg sync.WaitGroup
 	for n := 0; n < 50; n++ {
@@ -36,7 +37,7 @@ func TestConcurrentBlock(t *testing.T) {
 			defer wg.Done()
 
 			blk := helper.RandomBlock(1, 3)
-			chain.ProcessSyncBlock(*blk)
+			chain.ProcessBlockFromNetwork(message.New(topics.Block, *blk))
 		}()
 	}
 
