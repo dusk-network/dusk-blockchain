@@ -25,7 +25,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -70,7 +69,6 @@ type Ledger interface {
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	eventBus *eventbus.EventBus
-	rpcBus   *rpcbus.RPCBus
 	db       database.DB
 
 	// loader abstracts away the persistence aspect of Block operations.
@@ -101,12 +99,10 @@ type Chain struct {
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
-// from (remote) consensus components, the RPCBus for dispatching synchronous
-// data related to Certificates, Blocks, Rounds and progress.
-func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus) (*Chain, error) {
+// from (remote) consensus components.
+func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus) (*Chain, error) {
 	chain := &Chain{
 		eventBus:          eventBus,
-		rpcBus:            rpcBus,
 		db:                db,
 		loader:            loader,
 		verifier:          verifier,
@@ -465,35 +461,34 @@ func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 	}
 }
 
+// GetSyncProgress returns how close the node is to being synced to the tip,
+// as a percentage value.
+// NOTE: this is just here to satisfy the grpc interface. It should be removed
+// and the method should be moved to a synchronizer service.
+func (c *Chain) GetSyncProgress(_ context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
+	return &node.SyncProgressResponse{Progress: float32(100.0)}, nil
+}
+
+// CalculateSyncProgress of the node.
+func (c *Chain) CalculateSyncProgress() float64 {
+	if c.highestSeen == 0 {
+		return 0.0
+	}
+
+	progressPercentage := (float64(c.tip.Header.Height) / float64(c.highestSeen)) * 100
+	if progressPercentage > 100 {
+		progressPercentage = 100
+	}
+
+	return progressPercentage
+}
+
 // RebuildChain will delete all blocks except for the genesis block,
 // to allow for a full re-sync.
 // NOTE: This function no longer does anything, but is still here to conform to the
 // ChainServer interface, for GRPC communications.
 func (c *Chain) RebuildChain(_ context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	return &node.GenericResponse{Response: "Unimplemented"}, nil
-}
-
-// GetSyncProgress returns how close the node is to being synced to the tip,
-// as a percentage value.
-func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
-	// Guard `highestSeen`.
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if c.highestSeen == 0 {
-		return &node.SyncProgressResponse{Progress: 0}, nil
-	}
-
-	progressPercentage := (float64(c.tip.Header.Height) / float64(c.highestSeen)) * 100
-
-	// Avoiding strange output when the chain can be ahead of the highest
-	// seen block, as in most cases, consensus terminates before we see
-	// the new block from other peers.
-	if progressPercentage > 100 {
-		progressPercentage = 100
-	}
-
-	return &node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil
 }
 
 func (c *Chain) storeStakesInStormDB(blkHeight uint64) {

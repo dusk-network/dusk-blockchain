@@ -67,12 +67,12 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check.
-func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (*chain.Chain, error) {
+func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, srv *grpc.Server, db database.DB) (*chain.Chain, error) {
 	// creating and firing up the chain process
 	genesis := cfg.DecodeGenesis()
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(ctx, db, eventBus, rpcBus, l, l, srv, proxy, cl)
+	chainProcess, err := chain.New(ctx, db, eventBus, l, l, srv, proxy, cl)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func Setup() *Server {
 	cl := loop.New(e, &w.PublicKey)
 	processor.Register(topics.Candidate, cl.ProcessCandidate)
 
-	c, err := LaunchChain(ctx, cl, proxy, eventBus, rpcBus, grpcServer, db)
+	c, err := LaunchChain(ctx, cl, proxy, eventBus, grpcServer, db)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -260,7 +260,7 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy, w)
+	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy, w, c.CalculateSyncProgress)
 	if err != nil {
 		log.Panic(err)
 	}

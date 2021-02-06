@@ -34,11 +34,14 @@ type Transactor struct {
 	// Passed to the consensus component startup
 	proxy transactions.Proxy
 
+	// Used to retrieve the node's sync progress
+	getSyncProgress func() float64
+
 	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy, w *wallet.Wallet) (*Transactor, error) {
+func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy, w *wallet.Wallet, getSyncProgress func() float64) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -47,13 +50,14 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 	bidChan := make(chan rpcbus.Request, 1)
 
 	t := &Transactor{
-		db:        db,
-		eb:        eb,
-		rb:        rb,
-		stakeChan: stakeChan,
-		bidChan:   bidChan,
-		proxy:     proxy,
-		w:         w,
+		db:              db,
+		eb:              eb,
+		rb:              rb,
+		stakeChan:       stakeChan,
+		bidChan:         bidChan,
+		proxy:           proxy,
+		w:               w,
+		getSyncProgress: getSyncProgress,
 	}
 
 	if srv != nil {
@@ -81,6 +85,11 @@ func (t *Transactor) Listen() {
 	for {
 		select {
 		case r := <-t.stakeChan:
+			// Are we synced?
+			if t.getSyncProgress() != 100 {
+				continue
+			}
+
 			req, ok := r.Params.(*node.StakeRequest)
 			if !ok {
 				continue
