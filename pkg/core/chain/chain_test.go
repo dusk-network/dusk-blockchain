@@ -15,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -196,6 +197,28 @@ func TestFetchTip(t *testing.T) {
 	assert.NoError(err)
 
 	assert.Equal(chain.tip.Header.Hash, s.TipHash)
+}
+
+func TestSyncProgress(t *testing.T) {
+	assert := assert.New(t)
+	_, c := setupChainTest(t, 0)
+
+	// SyncProgress should be 0% right now
+	resp, err := c.GetSyncProgress(context.Background(), &node.EmptyRequest{})
+	assert.NoError(err)
+
+	assert.Equal(resp.Progress, float32(0.0))
+
+	// Change tipHeight and then give the chain a block from far in the future
+	c.tip.Header.Height = 50
+	blk := helper.RandomBlock(100, 1)
+	c.ProcessBlockFromNetwork(message.New(topics.Block, *blk))
+
+	// SyncProgress should be 50%
+	resp, err = c.GetSyncProgress(context.Background(), &node.EmptyRequest{})
+	assert.NoError(err)
+
+	assert.Equal(resp.Progress, float32(50.0))
 }
 
 // mock a block which can be accepted by the chain.

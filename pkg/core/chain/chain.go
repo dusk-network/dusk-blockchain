@@ -465,20 +465,35 @@ func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 	}
 }
 
-// GetSyncProgress returns how close the node is to being synced to the tip,
-// as a percentage value.
-// NOTE: this is just here to satisfy the grpc interface. It should be removed
-// and the method should be moved to a synchronizer service.
-func (c *Chain) GetSyncProgress(_ context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
-	return &node.SyncProgressResponse{Progress: float32(100.0)}, nil
-}
-
 // RebuildChain will delete all blocks except for the genesis block,
 // to allow for a full re-sync.
 // NOTE: This function no longer does anything, but is still here to conform to the
 // ChainServer interface, for GRPC communications.
 func (c *Chain) RebuildChain(_ context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
 	return &node.GenericResponse{Response: "Unimplemented"}, nil
+}
+
+// GetSyncProgress returns how close the node is to being synced to the tip,
+// as a percentage value.
+func (c *Chain) GetSyncProgress(ctx context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
+	// Guard `highestSeen`.
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.highestSeen == 0 {
+		return &node.SyncProgressResponse{Progress: 0}, nil
+	}
+
+	progressPercentage := (float64(c.tip.Header.Height) / float64(c.highestSeen)) * 100
+
+	// Avoiding strange output when the chain can be ahead of the highest
+	// seen block, as in most cases, consensus terminates before we see
+	// the new block from other peers.
+	if progressPercentage > 100 {
+		progressPercentage = 100
+	}
+
+	return &node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil
 }
 
 func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
