@@ -49,6 +49,11 @@ func ReconstructCommittee(p *user.Provisioners, b *block.Block) error {
 				return err
 			}
 
+			// Add grace period for stakes that aren't included in genesis.
+			if b.Header.Height != 0 {
+				expirationHeight += 1000
+			}
+
 			blsKey := make([]byte, 0)
 			if err := encoding.ReadVarBytes(buf, &blsKey); err != nil {
 				return err

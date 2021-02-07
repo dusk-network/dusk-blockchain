@@ -196,7 +196,10 @@ func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight u
 	for _, tx := range txs {
 		if tx.Type() == transactions.StakeType {
 			stake := tx.(*transactions.Stake)
-			if err := s.p.Add(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
+
+			// Add grace period for stakes.
+			stakeStartHeight := startHeight + 1000
+			if err := s.p.Add(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), stakeStartHeight, startHeight+stake.Lock-2); err != nil {
 				return err
 			}
 		}
