@@ -463,14 +463,15 @@ func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 
 // GetSyncProgress returns how close the node is to being synced to the tip,
 // as a percentage value.
-// NOTE: this is just here to satisfy the grpc interface. It should be removed
-// and the method should be moved to a synchronizer service.
 func (c *Chain) GetSyncProgress(_ context.Context, e *node.EmptyRequest) (*node.SyncProgressResponse, error) {
-	return &node.SyncProgressResponse{Progress: float32(100.0)}, nil
+	return &node.SyncProgressResponse{Progress: float32(c.CalculateSyncProgress())}, nil
 }
 
 // CalculateSyncProgress of the node.
 func (c *Chain) CalculateSyncProgress() float64 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	if c.highestSeen == 0 {
 		return 0.0
 	}
