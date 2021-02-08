@@ -8,6 +8,7 @@ package transactor
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -86,11 +87,6 @@ func (t *Transactor) Listen() {
 	for {
 		select {
 		case r := <-t.stakeChan:
-			// Are we synced?
-			if !t.canStake() {
-				continue
-			}
-
 			req, ok := r.Params.(*node.StakeRequest)
 			if !ok {
 				continue
@@ -101,7 +97,6 @@ func (t *Transactor) Listen() {
 			if _, err := t.Stake(context.Background(), req); err != nil {
 				l.WithError(err).Error("error in creating a stake transaction")
 			}
-
 		case r := <-t.bidChan:
 			req, ok := r.Params.(*node.BidRequest)
 			if !ok {
@@ -163,6 +158,11 @@ func (t *Transactor) Bid(ctx context.Context, c *node.BidRequest) (*node.Transac
 
 // Stake will create a staking transaction.
 func (t *Transactor) Stake(ctx context.Context, c *node.StakeRequest) (*node.TransactionResponse, error) {
+	// Are we synced?
+	if !t.canStake() {
+		return nil, errors.New("node is not synced")
+	}
+
 	return t.handleSendStakeTx(c)
 }
 
