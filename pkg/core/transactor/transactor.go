@@ -8,6 +8,7 @@ package transactor
 
 import (
 	"context"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
@@ -86,7 +87,7 @@ func (t *Transactor) Listen() {
 		select {
 		case r := <-t.stakeChan:
 			// Are we synced?
-			if t.getSyncProgress() != 100 {
+			if !t.canStake() {
 				continue
 			}
 
@@ -112,6 +113,27 @@ func (t *Transactor) Listen() {
 			}
 		}
 	}
+}
+
+func (t *Transactor) canStake() bool {
+	if t.getSyncProgress() == 100 {
+		return true
+	}
+
+	// Check for our sync progress three more times. If we still can't stake after
+	// the third check, it's better to just return false, and give the Transactor
+	// control back over the Listen goroutine.
+	interval := 5 * time.Second
+
+	for i := 0; i < 3; i++ {
+		time.Sleep(interval * time.Duration(i+1))
+
+		if t.getSyncProgress() == 100 {
+			return true
+		}
+	}
+
+	return false
 }
 
 // GetTxHistory will return a subset of the transactions that were sent and received.
