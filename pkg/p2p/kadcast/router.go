@@ -66,10 +66,11 @@ func (m *messageRouter) route(msg message.Message) error {
 		return fmt.Errorf("%s topic not routable", category.String())
 	}
 
-	// Filter duplicated messages
-	if !m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
-		// return fmt.Errorf("duplicated message received with topic %s", category.String())
+	// TODO Filter duplicated messages
+	/* if !m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
+		 return fmt.Errorf("duplicated message received with topic %s", category.String())
 	}
+	*/
 
 	// Publish wire message to the eventbus so that the subscribed
 	// components could handle it

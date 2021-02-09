@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -53,9 +52,8 @@ func TestReader(t *testing.T) {
 	processor.Register(topics.Agreement, respFn)
 	factory := NewReaderFactory(processor)
 
-	dupeMap := dupemap.NewDupeMap(5)
 	responseChan := make(chan bytes.Buffer, 100)
-	peerReader := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupeMap, responseChan)
+	peerReader := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), responseChan)
 
 	go peerReader.ReadLoop(context.Background(), make(chan error, 1))
 

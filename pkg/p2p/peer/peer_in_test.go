@@ -17,7 +17,6 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -63,9 +62,9 @@ func TestPingLoop(t *testing.T) {
 	processor.Register(topics.Ping, responding.ProcessPing)
 	factory := NewReaderFactory(processor)
 
-	reader := factory.SpawnReader(client, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan)
+	reader := factory.SpawnReader(client, protocol.NewGossip(protocol.TestNet), responseChan)
 
-	reader2 := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), responseChan2)
+	reader2 := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), responseChan2)
 
 	go Create(context.Background(), reader, writer, responseChan)
 	go Create(context.Background(), reader2, writer2, responseChan2)
@@ -223,12 +222,11 @@ func TestInvalidPayload(t *testing.T) {
 
 //nolint:unparam
 func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, chan<- bytes.Buffer) {
-	d := dupemap.NewDupeMap(0)
 	r, w := net.Pipe()
 
 	respChan := make(chan bytes.Buffer, 10)
 	g := protocol.NewGossip(protocol.TestNet)
-	peer := f.SpawnReader(r, g, d, respChan)
+	peer := f.SpawnReader(r, g, respChan)
 
 	// Run the non-recover readLoop to watch for panics
 	go assert.NotPanics(t, func() { peer.readLoop(context.Background(), make(chan error, 1)) })

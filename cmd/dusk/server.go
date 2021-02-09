@@ -33,7 +33,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -56,7 +55,6 @@ type Server struct {
 	eventBus          *eventbus.EventBus
 	rpcBus            *rpcbus.RPCBus
 	c                 *chain.Chain
-	dupeMap           *dupemap.DupeMap
 	gossip            *protocol.Gossip
 	grpcServer        *grpc.Server
 	ruskConn          *grpc.ClientConn
@@ -94,7 +92,7 @@ func (s *Server) launchKadcastPeer() {
 		return
 	}
 
-	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, s.dupeMap, kcfg.Raptor)
+	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, nil, kcfg.Raptor)
 	// Launch kadcast peer services and join network defined by bootstrappers
 	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
 	s.kadPeer = kadPeer
@@ -230,8 +228,6 @@ func Setup() *Server {
 
 	processor.Register(topics.Block, c.ProcessBlockFromNetwork)
 
-	dupeBlacklist := dupemap.Launch(eventBus)
-
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
 		if gqlServer, e := gql.NewHTTPServer(eventBus, rpcBus); e != nil {
@@ -251,7 +247,6 @@ func Setup() *Server {
 		eventBus:          eventBus,
 		rpcBus:            rpcBus,
 		c:                 c,
-		dupeMap:           dupeBlacklist,
 		gossip:            protocol.NewGossip(protocol.TestNet),
 		grpcServer:        grpcServer,
 		ruskConn:          ruskConn,
@@ -301,7 +296,7 @@ func Setup() *Server {
 func (s *Server) OnAccept(conn net.Conn) {
 	writeQueueChan := make(chan bytes.Buffer, 1000)
 
-	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan)
+	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, writeQueueChan)
 	if err := peerReader.Accept(); err != nil {
 		logServer.WithError(err).Warnln("OnAccept, problem performing handshake")
 		return
@@ -335,7 +330,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	logServer.WithField("address", address).
 		Debugln("connection established")
 
-	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, s.dupeMap, writeQueueChan)
+	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, writeQueueChan)
 
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
