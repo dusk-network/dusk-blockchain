@@ -111,9 +111,12 @@ func (t *Transactor) Listen() {
 }
 
 func (t *Transactor) canStake() bool {
-	if t.getSyncProgress() == 100 {
+	progress := t.getSyncProgress()
+	if progress == 100 {
 		return true
 	}
+
+	log.WithField("progress", progress).Debugln("could not send stake tx - node is not synced")
 
 	// Check for our sync progress three more times. If we still can't stake after
 	// the third check, it's better to just return false, and give the Transactor
@@ -123,9 +126,12 @@ func (t *Transactor) canStake() bool {
 	for i := 0; i < 3; i++ {
 		time.Sleep(interval * time.Duration(i+1))
 
-		if t.getSyncProgress() == 100 {
+		progress = t.getSyncProgress()
+		if progress == 100 {
 			return true
 		}
+
+		log.WithField("progress", progress).Debugln("could not send stake tx - node is not synced")
 	}
 
 	return false
