@@ -31,4 +31,6 @@
 
 * Chain is the only process with a RW copy to the database
 
+## Mechanisms
 
+![Block processing decision tree](./chain_processing_flow.jpg)
