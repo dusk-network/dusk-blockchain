@@ -59,7 +59,7 @@ Finally, to start your node, type:
 
 ## Wallet
 
-The wallet is hosted in a separate folder, [found here](https://github.com/dusk-network/cmd/wallet). 
+The wallet is hosted in a separate folder, [found here](./cmd/wallet). 
 
 ### Building the wallet
 
