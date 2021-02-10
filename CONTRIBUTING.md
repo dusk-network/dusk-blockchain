@@ -22,6 +22,7 @@ Thank you for your interest in contributing to `dusk-blockchain`! In this file, 
 * If you fix a bug which was hard to find, create/add to the `gotchas.md` file in the package. This helps other developers catch the bug much quicker if it pops up again.
 * If you are adding new code, please include proper documentation outside of code comments where it makes sense. Ideally, for adding new features, it helps to at the very minimum add a `README.md` which explains purpose, inner workings, etc. In some cases, it may also be helpful to include UML diagrams which depict the new feature/component (sequence diagrams, component diagrams and workflows are often good choices).
 * Use the `context` package to manage goroutine lifetimes. For good examples, look at how the `Chain` and `Mempool` are managed using contexts.
+* Where possible, try to fail and return errors before sending out requests (be it GRPC, channels or any other method). Try as much as possible to verify input before sending it out.
 
 ### Performance
 
