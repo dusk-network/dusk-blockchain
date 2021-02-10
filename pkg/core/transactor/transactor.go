@@ -8,6 +8,8 @@ package transactor
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
@@ -34,11 +36,14 @@ type Transactor struct {
 	// Passed to the consensus component startup
 	proxy transactions.Proxy
 
+	// Used to retrieve the node's sync progress
+	getSyncProgress func() float64
+
 	w *wallet.Wallet
 }
 
 // New Instantiate a new Transactor struct.
-func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy, w *wallet.Wallet) (*Transactor, error) {
+func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Server, proxy transactions.Proxy, w *wallet.Wallet, getSyncProgress func() float64) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -47,13 +52,14 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 	bidChan := make(chan rpcbus.Request, 1)
 
 	t := &Transactor{
-		db:        db,
-		eb:        eb,
-		rb:        rb,
-		stakeChan: stakeChan,
-		bidChan:   bidChan,
-		proxy:     proxy,
-		w:         w,
+		db:              db,
+		eb:              eb,
+		rb:              rb,
+		stakeChan:       stakeChan,
+		bidChan:         bidChan,
+		proxy:           proxy,
+		w:               w,
+		getSyncProgress: getSyncProgress,
 	}
 
 	if srv != nil {
@@ -91,7 +97,6 @@ func (t *Transactor) Listen() {
 			if _, err := t.Stake(context.Background(), req); err != nil {
 				l.WithError(err).Error("error in creating a stake transaction")
 			}
-
 		case r := <-t.bidChan:
 			req, ok := r.Params.(*node.BidRequest)
 			if !ok {
@@ -103,6 +108,33 @@ func (t *Transactor) Listen() {
 			}
 		}
 	}
+}
+
+func (t *Transactor) canStake() bool {
+	progress := t.getSyncProgress()
+	if progress == 100 {
+		return true
+	}
+
+	log.WithField("progress", progress).Debugln("could not send stake tx - node is not synced")
+
+	// Check for our sync progress three more times. If we still can't stake after
+	// the third check, it's better to just return false, and give the Transactor
+	// control back over the Listen goroutine.
+	interval := 5 * time.Second
+
+	for i := 0; i < 3; i++ {
+		time.Sleep(interval * time.Duration(i+1))
+
+		progress = t.getSyncProgress()
+		if progress == 100 {
+			return true
+		}
+
+		log.WithField("progress", progress).Debugln("could not send stake tx - node is not synced")
+	}
+
+	return false
 }
 
 // GetTxHistory will return a subset of the transactions that were sent and received.
@@ -132,6 +164,11 @@ func (t *Transactor) Bid(ctx context.Context, c *node.BidRequest) (*node.Transac
 
 // Stake will create a staking transaction.
 func (t *Transactor) Stake(ctx context.Context, c *node.StakeRequest) (*node.TransactionResponse, error) {
+	// Are we synced?
+	if !t.canStake() {
+		return nil, errors.New("node is not synced")
+	}
+
 	return t.handleSendStakeTx(c)
 }
 
