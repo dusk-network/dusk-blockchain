@@ -2,7 +2,7 @@
 
 ## Message encoding
 
-Messages sent over the wire are simple frames of data, with the following structure:
+Messages sent over the wire are length-prefixed frames of data, with the following structure:
 
 | Field | Size \(bytes\) |
 | :--- | :--- |

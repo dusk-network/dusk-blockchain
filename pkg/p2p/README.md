@@ -20,3 +20,6 @@ A `peer.Writer` goroutine, when instantiated, registers a [ring buffer](../util/
 
 Additionally, when launching the goroutine, a channel is passed, which accepts `bytes.Buffer` structures directly. This channel is used to send response messages, as outlined above, from the `MessageProcessor` to the `Writer`. This allows for directed delivery of messages to a single node.
 
+### Component layout
+
+![P2P component layout](p2p_component_diagram.jpg)
