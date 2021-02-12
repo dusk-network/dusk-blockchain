@@ -27,7 +27,7 @@ type DupeMap struct {
 // which listens for accepted blocks, and updates the height upon receipt.
 func Launch(eventBus eventbus.Broker) *DupeMap {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
-	dupeBlacklist := NewDupeMap(1)
+	dupeBlacklist := NewDupeMap(1, 300*1000)
 
 	go func() {
 		for {
@@ -41,8 +41,8 @@ func Launch(eventBus eventbus.Broker) *DupeMap {
 }
 
 // NewDupeMap returns a DupeMap.
-func NewDupeMap(round uint64) *DupeMap {
-	tmpMap := NewTmpMap(defaultTolerance)
+func NewDupeMap(round uint64, capacity uint) *DupeMap {
+	tmpMap := NewTmpMap(defaultTolerance, capacity)
 
 	return &DupeMap{
 		round,
@@ -63,12 +63,19 @@ func (d *DupeMap) SetTolerance(roundNr uint64) {
 	d.tmpMap.SetTolerance(roundNr)
 }
 
-// CanFwd payload.
+// CanFwd tests if any of Cuckoo Filters (a filter per round) knows already
+// this payload. Similarly to Bloom Filters, False positive matches are
+// possible, but false negatives are not.
 func (d *DupeMap) CanFwd(payload *bytes.Buffer) bool {
 	found := d.tmpMap.HasAnywhere(payload)
 	if found {
 		return false
 	}
 
-	return !d.tmpMap.Add(payload)
+	return d.tmpMap.Add(payload)
+}
+
+// Size returns the bytes count allocated by the underlying filter.
+func (d *DupeMap) Size() int {
+	return d.tmpMap.Size()
 }

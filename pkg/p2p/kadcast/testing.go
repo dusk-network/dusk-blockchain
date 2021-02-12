@@ -121,7 +121,7 @@ func newKadcastNode(r *RoutingTable, eb *eventbus.EventBus) *Node {
 func TestNode(port int) *Node {
 	eb := eventbus.New()
 	g := protocol.NewGossip(protocol.TestNet)
-	d := dupemap.NewDupeMap(1)
+	d := dupemap.NewDupeMap(1, 10000)
 
 	// Instantiate Kadcast Router
 	peer := testPeerInfo(uint16(port))
