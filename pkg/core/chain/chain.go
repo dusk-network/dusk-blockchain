@@ -222,12 +222,13 @@ func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan cons
 
 			if block.IsEmpty() || block.Header.Height != c.tip.Header.Height+1 {
 				log.WithField("height", block.Header.Height).Debugln("discarding consensus result")
+				c.lock.Unlock()
 				return
 			}
 
 			if err = c.AcceptSuccessiveBlock(block); err != nil {
-				c.lock.Unlock()
 				log.WithError(err).Error("block acceptance failed")
+				c.lock.Unlock()
 				return
 			}
 
