@@ -1,16 +1,16 @@
-# README
+# DUSK Network Wire Protocol Documentation
 
 ## Message encoding
 
-Messages sent over the wire are **COBS encoded** frames of data, with the following structure:
+Messages sent over the wire are length-prefixed frames of data, with the following structure:
 
 | Field | Size \(bytes\) |
 | :--- | :--- |
+| Packet Length | 8 |
 | Magic | 4 |
-| Topic | 15 |
+| Checksum | 4 |
+| Topic | 1 |
 | Payload | Any |
-
-These packets are delimited with a 0 byte.
 
 ## Topics
 
@@ -18,12 +18,16 @@ Below is a list of supported topics which can be sent and received over the wire
 
 * Version
 * VerAck
+* Ping
+* Pong
 * Inv
 * GetData
 * GetBlocks
 * Block
 * Tx
+* MemPool
 * Candidate
+* GetCandidate
 * Score
 * Reduction
 * Agreement
@@ -57,9 +61,11 @@ Protocol version, expressed in a semver format.
 
 | Field Size | Title | Data Type | Description |
 | :--- | :--- | :--- | :--- |
-| 33 | Batched Signature | \[\]byte | Batched BLS Signature of all votes |
-| 8 | Committee Bitset | uint64 | The committee members who voted, represented with 0 or 1 |
-| 1 | Step | uint8 | The step at which this committee was formed |
+| 33 | Batched Signature Step 1 | \[\]byte | Batched BLS Signature of all votes of step 1 |
+| 33 | Batched Signature Step 2 | \[\]byte | Batched BLS Signature of all votes of step 2 |
+| 1 | Step | uint8 | The step at which consensus was reached |
+| 8 | Committee Bitset Step 1 | uint64 | The committee members who voted on step 1, represented with 0 or 1 |
+| 8 | Committee Bitset Step 2 | uint64 | The committee members who voted on step 2, represented with 0 or 1 |
 
 A block certificate, proving that this block was fairly decided upon during consensus. Equivalent to a proof-of-work in Bitcoin.
 
@@ -74,10 +80,15 @@ A block certificate, proving that this block was fairly decided upon during cons
 
 | Field Size | Title | Data Type | Description |
 | :--- | :--- | :--- | :--- |
-| 32 | Key Image | \[\]byte | Image of the key used to sign the transaction |
-| 32 | TxID | \[\]byte | TxID of the transaction this input is coming from |
-| 1 | Index | uint8 | The position at which this input is placed at in the current transaction |
-| ?? | Signature | \[\]byte | Ring signature of the transaction |
+| 32 | Nullifier | \[\]byte | A hash which 'spends' a Note, according to the Phoenix rules |
+
+### transactions.Crossover
+
+| Field Size | Title | Data Type | Description |
+| :--- | :--- | :--- | :--- |
+| 32 | Value Commitment | \[\]byte | Commitment to the value assigned to the Crossover |
+| 32 | Nonce | \[\]byte | Nonce, used for encryption |
+| 96 | Encrypted Data | \[\]byte | Encrypted value of the Commitment |
 
 ### transactions.Output
 
@@ -86,6 +97,24 @@ A block certificate, proving that this block was fairly decided upon during cons
 | ?? | Commitment | \[\]byte | Pedersen commitment of the amount being transacted |
 | 32 | Destination Key | \[\]byte | The one-time public key of the address that the funds are going to |
 | ?? | Range proof | \[\]byte | Bulletproof range proof proving that the amount is between 0 and 2^64 |
+
+### transactions.Fee
+
+| Field Size | Title | Data Type | Description |
+| :--- | :--- | :--- | :--- |
+| 8 | Gas Limit | uint64 | Amount of gas allowed for VM execution of this transaction |
+| 8 | Gas Price | uint64 | Amount of DUSK paid per unit of gas, used for execution of this transaction |
+| 32 | R | \[\]byte | Random point of the stealth address |
+| 32 | PkR | \[\]byte | Public key of the stealth address |
+
+### StepVotes
+
+| Field Size | Title | Data Type | Description |
+| :--- | :--- | :--- | :--- |
+| 129 | Aggregated Public Keys | bls.APK | Aggregated representation of all public keys that voted for this step |
+| 8 | Bitset | uint64| Bitmap representation of which committee members are included in the APK |
+| 33 | Signature | bls.Signature | Aggregated BLS signature |
+| 1 | Step | uint8 | The step which was voted on |
 
 ## Message outline
 
@@ -104,6 +133,14 @@ A version message, which is sent when a node attempts to connect with another no
 ### VerAck
 
 This message is sent as a reply to the version message, to acknowledge a peer has received and accepted this version message. It contains no other information.
+
+### Ping
+
+This message is used to inquire if a node is still active and maintaining its connection on the other end. The Ping message contains no other information.
+
+### Pong
+
+This message is used to respond to other nodes' Ping messages, informing them that a connection is still being maintained. It carries no other information.
 
 ### Inv
 
@@ -137,7 +174,7 @@ A GetBlocks message is sent when a block is received which has a height that is 
 | 32 | Previous Block Hash | \[\]byte |  |
 | 33 | Seed | \[\]byte | BLS Signature of the previous block seed, made by a block generator |
 | 32 | Tx Root | \[\]byte | Merkle root hash of all transactions in this block |
-| 42 | Certificate | Block Certificate |  |
+| 83 | Certificate | Block Certificate |  |
 | 32 | Hash | \[\]byte | Hash of this block |
 | ?? | Txs | \[\]tx | All transactions contained in this block |
 
@@ -155,17 +192,19 @@ The block hash is the hash of the following fields:
 
 | Field Size | Title | Data Type | Description |
 | :--- | :--- | :--- | :--- |
-| 1 | Type | uint8 | Transaction type identifier |
 | 1 | Version | uint8 | Transaction version byte |
-| 32 | TxID | \[\]byte | Transaction identifier \(hash of transaction fields\) |
-| ?? | Inputs | \[\]transactions.Input |  |
-| ?? | Outputs | \[\]transactions.Output |  |
-| 8 | Fee | uint64 | Amount of DUSK paid in fees |
-| ?? | Optional Fields | ?? |  |
+| 1 | Type | uint8 | Transaction type identifier |
+| 32 | Anchor | \[\]byte | State root at the time of transaction creation |
+| ?? | Inputs | \[\]transactions.Input | Hashes of notes being spent |
+| 160 | Crossover | transactions.Crossover |  |
+| ?? | Notes | \[\]transactions.Output | Notes created by this transaction |
+| 80 | Fee | uint64 | Amount of DUSK paid in fees |
+| ?? | Spending Proof | \[\]byte | Proof of ownership of spent notes in the transaction |
+| ?? | Call Data | \[\]byte | Collection of VM instructions and arguments |
 
-A Dusk transaction. Note that this only defines the standard transaction, as most other types contain extra information on top of the defined fields.
+### MemPool
 
-The TxID is calculated by hashing all of the defined fields. The optional fields are not included in the TxID hash.
+This message is used to request the mempool contents of another node in the network. Used by nodes which just recently joined, and wish to have an updated view of the current pending transaction queue. Responses are typically given with `Inv` messages. The message carries no other information.
 
 ### Candidate
 
@@ -173,19 +212,30 @@ The TxID is calculated by hashing all of the defined fields. The optional fields
 | :--- | :--- | :--- | :--- |
 | ?? | Block | Block |  |
 
-A block proposal, made by a block generator. Note that the certificate field is empty when a block is included in a Candidate message, as consensus has not yet been reached on it. Should come directly after a Score message.
+A standalone candidate block provided to a requesting node. This message will only be sent out in response to a `GetCandidate`, as the candidate block is normally included in a `Score` message.
+
+### GetCandidate
+
+| Field Size | Title | Data Type | Description |
+| :--- | :--- | :--- | :--- |
+| 32 | Block Hash | \[\]byte | Hash of the requested candidate block |
+
+This message can be used by nodes which are missing a certain candidate block at any point during consensus. Responses will be of the `Candidate` topci.
 
 ### Score
 
 | Field Size | Title | Data Type | Description |
 | :--- | :--- | :--- | :--- |
+| 129 | Public Key | \[\] | BLS Public Key of the sender |
 | 8 | Round | uint64 | Consensus round |
+| 1 | Step | uint8 | Consensus step |
+| 32 | Block Hash | \[\]byte | Hash of the candidate block |
 | 32 | Score | \[\]byte | Proof score |
 | ?? | Proof | \[\]byte | Zero-knowledge proof of blind bid |
-| 32 | Z | \[\]byte | Identity hash |
-| 32 \* ?? | Bidlist Subset | \[\]byte | Subset of bids, that the proof generator's bid is shuffled into |
+| 32 | Identity | \[\]byte | Identity hash |
 | 33 | Seed | \[\]byte | Seed of the proposed block |
-| 32 | Hash | \[\]byte | Hash of the proposed block |
+| 32 | Previous Hash | \[\]byte | Hash of the previous block |
+| ?? | Candidate | Block | Candidate block |
 
 A consensus score message, generated by a block generator. This score message determines whether or not the proposed block is chosen by the provisioners. Should precede a Candidate message.
 
@@ -209,8 +259,8 @@ A reduction message, sent by provisioners during consensus. It is essentially a 
 | 8 | Round | uint64 | Consensus round |
 | 1 | Step | uint8 | Consensus step |
 | 32 | Block Hash | \[\]byte | The block hash that these nodes have voted on |
-| 33 | Signed Votes | \[\]byte | BLS Signature of the Votes field |
 | 2\*?? | Votes | \[\]StepVotes | The compressed representation of the votes that were cast during a step |
+| ?? | Committee Representation | big.Int | Bitmap representation of committee members which voted |
 
 An agreement message, sent by provisioners during consensus. It's a compressed collection of all the votes that were cast in 2 steps of reduction, and is paramount in reaching consensus on a certain block.
 

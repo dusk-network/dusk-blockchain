@@ -62,9 +62,9 @@ func ReadFrame(r io.Reader) (uint64, error) {
 	var length uint64
 
 	sizeBytes := make([]byte, 8)
-	// this is used mainly for net.Conn, therefore io.ReadFull prevents weird
+	// This is used mainly for net.Conn, therefore io.ReadFull prevents weird
 	// unbuffered reads which would terminate the reading operation before
-	// actually reading 8 bytes
+	// actually reading 8 bytes.
 	if _, err := io.ReadFull(r, sizeBytes); err != nil {
 		return length, err
 	}
