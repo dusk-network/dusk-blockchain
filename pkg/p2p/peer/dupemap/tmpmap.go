@@ -10,25 +10,28 @@ import (
 	"bytes"
 	"sync"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/hashset"
+	cuckoo "github.com/seiflotfy/cuckoofilter"
 )
 
 type (
 	//nolint:golint
 	TmpMap struct {
-		lock      sync.RWMutex
+		lock sync.RWMutex
+		// current height
 		height    uint64
-		msgSets   map[uint64]*hashset.Set
 		tolerance uint64
+
+		// map round to cuckoo filter
+		msgFilter map[uint64]*cuckoo.Filter
+		capacity  uint
 	}
 )
 
 // NewTmpMap creates a TmpMap instance.
-func NewTmpMap(tolerance uint64) *TmpMap {
-	msgSets := make(map[uint64]*hashset.Set)
-
+func NewTmpMap(tolerance uint64, capacity uint) *TmpMap {
 	return &TmpMap{
-		msgSets:   msgSets,
+		msgFilter: make(map[uint64]*cuckoo.Filter),
+		capacity:  capacity,
 		height:    0,
 		tolerance: tolerance,
 	}
@@ -43,9 +46,9 @@ func (t *TmpMap) UpdateHeight(round uint64) {
 		return
 	}
 
-	_, found := t.msgSets[round]
+	_, found := t.msgFilter[round]
 	if !found {
-		t.msgSets[round] = hashset.New()
+		t.msgFilter[round] = cuckoo.NewFilter(t.capacity)
 		t.height = round
 		t.clean()
 	}
@@ -70,7 +73,7 @@ func (t *TmpMap) HasAnywhere(b *bytes.Buffer) bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	for k := range t.msgSets {
+	for k := range t.msgFilter {
 		if t.has(b, k) {
 			return true
 		}
@@ -99,9 +102,10 @@ func (t *TmpMap) deleteBefore(height uint64) {
 		return
 	}
 
-	for level := range t.msgSets {
+	for level := range t.msgFilter {
 		if level < height {
-			delete(t.msgSets, level)
+			t.msgFilter[level].Reset()
+			delete(t.msgFilter, level)
 		}
 	}
 }
@@ -117,12 +121,12 @@ func (t *TmpMap) SetTolerance(tolerance uint64) {
 }
 
 func (t *TmpMap) has(b *bytes.Buffer, heigth uint64) bool {
-	set := t.msgSets[heigth]
-	if set == nil {
+	f := t.msgFilter[heigth]
+	if f == nil {
 		return false
 	}
 
-	return set.Has(b.Bytes())
+	return f.Lookup(b.Bytes())
 }
 
 // Add the hash of a buffer to the blacklist.
@@ -140,6 +144,19 @@ func (t *TmpMap) AddAt(b *bytes.Buffer, height uint64) bool {
 	return t.add(b, height)
 }
 
+// Size returns overall size of all filters.
+func (t *TmpMap) Size() int {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	var fullSize int
+	for _, f := range t.msgFilter {
+		fullSize += len(f.Encode())
+	}
+
+	return fullSize
+}
+
 // clean the TmpMap up to the upto argument.
 func (t *TmpMap) clean() {
 	if t.height <= t.tolerance {
@@ -147,21 +164,20 @@ func (t *TmpMap) clean() {
 		return
 	}
 
-	for r := range t.msgSets {
+	for r := range t.msgFilter {
 		if r <= t.height-t.tolerance {
-			delete(t.msgSets, r)
+			t.msgFilter[r].Reset()
+			delete(t.msgFilter, r)
 		}
 	}
 }
 
 // add an entry to the set at the current height. Returns false if the element has not been added (due to being a duplicate).
 func (t *TmpMap) add(b *bytes.Buffer, round uint64) bool {
-	set, found := t.msgSets[round]
+	_, found := t.msgFilter[round]
 	if !found {
-		set = hashset.New()
+		t.msgFilter[round] = cuckoo.NewFilter(t.capacity)
 	}
 
-	ret := set.Add(b.Bytes())
-	t.msgSets[round] = set
-	return ret
+	return t.msgFilter[round].Insert(b.Bytes())
 }
