@@ -20,6 +20,8 @@ import (
 
 // CheckBlockCertificate ensures that the block certificate is valid.
 func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) error {
+	// TODO: this should be set back to 1, once we fix this issue:
+	// https://github.com/dusk-network/dusk-blockchain/issues/925
 	if blk.Header.Height < 2 {
 		return nil
 	}
