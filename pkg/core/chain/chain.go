@@ -32,6 +32,11 @@ import (
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
 
+// TODO: This Verifier/Loader interface needs to be re-evaluated and most likely
+// renamed. They don't make too much sense on their own (the `Loader` also
+// appends blocks, and allows for fetching data from the DB), and potentially
+// cause some clutter in the structure of the `Chain`.
+
 // Verifier performs checks on the blockchain and potentially new incoming block.
 type Verifier interface {
 	// PerformSanityCheck on first N blocks and M last blocks.
