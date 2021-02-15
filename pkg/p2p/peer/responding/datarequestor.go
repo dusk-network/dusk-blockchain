@@ -83,7 +83,7 @@ func (d *DataRequestor) RequestMissingItems(m message.Message) ([]bytes.Buffer, 
 				return nil, err
 			}
 		case message.InvTypeMempoolTx:
-			txs, _ := GetMempoolTxs(d.rpcBus, obj.Hash)
+			txs, _ := getMempoolTxs(d.rpcBus, obj.Hash)
 
 			// TxID not found in the local mempool:
 			// it migth be due to a few reasons:
@@ -122,9 +122,9 @@ func marshalGetData(getData *message.Inv) (*bytes.Buffer, error) {
 	return buf, nil
 }
 
-// GetMempoolTxs is a wire.GetMempoolTx API wrapper. Later it could be moved into
+// getMempoolTxs is a wire.GetMempoolTx API wrapper. Later it could be moved into
 // a separate utils pkg.
-func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.ContractCall, error) {
+func getMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.ContractCall, error) {
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write(txID)
 

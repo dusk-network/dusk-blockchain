@@ -65,7 +65,7 @@ func (d *DataBroker) MarshalObjects(m message.Message) ([]bytes.Buffer, error) {
 		case message.InvTypeMempoolTx:
 			// Try to retrieve tx from local mempool state. It might not be
 			// available
-			txs, err := GetMempoolTxs(d.rpcBus, obj.Hash)
+			txs, err := getMempoolTxs(d.rpcBus, obj.Hash)
 			if err != nil {
 				return nil, err
 			}
@@ -93,7 +93,7 @@ func (d *DataBroker) MarshalMempoolTxs(m message.Message) ([]bytes.Buffer, error
 		return nil, errors.New("responding to topics.Mempool is disabled")
 	}
 
-	txs, err := GetMempoolTxs(d.rpcBus, nil)
+	txs, err := getMempoolTxs(d.rpcBus, nil)
 	if err != nil {
 		return nil, err
 	}
