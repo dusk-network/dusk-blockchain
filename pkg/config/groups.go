@@ -50,6 +50,8 @@ type networkConfiguration struct {
 	Seeder  seedersConfiguration
 	Monitor monitorConfiguration
 	Port    string
+
+	MaxDupeMapItems uint32
 }
 
 type kadcastConfiguration struct {

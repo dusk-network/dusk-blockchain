@@ -89,7 +89,7 @@ func TestCanFwdBigData(t *testing.T) {
 
 	testData := make([]testu, 0)
 
-	// Populate test data
+	// Populate test data with N distinct values
 	for i := uint32(0); i < 800*1000; i++ {
 		d := make([]byte, 4)
 		binary.BigEndian.PutUint32(d, i)
@@ -98,7 +98,7 @@ func TestCanFwdBigData(t *testing.T) {
 	}
 
 	// Initialize a dupemap with 1M capacity per round-filter
-	itemsCount := uint(1000 * 1000)
+	itemsCount := uint32(1000 * 1000)
 	dupeMap := dupemap.NewDupeMap(1, itemsCount)
 	dupeMap.SetTolerance(10)
 
@@ -112,9 +112,9 @@ func TestCanFwdBigData(t *testing.T) {
 		}
 	}
 
-	// Ensure false positive rate is less than 1.3%
+	// Ensure false positive rate is less than 1.0%
 	falsePositiveRate := float64(100*falsePositiveCount) / float64(itemsCount)
-	if falsePositiveRate > 1.3 {
+	if falsePositiveRate > 1.0 {
 		assert.Failf(t, "failure", "false positive are too many %f", falsePositiveRate)
 	}
 

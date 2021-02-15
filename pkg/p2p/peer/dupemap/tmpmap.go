@@ -23,12 +23,12 @@ type (
 
 		// map round to cuckoo filter
 		msgFilter map[uint64]*cuckoo.Filter
-		capacity  uint
+		capacity  uint32
 	}
 )
 
 // NewTmpMap creates a TmpMap instance.
-func NewTmpMap(tolerance uint64, capacity uint) *TmpMap {
+func NewTmpMap(tolerance uint64, capacity uint32) *TmpMap {
 	return &TmpMap{
 		msgFilter: make(map[uint64]*cuckoo.Filter),
 		capacity:  capacity,
@@ -48,7 +48,7 @@ func (t *TmpMap) UpdateHeight(round uint64) {
 
 	_, found := t.msgFilter[round]
 	if !found {
-		t.msgFilter[round] = cuckoo.NewFilter(t.capacity)
+		t.msgFilter[round] = cuckoo.NewFilter(uint(t.capacity))
 		t.height = round
 		t.clean()
 	}
@@ -176,7 +176,7 @@ func (t *TmpMap) clean() {
 func (t *TmpMap) add(b *bytes.Buffer, round uint64) bool {
 	_, found := t.msgFilter[round]
 	if !found {
-		t.msgFilter[round] = cuckoo.NewFilter(t.capacity)
+		t.msgFilter[round] = cuckoo.NewFilter(uint(t.capacity))
 	}
 
 	return t.msgFilter[round].Insert(b.Bytes())

@@ -56,6 +56,10 @@ streamErrors=true
 # port for the node to bind on
 port=7000
 
+# Maximum number of items that can be registered per round in any DupeMap
+# Up to 1MB per DupeMap instance could be allocated if maxDupeMapItems=300000
+maxDupeMapItems=300000
+
 [network.seeder]
 # array of seeder servers
 addresses=["127.0.0.1:8081"]
