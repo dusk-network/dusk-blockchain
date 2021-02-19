@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -114,8 +115,11 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 	return resp.Hash, nil
 }
 
-// SendWireMsg sends a P2P message to the specified network node
-// NB: Handshaking procedure must be performed prior to the message sending.
+// SendWireMsg sends a P2P message to the specified network node. Message should
+// be in form of topic id + marshaled payload.
+//
+// The utility sets up a valid inbound peer connection with a localnet node.
+// After the handshake procedure, it writes the message to the Peer connection.
 func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 	if ind >= uint(len(n.nodes)) {
 		return errors.New("invalid node index")
@@ -125,14 +129,30 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 	addr := "127.0.0.1:" + targetNode.Cfg.Network.Port
 
 	// connect to this socket
-	conn, err := net.Dial("tcp", addr)
+	conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
 	if err != nil {
 		return err
 	}
 
-	writeTimeoutDuration := time.Duration(writeTimeout) * time.Second
-	_ = conn.SetWriteDeadline(time.Now().Add(writeTimeoutDuration))
-	_, err = conn.Write(msg)
+	gossip := protocol.NewGossip(protocol.TestNet)
+	w := peer.NewWriter(conn, gossip, nil)
+
+	// Run handshake procedure
+	if err = w.Connect(); err != nil {
+		return err
+	}
+
+	// Build wire frame
+	buf := bytes.NewBuffer(msg)
+	if err = gossip.Process(buf); err != nil {
+		return err
+	}
+
+	// Write to the Peer connection
+	if _, err = w.Connection.Write(buf.Bytes()); err != nil {
+		return err
+	}
+
 	return err
 }
 
