@@ -459,10 +459,15 @@ func (c *Connection) keepAlive() error {
 // Conn needs to be locked, as this function can be called both by the WriteLoop,
 // and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
-	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second // Max idle time for a peer
+	wt := config.Get().Timeout.TimeoutReadWrite
+	if wt == 0 {
+		wt = 1
+	}
+
+	writeTimeout := time.Duration(wt) * time.Second // Max idle time for a peer
 
 	c.lock.Lock()
-	_ = c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
+	_ = c.Conn.SetWriteDeadline(time.Now().Add(writeTimeout))
 	n, err := c.Conn.Write(b)
 	c.lock.Unlock()
 
