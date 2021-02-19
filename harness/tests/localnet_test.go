@@ -7,6 +7,7 @@
 package tests
 
 import (
+	"bytes"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -17,6 +18,9 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/harness/engine"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -347,4 +351,33 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	}
 
 	time.Sleep(20 * time.Second)
+}
+
+// TestForgedBlock propagates a forged block with height >100000 to the network.
+// It should ensure that this will not impact negatively consensus.
+func TestForgedBlock(t *testing.T) {
+	blk := helper.RandomBlock(1000000, 3)
+
+	buf := new(bytes.Buffer)
+	if err := message.MarshalBlock(buf, blk); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := topics.Prepend(buf, topics.Block); err != nil {
+		t.Fatal(err)
+	}
+
+	networkTip, _ := localNet.GetLastBlockHeight(0)
+
+	for i := uint(0); i < uint(localNet.Size()); i++ {
+		time.Sleep(100 * time.Millisecond)
+		t.Logf("Sending a forged block to Node %d", i)
+
+		if err := localNet.SendWireMsg(i, buf.Bytes(), 2); err != nil {
+			t.Log(err)
+		}
+	}
+
+	// Waits for at least 5 consecutive blocks to ensure consensus has not been stalled
+	localNet.WaitUntil(t, 0, networkTip+5, 3*time.Minute, 5*time.Second)
 }
