@@ -1,4 +1,6 @@
-# Candidate Generator
+# Candidate Generator Component
+
+This package implements a candidate generator, for the blind-bid protocol of the SBA\* consensus protocol.
 
 ## Abstract
 
@@ -20,13 +22,16 @@ For more information on block generation, please refer to the [generation packag
 | Block hash | \[\]byte \(32 bytes\) |
 | Transactions | \[\]Transaction\* \(variable size\) |
 
-<<<<<<< HEAD:pkg/core/consensus/blockgenerator/candidate/readme.md
-### Architecture
-=======
-\* For schemas of these items, please refer to [the dusk-wallet/v2 repo](https://github.com/dusk-network/dusk-wallet/v2).
-
 ## Architecture
->>>>>>> master:pkg/core/consensus/candidate/candidate.md
 
-The candidate generator component is triggered by the score generator, through the `ScoreEvent` message. After receiving this message, the candidate generator will start constructing a candidate block. First off, it requests all verified transactions from the mempool. It prepends a coinbase transaction to this set, which rewards him with the agreed-upon reward amount. It then constructs the block header, and calculates the block merkle root, and the hash. Finally, it wraps the `ScoreEvent` into a `Score` message, and the newly created block into a `Candidate` message, before propagating both of these messages to the rest of the network.
+The candidate generator exposes its functionality through a single interface method: `GenerateCandidateMessage`. It should logically follow a call to the score generator to generate a score proposal. This score proposal should also be fed into the candidate generator, which combines it with the candidate block, in order to create a fully-fledged `Score` message.
 
+The component should be initialized with a public key, to which the potential reward can be attributed. Once called, the block generator goes through these steps:
+
+- It will generate a committee for the given round and step. This committee contains all the people that can potentially be rewarded, if this block is finalized
+- The generator will ask the mempool for a list of transactions, up to a certain size (determined by the block size cap)
+- A coinbase transaction will be appended to the end of the list, as per the consensus rules
+- A block header is constructed, leaving only the certificate field empty. This certificate is constructed later, in the agreement phase
+- The block is put together, and is then concatenated with the score proposal, to create a `Score message. This message is then returned to the caller
+
+This message is then fully ready to be encoded and gossiped to the network.
