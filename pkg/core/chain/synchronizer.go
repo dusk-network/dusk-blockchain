@@ -29,25 +29,13 @@ func (s *synchronizer) inSync(currentHeight uint64, blk block.Block) ([]bytes.Bu
 		s.chain.StopBlockProduction()
 		s.sequencer.add(blk)
 
-		// Trigger timeout outSync timer. If the peer trigerring the Sync
-		// procedure is dishonest, this timer should switch state back to InSync
+		// Trigger timeout outSync timer. If the peer initiating the Sync
+		// procedure is dishonest, this timer should switch back to InSync
+		// and restart Consensus Loop.
 		//
-		// A peer is marked as dishonest if it cannot provide next valid
-		// consecutive block within syncTimeout seconds
-		s.timer = time.NewTimer(syncTimeout)
-
-		go func() {
-			_, ok := <-s.timer.C
-			if !ok {
-				return
-			}
-
-			// Dishonest peer.
-			// TODO: Implement Peer addr temporary ban
-
-			_ = s.chain.ProduceBlock()
-			s.state = s.inSync
-		}()
+		// A peer is marked as dishonest if it cannot provide a valid
+		// consecutive block before the timer expires
+		s.timer.Start("")
 
 		s.state = s.outSync
 		b, err := s.startSync(blk.Header.Height, currentHeight)
@@ -85,21 +73,20 @@ func (s *synchronizer) outSync(currentHeight uint64, blk block.Block) ([]bytes.B
 			return nil, err
 		}
 
-		if s.timer != nil {
-			// Peer does provide a valid consecutive block
-			_ = s.timer.Reset(syncTimeout)
+		// Peer does provide a valid consecutive block
+		// outSyncTimer should restart its counter
+		if err = s.timer.Reset(""); err != nil {
+			log.WithError(err).Warn("outsynctimer error")
 		}
 
 		if blk.Header.Height == s.syncTarget {
+			// Sync Target reached. outSyncTimer is not anymore needed
+			s.timer.Cancel()
+
 			// if we reach the target we get into sync mode
 			// and trigger the consensus again
 			if err = s.chain.ProduceBlock(); err != nil {
 				return nil, err
-			}
-
-			if s.timer != nil {
-				_ = s.timer.Stop()
-				s.timer = nil
 			}
 
 			s.state = s.inSync
@@ -120,7 +107,7 @@ type synchronizer struct {
 	chain      Ledger
 	syncTarget uint64
 
-	timer *time.Timer
+	timer *outSyncTimer
 }
 
 // newSynchronizer returns an initialized synchronizer, ready for use.
@@ -130,6 +117,16 @@ func newSynchronizer(db database.DB, chain Ledger) *synchronizer {
 		sequencer: newSequencer(),
 		chain:     chain,
 	}
+
+	onExpiryFn := func() error {
+		if err := s.chain.ProduceBlock(); err != nil {
+			return err
+		}
+
+		s.state = s.inSync
+		return nil
+	}
+	s.timer = newSyncTimer(syncTimeout, onExpiryFn)
 
 	s.state = s.inSync
 	return s
@@ -146,12 +143,11 @@ func (s *synchronizer) processBlock(currentHeight uint64, blk block.Block) (res 
 }
 
 func (s *synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
-
 	s.setSyncTarget(tipHeight, currentHeight+config.MaxInvBlocks)
 
 	log.WithField("curr", currentHeight).
 		WithField("tip", tipHeight).WithField("target", s.syncTarget).
-		Trace("Starting syncing")
+		Debug("Start syncing")
 
 	var hash []byte
 
