@@ -19,7 +19,7 @@ import (
 
 // ProcessorFunc defines an interface for callbacks which can be registered
 // to the MessageProcessor, in order to process messages from the network.
-type ProcessorFunc func(message.Message) ([]bytes.Buffer, error)
+type ProcessorFunc func(srcPeerID string, m message.Message) ([]bytes.Buffer, error)
 
 // MessageProcessor is connected to all of the processing units that are tied to the peer.
 // It sends an incoming message in the right direction, according to its topic.
@@ -44,14 +44,14 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
-func (m *MessageProcessor) Collect(packet []byte, respChan chan<- bytes.Buffer) error {
+func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan chan<- bytes.Buffer) error {
 	b := bytes.NewBuffer(packet)
 
 	msg, err := message.Unmarshal(b)
 	if err != nil {
 		return err
 	}
-	return m.process(msg, respChan)
+	return m.process(srcPeerID, msg, respChan)
 }
 
 // CanRoute determines whether or not a message needs to be filtered by the
@@ -71,7 +71,7 @@ func (m *MessageProcessor) CanRoute(topic topics.Topic) bool {
 	return false
 }
 
-func (m *MessageProcessor) process(msg message.Message, respChan chan<- bytes.Buffer) error {
+func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respChan chan<- bytes.Buffer) error {
 	category := msg.Category()
 	if m.CanRoute(category) {
 		if !m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
@@ -85,7 +85,7 @@ func (m *MessageProcessor) process(msg message.Message, respChan chan<- bytes.Bu
 		return nil
 	}
 
-	bufs, err := processFn(msg)
+	bufs, err := processFn(srcPeerID, msg)
 	if err != nil {
 		return err
 	}

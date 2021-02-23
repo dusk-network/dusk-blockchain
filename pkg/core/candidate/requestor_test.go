@@ -29,7 +29,7 @@ func TestCandidateQueue(t *testing.T) {
 
 	// Getting a block when no request is made should not result in it being
 	// pushed to the candidateQueue
-	_, err := req.ProcessCandidate(message.New(topics.Candidate, *config.DecodeGenesis()))
+	_, err := req.ProcessCandidate("", message.New(topics.Candidate, *config.DecodeGenesis()))
 	assert.NoError(err)
 
 	assert.Empty(req.candidateQueue)
@@ -39,7 +39,7 @@ func TestCandidateQueue(t *testing.T) {
 
 	req.setRequesting(true)
 
-	_, err = req.ProcessCandidate(message.New(topics.Candidate, *c))
+	_, err = req.ProcessCandidate("", message.New(topics.Candidate, *c))
 	assert.NoError(err)
 
 	assert.True(len(req.candidateQueue) == 1)
@@ -78,7 +78,7 @@ func TestRequestor(t *testing.T) {
 	assert.True(streamer.SeenTopics()[0] == topics.GetCandidate)
 	assert.True(bytes.Equal(c.Header.Hash, m))
 
-	_, err = req.ProcessCandidate(message.New(topics.Candidate, *c))
+	_, err = req.ProcessCandidate("", message.New(topics.Candidate, *c))
 	assert.NoError(err)
 
 	// Wait for the candidate to be processed

@@ -15,7 +15,7 @@ import (
 
 // ProcessPing will simply return a Pong message.
 // Satisfies the peer.ProcessorFunc interface.
-func ProcessPing(_ message.Message) ([]bytes.Buffer, error) {
+func ProcessPing(srcPeerID string, _ message.Message) ([]bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	if err := topics.Prepend(buf, topics.Pong); err != nil {
 		return nil, err
@@ -26,6 +26,6 @@ func ProcessPing(_ message.Message) ([]bytes.Buffer, error) {
 
 // ProcessPong empty processor to process a Pong message
 // Satisfies the peer.ProcessorFunc interface.
-func ProcessPong(_ message.Message) ([]bytes.Buffer, error) {
+func ProcessPong(srcPeerID string, _ message.Message) ([]bytes.Buffer, error) {
 	return []bytes.Buffer{}, nil
 }

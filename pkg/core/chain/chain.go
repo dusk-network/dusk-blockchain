@@ -168,7 +168,7 @@ func (c *Chain) StopBlockProduction() {
 // which will cancel the running consensus loop and attempt to reach the new
 // chain tip.
 // Satisfies the peer.ProcessorFunc interface.
-func (c *Chain) ProcessBlockFromNetwork(m message.Message) ([]bytes.Buffer, error) {
+func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	blk := m.Payload().(block.Block)
 
 	log.WithField("height", blk.Header.Height).Trace("received block")

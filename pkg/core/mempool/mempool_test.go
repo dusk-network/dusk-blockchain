@@ -61,7 +61,7 @@ func TestTxAdvertising(t *testing.T) {
 	tx := transactions.RandTx()
 
 	go func() {
-		_, err := m.ProcessTx(message.New(topics.Tx, tx))
+		_, err := m.ProcessTx("", message.New(topics.Tx, tx))
 		assert.NoError(t, err)
 	}()
 
@@ -89,17 +89,17 @@ func TestProcessPendingTxs(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		// Publish valid tx
-		_, errList := m.ProcessTx(message.New(topics.Tx, cc[i]))
+		_, errList := m.ProcessTx("", message.New(topics.Tx, cc[i]))
 		assert.Empty(t, errList)
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
 		invalid := transactions.RandContractCall()
 		transactions.Invalidate(invalid)
-		_, errList = m.ProcessTx(message.New(topics.Tx, invalid))
+		_, errList = m.ProcessTx("", message.New(topics.Tx, invalid))
 		assert.NotEmpty(t, errList)
 
 		// Publish a duplicated tx
-		_, errList = m.ProcessTx(message.New(topics.Tx, invalid))
+		_, errList = m.ProcessTx("", message.New(topics.Tx, invalid))
 		assert.NotEmpty(t, errList)
 	}
 
@@ -148,7 +148,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 
 		go func(txs []transactions.ContractCall) {
 			for _, tx := range txs {
-				_, errList := m.ProcessTx(message.New(topics.Tx, tx))
+				_, errList := m.ProcessTx("", message.New(topics.Tx, tx))
 				assert.Empty(t, errList)
 			}
 
@@ -162,7 +162,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		go func() {
 			for j := 0; j <= 5; j++ {
 				tx := transactions.MockInvalidTx()
-				_, errList := m.ProcessTx(message.New(topics.Tx, tx))
+				_, errList := m.ProcessTx("", message.New(topics.Tx, tx))
 				assert.NotEmpty(t, errList)
 			}
 			wg.Done()
@@ -195,7 +195,7 @@ func TestRemoveAccepted(t *testing.T) {
 	for i, tx := range txs {
 		// Publish valid tx
 		// Copy the tx to avoid sharing pointers
-		_, errList := m.ProcessTx(message.New(topics.Tx, tx.Copy()))
+		_, errList := m.ProcessTx("", message.New(topics.Tx, tx.Copy()))
 		assert.Empty(errList)
 
 		// Simulate a situation where the block has accepted each 2nd tx
@@ -243,7 +243,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 	txs := transactions.RandContractCalls(5, 0, true)
 
 	for _, tx := range txs {
-		_, errList := m.ProcessTx(message.New(topics.Tx, tx))
+		_, errList := m.ProcessTx("", message.New(topics.Tx, tx))
 
 		if tx.Type() == transactions.Distribute {
 			assert.NotEmpty(t, errList)

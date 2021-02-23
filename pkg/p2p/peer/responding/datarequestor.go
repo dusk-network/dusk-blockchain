@@ -54,7 +54,7 @@ func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus, broker eventbus.Bro
 // RequestMissingItems takes an inventory message, checks it for any items that the node
 // is missing, puts these items in a GetData wire message, and sends it off to the peer's
 // outgoing message queue, requesting the items in full.
-func (d *DataRequestor) RequestMissingItems(m message.Message) ([]bytes.Buffer, error) {
+func (d *DataRequestor) RequestMissingItems(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 

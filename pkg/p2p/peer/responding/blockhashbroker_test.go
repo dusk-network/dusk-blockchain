@@ -37,7 +37,7 @@ func TestAdvertiseBlocks(t *testing.T) {
 
 	// Make a GetBlocks, with the genesis block as the locator.
 	msg := createGetBlocks(hashes[0])
-	blksBuf, err := blockHashBroker.AdvertiseMissingBlocks(msg)
+	blksBuf, err := blockHashBroker.AdvertiseMissingBlocks("", msg)
 	assert.NoError(err)
 
 	// Check for correctness of topic
