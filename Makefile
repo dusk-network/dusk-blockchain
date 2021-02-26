@@ -12,6 +12,9 @@ go-analyzer: ## Run go-analyzer
 	GOBIN=$(PWD)/bin go run scripts/build.go go-analyzer
 test: ## Run unittests
 	@go test $(TFLAGS) -short ${PKG_LIST}
+test-harness-unit: build ## Run a specified harness unit test e.g make UNIT_TEST=TestForgedBlock test-harness-unit
+	MOCK_ADDRESS=127.0.0.1:8080 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run $(UNIT_TEST) -args -enable
 test-harness: ## Run harness tests
 	@go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable
 test-harness-ci: build
