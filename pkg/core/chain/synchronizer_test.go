@@ -25,7 +25,7 @@ func TestSuccessiveBlocks(t *testing.T) {
 
 	// tipHeight will be 0, so make the successive block
 	blk := helper.RandomBlock(1, 1)
-	res, err := s.processBlock(0, *blk)
+	res, err := s.processBlock("", 0, *blk)
 	assert.NoError(err)
 	assert.Nil(res)
 
@@ -40,7 +40,7 @@ func TestFutureBlocks(t *testing.T) {
 
 	height := uint64(10)
 	blk := helper.RandomBlock(height, 1)
-	resp, err := s.processBlock(0, *blk)
+	resp, err := s.processBlock("", 0, *blk)
 	assert.NoError(err)
 
 	// Response should be of the GetBlocks topic

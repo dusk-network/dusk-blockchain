@@ -21,9 +21,9 @@ const (
 	syncTimeout = time.Duration(5) * time.Second
 )
 
-type syncState func(currentHeight uint64, blk block.Block) ([]bytes.Buffer, error)
+type syncState func(srcPeerAddr string, currentHeight uint64, blk block.Block) ([]bytes.Buffer, error)
 
-func (s *synchronizer) inSync(currentHeight uint64, blk block.Block) ([]bytes.Buffer, error) {
+func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk block.Block) ([]bytes.Buffer, error) {
 	if blk.Header.Height > currentHeight+1 {
 		// If this block is from far in the future, we should start syncing mode.
 		s.chain.StopBlockProduction()
@@ -35,7 +35,7 @@ func (s *synchronizer) inSync(currentHeight uint64, blk block.Block) ([]bytes.Bu
 		//
 		// A peer is marked as dishonest if it cannot provide a valid
 		// consecutive block before the timer expires
-		s.timer.Start("")
+		s.timer.Start(srcPeerAddr)
 
 		s.state = s.outSync
 		b, err := s.startSync(blk.Header.Height, currentHeight)
@@ -50,7 +50,7 @@ func (s *synchronizer) inSync(currentHeight uint64, blk block.Block) ([]bytes.Bu
 	return nil, nil
 }
 
-func (s *synchronizer) outSync(currentHeight uint64, blk block.Block) ([]bytes.Buffer, error) {
+func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk block.Block) ([]bytes.Buffer, error) {
 	var err error
 
 	if blk.Header.Height > currentHeight+1 {
@@ -75,7 +75,7 @@ func (s *synchronizer) outSync(currentHeight uint64, blk block.Block) ([]bytes.B
 
 		// Peer does provide a valid consecutive block
 		// outSyncTimer should restart its counter
-		if err = s.timer.Reset(""); err != nil {
+		if err = s.timer.Reset(srcPeerAddr); err != nil {
 			log.WithError(err).Warn("outsynctimer error")
 		}
 
@@ -133,12 +133,12 @@ func newSynchronizer(db database.DB, chain Ledger) *synchronizer {
 }
 
 // processBlock handles an incoming block from the network.
-func (s *synchronizer) processBlock(currentHeight uint64, blk block.Block) (res []bytes.Buffer, err error) {
+func (s *synchronizer) processBlock(srcPeerID string, currentHeight uint64, blk block.Block) (res []bytes.Buffer, err error) {
 	// Clean up sequencer
 	s.sequencer.cleanup(currentHeight)
 
 	currState := s.state
-	res, err = currState(currentHeight, blk)
+	res, err = currState(srcPeerID, currentHeight, blk)
 	return
 }
 

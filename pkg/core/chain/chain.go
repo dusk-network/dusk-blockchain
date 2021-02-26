@@ -186,7 +186,7 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 		c.highestSeen = blk.Header.Height
 	}
 
-	return c.synchronizer.processBlock(c.tip.Header.Height, blk)
+	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk)
 }
 
 // ProduceBlock will start the consensus loop. It can be halted at any point by
