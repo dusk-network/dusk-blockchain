@@ -212,7 +212,7 @@ func TestSyncProgress(t *testing.T) {
 	// Change tipHeight and then give the chain a block from far in the future
 	c.tip.Header.Height = 50
 	blk := helper.RandomBlock(100, 1)
-	c.ProcessBlockFromNetwork(message.New(topics.Block, *blk))
+	c.ProcessBlockFromNetwork("", message.New(topics.Block, *blk))
 
 	// SyncProgress should be 50%
 	resp, err = c.GetSyncProgress(context.Background(), &node.EmptyRequest{})

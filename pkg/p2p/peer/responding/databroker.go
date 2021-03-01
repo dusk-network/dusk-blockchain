@@ -36,7 +36,7 @@ func NewDataBroker(db database.DB, rpcBus *rpcbus.RPCBus) *DataBroker {
 }
 
 // MarshalObjects marshals requested objects by a message of type message.Inv.
-func (d *DataBroker) MarshalObjects(m message.Message) ([]bytes.Buffer, error) {
+func (d *DataBroker) MarshalObjects(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.Inv)
 	bufs := make([]bytes.Buffer, 0, len(msg.InvList))
 
@@ -86,7 +86,7 @@ func (d *DataBroker) MarshalObjects(m message.Message) ([]bytes.Buffer, error) {
 }
 
 // MarshalMempoolTxs marshals all or subset of pending Mempool transactions.
-func (d *DataBroker) MarshalMempoolTxs(m message.Message) ([]bytes.Buffer, error) {
+func (d *DataBroker) MarshalMempoolTxs(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	maxItemsSent := config.Get().Mempool.MaxInvItems
 	if maxItemsSent == 0 {
 		// responding to topics.Mempool disabled

@@ -161,7 +161,7 @@ func (m *Mempool) Run(ctx context.Context) {
 }
 
 // ProcessTx handles a submitted tx from any source (rpcBus or eventBus).
-func (m *Mempool) ProcessTx(msg message.Message) ([]bytes.Buffer, error) {
+func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buffer, error) {
 	t := TxDesc{tx: msg.Payload().(transactions.ContractCall), received: time.Now(), size: uint(len(msg.Id()))}
 	start := time.Now()
 	txid, err := m.processTx(t)

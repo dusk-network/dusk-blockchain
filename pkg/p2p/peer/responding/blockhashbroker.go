@@ -33,7 +33,7 @@ func NewBlockHashBroker(db database.DB) *BlockHashBroker {
 // AdvertiseMissingBlocks takes a GetBlocks wire message, finds the requesting peer's
 // height, and returns an inventory message of up to config.MaxInvBlocks blocks which follow the
 // provided locator.
-func (b *BlockHashBroker) AdvertiseMissingBlocks(m message.Message) ([]bytes.Buffer, error) {
+func (b *BlockHashBroker) AdvertiseMissingBlocks(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.GetBlocks)
 
 	// Determine from where we need to start fetching blocks, going off his Locator

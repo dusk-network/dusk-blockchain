@@ -31,7 +31,7 @@ func TestRequestData(t *testing.T) {
 	// Send topics.Inv
 	hash, msg := createInv()
 
-	bufs, err := dataRequestor.RequestMissingItems(msg)
+	bufs, err := dataRequestor.RequestMissingItems("", msg)
 	if err != nil {
 		t.Fatal(err)
 	}

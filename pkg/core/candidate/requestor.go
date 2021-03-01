@@ -41,7 +41,7 @@ func NewRequestor(publisher eventbus.Publisher) *Requestor {
 
 // ProcessCandidate will process a received Candidate message.
 // Invalid and non-matching Candidate messages are discarded.
-func (r *Requestor) ProcessCandidate(msg message.Message) ([]bytes.Buffer, error) {
+func (r *Requestor) ProcessCandidate(srcPeerID string, msg message.Message) ([]bytes.Buffer, error) {
 	if r.isRequesting() {
 		if err := Validate(msg); err != nil {
 			return nil, err

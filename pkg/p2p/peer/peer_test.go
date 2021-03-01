@@ -44,7 +44,7 @@ func TestReader(t *testing.T) {
 	// Set up reader factory
 	processor := NewMessageProcessor(eb)
 	agreementChan := make(chan struct{}, 1)
-	respFn := func(_ message.Message) ([]bytes.Buffer, error) {
+	respFn := func(_ string, _ message.Message) ([]bytes.Buffer, error) {
 		agreementChan <- struct{}{}
 		return nil, nil
 	}

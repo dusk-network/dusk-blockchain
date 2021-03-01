@@ -26,7 +26,7 @@ func NewCandidateBroker(db database.DB) *CandidateBroker {
 }
 
 // ProvideCandidate for a given (m *bytes.Buffer).
-func (c *CandidateBroker) ProvideCandidate(m message.Message) ([]bytes.Buffer, error) {
+func (c *CandidateBroker) ProvideCandidate(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.GetCandidate)
 
 	var cm block.Block

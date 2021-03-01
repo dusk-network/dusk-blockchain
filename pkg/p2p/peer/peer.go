@@ -373,7 +373,7 @@ func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
 			// or blacklist spammers
 			startTime := time.Now().UnixNano()
 
-			if err = p.processor.Collect(message, p.responseChan); err != nil {
+			if err = p.processor.Collect(p.Addr(), message, p.responseChan); err != nil {
 				l.WithField("process", "readloop").
 					WithError(err).Error("failed to process message")
 			}

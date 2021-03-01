@@ -37,7 +37,7 @@ func TestConcurrentBlock(t *testing.T) {
 			defer wg.Done()
 
 			blk := helper.RandomBlock(1, 3)
-			chain.ProcessBlockFromNetwork(message.New(topics.Block, *blk))
+			chain.ProcessBlockFromNetwork("", message.New(topics.Block, *blk))
 		}()
 	}
 

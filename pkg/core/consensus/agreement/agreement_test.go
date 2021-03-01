@@ -115,7 +115,7 @@ func TestRequestor(t *testing.T) {
 		if request.Category() == topics.GetCandidate {
 			assert.Equal(t, request.Payload().(message.GetCandidate).Hash, blk.Header.Hash)
 
-			_, err := req.ProcessCandidate(message.New(topics.Candidate, *blk))
+			_, err := req.ProcessCandidate("", message.New(topics.Candidate, *blk))
 			assert.NoError(t, err)
 
 			wg.Wait()
