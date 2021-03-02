@@ -29,6 +29,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+var log = logrus.WithField("process", "mock rusk server")
+
 // Server is a stand-in Rusk server, which can be used during any kind of
 // testing. Its behavior can be modified depending on the settings of the
 // `Config` struct, contained in the `Server`, to simulate different types
@@ -59,6 +61,7 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 	srv.s = grpcServer
 
 	if err := srv.setupWallet(c); err != nil {
+		log.WithError(err).Errorln("error setting up wallet")
 		return nil, err
 	}
 
@@ -66,6 +69,8 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 }
 
 func (s *Server) setupWallet(c config.Registry) error {
+	log.Infoln("setting up wallet")
+
 	// First load the database
 	db, err := database.New(c.Wallet.Store + "_2")
 	if err != nil {
@@ -89,6 +94,8 @@ func (s *Server) setupWallet(c config.Registry) error {
 }
 
 func (s *Server) bootstrapBlockchain() error {
+	log.Infoln("bootstrapping blockchain")
+
 	var genesis *block.Block
 
 	g := config.DecodeGenesis()
@@ -108,6 +115,7 @@ func (s *Server) bootstrapBlockchain() error {
 }
 
 func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
+	log.Debugln("registering GRPC services")
 	rusk.RegisterStateServer(grpcServer, srv)
 	rusk.RegisterKeysServer(grpcServer, srv)
 	rusk.RegisterBlindBidServiceServer(grpcServer, srv)
@@ -115,11 +123,14 @@ func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
 	rusk.RegisterTransferServer(grpcServer, srv)
 	rusk.RegisterStakeServiceServer(grpcServer, srv)
 	rusk.RegisterWalletServer(grpcServer, srv)
+	log.Debugln("GRPC services registered")
 }
 
 // Serve will start listening on a hardcoded IP and port. The server will then accept
 // incoming gRPC requests.
 func (s *Server) Serve(network, url string) error {
+	log.Infoln("starting GRPC server")
+
 	l, err := net.Listen(network, url)
 	if err != nil {
 		return err
@@ -131,12 +142,16 @@ func (s *Server) Serve(network, url string) error {
 		}
 	}()
 
+	log.Infoln("GRPC server started")
 	return nil
 }
 
 // VerifyStateTransition simulates a state transition validation. The outcome is dictated
 // by the server configuration.
 func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStateTransitionRequest) (*rusk.VerifyStateTransitionResponse, error) {
+	log.Infoln("call received to VerifyStateTransition")
+	defer log.Infoln("finished call to VerifyStateTransition")
+
 	if !s.cfg.PassStateTransitionValidation {
 		indices := make([]uint64, len(req.Txs))
 		for i := range indices {
@@ -156,6 +171,9 @@ func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStat
 // ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
 // configuration.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
+	log.Infoln("call received to ExecuteStateTransition")
+	defer log.Infoln("finished call to ExecuteStateTransition")
+
 	if !s.cfg.PassStateTransition {
 		return &rusk.ExecuteStateTransitionResponse{
 			Success: s.cfg.PassStateTransition,
@@ -164,6 +182,7 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 
 	txs, err := legacy.ContractCallsToTxs(req.Txs)
 	if err != nil {
+		log.WithError(err).Errorln("could not convert contract calls to legacy txs")
 		return nil, err
 	}
 
@@ -173,10 +192,12 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 
 	_, _, err = s.w.CheckWireBlock(*blk)
 	if err != nil {
+		log.WithError(err).Errorln("could not check wire block")
 		return nil, err
 	}
 
 	if err := s.addConsensusNodes(blk.Txs, req.Height); err != nil {
+		log.WithError(err).Errorln("could not add consensus nodes")
 		return nil, err
 	}
 
@@ -187,12 +208,17 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 
 // GetProvisioners returns the current set of provisioners.
 func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersRequest) (*rusk.GetProvisionersResponse, error) {
+	log.Infoln("call received to GetProvisioners")
+	defer log.Infoln("finished call to GetProvisioners")
+
 	return &rusk.GetProvisionersResponse{
 		Provisioners: legacy.ProvisionersToRuskCommittee(s.p),
 	}, nil
 }
 
 func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight uint64) error {
+	log.Debugln("adding consensus nodes")
+
 	for _, tx := range txs {
 		if tx.Type() == transactions.StakeType {
 			stake := tx.(*transactions.Stake)
@@ -202,6 +228,13 @@ func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight u
 			if err := s.p.Add(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), stakeStartHeight, startHeight+stake.Lock-2); err != nil {
 				return err
 			}
+
+			log.WithFields(logrus.Fields{
+				"BLS key":      stake.PubKeyBLS,
+				"amount":       stake.Outputs[0].EncryptedAmount.BigInt().Uint64(),
+				"start height": stakeStartHeight,
+				"end height":   startHeight + stake.Lock - 2,
+			}).Debugln("added provisioner")
 		}
 	}
 
@@ -213,18 +246,24 @@ func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight u
 // the server configuration. This makes it easier for us to test different
 // scenarios, and it greatly simplifies the bootstrapping of a network.
 func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreRequest) (*rusk.GenerateScoreResponse, error) {
+	log.Infoln("call received to GenerateScore")
+	defer log.Infoln("finished call to GenerateScore")
+
 	proof, err := crypto.RandEntropy(400)
 	if err != nil {
+		log.WithError(err).Errorln("could not generate random bytes")
 		return nil, err
 	}
 
 	score, err := crypto.RandEntropy(32)
 	if err != nil {
+		log.WithError(err).Errorln("could not generate random bytes")
 		return nil, err
 	}
 
 	identity, err := crypto.RandEntropy(32)
 	if err != nil {
+		log.WithError(err).Errorln("could not generate random bytes")
 		return nil, err
 	}
 
@@ -237,6 +276,9 @@ func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreReque
 
 // VerifyScore will return either true or false, depending on the server configuration.
 func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) (*rusk.VerifyScoreResponse, error) {
+	log.Infoln("call received to VerifyScore")
+	defer log.Infoln("finished call to VerifyScore")
+
 	return &rusk.VerifyScoreResponse{
 		Success: s.cfg.PassScoreValidation,
 	}, nil
@@ -245,6 +287,9 @@ func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) 
 // GenerateKeys returns the server's wallet private key, and a stealth address.
 // The response will contain Ristretto points under the hood.
 func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest) (*rusk.GenerateKeysResponse, error) {
+	log.Infoln("call received to GenerateKeys")
+	defer log.Infoln("finished call to GenerateKeys")
+
 	var r ristretto.Scalar
 
 	r.Rand()
@@ -254,6 +299,7 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 
 	pSpend, err := s.w.PrivateSpend()
 	if err != nil {
+		log.WithError(err).Errorln("could not get private spend key")
 		return nil, err
 	}
 
@@ -276,6 +322,9 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 // GenerateStealthAddress returns a stealth address generated from the server's
 // wallet public key.
 func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey) (*rusk.StealthAddress, error) {
+	log.Infoln("call received to GenerateStealthAddress")
+	defer log.Infoln("finished call to GenerateStealthAddress")
+
 	var r ristretto.Scalar
 
 	r.Rand()
@@ -291,8 +340,12 @@ func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey
 
 // NewTransfer creates a transaction and returns it to the caller.
 func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionRequest) (*rusk.Transaction, error) {
+	log.Infoln("call received to NewTransfer")
+	defer log.Infoln("finished call to NewTransfer")
+
 	tx, err := transactions.NewStandard(0, byte(2), int64(100))
 	if err != nil {
+		log.WithError(err).Errorln("error creating new transfer")
 		return nil, err
 	}
 
@@ -311,6 +364,7 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 
 	addr, err := pk.PublicAddress(byte(2))
 	if err != nil {
+		log.WithError(err).Errorln("error getting public address")
 		return nil, err
 	}
 
@@ -318,10 +372,12 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 	value.SetBigInt(big.NewInt(int64(req.Value)))
 
 	if err := tx.AddOutput(*addr, value); err != nil {
+		log.WithError(err).Errorln("error adding output")
 		return nil, err
 	}
 
 	if err := s.w.Sign(tx); err != nil {
+		log.WithError(err).Errorln("error signing tx")
 		return nil, err
 	}
 
@@ -330,16 +386,21 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 
 // NewStake creates a staking transaction and returns it to the caller.
 func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.Transaction, error) {
+	log.Infoln("call received to NewTransfer")
+	defer log.Infoln("cinished call to NewTransfer")
+
 	var value ristretto.Scalar
 
 	value.SetBigInt(big.NewInt(0).SetUint64(req.Value))
 
 	stake, err := s.w.NewStakeTx(int64(0), 250000, value)
 	if err != nil {
+		log.WithError(err).Errorln("error creating new stake")
 		return nil, err
 	}
 
 	if err := s.w.Sign(stake); err != nil {
+		log.WithError(err).Errorln("error signing stake")
 		return nil, err
 	}
 
@@ -348,6 +409,9 @@ func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest
 
 // NewBid creates a bidding transaction and returns it to the caller.
 func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*rusk.BidTransaction, error) {
+	log.Infoln("call received to NewTransfer")
+	defer log.Infoln("finished call to NewTransfer")
+
 	var k ristretto.Scalar
 
 	_ = k.UnmarshalBinary(req.K)
@@ -355,10 +419,12 @@ func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*
 
 	bid, err := transactions.NewBid(0, byte(2), int64(0), 250000, m.Bytes())
 	if err != nil {
+		log.WithError(err).Errorln("error creating new bid")
 		return nil, err
 	}
 
 	if err := s.w.Sign(bid); err != nil {
+		log.WithError(err).Errorln("error signing bid")
 		return nil, err
 	}
 
@@ -368,12 +434,18 @@ func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*
 // FindBid will return all of the bids for a given stealth address.
 // TODO: implement.
 func (s *Server) FindBid(ctx context.Context, req *rusk.FindBidRequest) (*rusk.BidList, error) {
+	log.Infoln("call received to NewTransfer")
+	defer log.Infoln("finished call to NewTransfer")
+
 	return nil, nil
 }
 
 // FindStake will return a stake for a given public key.
 // TODO: Implement.
 func (s *Server) FindStake(ctx context.Context, req *rusk.FindStakeRequest) (*rusk.FindStakeResponse, error) {
+	log.Infoln("call received to NewTransfer")
+	defer log.Infoln("finished call to NewTransfer")
+
 	return nil, nil
 }
 
@@ -419,6 +491,9 @@ func fetchDecoys(numMixins int) []mlsag.PubKeys {
 
 // GetBalance locked and unlocked balance values per a ViewKey.
 func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*rusk.GetWalletBalanceResponse, error) {
+	log.Infoln("call received to NewTransfer")
+	defer log.Infoln("finished call to NewTransfer")
+
 	resp := new(rusk.GetWalletBalanceResponse)
 
 	unlockedBalance, lockedBalance, err := s.w.Balance()
@@ -433,6 +508,8 @@ func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*
 
 // Stop the rusk mock server.
 func (s *Server) Stop() error {
+	log.Infoln("stopping RUSK mock server")
+
 	s.s.Stop()
 	return s.db.Close()
 }
