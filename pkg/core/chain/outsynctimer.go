@@ -47,7 +47,7 @@ func (s *outSyncTimer) Start(id string) {
 	eventChan := s.t.C
 	s.lock.Unlock()
 
-	go eventConsumer(eventChan, s.cancelChan, s.callback)
+	go eventConsumer(eventChan, s.cancelChan, s.callback, id)
 }
 
 // Cancel terminates timer and cancel eventConsumer goroutine, if exists.
@@ -85,13 +85,15 @@ func (s *outSyncTimer) Reset(id string) error {
 }
 
 // eventConsumer is statless consumer of time.Timer event.
-func eventConsumer(event <-chan time.Time, cancelChan chan bool, onExpiredFn func() error) {
+func eventConsumer(event <-chan time.Time, cancelChan chan bool, onExpiredFn func() error, id string) {
 	select {
 	case <-cancelChan:
 		return
 	case <-event:
 		// TODO: Increase ban score for the dishonest Peer
 		// Trigger callback
+		logrus.WithField("dishonest_peer", id).Warn("synchronizer timer triggered")
+
 		if err := onExpiredFn(); err != nil {
 			logrus.WithError(err).Warn("outsynctimer expiry callback err")
 		}

@@ -282,9 +282,9 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		t.Logf("Node %d sending a Transfer transaction", i)
 
-		if _, err := localNet.SendTransferTxCmd(i, i+1, 1000*uint64(i+1), 100); err != nil {
-			t.Log(err.Error())
-		}
+		//if _, err := localNet.SendTransferTxCmd(i, i+1, 1000*uint64(i+1), 100); err != nil {
+		//	t.Log(err.Error())
+		//}
 	}
 
 	targetRound := uint64(7)

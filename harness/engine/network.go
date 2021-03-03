@@ -164,7 +164,7 @@ func (n *Network) Bootstrap(workspace string) error {
 		}
 
 		// avoid stressing dusk-seeder
-		time.Sleep(time.Duration(1) * time.Second)
+		time.Sleep(time.Duration(4) * time.Second)
 	}
 
 	log.Infof("Local network workspace: %s", workspace)

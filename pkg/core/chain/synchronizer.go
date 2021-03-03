@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	syncTimeout = time.Duration(5) * time.Second
+	syncTimeout = time.Duration(3) * time.Second
 )
 
 type syncState func(srcPeerAddr string, currentHeight uint64, blk block.Block) ([]bytes.Buffer, error)
@@ -38,7 +38,7 @@ func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk bloc
 		s.timer.Start(srcPeerAddr)
 
 		s.state = s.outSync
-		b, err := s.startSync(blk.Header.Height, currentHeight)
+		b, err := s.startSync(srcPeerAddr, blk.Header.Height, currentHeight)
 		return b, err
 	}
 
@@ -142,10 +142,11 @@ func (s *synchronizer) processBlock(srcPeerID string, currentHeight uint64, blk 
 	return
 }
 
-func (s *synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
+func (s *synchronizer) startSync(strPeerAddr string, tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
 	s.setSyncTarget(tipHeight, currentHeight+config.MaxInvBlocks)
 
-	log.WithField("curr", currentHeight).
+	log.WithField("src_addr", strPeerAddr).
+		WithField("curr", currentHeight).
 		WithField("tip", tipHeight).WithField("target", s.syncTarget).
 		Debug("Start syncing")
 

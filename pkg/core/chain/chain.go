@@ -171,7 +171,7 @@ func (c *Chain) StopBlockProduction() {
 func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	blk := m.Payload().(block.Block)
 
-	log.WithField("height", blk.Header.Height).Trace("received block")
+	log.WithField("src_addr", srcPeerID).WithField("height", blk.Header.Height).Trace("received block")
 
 	c.lock.Lock()
 	defer c.lock.Unlock()

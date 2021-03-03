@@ -40,6 +40,10 @@ func (d *DataBroker) MarshalObjects(srcPeerID string, m message.Message) ([]byte
 	msg := m.Payload().(message.Inv)
 	bufs := make([]bytes.Buffer, 0, len(msg.InvList))
 
+	if config.Get().Network.Port == "7103" {
+		return bufs, nil
+	}
+
 	for _, obj := range msg.InvList {
 		switch obj.Type {
 		case message.InvTypeBlock:
