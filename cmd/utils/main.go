@@ -12,6 +12,8 @@ import (
 	"os"
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/mock"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/transactions"
 	log "github.com/sirupsen/logrus"
@@ -252,6 +254,19 @@ func mockRuskAction(ctx *cli.Context) error {
 	walletStore := ctx.String(walletStoreFlag.Name)
 	walletFile := ctx.String(walletFileFlag.Name)
 
-	err := mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
+	logging.SetToLevel(config.Get().Logger.Level)
+
+	logFile, err := os.Create(config.Get().Logger.Output + "_mock_rusk.log")
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_ = logFile.Close()
+	}()
+
+	log.SetOutput(logFile)
+
+	err = mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
 	return err
 }
