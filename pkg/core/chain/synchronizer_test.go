@@ -89,3 +89,7 @@ func (m *mockChain) ProduceBlock() error {
 }
 
 func (m *mockChain) StopBlockProduction() {}
+
+func (m *mockChain) ProcessSyncTimerExpired() error {
+	return nil
+}

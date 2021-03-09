@@ -68,6 +68,7 @@ type Ledger interface {
 	TryNextConsecutiveBlockOutSync(block.Block) error
 	ProduceBlock() error
 	StopBlockProduction()
+	ProcessSyncTimerExpired() error
 }
 
 // Chain represents the nodes blockchain.
@@ -535,4 +536,20 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 	if err != nil {
 		log.Warn("Could not store provisioners on memoryDB")
 	}
+}
+
+// ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
+// It implements transition back to inSync state.
+func (c *Chain) ProcessSyncTimerExpired() error {
+	log.WithField("curr", c.tip.Header.Height).Warn("sync timer expired")
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if err := c.ProduceBlock(); err != nil {
+		log.WithError(err).Warn("sync timer could not restart consensus loop")
+	}
+
+	c.state = c.inSync
+	return nil
 }
