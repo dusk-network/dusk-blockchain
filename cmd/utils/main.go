@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dusk-network/dusk-blockchain/cmd/utils/grpcclient"
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/mock"
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/transactions"
@@ -31,6 +32,7 @@ func main() {
 		transactionsCMD,
 		mockCMD,
 		mockRUSKCMD,
+		setConfigCMD,
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -137,6 +139,18 @@ var (
 		Value: "password",
 	}
 
+	configNameFlag = cli.StringFlag{
+		Name:  "configname",
+		Usage: "Config ID from dusk.toml, eg: logger.level",
+		Value: "",
+	}
+
+	configValueFlag = cli.StringFlag{
+		Name:  "configvalue",
+		Usage: "New Config value, eg: info",
+		Value: "",
+	}
+
 	metricsCMD = cli.Command{
 		Name:      "metrics",
 		Usage:     "expose a metrics endpoint",
@@ -190,6 +204,19 @@ var (
 			walletFileFlag,
 		},
 		Description: `Execute/Query transactions for a Dusk node`,
+	}
+
+	setConfigCMD = cli.Command{
+		Name:      "setconfig",
+		Usage:     "set config in run-time",
+		Action:    setConfigAction,
+		ArgsUsage: "",
+		Flags: []cli.Flag{
+			grpcHostFlag,
+			configNameFlag,
+			configValueFlag,
+		},
+		Description: `Modify a specific dusk config in run-time`,
 	}
 )
 
@@ -254,4 +281,12 @@ func mockRuskAction(ctx *cli.Context) error {
 
 	err := mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
 	return err
+}
+
+func setConfigAction(ctx *cli.Context) error {
+	return grpcclient.SetConfig(grpcclient.SetConfigReq{
+		Name:     ctx.String(configNameFlag.Name),
+		NewValue: ctx.String(configValueFlag.Name),
+		Host:     ctx.String(grpcHostFlag.Name),
+	})
 }
