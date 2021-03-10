@@ -333,7 +333,7 @@ func (m *Mempool) onIdle() {
 			Warn("exceeding max size")
 	}
 
-	if log.Logger.Level == logger.TraceLevel {
+	if log.Logger.GetLevel() == logger.TraceLevel {
 		if m.verified.Len() > 0 {
 			_ = m.verified.Range(func(k txHash, t TxDesc) error {
 				log.WithField("txid", toHex(k[:])).Trace("accepted transaction")
