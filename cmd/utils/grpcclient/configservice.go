@@ -11,33 +11,28 @@ import (
 	"time"
 
 	node "github.com/dusk-network/dusk-protobuf/autogen/go/node"
-
-	"google.golang.org/grpc"
 )
 
 // SetConfigReq describes a set-config request.
 type SetConfigReq struct {
-	Host string
+	Address string
 
 	Name     string
 	NewValue string
 }
 
-// SetConfig implement a cli client over node.ConfigClient grpc interface.
-func SetConfig(r SetConfigReq) error {
-	// TODO: enable tcp transport
-	addr := "unix://" + r.Host
+// TrySetConfig implement a cli client over node.ConfigClient grpc interface.
+func TrySetConfig(r SetConfigReq) error {
+	var err error
 
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
-	if err != nil {
+	c := grpcClient{dialTimeout: 5}
+	if err = c.TryConnect(r.Address); err != nil {
 		return err
 	}
 
-	defer func() {
-		_ = conn.Close()
-	}()
+	defer c.Close()
 
-	client := node.NewConfigClient(conn)
+	client := node.NewConfigClient(c.conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
