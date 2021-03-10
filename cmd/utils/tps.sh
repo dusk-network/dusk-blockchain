@@ -33,7 +33,7 @@ set -euxo pipefail
 
 sendtx_func() {
   echo "sending transactions to node $i ..."
-  "$PWD"/bin/utils transactions --txtype=transfer --amount=1 --locktime=1 --grpchost=unix:///tmp/localnet-"${ID}"/node-$((PORT + i))/dusk-grpc.sock > /tmp/localnet-"${ID}"/tps.log 2>&1 & disown
+  "$PWD"/bin/utils transactions --txtype=transfer --amount=1 --locktime=1 --grpcaddr=unix:///tmp/localnet-"${ID}"/node-$((PORT + i))/dusk-grpc.sock > /tmp/localnet-"${ID}"/tps.log 2>&1 & disown
 
   TX_PID=$!
   echo "sent transaction to node, pid=$TX_PID"
