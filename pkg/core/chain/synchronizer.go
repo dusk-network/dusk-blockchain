@@ -118,16 +118,7 @@ func newSynchronizer(db database.DB, chain Ledger) *synchronizer {
 		chain:     chain,
 	}
 
-	onExpiryFn := func() error {
-		if err := s.chain.ProduceBlock(); err != nil {
-			return err
-		}
-
-		s.state = s.inSync
-		return nil
-	}
-	s.timer = newSyncTimer(syncTimeout, onExpiryFn)
-
+	s.timer = newSyncTimer(syncTimeout, chain.ProcessSyncTimerExpired)
 	s.state = s.inSync
 	return s
 }
