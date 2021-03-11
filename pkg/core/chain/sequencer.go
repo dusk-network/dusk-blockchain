@@ -7,10 +7,12 @@
 package chain
 
 import (
+	"encoding/hex"
 	"errors"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/sirupsen/logrus"
 )
 
 // The sequencer is used to order incoming blocks and provide them
@@ -77,5 +79,24 @@ func (s *sequencer) provideSuccessors(blk block.Block) []block.Block {
 		blks = append(blks, blk)
 
 		s.remove(i)
+	}
+}
+
+// dump report a log entry with current state of sequencer.
+func (s *sequencer) dump() {
+	if logrus.GetLevel() != logrus.TraceLevel {
+		return
+	}
+
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	for height := range s.blockPool {
+		blk, err := s.get(height)
+		if err == nil {
+			log.WithField("hash", hex.EncodeToString(blk.Header.Hash)).
+				WithField("height", blk.Header.Height).
+				Trace("sequencer item")
+		}
 	}
 }
