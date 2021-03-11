@@ -8,6 +8,7 @@ package chain
 
 import (
 	"bytes"
+	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -37,13 +38,20 @@ func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk bloc
 		// consecutive block before the timer expires
 		s.timer.Start(srcPeerAddr)
 
+		log.WithField("state", "outSync").Traceln("change sync state")
+
 		s.state = s.outSync
-		b, err := s.startSync(blk.Header.Height, currentHeight)
+		b, err := s.startSync(srcPeerAddr, blk.Header.Height, currentHeight)
 		return b, err
 	}
 
 	// Otherwise notify the chain (and the consensus loop).
 	if err := s.chain.TryNextConsecutiveBlockInSync(blk); err != nil {
+		log.WithField("blk_height", blk.Header.Height).
+			WithField("blk_hash", hex.EncodeToString(blk.Header.Hash)).
+			WithField("state", "insync").
+			WithError(err).
+			Debug("could not AcceptBlock")
 		return nil, err
 	}
 
@@ -69,14 +77,14 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 	for _, blk := range blks {
 		// append them all to the ledger
 		if err = s.chain.TryNextConsecutiveBlockOutSync(blk); err != nil {
-			log.WithError(err).Debug("could not AcceptBlock")
+			log.WithError(err).WithField("state", "outSync").Debug("could not AcceptBlock")
 			return nil, err
 		}
 
 		// Peer does provide a valid consecutive block
 		// outSyncTimer should restart its counter
 		if err = s.timer.Reset(srcPeerAddr); err != nil {
-			log.WithError(err).Warn("outsynctimer error")
+			log.WithError(err).WithField("state", "outSync").Warn("timer error")
 		}
 
 		if blk.Header.Height == s.syncTarget {
@@ -88,6 +96,8 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 			if err = s.chain.ProduceBlock(); err != nil {
 				return nil, err
 			}
+
+			log.WithField("state", "inSync").Traceln("change sync state")
 
 			s.state = s.inSync
 		}
@@ -119,6 +129,9 @@ func newSynchronizer(db database.DB, chain Ledger) *synchronizer {
 	}
 
 	s.timer = newSyncTimer(syncTimeout, chain.ProcessSyncTimerExpired)
+
+	log.WithField("state", "inSync").Traceln("change sync state")
+
 	s.state = s.inSync
 	return s
 }
@@ -127,17 +140,20 @@ func newSynchronizer(db database.DB, chain Ledger) *synchronizer {
 func (s *synchronizer) processBlock(srcPeerID string, currentHeight uint64, blk block.Block) (res []bytes.Buffer, err error) {
 	// Clean up sequencer
 	s.sequencer.cleanup(currentHeight)
+	s.sequencer.dump()
 
 	currState := s.state
 	res, err = currState(srcPeerID, currentHeight, blk)
 	return
 }
 
-func (s *synchronizer) startSync(tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
+func (s *synchronizer) startSync(strPeerAddr string, tipHeight, currentHeight uint64) ([]bytes.Buffer, error) {
 	s.setSyncTarget(tipHeight, currentHeight+config.MaxInvBlocks)
 
 	log.WithField("curr", currentHeight).
-		WithField("tip", tipHeight).WithField("target", s.syncTarget).
+		WithField("tip", tipHeight).
+		WithField("target", s.syncTarget).
+		WithField("src_addr", strPeerAddr).
 		Debug("Start syncing")
 
 	var hash []byte

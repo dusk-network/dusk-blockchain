@@ -18,7 +18,8 @@ type outSyncTimer struct {
 	// Timeout duration before executing timer callback
 	timeout time.Duration
 	// callback to be executed when timer expires
-	callback func() error
+	// strPeerAddr is the address of the peer initiated the syncing but failed to deliver.
+	callback func(strPeerAddr string) error
 
 	lock sync.Mutex
 	// ownerID is the ID (IPv4) addr of the peer that initiated outSync mode
@@ -27,7 +28,7 @@ type outSyncTimer struct {
 	t          *time.Timer
 }
 
-func newSyncTimer(timeout time.Duration, onExpiredFn func() error) *outSyncTimer {
+func newSyncTimer(timeout time.Duration, onExpiredFn func(string) error) *outSyncTimer {
 	return &outSyncTimer{
 		timeout:  timeout,
 		callback: onExpiredFn,
@@ -47,7 +48,7 @@ func (s *outSyncTimer) Start(id string) {
 	eventChan := s.t.C
 	s.lock.Unlock()
 
-	go eventConsumer(eventChan, s.cancelChan, s.callback)
+	go eventConsumer(eventChan, s.cancelChan, s.callback, id)
 }
 
 // Cancel terminates timer and cancel eventConsumer goroutine, if exists.
@@ -85,14 +86,14 @@ func (s *outSyncTimer) Reset(id string) error {
 }
 
 // eventConsumer is statless consumer of time.Timer event.
-func eventConsumer(event <-chan time.Time, cancelChan chan bool, onExpiredFn func() error) {
+func eventConsumer(event <-chan time.Time, cancelChan chan bool, onExpiredFn func(string) error, strPeerAddr string) {
 	select {
 	case <-cancelChan:
 		return
 	case <-event:
 		// TODO: Increase ban score for the dishonest Peer
 		// Trigger callback
-		if err := onExpiredFn(); err != nil {
+		if err := onExpiredFn(strPeerAddr); err != nil {
 			logrus.WithError(err).Warn("outsynctimer expiry callback err")
 		}
 	}

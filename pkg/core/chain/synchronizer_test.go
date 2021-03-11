@@ -90,6 +90,6 @@ func (m *mockChain) ProduceBlock() error {
 
 func (m *mockChain) StopBlockProduction() {}
 
-func (m *mockChain) ProcessSyncTimerExpired() error {
+func (m *mockChain) ProcessSyncTimerExpired(string) error {
 	return nil
 }

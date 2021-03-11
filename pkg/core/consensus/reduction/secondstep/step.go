@@ -9,6 +9,7 @@ package secondstep
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -211,7 +212,8 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 	lg.WithFields(log.Fields{
 		"round": round,
 		"step":  step,
-	}).Traceln("sending_agreement")
+		"hash":  hex.EncodeToString(svm.BlockHash),
+	}).Debugln("sending_agreement")
 
 	hdr := header.Header{
 		Round:     round,
