@@ -8,6 +8,7 @@ package responding
 
 import (
 	"bytes"
+	"encoding/hex"
 	"sync"
 	"time"
 
@@ -63,6 +64,11 @@ func (d *DataRequestor) RequestMissingItems(srcPeerID string, m message.Message)
 
 	for _, obj := range msg.InvList {
 		if !d.dupemap.CanFwd(bytes.NewBuffer(obj.Hash)) {
+			log.
+				WithField("hash", hex.EncodeToString(obj.Hash)).
+				WithField("type", obj.Type).
+				WithField("src_addr", srcPeerID).
+				Trace("dupemap rejected item")
 			continue
 		}
 

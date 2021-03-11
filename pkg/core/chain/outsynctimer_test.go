@@ -18,7 +18,7 @@ func TestBasicOutSyncTimer(t *testing.T) {
 	assert := assert.New(t)
 
 	done := make(chan bool)
-	onExpired := func() error {
+	onExpired := func(string) error {
 		done <- true
 		return nil
 	}
@@ -37,7 +37,7 @@ func TestCancelOutSyncTimer(t *testing.T) {
 	assert := assert.New(t)
 
 	done := make(chan bool)
-	onExpired := func() error {
+	onExpired := func(string) error {
 		done <- true
 		return nil
 	}
@@ -57,7 +57,7 @@ func TestResetOutSyncTimer(t *testing.T) {
 	assert := assert.New(t)
 
 	done := make(chan int64)
-	onExpired := func() error {
+	onExpired := func(string) error {
 		done <- time.Now().Unix()
 		return nil
 	}
@@ -75,7 +75,7 @@ func TestResetOutSyncTimer(t *testing.T) {
 
 // TestConcurrentOutSyncTimer ensures all exposed methods are concurrency-safe.
 func TestConcurrentOutSyncTimer(t *testing.T) {
-	onExpired := func() error {
+	onExpired := func(string) error {
 		return nil
 	}
 	timer := newSyncTimer(2*time.Second, onExpired)

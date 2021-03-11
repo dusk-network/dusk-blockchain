@@ -68,7 +68,7 @@ type Ledger interface {
 	TryNextConsecutiveBlockOutSync(block.Block) error
 	ProduceBlock() error
 	StopBlockProduction()
-	ProcessSyncTimerExpired() error
+	ProcessSyncTimerExpired(strPeerAddr string) error
 }
 
 // Chain represents the nodes blockchain.
@@ -540,8 +540,10 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 
 // ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
 // It implements transition back to inSync state.
-func (c *Chain) ProcessSyncTimerExpired() error {
-	log.WithField("curr", c.tip.Header.Height).Warn("sync timer expired")
+// strPeerAddr is the address of the peer initiated the syncing but failed to deliver.
+func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
+	log.WithField("curr", c.tip.Header.Height).
+		WithField("src_addr", strPeerAddr).Warn("sync timer expired")
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -549,6 +551,8 @@ func (c *Chain) ProcessSyncTimerExpired() error {
 	if err := c.ProduceBlock(); err != nil {
 		log.WithError(err).Warn("sync timer could not restart consensus loop")
 	}
+
+	log.WithField("state", "inSync").Traceln("change sync state")
 
 	c.state = c.inSync
 	return nil

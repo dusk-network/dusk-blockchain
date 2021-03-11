@@ -374,15 +374,11 @@ func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
 			startTime := time.Now().UnixNano()
 
 			if err = p.processor.Collect(p.Addr(), message, p.responseChan); err != nil {
-				l.WithField("process", "readloop").
+				l.WithField("process", "readloop").WithField("cs", hex.EncodeToString(cs)).
 					WithError(err).Error("failed to process message")
 			}
 
-			duration := float64(time.Now().UnixNano()-startTime) / 1000000
-
-			l.WithField("cs", hex.EncodeToString(cs)).
-				WithField("len", len(message)).
-				WithField("ms", duration).Trace("message routing")
+			p.logWireMsg(startTime, cs, message)
 		}()
 
 		// Reset the keepalive timer
@@ -438,6 +434,23 @@ func (p *Reader) keepAliveLoop(ctx context.Context, timer *time.Timer) {
 			timer.Stop()
 			return
 		}
+	}
+}
+
+func (p *Reader) logWireMsg(startTime int64, cs, msg []byte) {
+	if l.Logger.GetLevel() == log.TraceLevel {
+		duration := float64(time.Now().UnixNano()-startTime) / 1000000
+
+		var topicName string
+		if len(msg) > 0 {
+			topicName = topics.Topic(msg[0]).String()
+		}
+
+		l.WithField("process", "readloop").WithField("cs", hex.EncodeToString(cs)).
+			WithField("len", len(msg)).
+			WithField("ms", duration).
+			WithField("topic", topicName).
+			Trace("gossip message")
 	}
 }
 
