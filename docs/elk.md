@@ -43,7 +43,7 @@ make build && ./bin/utils metrics
 
 6. Send some txs to node 0
 ```
-make build && watch "./bin/utils transactions --txtype=transfer --amount=1 --locktime=1 --grpchost=unix://$GOPATH/src/github.com/dusk-network/dusk-blockchain/devnet/dusk_data/dusk0/dusk-grpc.sock"
+make build && watch "./bin/utils transactions --txtype=transfer --amount=1 --locktime=1 --grpcaddr=unix://$GOPATH/src/github.com/dusk-network/dusk-blockchain/devnet/dusk_data/dusk0/dusk-grpc.sock"
 ```
 ## Cleanup
 To Remove the docker with:

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dusk-network/dusk-blockchain/cmd/utils/grpcclient"
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/mock"
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/transactions"
@@ -31,6 +32,7 @@ func main() {
 		transactionsCMD,
 		mockCMD,
 		mockRUSKCMD,
+		setConfigCMD,
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -40,9 +42,9 @@ func main() {
 }
 
 var (
-	grpcHostFlag = cli.StringFlag{
-		Name:  "grpchost",
-		Usage: "gRPC HOST , eg: --grpchost=127.0.0.1:9001",
+	grpcAddressFlag = cli.StringFlag{
+		Name:  "grpcaddr",
+		Usage: "gRPC UNIX or TCP address , eg: --grpcaddr=127.0.0.1:9001 or --grpcaddr=unix:///var/dusk-grpc.sock",
 		Value: "127.0.0.1:9001",
 	}
 
@@ -137,6 +139,18 @@ var (
 		Value: "password",
 	}
 
+	configNameFlag = cli.StringFlag{
+		Name:  "configname",
+		Usage: "Config ID from dusk.toml, eg: logger.level",
+		Value: "",
+	}
+
+	configValueFlag = cli.StringFlag{
+		Name:  "configvalue",
+		Usage: "New Config value, eg: info",
+		Value: "",
+	}
+
 	metricsCMD = cli.Command{
 		Name:      "metrics",
 		Usage:     "expose a metrics endpoint",
@@ -159,7 +173,7 @@ var (
 		ArgsUsage: "",
 		Flags: []cli.Flag{
 			txtypeFlag,
-			grpcHostFlag,
+			grpcAddressFlag,
 			amountFlag,
 			lockTimeFlag,
 			addressFlag,
@@ -191,6 +205,22 @@ var (
 		},
 		Description: `Execute/Query transactions for a Dusk node`,
 	}
+
+	// setconfig command
+	// Example ./bin/utils setconfig --grpcaddr="unix:///tmp/dusk-node/dusk-grpc.sock" --configname="logger.level" --configvalue="info".
+	// 	     ./bin/utils setconfig --grpcaddr="127.0.0.1:10506" --configname="logger.level" --configvalue="trace".
+	setConfigCMD = cli.Command{
+		Name:      "setconfig",
+		Usage:     "set config in run-time",
+		Action:    setConfigAction,
+		ArgsUsage: "",
+		Flags: []cli.Flag{
+			grpcAddressFlag,
+			configNameFlag,
+			configValueFlag,
+		},
+		Description: `Modify a specific dusk config in run-time`,
+	}
 )
 
 // metricsAction will expose the metrics endpoint.
@@ -208,7 +238,7 @@ func metricsAction(ctx *cli.Context) error {
 
 // transactionsAction will expose the metrics endpoint.
 func transactionsAction(ctx *cli.Context) error {
-	grpcHost := ctx.String(grpcHostFlag.Name)
+	grpcHost := ctx.String(grpcAddressFlag.Name)
 	amount := ctx.Uint64(amountFlag.Name)
 	lockTime := ctx.Uint64(lockTimeFlag.Name)
 	txtype := ctx.String(txtypeFlag.Name)
@@ -254,4 +284,14 @@ func mockRuskAction(ctx *cli.Context) error {
 
 	err := mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
 	return err
+}
+
+func setConfigAction(ctx *cli.Context) error {
+	req := grpcclient.SetConfigReq{
+		Name:     ctx.String(configNameFlag.Name),
+		NewValue: ctx.String(configValueFlag.Name),
+	}
+
+	req.Address = ctx.String(grpcAddressFlag.Name)
+	return grpcclient.TrySetConfig(req)
 }

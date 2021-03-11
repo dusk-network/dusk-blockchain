@@ -279,7 +279,7 @@ start_dusk_func() {
   sleep 1
 
   # load wallet cmd
-  LOADWALLET_CMD="./bin/utils walletutils --grpchost unix://${DDIR}/dusk-grpc.sock --walletcmd loadwallet --walletpassword password"
+  LOADWALLET_CMD="./bin/utils walletutils --grpcaddr unix://${DDIR}/dusk-grpc.sock --walletcmd loadwallet --walletpassword password"
   ${LOADWALLET_CMD} >> "${currentDir}/devnet/dusk_data/logs/load_wallet$i.log" 2>&1 &
 
 }
@@ -299,7 +299,7 @@ send_bid_func(){
   echo "Sending bid to node $i ..."
 
   # send bid cmd
-  SENDBID_CMD="./bin/utils transactions --grpchost unix://${DDIR}/dusk-grpc.sock --txtype consensus --amount 10 --locktime 10"
+  SENDBID_CMD="./bin/utils transactions --grpcaddr unix://${DDIR}/dusk-grpc.sock --txtype consensus --amount 10 --locktime 10"
   ${SENDBID_CMD} >> "${currentDir}/devnet/dusk_data/logs/sendbid_bid$i.log" 2>&1 &
 }
 

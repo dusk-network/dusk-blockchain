@@ -166,6 +166,8 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
+	_ = newConfigService(grpcServer)
+
 	eventBus := eventbus.New()
 	rpcBus := rpcbus.New()
 
