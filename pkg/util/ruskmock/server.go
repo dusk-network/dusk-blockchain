@@ -129,7 +129,7 @@ func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
 // Serve will start listening on a hardcoded IP and port. The server will then accept
 // incoming gRPC requests.
 func (s *Server) Serve(network, url string) error {
-	log.Infoln("starting GRPC server")
+	log.WithField("addr", url).WithField("net", network).Infoln("starting GRPC server")
 
 	l, err := net.Listen(network, url)
 	if err != nil {
@@ -340,8 +340,8 @@ func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey
 
 // NewTransfer creates a transaction and returns it to the caller.
 func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionRequest) (*rusk.Transaction, error) {
-	log.Infoln("call received to NewTransfer")
-	defer log.Infoln("finished call to NewTransfer")
+	log.Infoln("call received to FindBid")
+	defer log.Infoln("finished call to FindBid")
 
 	tx, err := transactions.NewStandard(0, byte(2), int64(100))
 	if err != nil {
@@ -386,8 +386,8 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 
 // NewStake creates a staking transaction and returns it to the caller.
 func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.Transaction, error) {
-	log.Infoln("call received to NewTransfer")
-	defer log.Infoln("cinished call to NewTransfer")
+	log.Infoln("call received to NewStake")
+	defer log.Infoln("cinished call to NewStake")
 
 	var value ristretto.Scalar
 
@@ -409,8 +409,8 @@ func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest
 
 // NewBid creates a bidding transaction and returns it to the caller.
 func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*rusk.BidTransaction, error) {
-	log.Infoln("call received to NewTransfer")
-	defer log.Infoln("finished call to NewTransfer")
+	log.Infoln("call received to NewBid")
+	defer log.Infoln("finished call to NewBid")
 
 	var k ristretto.Scalar
 
@@ -434,8 +434,8 @@ func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*
 // FindBid will return all of the bids for a given stealth address.
 // TODO: implement.
 func (s *Server) FindBid(ctx context.Context, req *rusk.FindBidRequest) (*rusk.BidList, error) {
-	log.Infoln("call received to NewTransfer")
-	defer log.Infoln("finished call to NewTransfer")
+	log.Infoln("call received to FindBid")
+	defer log.Infoln("finished call to FindBid")
 
 	return nil, nil
 }
@@ -443,8 +443,8 @@ func (s *Server) FindBid(ctx context.Context, req *rusk.FindBidRequest) (*rusk.B
 // FindStake will return a stake for a given public key.
 // TODO: Implement.
 func (s *Server) FindStake(ctx context.Context, req *rusk.FindStakeRequest) (*rusk.FindStakeResponse, error) {
-	log.Infoln("call received to NewTransfer")
-	defer log.Infoln("finished call to NewTransfer")
+	log.Infoln("call received to FindStake")
+	defer log.Infoln("finished call to FindStake")
 
 	return nil, nil
 }
@@ -491,8 +491,8 @@ func fetchDecoys(numMixins int) []mlsag.PubKeys {
 
 // GetBalance locked and unlocked balance values per a ViewKey.
 func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*rusk.GetWalletBalanceResponse, error) {
-	log.Infoln("call received to NewTransfer")
-	defer log.Infoln("finished call to NewTransfer")
+	log.Infoln("call received to GetBalance")
+	defer log.Infoln("finished call to GetBalance")
 
 	resp := new(rusk.GetWalletBalanceResponse)
 
