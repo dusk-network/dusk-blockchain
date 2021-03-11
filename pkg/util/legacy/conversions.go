@@ -19,6 +19,8 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // NewBlockToOldBlock will convert a dusk-blockchain block into a dusk-wallet block.
@@ -193,6 +195,10 @@ func ContractCallsToTxs(calls []*rusk.Transaction) ([]transactions.Transaction, 
 		case 0:
 			tx, err := RuskTxToTx(call)
 			if err != nil {
+				log.WithError(err).
+					WithField("type", call.Type).
+					WithField("index", i).
+					Errorln("error RuskTxToTx")
 				return nil, err
 			}
 
@@ -201,6 +207,10 @@ func ContractCallsToTxs(calls []*rusk.Transaction) ([]transactions.Transaction, 
 		case 1:
 			tx, err := RuskDistributeToCoinbase(call)
 			if err != nil {
+				log.WithError(err).
+					WithField("type", call.Type).
+					WithField("index", i).
+					Errorln("error RuskTxToTx")
 				return nil, err
 			}
 
@@ -209,6 +219,10 @@ func ContractCallsToTxs(calls []*rusk.Transaction) ([]transactions.Transaction, 
 		case 3:
 			tx, err := RuskBidToBid(call)
 			if err != nil {
+				log.WithError(err).
+					WithField("type", call.Type).
+					WithField("index", i).
+					Errorln("error RuskTxToTx")
 				return nil, err
 			}
 
@@ -217,6 +231,10 @@ func ContractCallsToTxs(calls []*rusk.Transaction) ([]transactions.Transaction, 
 		case 4:
 			tx, err := RuskStakeToStake(call)
 			if err != nil {
+				log.WithError(err).
+					WithField("type", call.Type).
+					WithField("index", i).
+					Errorln("error RuskTxToTx")
 				return nil, err
 			}
 

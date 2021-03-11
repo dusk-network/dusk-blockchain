@@ -13,6 +13,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/grpcclient"
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/mock"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/transactions"
 	log "github.com/sirupsen/logrus"
@@ -130,6 +132,11 @@ var (
 		Value: "./devnet-wallets/wallet0.dat",
 	}
 
+	configFileFlag = cli.StringFlag{
+		Name:  "configfile",
+		Usage: "dusk.toml configuration file",
+	}
+
 	// XXX: This seems unused now. We should figure out if that's alright,
 	// or if we need to update some of the logic on wallet creation.
 	//nolint
@@ -202,6 +209,7 @@ var (
 			ruskAddressFlag,
 			walletStoreFlag,
 			walletFileFlag,
+			configFileFlag,
 		},
 		Description: `Execute/Query transactions for a Dusk node`,
 	}
@@ -281,8 +289,25 @@ func mockRuskAction(ctx *cli.Context) error {
 
 	walletStore := ctx.String(walletStoreFlag.Name)
 	walletFile := ctx.String(walletFileFlag.Name)
+	configFile := ctx.String(configFileFlag.Name)
 
-	err := mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
+	fmt.Println(configFile)
+
+	r, _ := config.LoadFromFile(configFile)
+	logging.SetToLevel(r.Logger.Level)
+
+	logFile, err := os.Create(r.Logger.Output + "_mock_rusk.log")
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_ = logFile.Close()
+	}()
+
+	log.SetOutput(logFile)
+
+	err = mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
 	return err
 }
 
