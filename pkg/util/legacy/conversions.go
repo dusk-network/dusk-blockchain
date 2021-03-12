@@ -292,7 +292,7 @@ func TxToRuskTx(tx transactions.Transaction) (*rusk.Transaction, error) {
 
 	return &rusk.Transaction{
 		Version: 0,
-		Type:    uint32(tx.Type()),
+		Type:    uint32(ntx.Type()),
 		Payload: plBuf.Bytes(),
 	}, nil
 }
