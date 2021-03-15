@@ -371,17 +371,24 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 	var value ristretto.Scalar
 	value.SetBigInt(big.NewInt(int64(req.Value)))
 
-	if err := tx.AddOutput(*addr, value); err != nil {
+	err = tx.AddOutput(*addr, value)
+	if err != nil {
 		log.WithError(err).Errorln("error adding output")
 		return nil, err
 	}
 
-	if err := s.w.Sign(tx); err != nil {
+	err = s.w.Sign(tx)
+	if err != nil {
 		log.WithError(err).Errorln("error signing tx")
 		return nil, err
 	}
 
-	return legacy.TxToRuskTx(tx)
+	ruskTx, err := legacy.TxToRuskTx(tx)
+	if ruskTx != nil {
+		ruskTx.Type = 0
+	}
+
+	return ruskTx, err
 }
 
 // NewStake creates a staking transaction and returns it to the caller.
