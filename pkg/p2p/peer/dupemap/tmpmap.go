@@ -9,9 +9,20 @@ package dupemap
 import (
 	"bytes"
 	"sync"
+	"time"
 
 	cuckoo "github.com/seiflotfy/cuckoofilter"
 )
+
+const (
+	// defaultTTL number of seconds of Time To Live setting for each cache instance.
+	defaultTTL = 5
+)
+
+type cache struct {
+	*cuckoo.Filter
+	TTL int64
+}
 
 type (
 	//nolint:golint
@@ -21,8 +32,11 @@ type (
 		height    uint64
 		tolerance uint64
 
+		// point in time current height will expire
+		expiryTimestamp int64
+
 		// map round to cuckoo filter
-		msgFilter map[uint64]*cuckoo.Filter
+		msgFilter map[uint64]*cache
 		capacity  uint32
 	}
 )
@@ -30,7 +44,7 @@ type (
 // NewTmpMap creates a TmpMap instance.
 func NewTmpMap(tolerance uint64, capacity uint32) *TmpMap {
 	return &TmpMap{
-		msgFilter: make(map[uint64]*cuckoo.Filter),
+		msgFilter: make(map[uint64]*cache),
 		capacity:  capacity,
 		height:    0,
 		tolerance: tolerance,
@@ -48,7 +62,10 @@ func (t *TmpMap) UpdateHeight(round uint64) {
 
 	_, found := t.msgFilter[round]
 	if !found {
-		t.msgFilter[round] = cuckoo.NewFilter(uint(t.capacity))
+		t.msgFilter[round] = &cache{
+			Filter: cuckoo.NewFilter(uint(t.capacity)),
+			TTL:    time.Now().Unix() + defaultTTL,
+		}
 		t.height = round
 		t.clean()
 	}
@@ -157,6 +174,14 @@ func (t *TmpMap) Size() int {
 	return fullSize
 }
 
+// IsExpired returns true if TmpMap has expired.
+func (t *TmpMap) IsExpired() bool {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return time.Now().Unix() >= t.expiryTimestamp
+}
+
 // clean the TmpMap up to the upto argument.
 func (t *TmpMap) clean() {
 	if t.height <= t.tolerance {
@@ -172,11 +197,27 @@ func (t *TmpMap) clean() {
 	}
 }
 
+// CleanExpired the TmpMap up to the upto argument.
+func (t *TmpMap) CleanExpired() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	for height, f := range t.msgFilter {
+		if time.Now().Unix() >= f.TTL {
+			t.msgFilter[height].Reset()
+			delete(t.msgFilter, height)
+		}
+	}
+}
+
 // add an entry to the set at the current height. Returns false if the element has not been added (due to being a duplicate).
 func (t *TmpMap) add(b *bytes.Buffer, round uint64) bool {
 	_, found := t.msgFilter[round]
 	if !found {
-		t.msgFilter[round] = cuckoo.NewFilter(uint(t.capacity))
+		t.msgFilter[round] = &cache{
+			Filter: cuckoo.NewFilter(uint(t.capacity)),
+			TTL:    time.Now().Unix() + defaultTTL,
+		}
 	}
 
 	return t.msgFilter[round].Insert(b.Bytes())

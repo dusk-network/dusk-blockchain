@@ -74,6 +74,11 @@ func (d *DataRequestor) RequestMissingItems(srcPeerID string, m message.Message)
 
 		switch obj.Type {
 		case message.InvTypeBlock:
+			log.
+				WithField("hash", hex.EncodeToString(obj.Hash)).
+				WithField("src_addr", srcPeerID).
+				Trace("dupemap registered block hash")
+
 			// Check if local blockchain state does include this block hash ...
 			err := d.db.View(func(t database.Transaction) error {
 				_, err := t.FetchBlockExists(obj.Hash)

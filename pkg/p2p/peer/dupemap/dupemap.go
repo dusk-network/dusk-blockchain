@@ -86,6 +86,9 @@ func (d *DupeMap) SetTolerance(roundNr uint64) {
 // this payload. Similarly to Bloom Filters, False positive matches are
 // possible, but false negatives are not.
 func (d *DupeMap) CanFwd(payload *bytes.Buffer) bool {
+	// Reset any bloom filters that have expired
+	d.tmpMap.CleanExpired()
+
 	found := d.tmpMap.HasAnywhere(payload)
 	if found {
 		return false
