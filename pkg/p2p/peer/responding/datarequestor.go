@@ -19,7 +19,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
@@ -44,11 +43,11 @@ type DataRequestor struct {
 }
 
 // NewDataRequestor returns an initialized DataRequestor.
-func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus, broker eventbus.Broker) *DataRequestor {
+func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus) *DataRequestor {
 	return &DataRequestor{
 		db:      db,
 		rpcBus:  rpcBus,
-		dupemap: dupemap.Launch(broker),
+		dupemap: dupemap.NewDupeMap(5, 0),
 	}
 }
 
@@ -63,35 +62,30 @@ func (d *DataRequestor) RequestMissingItems(srcPeerID string, m message.Message)
 	getData := &message.Inv{}
 
 	for _, obj := range msg.InvList {
-		if !d.dupemap.CanFwd(bytes.NewBuffer(obj.Hash)) {
-			log.
-				WithField("hash", hex.EncodeToString(obj.Hash)).
-				WithField("type", obj.Type).
-				WithField("src_addr", srcPeerID).
-				Trace("dupemap rejected item")
-			continue
-		}
-
 		switch obj.Type {
 		case message.InvTypeBlock:
-			log.
-				WithField("hash", hex.EncodeToString(obj.Hash)).
-				WithField("src_addr", srcPeerID).
-				Trace("dupemap registered block hash")
-
 			// Check if local blockchain state does include this block hash ...
+			// if local state knows this block hash then we don't need to ask the initiator peer for the full block.
 			err := d.db.View(func(t database.Transaction) error {
 				_, err := t.FetchBlockExists(obj.Hash)
-				if err == database.ErrBlockNotFound {
-					// .. if not, let's request the full block data from the InvMsg initiator node
-					getData.AddItem(message.InvTypeBlock, obj.Hash)
-					return nil
-				}
-
 				return err
 			})
-			if err != nil {
-				return nil, err
+
+			if err == database.ErrBlockNotFound {
+				if d.dupemap.HasAnywhere(bytes.NewBuffer(obj.Hash)) {
+					// .. if not, let's request the full block data from the InvMsg initiator node
+					getData.AddItem(message.InvTypeBlock, obj.Hash)
+
+					log.
+						WithField("hash", hex.EncodeToString(obj.Hash)).
+						WithField("src_addr", srcPeerID).
+						Trace("dupemap registers block hash")
+				} else {
+					log.
+						WithField("hash", hex.EncodeToString(obj.Hash)).
+						WithField("src_addr", srcPeerID).
+						Trace("dupemap rejects block hash")
+				}
 			}
 		case message.InvTypeMempoolTx:
 			txs, _ := getMempoolTxs(d.rpcBus, obj.Hash)
@@ -104,7 +98,20 @@ func (d *DataRequestor) RequestMissingItems(srcPeerID string, m message.Message)
 			// Tx has been already accepted.
 			// TODO: To check that look for this Tx in the last 10 blocks (db.FetchTxExists())
 			if len(txs) == 0 {
-				getData.AddItem(message.InvTypeMempoolTx, obj.Hash)
+				if d.dupemap.HasAnywhere(bytes.NewBuffer(obj.Hash)) {
+					// .. if not, let's request the full tx data from the InvMsg initiator node
+					getData.AddItem(message.InvTypeMempoolTx, obj.Hash)
+
+					log.
+						WithField("hash", hex.EncodeToString(obj.Hash)).
+						WithField("src_addr", srcPeerID).
+						Trace("dupemap registers tx hash")
+				} else {
+					log.
+						WithField("hash", hex.EncodeToString(obj.Hash)).
+						WithField("src_addr", srcPeerID).
+						Trace("dupemap rejects tx hash")
+				}
 			}
 		}
 	}
