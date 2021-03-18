@@ -14,11 +14,6 @@ import (
 	cuckoo "github.com/seiflotfy/cuckoofilter"
 )
 
-const (
-	// defaultTTL number of seconds of Time To Live setting for each cache instance.
-	defaultTTL = 5
-)
-
 type cache struct {
 	*cuckoo.Filter
 	TTL int64
@@ -32,6 +27,9 @@ type (
 		height    uint64
 		tolerance uint64
 
+		// expire number of seconds for a cache before being reset
+		expire int64
+
 		// point in time current height will expire
 		expiryTimestamp int64
 
@@ -42,12 +40,13 @@ type (
 )
 
 // NewTmpMap creates a TmpMap instance.
-func NewTmpMap(tolerance uint64, capacity uint32) *TmpMap {
+func NewTmpMap(tolerance uint64, capacity uint32, expire int64) *TmpMap {
 	return &TmpMap{
 		msgFilter: make(map[uint64]*cache),
 		capacity:  capacity,
 		height:    0,
 		tolerance: tolerance,
+		expire:    expire,
 	}
 }
 
@@ -64,7 +63,7 @@ func (t *TmpMap) UpdateHeight(round uint64) {
 	if !found {
 		t.msgFilter[round] = &cache{
 			Filter: cuckoo.NewFilter(uint(t.capacity)),
-			TTL:    time.Now().Unix() + defaultTTL,
+			TTL:    time.Now().Unix() + t.expire,
 		}
 		t.height = round
 		t.clean()
@@ -197,7 +196,7 @@ func (t *TmpMap) clean() {
 	}
 }
 
-// CleanExpired the TmpMap up to the upto argument.
+// CleanExpired resets all cache instances that has expired.
 func (t *TmpMap) CleanExpired() {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -216,7 +215,7 @@ func (t *TmpMap) add(b *bytes.Buffer, round uint64) bool {
 	if !found {
 		t.msgFilter[round] = &cache{
 			Filter: cuckoo.NewFilter(uint(t.capacity)),
-			TTL:    time.Now().Unix() + defaultTTL,
+			TTL:    time.Now().Unix() + t.expire,
 		}
 	}
 

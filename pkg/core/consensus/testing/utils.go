@@ -71,7 +71,7 @@ type gossipRouter struct {
 
 func (g *gossipRouter) route(m message.Message) {
 	b := m.Payload().(message.SafeBuffer).Buffer
-	if g.d.CanFwd(&b) {
+	if g.d.HasAnywhere(&b) {
 		// The incoming message will be a message.SafeBuffer, as it's coming from
 		// the consensus.Emitter.
 		m, err := message.Unmarshal(&b)
@@ -84,7 +84,7 @@ func (g *gossipRouter) route(m message.Message) {
 }
 
 func rerouteGossip(eb *eventbus.EventBus) {
-	router := &gossipRouter{eb, dupemap.Launch(eb)}
+	router := &gossipRouter{eb, dupemap.NewDupeMap(5, 100)}
 	gossipListener := eventbus.NewSafeCallbackListener(router.route)
 	eb.Subscribe(topics.Gossip, gossipListener)
 }

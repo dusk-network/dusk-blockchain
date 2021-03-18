@@ -49,7 +49,7 @@ var dupeFilterTests = []struct {
 }
 
 func TestDupeMap(t *testing.T) {
-	dupeMap := dupemap.NewDupeMap(1, 100)
+	dupeMap := dupemap.NewDupeMap(5, 100)
 
 	test := bytes.NewBufferString("This is a test")
 
@@ -57,31 +57,31 @@ func TestDupeMap(t *testing.T) {
 		dupeMap.UpdateHeight(tt.height)
 		dupeMap.SetTolerance(tt.tolerance)
 
-		res := dupeMap.CanFwd(test)
+		res := dupeMap.HasAnywhere(test)
 		if !assert.Equal(t, tt.canFwd, res) {
-			assert.FailNowf(t, "failure", "DupeMap.CanFwd: expected %t, got %t with height %d and tolerance %d", res, tt.canFwd, tt.height, tt.tolerance)
+			assert.FailNowf(t, "failure", "DupeMap.HasAnywhere: expected %t, got %t with height %d and tolerance %d", res, tt.canFwd, tt.height, tt.tolerance)
 		}
 	}
 
 	t.Log("Size: ", dupeMap.Size())
 }
 
-func TestCanFwd(t *testing.T) {
-	dupeMap := dupemap.NewDupeMap(1, 100)
+func TestHasAnywhere(t *testing.T) {
+	dupeMap := dupemap.NewDupeMap(5, 100)
 	dupeMap.SetTolerance(10)
 
 	for i, tt := range dupeFilterTests {
 		test := make([]byte, 2)
 		binary.BigEndian.PutUint16(test, tt.data)
 
-		res := dupeMap.CanFwd(bytes.NewBuffer(test))
+		res := dupeMap.HasAnywhere(bytes.NewBuffer(test))
 		if !assert.Equal(t, tt.canFwd, res) {
-			assert.FailNowf(t, "failure", "DupeMap.CanFwd: expected %t, got %t, index %d", res, tt.canFwd, i)
+			assert.FailNowf(t, "failure", "DupeMap.HasAnywhere: expected %t, got %t, index %d", res, tt.canFwd, i)
 		}
 	}
 }
 
-func TestCanFwdBigData(t *testing.T) {
+func TestHasAnywhereBigData(t *testing.T) {
 	type testu struct {
 		payload *bytes.Buffer
 		canFwd  bool
@@ -99,7 +99,7 @@ func TestCanFwdBigData(t *testing.T) {
 
 	// Initialize a dupemap with 1M capacity per round-filter
 	itemsCount := uint32(1000 * 1000)
-	dupeMap := dupemap.NewDupeMap(1, itemsCount)
+	dupeMap := dupemap.NewDupeMap(10, itemsCount)
 	dupeMap.SetTolerance(10)
 
 	falsePositiveCount := uint(0)
@@ -107,7 +107,7 @@ func TestCanFwdBigData(t *testing.T) {
 	for _, d := range testData {
 		// underlying filter structure is a probabilistic data structure
 		// That's said, Few false positive are possible.
-		if !dupeMap.CanFwd(d.payload) {
+		if !dupeMap.HasAnywhere(d.payload) {
 			falsePositiveCount++
 		}
 	}
@@ -118,11 +118,11 @@ func TestCanFwdBigData(t *testing.T) {
 		assert.Failf(t, "failure", "false positive are too many %f", falsePositiveRate)
 	}
 
-	// Now CanFwd should always returns false
+	// Now HasAnywhere should always returns false
 	for _, d := range testData {
 		// Ensure that the underlying filter structure supports "definitely
 		// no" a.k.a no false negative
-		if dupeMap.CanFwd(d.payload) != false {
+		if dupeMap.HasAnywhere(d.payload) != false {
 			t.FailNow()
 		}
 	}
@@ -131,7 +131,7 @@ func TestCanFwdBigData(t *testing.T) {
 	assert.LessOrEqual(t, dupeMap.Size(), 1024*1024)
 }
 
-func BenchmarkCanFwd(b *testing.B) {
+func BenchmarkHasAnywhere(b *testing.B) {
 	b.StopTimer()
 
 	type testu struct {
@@ -151,18 +151,18 @@ func BenchmarkCanFwd(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 
-		dupeMap := dupemap.NewDupeMap(1, 1000000)
+		dupeMap := dupemap.NewDupeMap(5, 1000000)
 		dupeMap.SetTolerance(10)
 
 		b.StartTimer()
 
 		// CanFwd always returns true
 		for _, t := range testData {
-			_ = dupeMap.CanFwd(t.payload)
+			_ = dupeMap.HasAnywhere(t.payload)
 		}
 
 		for _, t := range testData {
-			_ = dupeMap.CanFwd(t.payload)
+			_ = dupeMap.HasAnywhere(t.payload)
 		}
 	}
 }

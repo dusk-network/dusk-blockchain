@@ -31,7 +31,7 @@ type MessageProcessor struct {
 // NewMessageProcessor returns an initialized MessageProcessor.
 func NewMessageProcessor(bus eventbus.Broker) *MessageProcessor {
 	return &MessageProcessor{
-		dupeMap:    dupemap.Launch(bus),
+		dupeMap:    dupemap.NewDupeMap(5, 0),
 		processors: make(map[topics.Topic]ProcessorFunc),
 	}
 }
@@ -74,7 +74,7 @@ func (m *MessageProcessor) CanRoute(topic topics.Topic) bool {
 func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respChan chan<- bytes.Buffer) error {
 	category := msg.Category()
 	if m.CanRoute(category) {
-		if !m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
+		if !m.dupeMap.HasAnywhere(bytes.NewBuffer(msg.Id())) {
 			return nil
 		}
 	}

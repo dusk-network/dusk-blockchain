@@ -16,7 +16,7 @@ import (
 
 func TestHas(t *testing.T) {
 	testPayload := bytes.NewBufferString("This is a test")
-	tmpMap := dupemap.NewTmpMap(3, 1000)
+	tmpMap := dupemap.NewTmpMap(3, 1000, 5)
 
 	assert.False(t, tmpMap.Has(testPayload))
 
@@ -33,7 +33,7 @@ func TestHas(t *testing.T) {
 
 func TestAdd(t *testing.T) {
 	testPayload := bytes.NewBufferString("This is a test")
-	tmpMap := dupemap.NewTmpMap(3, 1000)
+	tmpMap := dupemap.NewTmpMap(3, 1000, 5)
 
 	assert.True(t, tmpMap.Add(testPayload))
 
@@ -43,7 +43,7 @@ func TestAdd(t *testing.T) {
 
 func TestClean(t *testing.T) {
 	testPayload := bytes.NewBufferString("This is a test")
-	tmpMap := dupemap.NewTmpMap(3, 1000)
+	tmpMap := dupemap.NewTmpMap(3, 1000, 5)
 
 	assert.True(t, tmpMap.Add(testPayload))
 

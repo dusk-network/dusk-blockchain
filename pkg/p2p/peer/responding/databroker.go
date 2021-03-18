@@ -11,14 +11,12 @@ import (
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/sirupsen/logrus"
 )
 
 // DataBroker is a processing unit responsible for handling GetData messages. It
@@ -41,11 +39,6 @@ func NewDataBroker(db database.DB, rpcBus *rpcbus.RPCBus) *DataBroker {
 func (d *DataBroker) MarshalObjects(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	msg := m.Payload().(message.Inv)
 	bufs := make([]bytes.Buffer, 0, len(msg.InvList))
-
-	if cfg.Get().Network.Port == "7102" {
-		logrus.Errorf("I decided not to respond to topics.GetData for node %s", srcPeerID)
-		return []bytes.Buffer{}, nil
-	}
 
 	for _, obj := range msg.InvList {
 		switch obj.Type {
