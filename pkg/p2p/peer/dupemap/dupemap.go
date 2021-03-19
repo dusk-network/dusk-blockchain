@@ -14,14 +14,13 @@ import (
 )
 
 const (
-	defaultCapacity = uint32(200000)
+	defaultCapacity = uint32(100000)
 	defaultExpire   = int64(5)
 )
 
 // TODO: DupeMap should deal with value bytes.Buffer rather than pointers as it is not supposed to mutate the struct.
 //nolint:golint
 type DupeMap struct {
-	round  uint64
 	tmpMap *TmpMap
 }
 
@@ -42,7 +41,6 @@ func NewDupeMap(expire int64, capacity uint32) *DupeMap {
 	tmpMap := NewTmpMap(capacity, expire)
 
 	return &DupeMap{
-		0,
 		tmpMap,
 	}
 }
@@ -55,7 +53,7 @@ func (d *DupeMap) HasAnywhere(payload *bytes.Buffer) bool {
 	// Reset any bloom filters that have expired
 	d.tmpMap.CleanExpired()
 
-	found := d.tmpMap.HasAnywhere(payload)
+	found := d.tmpMap.Has(payload)
 	if found {
 		return false
 	}

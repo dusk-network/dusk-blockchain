@@ -19,23 +19,14 @@ func TestHas(t *testing.T) {
 	tmpMap := dupemap.NewTmpMap(1000, 5)
 
 	assert.False(t, tmpMap.Has(testPayload))
-
-	tmpMap.AddAt(testPayload, 0)
+	tmpMap.Add(testPayload)
 
 	assert.True(t, tmpMap.Has(testPayload))
-
-	assert.False(t, tmpMap.Has(testPayload))
-	assert.False(t, tmpMap.HasAt(testPayload, 2))
-	assert.True(t, tmpMap.HasAnywhere(testPayload))
-	assert.True(t, tmpMap.HasAt(testPayload, uint64(0)))
 }
 
 func TestAdd(t *testing.T) {
 	testPayload := bytes.NewBufferString("This is a test")
 	tmpMap := dupemap.NewTmpMap(1000, 5)
 
-	assert.True(t, tmpMap.Add(testPayload))
-
-	tmpMap.UpdateHeight(4)
 	assert.True(t, tmpMap.Add(testPayload))
 }
