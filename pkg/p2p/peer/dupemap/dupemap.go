@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	defaultCapacity = uint32(100000)
+	defaultCapacity = uint32(300000)
 	defaultExpire   = int64(5)
 )
 
@@ -31,7 +31,12 @@ func NewDupeMapDefault() *DupeMap {
 		capacity = defaultCapacity
 	}
 
-	return NewDupeMap(defaultExpire, capacity)
+	expire := int64(cfg.Get().Network.MaxDupeMapExpire)
+	if expire == 0 {
+		expire = defaultExpire
+	}
+
+	return NewDupeMap(expire, capacity)
 }
 
 // NewDupeMap creates new dupemap instance.

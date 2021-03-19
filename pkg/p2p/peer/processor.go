@@ -31,7 +31,7 @@ type MessageProcessor struct {
 // NewMessageProcessor returns an initialized MessageProcessor.
 func NewMessageProcessor(bus eventbus.Broker) *MessageProcessor {
 	return &MessageProcessor{
-		dupeMap:    dupemap.NewDupeMap(5, 0),
+		dupeMap:    dupemap.NewDupeMapDefault(),
 		processors: make(map[topics.Topic]ProcessorFunc),
 	}
 }

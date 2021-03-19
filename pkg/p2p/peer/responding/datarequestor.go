@@ -47,7 +47,7 @@ func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus) *DataRequestor {
 	return &DataRequestor{
 		db:      db,
 		rpcBus:  rpcBus,
-		dupemap: dupemap.NewDupeMap(5, 0),
+		dupemap: dupemap.NewDupeMapDefault(),
 	}
 }
 

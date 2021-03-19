@@ -51,7 +51,8 @@ type networkConfiguration struct {
 	Monitor monitorConfiguration
 	Port    string
 
-	MaxDupeMapItems uint32
+	MaxDupeMapItems  uint32
+	MaxDupeMapExpire uint32
 }
 
 type kadcastConfiguration struct {
