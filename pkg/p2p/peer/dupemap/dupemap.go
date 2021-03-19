@@ -14,17 +14,15 @@ import (
 )
 
 const (
-	defaultTolerance = uint64(3)
-	defaultCapacity  = uint32(100000)
-	defaultExpire    = int64(5)
+	defaultCapacity = uint32(200000)
+	defaultExpire   = int64(5)
 )
 
 // TODO: DupeMap should deal with value bytes.Buffer rather than pointers as it is not supposed to mutate the struct.
 //nolint:golint
 type DupeMap struct {
-	round     uint64
-	tmpMap    *TmpMap
-	tolerance uint64
+	round  uint64
+	tmpMap *TmpMap
 }
 
 // NewDupeMapDefault returns a dupemap instance with default config.
@@ -41,31 +39,18 @@ func NewDupeMapDefault() *DupeMap {
 func NewDupeMap(expire int64, capacity uint32) *DupeMap {
 	log.WithField("cap", capacity).Info("create dupemap instance")
 
-	round := uint64(1)
-	tmpMap := NewTmpMap(defaultTolerance, capacity, expire)
+	tmpMap := NewTmpMap(capacity, expire)
 
 	return &DupeMap{
-		round,
+		0,
 		tmpMap,
-		defaultTolerance,
 	}
-}
-
-// UpdateHeight for a round.
-func (d *DupeMap) UpdateHeight(round uint64) {
-	d.tmpMap.UpdateHeight(round)
-}
-
-// SetTolerance for a round.
-func (d *DupeMap) SetTolerance(roundNr uint64) {
-	threshold := d.tmpMap.Height() - roundNr
-	d.tmpMap.DeleteBefore(threshold)
-	d.tmpMap.SetTolerance(roundNr)
 }
 
 // HasAnywhere tests if any of Cuckoo Filters (a filter per round) knows already
 // this payload. Similarly to Bloom Filters, False positive matches are
 // possible, but false negatives are not.
+// In addition, it also resets all expired items.
 func (d *DupeMap) HasAnywhere(payload *bytes.Buffer) bool {
 	// Reset any bloom filters that have expired
 	d.tmpMap.CleanExpired()

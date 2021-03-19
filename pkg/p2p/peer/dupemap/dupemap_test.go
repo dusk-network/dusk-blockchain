@@ -54,8 +54,6 @@ func TestDupeMap(t *testing.T) {
 	test := bytes.NewBufferString("This is a test")
 
 	for _, tt := range dupeTests {
-		dupeMap.UpdateHeight(tt.height)
-		dupeMap.SetTolerance(tt.tolerance)
 
 		res := dupeMap.HasAnywhere(test)
 		if !assert.Equal(t, tt.canFwd, res) {
@@ -68,7 +66,6 @@ func TestDupeMap(t *testing.T) {
 
 func TestHasAnywhere(t *testing.T) {
 	dupeMap := dupemap.NewDupeMap(5, 100)
-	dupeMap.SetTolerance(10)
 
 	for i, tt := range dupeFilterTests {
 		test := make([]byte, 2)
@@ -100,7 +97,6 @@ func TestHasAnywhereBigData(t *testing.T) {
 	// Initialize a dupemap with 1M capacity per round-filter
 	itemsCount := uint32(1000 * 1000)
 	dupeMap := dupemap.NewDupeMap(10, itemsCount)
-	dupeMap.SetTolerance(10)
 
 	falsePositiveCount := uint(0)
 
@@ -152,7 +148,6 @@ func BenchmarkHasAnywhere(b *testing.B) {
 		b.StopTimer()
 
 		dupeMap := dupemap.NewDupeMap(5, 1000000)
-		dupeMap.SetTolerance(10)
 
 		b.StartTimer()
 

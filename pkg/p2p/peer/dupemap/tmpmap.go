@@ -24,8 +24,7 @@ type (
 	TmpMap struct {
 		lock sync.RWMutex
 		// current height
-		height    uint64
-		tolerance uint64
+		height uint64
 
 		// expire number of seconds for a cache before being reset
 		expire int64
@@ -40,33 +39,12 @@ type (
 )
 
 // NewTmpMap creates a TmpMap instance.
-func NewTmpMap(tolerance uint64, capacity uint32, expire int64) *TmpMap {
+func NewTmpMap(capacity uint32, expire int64) *TmpMap {
 	return &TmpMap{
 		msgFilter: make(map[uint64]*cache),
 		capacity:  capacity,
 		height:    0,
-		tolerance: tolerance,
 		expire:    expire,
-	}
-}
-
-// UpdateHeight for a round.
-func (t *TmpMap) UpdateHeight(round uint64) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	if t.height > round {
-		return
-	}
-
-	_, found := t.msgFilter[round]
-	if !found {
-		t.msgFilter[round] = &cache{
-			Filter: cuckoo.NewFilter(uint(t.capacity)),
-			TTL:    time.Now().Unix() + t.expire,
-		}
-		t.height = round
-		t.clean()
 	}
 }
 
@@ -103,37 +81,6 @@ func (t *TmpMap) HasAt(b *bytes.Buffer, heigth uint64) bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	return t.has(b, heigth)
-}
-
-// DeleteBefore clears a Map of items stored before the given height.
-func (t *TmpMap) DeleteBefore(height uint64) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.deleteBefore(height)
-}
-
-func (t *TmpMap) deleteBefore(height uint64) {
-	currentMin := t.height - t.tolerance
-	if currentMin >= height {
-		return
-	}
-
-	for level := range t.msgFilter {
-		if level < height {
-			t.msgFilter[level].Reset()
-			delete(t.msgFilter, level)
-		}
-	}
-}
-
-// SetTolerance adjusts how long hashes stay in the TmpMap until they are deleted.
-func (t *TmpMap) SetTolerance(tolerance uint64) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	threshold := t.height - tolerance
-
-	t.deleteBefore(threshold)
 }
 
 func (t *TmpMap) has(b *bytes.Buffer, heigth uint64) bool {
@@ -179,21 +126,6 @@ func (t *TmpMap) IsExpired() bool {
 	defer t.lock.RUnlock()
 
 	return time.Now().Unix() >= t.expiryTimestamp
-}
-
-// clean the TmpMap up to the upto argument.
-func (t *TmpMap) clean() {
-	if t.height <= t.tolerance {
-		// don't clean
-		return
-	}
-
-	for r := range t.msgFilter {
-		if r <= t.height-t.tolerance {
-			t.msgFilter[r].Reset()
-			delete(t.msgFilter, r)
-		}
-	}
 }
 
 // CleanExpired resets all cache instances that has expired.
