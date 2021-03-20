@@ -14,19 +14,17 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 func TestRequestData(t *testing.T) {
-	bus := eventbus.New()
 	_, db := lite.CreateDBConnection()
 
 	defer func() {
 		_ = db.Close()
 	}()
 
-	dataRequestor := responding.NewDataRequestor(db, nil, bus)
+	dataRequestor := responding.NewDataRequestor(db, nil)
 
 	// Send topics.Inv
 	hash, msg := createInv()

@@ -56,9 +56,12 @@ streamErrors=true
 # port for the node to bind on
 port=7000
 
-# Maximum number of items that can be registered per round in any DupeMap
-# Up to 1MB per DupeMap instance could be allocated if maxDupeMapItems=300000
+# Maximum number of items that can be registered by a single DupeMap
+# Up to ~0.3MB per DupeMap instance could be allocated if maxDupeMapItems=300000
 maxDupeMapItems=300000
+# Number of seconds before dupemap expires and gets reset. 
+# Ideally should be less than 15s - average consensus time
+maxDupeMapExpire=5
 
 [network.seeder]
 # array of seeder servers

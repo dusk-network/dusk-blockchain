@@ -359,7 +359,7 @@ func (s *Server) Close() {
 func registerPeerServices(processor *peer.MessageProcessor, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) {
 	processor.Register(topics.Ping, responding.ProcessPing)
 	dataBroker := responding.NewDataBroker(db, rpcBus)
-	dataRequestor := responding.NewDataRequestor(db, rpcBus, eventBus)
+	dataRequestor := responding.NewDataRequestor(db, rpcBus)
 	bhb := responding.NewBlockHashBroker(db)
 	cb := responding.NewCandidateBroker(db)
 	cp := consensus.NewPublisher(eventBus)

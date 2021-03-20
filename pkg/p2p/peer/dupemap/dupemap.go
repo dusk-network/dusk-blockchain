@@ -10,83 +10,55 @@ import (
 	"bytes"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	defaultTolerance = uint64(3)
-	defaultCapacity  = uint32(100000)
+	defaultCapacity = uint32(300000)
+	defaultExpire   = int64(5)
 )
 
 // TODO: DupeMap should deal with value bytes.Buffer rather than pointers as it is not supposed to mutate the struct.
 //nolint:golint
 type DupeMap struct {
-	round     uint64
-	tmpMap    *TmpMap
-	tolerance uint64
+	tmpMap *TmpMap
 }
 
-// Launch returns a dupemap which is self-cleaning, by launching a goroutine
-// which listens for accepted blocks, and updates the height upon receipt.
-func Launch(eventBus eventbus.Broker) *DupeMap {
-	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
-
+// NewDupeMapDefault returns a dupemap instance with default config.
+func NewDupeMapDefault() *DupeMap {
 	capacity := cfg.Get().Network.MaxDupeMapItems
 	if capacity == 0 {
 		capacity = defaultCapacity
 	}
 
-	log.WithField("cap", capacity).Info("launch dupemap instance")
+	expire := int64(cfg.Get().Network.MaxDupeMapExpire)
+	if expire == 0 {
+		expire = defaultExpire
+	}
 
-	// NB defaultTolerance is number of rounds before data expires. That's
-	// said, the overall number of items per DupeMap instance is
-	// defaultTolerance*maxItemsPerRound
-	//
-	// E.g 3 * 300,000 ~ 1MB max memory allocated by a DupeMap instance
-
-	dupeBlacklist := NewDupeMap(1, capacity)
-
-	go func() {
-		for {
-			blk := <-acceptedBlockChan
-			// NOTE: do we need locking?
-			dupeBlacklist.UpdateHeight(blk.Header.Height)
-		}
-	}()
-
-	return dupeBlacklist
+	return NewDupeMap(expire, capacity)
 }
 
-// NewDupeMap returns a DupeMap.
-func NewDupeMap(round uint64, capacity uint32) *DupeMap {
-	tmpMap := NewTmpMap(defaultTolerance, capacity)
+// NewDupeMap creates new dupemap instance.
+func NewDupeMap(expire int64, capacity uint32) *DupeMap {
+	log.WithField("cap", capacity).Info("create dupemap instance")
+
+	tmpMap := NewTmpMap(capacity, expire)
 
 	return &DupeMap{
-		round,
 		tmpMap,
-		defaultTolerance,
 	}
 }
 
-// UpdateHeight for a round.
-func (d *DupeMap) UpdateHeight(round uint64) {
-	d.tmpMap.UpdateHeight(round)
-}
-
-// SetTolerance for a round.
-func (d *DupeMap) SetTolerance(roundNr uint64) {
-	threshold := d.tmpMap.Height() - roundNr
-	d.tmpMap.DeleteBefore(threshold)
-	d.tmpMap.SetTolerance(roundNr)
-}
-
-// CanFwd tests if any of Cuckoo Filters (a filter per round) knows already
+// HasAnywhere tests if any of Cuckoo Filters (a filter per round) knows already
 // this payload. Similarly to Bloom Filters, False positive matches are
 // possible, but false negatives are not.
-func (d *DupeMap) CanFwd(payload *bytes.Buffer) bool {
-	found := d.tmpMap.HasAnywhere(payload)
+// In addition, it also resets all expired items.
+func (d *DupeMap) HasAnywhere(payload *bytes.Buffer) bool {
+	// Reset any bloom filters that have expired
+	d.tmpMap.CleanExpired()
+
+	found := d.tmpMap.Has(payload)
 	if found {
 		return false
 	}

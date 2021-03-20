@@ -9,124 +9,55 @@ package dupemap
 import (
 	"bytes"
 	"sync"
+	"time"
 
 	cuckoo "github.com/seiflotfy/cuckoofilter"
 )
+
+type cache struct {
+	*cuckoo.Filter
+	TTL int64
+}
 
 type (
 	//nolint:golint
 	TmpMap struct {
 		lock sync.RWMutex
-		// current height
-		height    uint64
-		tolerance uint64
 
-		// map round to cuckoo filter
-		msgFilter map[uint64]*cuckoo.Filter
+		// expire number of seconds for a cache before being reset
+		expire int64
+
+		// point in time current height will expire
+		expiryTimestamp int64
+
+		// cuckoo filter
+		msgFilter *cache
 		capacity  uint32
 	}
 )
 
 // NewTmpMap creates a TmpMap instance.
-func NewTmpMap(tolerance uint64, capacity uint32) *TmpMap {
+func NewTmpMap(capacity uint32, expire int64) *TmpMap {
 	return &TmpMap{
-		msgFilter: make(map[uint64]*cuckoo.Filter),
+		msgFilter: nil,
 		capacity:  capacity,
-		height:    0,
-		tolerance: tolerance,
+		expire:    expire,
 	}
-}
-
-// UpdateHeight for a round.
-func (t *TmpMap) UpdateHeight(round uint64) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	if t.height > round {
-		return
-	}
-
-	_, found := t.msgFilter[round]
-	if !found {
-		t.msgFilter[round] = cuckoo.NewFilter(uint(t.capacity))
-		t.height = round
-		t.clean()
-	}
-}
-
-//nolint:golint
-func (t *TmpMap) Height() uint64 {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	return t.height
 }
 
 //nolint:golint
 func (t *TmpMap) Has(b *bytes.Buffer) bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	return t.has(b, t.height)
+	return t.has(b)
 }
 
-// HasAnywhere checks if the TmpMap contains a hash of the passed buffer at any height.
-func (t *TmpMap) HasAnywhere(b *bytes.Buffer) bool {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
-	for k := range t.msgFilter {
-		if t.has(b, k) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// HasAt checks if the TmpMap contains a hash of the passed buffer at a specified height.
-func (t *TmpMap) HasAt(b *bytes.Buffer, heigth uint64) bool {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	return t.has(b, heigth)
-}
-
-// DeleteBefore clears a Map of items stored before the given height.
-func (t *TmpMap) DeleteBefore(height uint64) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.deleteBefore(height)
-}
-
-func (t *TmpMap) deleteBefore(height uint64) {
-	currentMin := t.height - t.tolerance
-	if currentMin >= height {
-		return
-	}
-
-	for level := range t.msgFilter {
-		if level < height {
-			t.msgFilter[level].Reset()
-			delete(t.msgFilter, level)
-		}
-	}
-}
-
-// SetTolerance adjusts how long hashes stay in the TmpMap until they are deleted.
-func (t *TmpMap) SetTolerance(tolerance uint64) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	threshold := t.height - tolerance
-
-	t.deleteBefore(threshold)
-}
-
-func (t *TmpMap) has(b *bytes.Buffer, heigth uint64) bool {
-	f := t.msgFilter[heigth]
-	if f == nil {
+func (t *TmpMap) has(b *bytes.Buffer) bool {
+	if t.msgFilter == nil {
 		return false
 	}
 
-	return f.Lookup(b.Bytes())
+	return t.msgFilter.Lookup(b.Bytes())
 }
 
 // Add the hash of a buffer to the blacklist.
@@ -134,14 +65,7 @@ func (t *TmpMap) has(b *bytes.Buffer, heigth uint64) bool {
 func (t *TmpMap) Add(b *bytes.Buffer) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	return t.add(b, t.height)
-}
-
-// AddAt adds a hash of a buffer at a specific height.
-func (t *TmpMap) AddAt(b *bytes.Buffer, height uint64) bool {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	return t.add(b, height)
+	return t.add(b)
 }
 
 // Size returns overall size of all filters.
@@ -149,35 +73,42 @@ func (t *TmpMap) Size() int {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	var fullSize int
-	for _, f := range t.msgFilter {
-		fullSize += len(f.Encode())
+	if t.msgFilter == nil {
+		return 0
 	}
 
-	return fullSize
+	return len(t.msgFilter.Encode())
 }
 
-// clean the TmpMap up to the upto argument.
-func (t *TmpMap) clean() {
-	if t.height <= t.tolerance {
-		// don't clean
-		return
-	}
+// IsExpired returns true if TmpMap has expired.
+func (t *TmpMap) IsExpired() bool {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-	for r := range t.msgFilter {
-		if r <= t.height-t.tolerance {
-			t.msgFilter[r].Reset()
-			delete(t.msgFilter, r)
+	return time.Now().Unix() >= t.expiryTimestamp
+}
+
+// CleanExpired resets all cache instances that has expired.
+func (t *TmpMap) CleanExpired() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	if t.msgFilter != nil {
+		if time.Now().Unix() >= t.msgFilter.TTL {
+			t.msgFilter.Reset()
+			t.msgFilter = nil
 		}
 	}
 }
 
-// add an entry to the set at the current height. Returns false if the element has not been added (due to being a duplicate).
-func (t *TmpMap) add(b *bytes.Buffer, round uint64) bool {
-	_, found := t.msgFilter[round]
-	if !found {
-		t.msgFilter[round] = cuckoo.NewFilter(uint(t.capacity))
+// add an entry. Returns false if the element has not been added (due to being a duplicate).
+func (t *TmpMap) add(b *bytes.Buffer) bool {
+	if t.msgFilter == nil {
+		t.msgFilter = &cache{
+			Filter: cuckoo.NewFilter(uint(t.capacity)),
+			TTL:    time.Now().Unix() + t.expire,
+		}
 	}
 
-	return t.msgFilter[round].Insert(b.Bytes())
+	return t.msgFilter.Insert(b.Bytes())
 }
