@@ -38,10 +38,13 @@ type (
 	// queryTx is a data-wrapper for all core.transaction relevant fields that
 	// can be fetched via grapqhql.
 	queryTx struct {
-		TxID    []byte
-		TxType  core.TxType
-		Outputs []queryOutput `json:"output"`
-		Inputs  []queryInput  `json:"input"`
+		TxID     []byte
+		TxType   core.TxType
+		Outputs  []queryOutput `json:"output"`
+		Inputs   []queryInput  `json:"input"`
+		GasLimit uint64
+		GasPrice uint64
+		FeePaid  uint64
 
 		// Non-StandardTx data fields.
 		BlockHash []byte
@@ -65,7 +68,6 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 
 	qd.Outputs = make([]queryOutput, 0)
 	for _, output := range tx.StandardTx().Notes {
-
 		if IsNil(output) {
 			continue
 		}
@@ -77,6 +79,10 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	for _, input := range tx.StandardTx().Nullifiers {
 		qd.Inputs = append(qd.Inputs, queryInput{input})
 	}
+
+	qd.GasLimit = tx.StandardTx().Fee.GasLimit
+	qd.GasPrice = tx.StandardTx().Fee.GasPrice
+	_, qd.FeePaid = tx.Values()
 
 	qd.BlockHash = blockHash
 
@@ -167,7 +173,6 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]que
 			if err == nil {
 				txs = append(txs, d)
 			}
-
 		}
 
 		return nil
@@ -201,7 +206,6 @@ func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error)
 		height := tip
 
 		for {
-
 			hash, err := t.FetchBlockHashByHeight(height)
 			if err != nil {
 				return err
@@ -213,7 +217,6 @@ func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error)
 			}
 
 			for _, tx := range blockTxs {
-
 				d, err := newQueryTx(tx, hash)
 				if err == nil {
 					txs = append(txs, d)

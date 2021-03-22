@@ -145,6 +145,9 @@ NB: The examples from below represent only query structures. To send a query as 
       txid
       txtype
       blockhash
+      gaslimit
+      gasprice
+      feepaid
   }
 }
 ```
@@ -157,6 +160,9 @@ NB: The examples from below represent only query structures. To send a query as 
       txid
       txtype
       blockhash
+      gaslimit
+      gasprice
+      feepaid
   }
 }
 ```

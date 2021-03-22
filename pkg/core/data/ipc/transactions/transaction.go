@@ -188,9 +188,9 @@ func (t Transaction) Obfuscated() bool {
 }
 
 // Values returns the amount and fee spent in this transaction.
-// TODO: implement.
+// TODO: add amount calculation.
 func (t Transaction) Values() (amount uint64, fee uint64) {
-	return
+	return 0, t.Payload.Fee.GasLimit * t.Payload.Fee.GasPrice
 }
 
 // Equal checks equality between two transactions.

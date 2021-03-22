@@ -86,6 +86,15 @@ var Transaction = graphql.NewObject(
 			"size": &graphql.Field{
 				Type: graphql.Int,
 			},
+			"gaslimit": &graphql.Field{
+				Type: graphql.Int,
+			},
+			"gasprice": &graphql.Field{
+				Type: graphql.Int,
+			},
+			"feepaid": &graphql.Field{
+				Type: graphql.Int,
+			},
 		},
 	},
 )
