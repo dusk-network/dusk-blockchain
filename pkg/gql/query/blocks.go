@@ -7,11 +7,13 @@
 package query
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	core "github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
 )
@@ -24,6 +26,63 @@ const (
 	blockLastArg   = "last"
 	blockSinceArg  = "since"
 )
+
+type (
+	queryBlock struct {
+		Header *queryHeader        `json:"header"`
+		Txs    []core.ContractCall `json:"transactions"`
+	}
+
+	queryHeader struct {
+		Version   uint8  `json:"version"`   // Block version byte
+		Height    uint64 `json:"height"`    // Block height
+		Timestamp int64  `json:"timestamp"` // Block timestamp
+
+		PrevBlockHash []byte `json:"prev-hash"` // Hash of previous block (32 bytes)
+		Seed          []byte `json:"seed"`      // Marshaled BLS signature or hash of the previous block seed (32 bytes)
+		TxRoot        []byte `json:"tx-root"`   // Root hash of the merkle tree containing all txes (32 bytes)
+
+		*block.Certificate `json:"certificate"` // Block certificate
+		Hash               []byte               `json:"hash"` // Hash of all previous fields
+
+		Reward   uint64 `json:"reward"`
+		FeesPaid uint64 `json:"feespaid"`
+	}
+)
+
+func newQueryBlock(b *block.Block) queryBlock {
+	qb := queryBlock{}
+	qb.Txs = b.Txs
+	qb.Header = &queryHeader{}
+	qb.Header.Version = b.Header.Version
+	qb.Header.Height = b.Header.Height
+	qb.Header.Timestamp = b.Header.Timestamp
+	qb.Header.PrevBlockHash = b.Header.PrevBlockHash
+	qb.Header.Seed = b.Header.Seed
+	qb.Header.TxRoot = b.Header.TxRoot
+	qb.Header.Certificate = b.Header.Certificate
+	qb.Header.Hash = b.Header.Hash
+
+	reward := uint64(0)
+	feesPaid := uint64(0)
+
+	for _, tx := range b.Txs {
+		_, fee := tx.Values()
+		feesPaid += fee
+
+		if tx.Type() == core.Distribute {
+			// TODO: this should align with the actual distribute tx structure
+			// once that is finalized.
+			r := binary.LittleEndian.Uint64(tx.StandardTx().CallData)
+			reward += r
+		}
+	}
+
+	qb.Header.Reward = reward
+	qb.Header.FeesPaid = feesPaid
+
+	return qb
+}
 
 // File purpose is to define all arguments and resolvers relevant to "blocks" query only.
 
@@ -119,7 +178,7 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 	txs := make([]queryTx, 0)
 
-	b, ok := p.Source.(*block.Block)
+	b, ok := p.Source.(queryBlock)
 	if ok {
 		// Retrieve DB conn from context
 		db, ok := p.Context.Value("database").(database.DB)
@@ -150,7 +209,7 @@ func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 }
 
 // Fetch block headers by a list of hashes.
-func (b blocks) fetchBlocksByHashes(db database.DB, hashes []interface{}) ([]*block.Block, error) {
+func (b blocks) fetchBlocksByHashes(db database.DB, hashes []interface{}) ([]queryBlock, error) {
 	blocks := make([]*block.Block, 0)
 	err := db.View(func(t database.Transaction) error {
 		for _, v := range hashes {
@@ -180,11 +239,18 @@ func (b blocks) fetchBlocksByHashes(db database.DB, hashes []interface{}) ([]*bl
 		return nil
 	})
 
-	return blocks, err
+	qbs := make([]queryBlock, len(blocks))
+
+	for i, b := range blocks {
+		qb := newQueryBlock(b)
+		qbs[i] = qb
+	}
+
+	return qbs, err
 }
 
 // Fetch block headers by a range of heights.
-func (b blocks) fetchBlocksByHeights(db database.DB, from, to int64) ([]*block.Block, error) {
+func (b blocks) fetchBlocksByHeights(db database.DB, from, to int64) ([]queryBlock, error) {
 	blocks := make([]*block.Block, 0)
 	err := db.View(func(t database.Transaction) error {
 		var tip uint64
@@ -234,11 +300,18 @@ func (b blocks) fetchBlocksByHeights(db database.DB, from, to int64) ([]*block.B
 		return nil
 	})
 
-	return blocks, err
+	qbs := make([]queryBlock, len(blocks))
+
+	for i, b := range blocks {
+		qb := newQueryBlock(b)
+		qbs[i] = qb
+	}
+
+	return qbs, err
 }
 
 // Fetch block headers by a range of heights.
-func (b blocks) fetchBlocksByDate(db database.DB, sinceDate time.Time) ([]*block.Block, error) {
+func (b blocks) fetchBlocksByDate(db database.DB, sinceDate time.Time) ([]queryBlock, error) {
 	blocks := make([]*block.Block, 0)
 
 	err := db.View(func(t database.Transaction) error {
@@ -271,5 +344,12 @@ func (b blocks) fetchBlocksByDate(db database.DB, sinceDate time.Time) ([]*block
 		return nil, err
 	}
 
-	return blocks, err
+	qbs := make([]queryBlock, len(blocks))
+
+	for i, b := range blocks {
+		qb := newQueryBlock(b)
+		qbs[i] = qb
+	}
+
+	return qbs, err
 }

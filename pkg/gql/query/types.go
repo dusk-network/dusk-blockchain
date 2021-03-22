@@ -56,6 +56,12 @@ var Header = graphql.NewObject(
 			"timestamp": &graphql.Field{
 				Type: UnixTimestamp,
 			},
+			"reward": &graphql.Field{
+				Type: graphql.Int,
+			},
+			"feespaid": &graphql.Field{
+				Type: graphql.Int,
+			},
 		},
 	},
 )
