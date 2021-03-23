@@ -97,6 +97,8 @@ github.com/dusk-network/dusk-protobuf v0.2.14 h1:UfN/Pq2Dx9z+wdAyY8GScCshpAV+iZT
 github.com/dusk-network/dusk-protobuf v0.2.14/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/dusk-network/dusk-protobuf v0.2.15 h1:uFf8rZxZvIY+ia92fco29qmGXg9CM47kUnrayRVfdTg=
 github.com/dusk-network/dusk-protobuf v0.2.15/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
+github.com/dusk-network/dusk-protobuf v0.2.16 h1:qIWpSsOiwrrDJyMUh9VWuxu6BSTj7Bc6ZGq4yRvaNP8=
+github.com/dusk-network/dusk-protobuf v0.2.16/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/dusk-network/dusk-wallet/v2 v2.0.3 h1:mKjuaVw5WCDZ9usl/pK+klTip8dHs0oGyqpGwGiv6hQ=
 github.com/dusk-network/dusk-wallet/v2 v2.0.3/go.mod h1:iweGXUe9XLFWh04TgfBfUu4hkhp4WNsrPWPYt2AHNwY=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
