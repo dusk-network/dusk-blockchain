@@ -119,22 +119,25 @@ func TestGenerateDevNetGenesis(t *testing.T) {
 	b.AddTx(bid)
 
 	for _, w := range wallets {
-		buf = new(bytes.Buffer)
-		if err := encoding.WriteUint64LE(buf, 50000*wallet.DUSK); err != nil {
-			t.Fatal(err)
-		}
+		// Add 200 coinbase outputs
+		for i := 0; i < 200; i++ {
+			buf = new(bytes.Buffer)
+			if err := encoding.WriteUint64LE(buf, 50000*wallet.DUSK); err != nil {
+				t.Fatal(err)
+			}
 
-		coinbase := transactions.NewTransaction()
-		coinbase.Payload.CallData = buf.Bytes()
-		coinbase.Payload.Notes = append(coinbase.Payload.Notes, &transactions.Note{
-			Randomness:    make([]byte, 32),
-			PkR:           w.PublicKey.AG,
-			Commitment:    amountBytes,
-			Nonce:         make([]byte, 32),
-			EncryptedData: make([]byte, 96),
-		})
-		coinbase.TxType = transactions.Distribute
-		b.AddTx(coinbase)
+			coinbase := transactions.NewTransaction()
+			coinbase.Payload.CallData = buf.Bytes()
+			coinbase.Payload.Notes = append(coinbase.Payload.Notes, &transactions.Note{
+				Randomness:    make([]byte, 32),
+				PkR:           w.PublicKey.AG,
+				Commitment:    amountBytes,
+				Nonce:         make([]byte, 32),
+				EncryptedData: make([]byte, 96),
+			})
+			coinbase.TxType = transactions.Distribute
+			b.AddTx(coinbase)
+		}
 	}
 
 	// Set root and hash, since they have changed because of the adding of txs.

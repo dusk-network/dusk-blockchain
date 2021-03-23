@@ -38,6 +38,7 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string, requireSession bool)
 
 	node.Cfg = config.Registry{}
 	node.Cfg.General.TestHarness = true
+	node.Cfg.General.GenesisPath = "$HOME/go/src/github.com/dusk-network/dusk-blockchain/devnetgenesis.txt"
 	node.Cfg.Gql.Address = "127.0.0.1:" + strconv.Itoa(graphqlPort)
 	node.Cfg.Gql.Network = "tcp" //nolint
 
@@ -56,7 +57,7 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string, requireSession bool)
 	node.Cfg.RPC.Rusk.Address = "127.0.0.1:" + strconv.Itoa(nodeID+1000)
 	node.Cfg.RPC.Rusk.ContractTimeout = 6000
 	node.Cfg.RPC.Rusk.DefaultTimeout = 1000
-	node.Cfg.RPC.Rusk.ConnectionTimeout = 5000
+	node.Cfg.RPC.Rusk.ConnectionTimeout = 10000
 
 	node.Gql = graphql.NewClient("http://" + node.Cfg.Gql.Address)
 	return node

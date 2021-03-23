@@ -259,4 +259,5 @@ func init() {
 	r.Consensus.ConsensusTimeOut = 5
 	r.Timeout.TimeoutBrokerGetCandidate = 2
 	r.Mempool.MaxInvItems = 10000
+	r.General.GenesisPath = "$HOME/go/src/github.com/dusk-network/dusk-blockchain/devnetgenesis.txt"
 }

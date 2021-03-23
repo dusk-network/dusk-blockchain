@@ -7,6 +7,7 @@ network = "testnet"
 walletonly = false
 # configure callback listeners
 safecallbacklistener = "true"
+genesispath = "$HOME/go/src/github.com/dusk-network/dusk-blockchain/devnetgenesis.txt"
 
 # Timeout cfg for rpcBus calls
 [timeout]
@@ -146,6 +147,7 @@ keyFile=""
 # timeout for internal GRPC calls expressed in milliseconds
 contractTimeout=6000
 defaultTimeout=200
+connectionTimeout = 10000
 
 # GraphQL API service
 [gql]
@@ -218,3 +220,4 @@ enabletls = false
 address="127.0.0.1:9199"
 #5 mins
 expirationtime=300
+

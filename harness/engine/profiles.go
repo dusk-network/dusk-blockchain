@@ -30,6 +30,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("general.walletonly", "false")
 	viper.Set("general.safecallbacklistener", "false")
 	viper.Set("general.testharness", "true")
+	viper.Set("general.genesispath", "$HOME/go/src/github.com/dusk-network/dusk-blockchain/devnetgenesis.txt")
 
 	// bidautomaton.go
 	viper.Set("timeout.timeoutsendbidtx", 5)
@@ -88,7 +89,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("rpc.rusk.address", node.Cfg.RPC.Rusk.Address)
 	viper.Set("rpc.rusk.contractTimeout", 6000)
 	viper.Set("rpc.rusk.defaultTimeout", 1000)
-	viper.Set("rpc.rusk.connectiontimeout", 5000)
+	viper.Set("rpc.rusk.connectiontimeout", 10000)
 	viper.Set("database.driver", heavy.DriverName)
 	viper.Set("database.dir", node.Dir+"/chain/")
 	viper.Set("wallet.store", node.Dir+"/walletDB/")

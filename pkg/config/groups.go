@@ -11,6 +11,7 @@ type generalConfiguration struct {
 	WalletOnly           bool
 	SafeCallbackListener bool
 	TestHarness          bool
+	GenesisPath          string
 }
 
 type timeoutConfiguration struct {
