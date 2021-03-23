@@ -11,8 +11,6 @@ import (
 	"testing"
 )
 
-var txHash = "214e7c972873d8ebcb1791e1d6f41dde7c9060ed54ff7a3865602b4b69274ffb"
-
 func TestBlocksByHeight(t *testing.T) {
 	query := `
 		{
@@ -159,7 +157,7 @@ func TestBlocksTxs(t *testing.T) {
 				]
 			}
 		}
-	`, txHash)
+	`, bid3Hash)
 	assertQuery(t, query, response)
 }
 
@@ -256,7 +254,7 @@ func TestBlocksTxsQuery(t *testing.T) {
 			]
 		}
 	}
-	`, txHash)
+	`, bid3Hash)
 	assertQuery(t, query, response)
 }
 
