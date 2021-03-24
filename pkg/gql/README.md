@@ -73,6 +73,8 @@ NB: The examples from below represent only query structures. To send a query as 
        seed
        prevblockhash
        txroot
+       reward
+       feespaid
     }
     transactions{
       txid
