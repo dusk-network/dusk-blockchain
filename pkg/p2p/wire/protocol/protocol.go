@@ -32,8 +32,8 @@ const (
 // NodeVer is the current node version.
 var NodeVer = &Version{
 	Major: 0,
-	Minor: 3,
-	Patch: 0,
+	Minor: 4,
+	Patch: 1,
 }
 
 // Magic is the network that Dusk is running on.
