@@ -42,11 +42,15 @@ func TestMain(m *testing.M) {
 }
 
 func startMempoolTest(ctx context.Context) (*Mempool, *eventbus.EventBus, *rpcbus.RPCBus, *eventbus.GossipStreamer) {
+	return startMempoolTestWithLatency(ctx, time.Duration(0))
+}
+
+func startMempoolTestWithLatency(ctx context.Context, latency time.Duration) (*Mempool, *eventbus.EventBus, *rpcbus.RPCBus, *eventbus.GossipStreamer) {
 	bus, streamer := eventbus.CreateGossipStreamer()
 
 	rpcBus := rpcbus.New()
 	v := &transactions.MockProxy{}
-	m := NewMempool(bus, rpcBus, v.Prober(), nil)
+	m := NewMempool(bus, rpcBus, v.ProberWithParams(latency), nil)
 
 	m.Run(ctx)
 	return m, bus, rpcBus, streamer
@@ -289,6 +293,68 @@ func TestSendMempoolTx(t *testing.T) {
 	}
 
 	assert.Equal(m.verified.Size(), totalSize)
+}
+
+func BenchmarkProcessTx_0(b *testing.B) {
+	// Recent result
+	// BenchmarkProcessTx_0-8             50475             33671 ns/op
+	// 33671 ns/op = 29699 TPS
+	benchmarkProcessTx(b, 25000, 0)
+}
+
+func BenchmarkProcessTx_10(b *testing.B) {
+	// Recent result
+	// BenchmarkProcessTx_10-8              100          10346391 ns/op
+	// 10346391 ns/op = 96 TPS
+	benchmarkProcessTx(b, 1000, 10*time.Millisecond)
+}
+
+func BenchmarkProcessTx_20(b *testing.B) {
+	// Recent result
+	// BenchmarkProcessTx_20-8               58          20395738 ns/op
+	// 20395738 ns/op = 58 TPS
+	benchmarkProcessTx(b, 1000, 20*time.Millisecond)
+}
+
+//nolint
+func benchmarkProcessTx(b *testing.B, batchCount int, verifyTransactionLatency time.Duration) {
+	// test parameters
+	const numOfTxsPerBatch = 4
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// NB VerifyTransaction has 0 latency
+	m, _, _, _ := startMempoolTestWithLatency(ctx, verifyTransactionLatency)
+
+	txs := make([]transactions.ContractCall, 0)
+
+	for i := 0; i <= batchCount; i++ {
+		// Generate a single batch of txs and added to the expected list of verified
+		batchTxs := transactions.RandContractCalls(numOfTxsPerBatch, 0, false)
+		txs = append(txs, batchTxs...)
+	}
+
+	b.ResetTimer()
+
+	// Publish batchCount*numOfTxsPerBatch valid txs in a row
+	var acceptedTxsCount int
+	for n := 0; n < b.N; n++ {
+		if n >= len(txs) {
+			break
+		}
+		_, err := m.ProcessTx("unknown_addr", message.New(topics.Tx, txs[n]))
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		acceptedTxsCount++
+	}
+
+	// Ensure all txs have been accepted
+	if m.verified.Len() != acceptedTxsCount || acceptedTxsCount == 0 {
+		b.Fatalf("not all txs accepted %d - %d", len(txs), m.verified.Len())
+	}
 }
 
 /*

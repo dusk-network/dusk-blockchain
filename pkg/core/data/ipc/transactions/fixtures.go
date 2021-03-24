@@ -13,6 +13,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
@@ -103,11 +104,17 @@ func (m MockProxy) Provisioner() Provisioner { return m.P }
 // Provider ...
 func (m MockProxy) Provider() Provider { return m.Pr }
 
-type mockVerifier struct{}
+type mockVerifier struct {
+	verifyTransactionLatency time.Duration
+}
 
 func (v *mockVerifier) VerifyTransaction(ctx context.Context, cc ContractCall) error {
 	if IsMockInvalid(cc) {
 		return errors.New("Invalid transaction")
+	}
+
+	if v.verifyTransactionLatency > 0 {
+		time.Sleep(v.verifyTransactionLatency)
 	}
 
 	return nil
@@ -120,6 +127,11 @@ func (v *mockVerifier) CalculateBalance(ctx context.Context, vkBytes []byte, txs
 // Prober returns a UnconfirmedTxProber that is capable of checking invalid mocked up transactions.
 func (m MockProxy) Prober() UnconfirmedTxProber {
 	return &mockVerifier{}
+}
+
+// ProberWithParams instantiates a mockVerifier with a latency value for VerifyTransaction.
+func (m MockProxy) ProberWithParams(verifyTransactionLatency time.Duration) UnconfirmedTxProber {
+	return &mockVerifier{verifyTransactionLatency}
 }
 
 // KeyMaster ...
