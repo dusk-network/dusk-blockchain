@@ -17,11 +17,15 @@ func TestBlocksByHeight(t *testing.T) {
 		  tip: blocks(height: -1) {
 			header {
 			   height
+			   reward
+			   feespaid
 			}
 		  },
 		  genesis: blocks(height: 0) {
 			header {
 			   height
+			   reward
+			   feespaid
 			}
 		  }
 		}
@@ -32,14 +36,18 @@ func TestBlocksByHeight(t *testing.T) {
 			"genesis":[
 			  {  
 				"header":{  
-				  "height":0
+				  "height":0,
+				  "feespaid":0,
+				  "reward":0
 				}
 			  }
 			],
 			"tip":[  
 			  {  
 				"header":{  
-				  "height":2
+				  "height":2,
+				  "feespaid":0,
+				  "reward":0
 				}
 			  }
 			]
