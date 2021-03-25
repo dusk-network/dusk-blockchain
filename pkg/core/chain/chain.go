@@ -301,6 +301,10 @@ func (c *Chain) AcceptSuccessiveBlock(blk block.Block) error {
 		return err
 	}
 
+	if blk.Header.Height > c.highestSeen {
+		c.highestSeen = blk.Header.Height
+	}
+
 	log.Trace("gossiping block")
 
 	if err := c.advertiseBlock(blk); err != nil {
