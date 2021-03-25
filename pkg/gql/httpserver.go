@@ -10,6 +10,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -33,6 +34,7 @@ var log = logger.WithFields(logger.Fields{"prefix": "gql"})
 
 const (
 	endpointWS  = "/ws"
+	endpointWSS = "/wss"
 	endpointGQL = "/graphql"
 )
 
@@ -110,6 +112,10 @@ func (s *Server) listenOnHTTPServer(l net.Listener) {
 
 	var err error
 	if conf.EnableTLS {
+		if _, err = os.Stat(conf.CertFile); err != nil {
+			log.WithError(err).Fatal("failed to enable TLS")
+		}
+
 		err = s.httpServer.ServeTLS(l, conf.CertFile, conf.KeyFile)
 	} else {
 		err = s.httpServer.Serve(l)
@@ -196,7 +202,13 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 	}
 
 	middleware := tollbooth.LimitFuncHandler(s.lmt, wsHandler)
-	serverMux.Handle(endpointWS, middleware)
+
+	endpoint := endpointWS
+	if cfg.Get().Gql.EnableTLS {
+		endpoint = endpointWSS
+	}
+
+	serverMux.Handle(endpoint, middleware)
 
 	return nil
 }

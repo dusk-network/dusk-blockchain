@@ -12,8 +12,9 @@ GraphQL package is here to provide a read-only access to any persistent/non-pers
 
 ### API Endpoints
 
-* `/graphql` - Support data fetching
-* `/ws` - Support websocket notifications
+* `/graphql` - data fetching
+* `/ws` - websocket notifications, if TLS is disabled
+* `/wss` - secure websocket notifications, if TLS is enabled
 
 ### Scenarios
 
