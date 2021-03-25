@@ -46,13 +46,16 @@ const (
 	TestNet
 	// DevNet identifies the development network of the Dusk blockchain.
 	DevNet
+	// StressNet identifies the stress testing network of the Dusk blockchain.
+	StressNet
 )
 
 const (
 	mainnetUint32 uint32 = 0x7630401f
 	testnetUint32 uint32 = 0x74746e41
 	//nolint
-	devnetUint32 uint32 = 0x74736e40
+	devnetUint32    uint32 = 0x74736e40
+	stressnetUint32 uint32 = 0x74726e39
 )
 
 type magicObj struct {
@@ -65,6 +68,7 @@ var magics = [...]magicObj{
 	{MainNet, asBuffer(0x7630401f), "mainnet"},
 	{TestNet, asBuffer(0x74746e41), "testnet"},
 	{DevNet, asBuffer(0x74736e40), "devnet"},
+	{StressNet, asBuffer(0x74726e39), "stressnet"},
 }
 
 // Len returns the amount of bytes of the Magic sequence.
@@ -88,6 +92,8 @@ func fromUint32(n uint32) Magic {
 		return MainNet
 	case testnetUint32:
 		return TestNet
+	case stressnetUint32:
+		return StressNet
 	default:
 		return DevNet
 	}

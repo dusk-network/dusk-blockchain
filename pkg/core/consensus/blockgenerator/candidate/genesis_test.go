@@ -68,21 +68,7 @@ func TestGenerateGenesis(t *testing.T) {
 
 func TestGenesisBlock(t *testing.T) {
 	// read the hard-coded genesis blob for testnet
-	genesis := config.ReadGenesis()
-
-	blob, err := hex.DecodeString(genesis)
-	if err != nil {
-		t.Fatalf("expecting valid cfg.TestNetGenesisBlob %s", err.Error())
-	}
-
-	// decode the blob to a block
-	var buf bytes.Buffer
-	buf.Write(blob)
-
-	b := block.NewBlock()
-	if err := message.UnmarshalBlock(&buf, b); err != nil {
-		t.Fatalf("expecting decodable cfg.TestNetGenesisBlob %s", err.Error())
-	}
+	b := config.DecodeGenesis()
 
 	// sanity checks
 	if b.Header.Height != 0 {
@@ -93,7 +79,7 @@ func TestGenesisBlock(t *testing.T) {
 		t.Fatalf("expecting valid version in cfg.TestNetGenesisBlob")
 	}
 
-	if b.Txs[0].Type() != transactions.Distribute {
+	if b.Txs[len(b.Txs)-1].Type() != transactions.Distribute {
 		t.Fatalf("expecting coinbase tx in cfg.TestNetGenesisBlob")
 	}
 }
