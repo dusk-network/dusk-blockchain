@@ -52,7 +52,8 @@ const (
 	mainnetUint32 uint32 = 0x7630401f
 	testnetUint32 uint32 = 0x74746e41
 	//nolint
-	devnetUint32 uint32 = 0x74736e40
+	devnetUint32    uint32 = 0x74736e40
+	stressnetUint32 uint32 = 0x74726e39
 )
 
 type magicObj struct {

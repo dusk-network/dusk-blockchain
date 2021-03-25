@@ -7,17 +7,11 @@
 package config
 
 import (
-	"bytes"
-	"encoding/hex"
-	"io/ioutil"
-	"log"
-	"os"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/sirupsen/logrus"
 )
 
 // A single point of constants definition.
@@ -41,61 +35,10 @@ const (
 
 // DecodeGenesis marshals a genesis block into a buffer.
 func DecodeGenesis() *block.Block {
-	b := block.NewBlock()
-
-	switch Get().General.Network {
-	case "testnet": //nolint
-		genesis := ReadGenesis()
-
-		blob, err := hex.DecodeString(genesis)
-		if err != nil {
-			logrus.Panic(err)
-		}
-
-		var buf bytes.Buffer
-		_, _ = buf.Write(blob)
-
-		if uerr := message.UnmarshalBlock(&buf, b); uerr != nil {
-			log.Panic(uerr)
-		}
-
-		sanityCheck(genesis, b)
-	}
-
-	return b
-}
-
-// ReadGenesis from the configured path.
-func ReadGenesis() string {
-	path := os.ExpandEnv(r.General.GenesisPath)
-
-	//nolint:gosec
-	file, err := os.Open(path)
+	cfg, err := genesis.GetPresetConfig(Get().General.Network)
 	if err != nil {
-		logrus.WithError(err).Panic("could not open genesis block file")
+		panic(err)
 	}
 
-	//nolint
-	defer file.Close()
-
-	bytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		logrus.WithError(err).Panic("could not read genesis block")
-	}
-
-	return string(bytes)
-}
-
-// nolint
-func sanityCheck(genesis string, b *block.Block) {
-	// sanity check the genesis block
-	r := new(bytes.Buffer)
-	if err := message.MarshalBlock(r, b); err != nil {
-		log.Panic(err)
-	}
-
-	hgen := hex.EncodeToString(r.Bytes())
-	if hgen != genesis {
-		log.Panic("genesis blob is wrongly serialized")
-	}
+	return genesis.Generate(cfg)
 }
