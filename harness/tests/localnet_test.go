@@ -277,26 +277,6 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 		}
 	}
 
-	// Send a bunch of Transfer transactions
-	for i := uint(0); i < uint(localNet.Size())-1; i++ {
-		time.Sleep(100 * time.Millisecond)
-		t.Logf("Node %d sending a Transfer transaction", i)
-
-		if _, err := localNet.SendTransferTxCmd(i, i+1, 1000*uint64(i+1), 100); err != nil {
-			t.Log(err.Error())
-		}
-	}
-
-	targetRound := uint64(7)
-	// Wait until round targetRound and print wallet information.
-	//
-	// NB Later on, ensure here that all Transfer,Bid and Stake transactions
-	// have been accepted by any round up to targetRound.
-	//
-	// Ensure also that balance of each wallet has been updated correctly
-	localNet.WaitUntil(t, 0, targetRound, 2*time.Minute, 5*time.Second)
-	localNet.PrintWalletsInfo(t)
-
 	deployNewNode := func() {
 		ind := localNetSize
 		node := engine.NewDuskNode(9500+ind, 9000+ind, "default", localNet.IsSessionRequired())
@@ -315,42 +295,54 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 // TestMeasureNetworkTPS is a placeholder for a simple test definition on top of
 // which network TPS metric should be collected.
 func TestMeasureNetworkTPS(t *testing.T) {
-	// Disabled by default not to messup the CI
-	_, presented := os.LookupEnv("DUSK_ENABLE_TPS_TEST")
-	if !presented {
-		t.SkipNow()
-	}
+	//TODO: Disabled by default not to messup the CI
+	//_, presented := os.LookupEnv("DUSK_ENABLE_TPS_TEST")
+	//if !presented {
+	//	t.SkipNow()
+	//}
 
-	log.Info("60sec Wait for network nodes to complete bootstrapping procedure")
-	time.Sleep(60 * time.Second)
+	defaultLocktime := uint64(100000)
 
-	consensusNodes := os.Getenv("DUSK_CONSENSUS_NODES")
-	if len(consensusNodes) == 0 {
-		consensusNodes = "10"
-	}
+	// Send a bunch of Bid transactions
+	// All nodes are Block Generators
+	for i := uint(0); i < uint(localNet.Size()); i++ {
+		time.Sleep(100 * time.Millisecond)
+		t.Logf("Node %d sending a Bid transaction", i)
 
-	nodesNum, err := strconv.Atoi(consensusNodes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	log.Info("10sec Wait for consensus-nodes to kick off consensus")
-	time.Sleep(10 * time.Second)
-
-	// Send to all consensus-running nodes a bid tx
-	for i := 0; i < nodesNum; i++ {
-		txidBytes, err := localNet.SendBidCmd(uint(i), 10, 10)
-		if err != nil {
-			continue
+		if _, err := localNet.SendBidCmd(i, 100, defaultLocktime); err != nil {
+			t.Log(err.Error())
 		}
-
-		txID := hex.EncodeToString(txidBytes)
-		t.Logf("Bid transaction id: %s", txID)
-
-		time.Sleep(3 * time.Second)
 	}
 
-	time.Sleep(20 * time.Second)
+	// Send a bunch of Stake transactions
+	// All nodes are Provisioners
+	for i := uint(0); i < uint(localNet.Size()); i++ {
+		time.Sleep(100 * time.Millisecond)
+		t.Logf("Node %d sending a Stake transaction", i)
+
+		if _, err := localNet.SendStakeCmd(i, 100, defaultLocktime); err != nil {
+			t.Log(err.Error())
+		}
+	}
+
+	// Wait until first two blocks are accepted
+	localNet.WaitUntil(t, 0, 2, 2*time.Minute, 5*time.Second)
+
+	// Transaction Load test.
+	// Each of the nodes in the network starts sending transfer txs up batchSize
+	//batchSizeEnv, _ := os.LookupEnv("DUSK_TX_BATCH_SIZE")
+	batchSize := 2 //strconv.Atoi(batchSizeEnv)
+
+	for i := uint(0); i < uint(localNet.Size()); i++ {
+		t.Logf("Node[%d] starts sending a batch of %d Transfer txs", i, batchSize)
+
+		// Start concurrently flooding the network with batch of Transfer transactions
+		go func(ind uint) {
+			if err := localNet.BatchSendTransferTx(t, ind, uint(batchSize), 100, 10, time.Minute); err != nil {
+				logrus.Error(err)
+			}
+		}(i)
+	}
 }
 
 // TestForgedBlock propagates a forged block with height >100000 to the network.

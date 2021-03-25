@@ -295,6 +295,19 @@ func (n *Network) GetLastBlockHeight(ind uint) (uint64, error) {
 	return uint64(result["data"]["blocks"][0]["header"]["height"]), nil
 }
 
+// GetTransactionsCountPerHeight makes an attempt to fetch last block height of a specified node.
+func (n *Network) GetTransactionsCountPerHeight(ind uint) (uint64, error) {
+	// Construct query to fetch block height
+	query := "{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}"
+
+	var result map[string]map[string][]map[string]map[string]int
+	if err := n.SendQuery(ind, query, &result); err != nil {
+		return 0, err
+	}
+
+	return uint64(result["data"]["blocks"][0]["header"]["height"]), nil
+}
+
 // IsSynced checks if each node blockchain tip is close to the blockchain tip of node 0.
 // threshold param is the number of blocks the last block can differ.
 func (n *Network) IsSynced(threshold uint64) (uint64, error) {
@@ -452,12 +465,14 @@ func (n *Network) SendTransferTxCmd(senderNodeInd, recvNodeInd uint, amount, fee
 		return nil, err
 	}
 
-	logrus.
-		WithField("s_wallet", senderAddr).
-		WithField("r_wallet", recvAddr).
-		WithField("amount", amount).
-		WithField("fee", fee).
-		Info("Sending transfer")
+	if logrus.GetLevel() == logrus.DebugLevel {
+		logrus.
+			WithField("s_wallet", senderAddr).
+			WithField("r_wallet", recvAddr).
+			WithField("amount", amount).
+			WithField("fee", fee).
+			Debug("Sending transfer")
+	}
 
 	// Send Transfer grpc command
 	c := n.grpcClients[n.nodes[senderNodeInd].Id]
@@ -481,3 +496,85 @@ func (n *Network) SendTransferTxCmd(senderNodeInd, recvNodeInd uint, amount, fee
 
 	return resp.Hash, nil
 }
+
+// BatchSendTransferTx sends a transfer call from node of index senderNodeInd to senderNodeInd+1 node.
+func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSize uint, amount, fee uint64, timeout time.Duration) error {
+	recvNodeInd := senderNodeInd + 1
+	if recvNodeInd >= uint(n.Size()) {
+		recvNodeInd = 0
+	}
+
+	// Get wallet address of sender
+	senderAddr, _, err := n.GetWalletAddress(senderNodeInd)
+	if err != nil {
+		return err
+	}
+
+	// Get wallet address of receiver
+	recvAddr, pubKey, err := n.GetWalletAddress(recvNodeInd)
+	if err != nil {
+		return err
+	}
+
+	if logrus.GetLevel() == logrus.DebugLevel {
+		logrus.
+			WithField("s_wallet", senderAddr).
+			WithField("r_wallet", recvAddr).
+			WithField("amount", amount).
+			WithField("fee", fee).
+			Debug("Sending transfer")
+	}
+
+	// Send Transfer grpc command
+	c := n.grpcClients[n.nodes[senderNodeInd].Id]
+
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	client := pb.NewTransactorClient(conn)
+
+	for i := uint(0); i < batchSize; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+
+		req := pb.TransferRequest{Amount: amount, Address: pubKey, Fee: fee}
+
+		_, err := client.Transfer(ctx, &req)
+		if err != nil {
+			logrus.WithField("sender_index", senderNodeInd).Error(err)
+		}
+	}
+
+	return nil
+}
+
+/*
+func (n *Network) CalculateTPS(threshold uint64) (uint64, error) {
+
+	block, err := n.GetBlockAtHeight(0, 1)
+	initialTimestamp = block.Header.Timestamp
+
+	primaryHeight := uint64(1)
+
+	for {
+		time.Sleep(2 * time.Second)
+
+		// TODO: subscribe for block updates via ws
+		lastBlock, err := n.GetBlockAtHeight(0, primaryHeight+1)
+		if err != nil {
+			continue
+		}
+
+		// seconds := LastBlock.timestamp - PreviousBlock.timestamp
+		// txsCount := lastBlock.Txs
+
+	}
+
+}
+*/

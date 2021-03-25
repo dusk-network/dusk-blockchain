@@ -26,7 +26,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	walletFileName := "wallet" + strconv.Itoa(index) + ".dat"
 
 	viper.Reset()
-	viper.Set("general.network", "devnet")
+	viper.Set("general.network", "stressnet")
 	viper.Set("general.walletonly", "false")
 	viper.Set("general.safecallbacklistener", "false")
 	viper.Set("general.testharness", "true")
