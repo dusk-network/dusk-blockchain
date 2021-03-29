@@ -23,7 +23,8 @@ const (
 	searchPath1 = "."
 	// Home datadir.
 	searchPath2 = "$HOME/.dusk/"
-	testnet     = "testnet"
+	testnet     = "testnet" //nolint
+	devnet      = "devnet"
 )
 
 var r *Registry
@@ -202,7 +203,7 @@ func loadFlags() (string, error) {
 // The settings that are needed to be passed frequently by CLI should be added here.
 func defineFlags() {
 	_ = pflag.StringP("logger.level", "l", "", "override logger.level settings in config file")
-	_ = pflag.StringP("general.network", "n", testnet, "override general.network settings in config file")
+	_ = pflag.StringP("general.network", "n", devnet, "override general.network settings in config file")
 	_ = pflag.StringP("network.port", "p", "7000", "port for the node to bind on")
 	_ = pflag.StringP("logger.output", "o", "dusk", "specifies the log output destination")
 	_ = pflag.StringP("database.dir", "b", "chain", "sets the blockchain database directory")
@@ -251,7 +252,7 @@ func init() {
 	r = new(Registry)
 	r.lock = new(sync.RWMutex)
 	r.Database.Driver = "lite_v0.1.0"
-	r.General.Network = testnet
+	r.General.Network = devnet
 	r.Wallet.File = "wallet.dat"
 	r.Wallet.Store = "walletDB"
 	r.Consensus.DefaultLockTime = 1000

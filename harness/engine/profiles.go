@@ -26,7 +26,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	walletFileName := "wallet" + strconv.Itoa(index) + ".dat"
 
 	viper.Reset()
-	viper.Set("general.network", "testnet")
+	viper.Set("general.network", "devnet")
 	viper.Set("general.walletonly", "false")
 	viper.Set("general.safecallbacklistener", "false")
 	viper.Set("general.testharness", "true")
@@ -64,7 +64,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("timeout.timeoutkeepalivetime", 30)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
-	viper.Set("logger.level", "info")
+	viper.Set("logger.level", "trace")
 
 	viper.Set("gql.address", node.Cfg.Gql.Address)
 	viper.Set("gql.network", node.Cfg.Gql.Network)
@@ -88,7 +88,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("rpc.rusk.address", node.Cfg.RPC.Rusk.Address)
 	viper.Set("rpc.rusk.contractTimeout", 6000)
 	viper.Set("rpc.rusk.defaultTimeout", 1000)
-	viper.Set("rpc.rusk.connectiontimeout", 5000)
+	viper.Set("rpc.rusk.connectiontimeout", 10000)
 	viper.Set("database.driver", heavy.DriverName)
 	viper.Set("database.dir", node.Dir+"/chain/")
 	viper.Set("wallet.store", node.Dir+"/walletDB/")
