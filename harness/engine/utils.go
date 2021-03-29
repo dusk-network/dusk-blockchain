@@ -295,6 +295,50 @@ func (n *Network) GetLastBlockHeight(ind uint) (uint64, error) {
 	return uint64(result["data"]["blocks"][0]["header"]["height"]), nil
 }
 
+// CalculateTPS makes an attempt to fetch last block height of a specified node.
+func (n *Network) CalculateTPS(ind uint) (uint64, float32, int64, int, error) {
+	// Fetch last height, timestamp and txs of the last two blocks
+	query := "{\"query\" : \"{ blocks (last: 2) { header { height timestamp } transactions { txid } } }\"}"
+
+	var result map[string]map[string][]map[string]interface{}
+	if err := n.SendQuery(ind, query, &result); err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	r := result["data"]
+
+	if len(r["blocks"]) < 2 {
+		return 0, 0, 0, 0, errors.New("not found")
+	}
+
+	last := r["blocks"][1]
+	lastHeight := last["header"].(map[string]interface{})["height"].(float64)
+	lastTimestamp := last["header"].(map[string]interface{})["timestamp"].(string)
+	lastTxsCount := len(last["transactions"].([]interface{}))
+
+	prev := r["blocks"][0]
+	prevTimestamp := prev["header"].(map[string]interface{})["timestamp"].(string)
+
+	lt, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", lastTimestamp)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	pt, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", prevTimestamp)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	blockTime := float32(lt.Unix() - pt.Unix())
+	tps := float32(0)
+
+	if blockTime > 0 {
+		tps = float32(lastTxsCount) / blockTime
+	}
+
+	return uint64(lastHeight), tps, int64(blockTime), lastTxsCount, nil
+}
+
 // IsSynced checks if each node blockchain tip is close to the blockchain tip of node 0.
 // threshold param is the number of blocks the last block can differ.
 func (n *Network) IsSynced(threshold uint64) (uint64, error) {
@@ -457,7 +501,7 @@ func (n *Network) SendTransferTxCmd(senderNodeInd, recvNodeInd uint, amount, fee
 		WithField("r_wallet", recvAddr).
 		WithField("amount", amount).
 		WithField("fee", fee).
-		Info("Sending transfer")
+		Debug("Sending transfer")
 
 	// Send Transfer grpc command
 	c := n.grpcClients[n.nodes[senderNodeInd].Id]
@@ -480,4 +524,87 @@ func (n *Network) SendTransferTxCmd(senderNodeInd, recvNodeInd uint, amount, fee
 	}
 
 	return resp.Hash, nil
+}
+
+// BatchSendTransferTx sends a transfer call from node of index senderNodeInd to senderNodeInd+1 node.
+func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSize uint, amount, fee uint64, timeout time.Duration) error {
+	recvNodeInd := senderNodeInd + 1
+	if recvNodeInd >= uint(n.Size()) {
+		recvNodeInd = 0
+	}
+
+	// Get wallet address of sender
+	senderAddr, _, err := n.GetWalletAddress(senderNodeInd)
+	if err != nil {
+		return err
+	}
+
+	// Get wallet address of receiver
+	recvAddr, pubKey, err := n.GetWalletAddress(recvNodeInd)
+	if err != nil {
+		return err
+	}
+
+	logrus.
+		WithField("s_wallet", senderAddr).
+		WithField("r_wallet", recvAddr).
+		WithField("amount", amount).
+		WithField("fee", fee).
+		Debug("Sending transfer")
+
+	// Send Transfer grpc command
+	c := n.grpcClients[n.nodes[senderNodeInd].Id]
+
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	client := pb.NewTransactorClient(conn)
+
+	for i := uint(0); i < batchSize; i++ {
+		req := pb.TransferRequest{Amount: amount, Address: pubKey, Fee: fee}
+
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
+		_, err := client.Transfer(ctx, &req)
+		if err != nil {
+			logrus.WithField("sender_index", senderNodeInd).Error(err)
+		}
+
+		cancel()
+	}
+
+	return nil
+}
+
+// MonitorTPS tries to measure network TPS each N seconds.
+func (n *Network) MonitorTPS(delay time.Duration) {
+	// Start monitoring TPS value of the network
+	nodeInd := uint(0)
+
+	for {
+		time.Sleep(delay)
+
+		h, tps, blockTime, lastTxsCount, err := n.CalculateTPS(nodeInd)
+		if err != nil {
+			logrus.WithError(err).
+				WithField("node_ind", nodeInd).
+				Warn("calculate tps failed")
+
+			// Failover to another node if this fails
+			nodeInd++
+			if nodeInd >= uint(n.Size()) {
+				nodeInd = 0
+			}
+
+			continue
+		}
+
+		logrus.WithField("height", h).Infof("Measured TPS %.2f (%d/%d)", tps, lastTxsCount, blockTime)
+	}
 }
