@@ -496,14 +496,12 @@ func (n *Network) SendTransferTxCmd(senderNodeInd, recvNodeInd uint, amount, fee
 		return nil, err
 	}
 
-	if logrus.GetLevel() == logrus.DebugLevel {
-		logrus.
-			WithField("s_wallet", senderAddr).
-			WithField("r_wallet", recvAddr).
-			WithField("amount", amount).
-			WithField("fee", fee).
-			Debug("Sending transfer")
-	}
+	logrus.
+		WithField("s_wallet", senderAddr).
+		WithField("r_wallet", recvAddr).
+		WithField("amount", amount).
+		WithField("fee", fee).
+		Debug("Sending transfer")
 
 	// Send Transfer grpc command
 	c := n.grpcClients[n.nodes[senderNodeInd].Id]
@@ -547,14 +545,12 @@ func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSiz
 		return err
 	}
 
-	if logrus.GetLevel() == logrus.DebugLevel {
-		logrus.
-			WithField("s_wallet", senderAddr).
-			WithField("r_wallet", recvAddr).
-			WithField("amount", amount).
-			WithField("fee", fee).
-			Debug("Sending transfer")
-	}
+	logrus.
+		WithField("s_wallet", senderAddr).
+		WithField("r_wallet", recvAddr).
+		WithField("amount", amount).
+		WithField("fee", fee).
+		Debug("Sending transfer")
 
 	// Send Transfer grpc command
 	c := n.grpcClients[n.nodes[senderNodeInd].Id]
@@ -571,15 +567,16 @@ func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSiz
 	client := pb.NewTransactorClient(conn)
 
 	for i := uint(0); i < batchSize; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-
 		req := pb.TransferRequest{Amount: amount, Address: pubKey, Fee: fee}
+
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
 		_, err := client.Transfer(ctx, &req)
 		if err != nil {
 			logrus.WithField("sender_index", senderNodeInd).Error(err)
 		}
+
+		cancel()
 	}
 
 	return nil
@@ -594,17 +591,20 @@ func (n *Network) MonitorTPS(delay time.Duration) {
 		time.Sleep(delay)
 
 		h, tps, blockTime, lastTxsCount, err := n.CalculateTPS(nodeInd)
-
-		if err == nil {
-			logrus.WithField("height", h).Infof("Measured TPS %.2f (%d/%d)", tps, lastTxsCount, blockTime)
-		} else {
-			logrus.WithError(err).Warn("calculate tps failed")
+		if err != nil {
+			logrus.WithError(err).
+				WithField("node_ind", nodeInd).
+				Warn("calculate tps failed")
 
 			// Failover to another node if this fails
 			nodeInd++
 			if nodeInd >= uint(n.Size()) {
 				nodeInd = 0
 			}
+
+			continue
 		}
+
+		logrus.WithField("height", h).Infof("Measured TPS %.2f (%d/%d)", tps, lastTxsCount, blockTime)
 	}
 }

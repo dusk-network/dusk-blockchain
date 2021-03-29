@@ -300,6 +300,21 @@ func TestMeasureNetworkTPS(t *testing.T) {
 		t.SkipNow()
 	}
 
+	// Recent results on 2021-03-29T:
+	/*
+	 msg="Measured TPS 11.20 (56/5)" height=14
+	 msg="Measured TPS 9.33 (56/6)" height=15
+	 msg="Measured TPS 9.33 (56/6)" height=15
+	 msg="Measured TPS 9.33 (56/6)" height=16
+	 msg="Measured TPS 11.20 (56/5)" height=17
+	 msg="Measured TPS 11.20 (56/5)" height=17
+	 msg="Measured TPS 9.33 (56/6)" height=18
+	 msg="Measured TPS 9.33 (56/6)" height=19
+	 msg="Measured TPS 9.33 (56/6)" height=19
+	 msg="Measured TPS 9.33 (56/6)" height=19
+	 msg="Measured TPS 9.33 (56/6)" height=19
+	*/
+
 	defaultLocktime := uint64(100000)
 
 	// Send a bunch of Bid transactions
@@ -349,21 +364,6 @@ func TestMeasureNetworkTPS(t *testing.T) {
 
 	// Start monitoring TPS metric of the network
 	localNet.MonitorTPS(4 * time.Second)
-
-	// Recent results on 2021-03-29T:
-	/*
-	 msg="Measured TPS 11.20 (56/5)" height=14
-	 msg="Measured TPS 9.33 (56/6)" height=15
-	 msg="Measured TPS 9.33 (56/6)" height=15
-	 msg="Measured TPS 9.33 (56/6)" height=16
-	 msg="Measured TPS 11.20 (56/5)" height=17
-	 msg="Measured TPS 11.20 (56/5)" height=17
-	 msg="Measured TPS 9.33 (56/6)" height=18
-	 msg="Measured TPS 9.33 (56/6)" height=19
-	 msg="Measured TPS 9.33 (56/6)" height=19
-	 msg="Measured TPS 9.33 (56/6)" height=19
-	 msg="Measured TPS 9.33 (56/6)" height=19
-	*/
 }
 
 // TestForgedBlock propagates a forged block with height >100000 to the network.
