@@ -9,7 +9,7 @@ require (
 	github.com/drewolson/testflight v1.0.0
 	github.com/dusk-network/dusk-crypto v0.1.3
 	github.com/dusk-network/dusk-protobuf v0.2.16
-	github.com/dusk-network/dusk-wallet/v2 v2.0.3
+	github.com/dusk-network/dusk-wallet/v2 v2.0.4
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/etherlabsio/healthcheck v0.0.0-20191224061800-dd3d2fd8c3f6
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
