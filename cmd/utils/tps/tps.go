@@ -15,6 +15,11 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	retryAmount = 5
+	retryDelay  = 5 * time.Second
+)
+
 // StartSpamming transactions from the given GRPC address. The utility will spam
 // Transfer transactions right back to the wallet it's coming from.
 func StartSpamming(addr string, delay int, amount uint64) error {
@@ -41,14 +46,30 @@ func StartSpamming(addr string, delay int, amount uint64) error {
 	for {
 		time.Sleep(delayTime)
 
-		logrus.WithFields(logrus.Fields{
-			"amount": amount,
-			"addr":   string(walletAddr),
-		}).Debug("sending transfer transaction")
+		// We retry whenever the first couple of attempts fail. This is due to
+		// a failure possibly being related to us spending all of our outputs
+		// before the new block is finalized, so a little bit of a wait could
+		// fix the issue. If we can't manage to succeed after 5 tries, we return.
+		for i := 0; i < retryAmount; i++ {
+			logrus.WithFields(logrus.Fields{
+				"amount": amount,
+				"addr":   string(walletAddr),
+			}).Debug("sending transfer transaction")
 
-		if err := sendTransaction(amount, client, walletAddr); err != nil {
-			logrus.WithError(err).Error("error encountered when sending transaction")
-			return err
+			err = sendTransaction(amount, client, walletAddr)
+			if err == nil {
+				break
+			}
+
+			if i == retryAmount-1 {
+				logrus.WithError(err).Error("didn't succeed in sending transaction")
+				return err
+			}
+
+			logrus.WithError(err).
+				Error("error encountered when sending transaction - retrying...")
+
+			time.Sleep(retryDelay * time.Duration(i+1))
 		}
 	}
 }
