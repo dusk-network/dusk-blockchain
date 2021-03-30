@@ -421,8 +421,6 @@ func (n *Network) GetWalletAddress(ind uint) (string, []byte, error) {
 		return "", nil, err
 	}
 
-	defer c.GracefulClose()
-
 	client := pb.NewWalletClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -445,8 +443,6 @@ func (n *Network) GetBalance(ind uint) (uint64, uint64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-
-	defer c.GracefulClose()
 
 	client := pb.NewWalletClient(conn)
 
@@ -561,7 +557,10 @@ func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSiz
 	}
 
 	defer func() {
-		_ = conn.Close()
+		err = conn.Close()
+		if err != nil {
+			logrus.WithError(err).WithField("sender_index", senderNodeInd).Warn("Closing grpc")
+		}
 	}()
 
 	client := pb.NewTransactorClient(conn)
@@ -569,7 +568,8 @@ func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSiz
 	for i := uint(0); i < batchSize; i++ {
 		req := pb.TransferRequest{Amount: amount, Address: pubKey, Fee: fee}
 
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		clientDeadline := time.Now().Add(timeout)
+		ctx, cancel := context.WithDeadline(context.Background(), clientDeadline)
 
 		_, err := client.Transfer(ctx, &req)
 		if err != nil {
@@ -586,6 +586,9 @@ func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSiz
 func (n *Network) MonitorTPS(delay time.Duration) {
 	// Start monitoring TPS value of the network
 	nodeInd := uint(0)
+
+	lastHeight := uint64(0)
+	cumulativeTxsCount := 0
 
 	for {
 		time.Sleep(delay)
@@ -605,6 +608,16 @@ func (n *Network) MonitorTPS(delay time.Duration) {
 			continue
 		}
 
-		logrus.WithField("height", h).Infof("Measured TPS %.2f (%d/%d)", tps, lastTxsCount, blockTime)
+		if lastHeight == h {
+			// do not print if height is the same
+			continue
+		}
+
+		cumulativeTxsCount += lastTxsCount
+		lastHeight = h
+
+		logrus.WithField("height", h).
+			WithField("cumulative_tx_count", cumulativeTxsCount).
+			Infof("Measured TPS %.2f (%d/%d) %d", tps, lastTxsCount, blockTime, cumulativeTxsCount)
 	}
 }
