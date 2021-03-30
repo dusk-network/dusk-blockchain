@@ -8,6 +8,7 @@ package tps
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
@@ -16,13 +17,22 @@ import (
 )
 
 const (
-	retryAmount = 5
-	retryDelay  = 5 * time.Second
+	retryAmount   = 5
+	retryDelay    = 5 * time.Second
+	defaultAmount = 100
 )
 
 // StartSpamming transactions from the given GRPC address. The utility will spam
 // Transfer transactions right back to the wallet it's coming from.
 func StartSpamming(addr string, delay int, amount uint64) error {
+	if addr == "" {
+		return errors.New("no GRPC address provided")
+	}
+
+	if amount == 0 {
+		amount = defaultAmount
+	}
+
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		return err
