@@ -33,7 +33,10 @@ func StartSpamming(addr string, delay int, amount uint64) error {
 		amount = defaultAmount
 	}
 
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return err
 	}
