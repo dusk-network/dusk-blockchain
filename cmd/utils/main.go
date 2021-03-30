@@ -13,6 +13,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/grpcclient"
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/mock"
+	"github.com/dusk-network/dusk-blockchain/cmd/utils/tps"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
 
@@ -35,6 +36,7 @@ func main() {
 		mockCMD,
 		mockRUSKCMD,
 		setConfigCMD,
+		tpsCMD,
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -158,6 +160,12 @@ var (
 		Value: "",
 	}
 
+	delayFlag = cli.IntFlag{
+		Name:  "delay",
+		Usage: "Set delay between sending of transactions in ms",
+		Value: 0,
+	}
+
 	metricsCMD = cli.Command{
 		Name:      "metrics",
 		Usage:     "expose a metrics endpoint",
@@ -228,6 +236,19 @@ var (
 			configValueFlag,
 		},
 		Description: `Modify a specific dusk config in run-time`,
+	}
+
+	tpsCMD = cli.Command{
+		Name:      "tps",
+		Usage:     "attach to a node for continuous transaction spamming",
+		Action:    tpsAction,
+		ArgsUsage: "",
+		Flags: []cli.Flag{
+			grpcAddressFlag,
+			delayFlag,
+			amountFlag,
+		},
+		Description: `Send transactions from the given node until process exits`,
 	}
 )
 
@@ -319,4 +340,12 @@ func setConfigAction(ctx *cli.Context) error {
 
 	req.Address = ctx.String(grpcAddressFlag.Name)
 	return grpcclient.TrySetConfig(req)
+}
+
+func tpsAction(ctx *cli.Context) error {
+	addr := ctx.String(grpcAddressFlag.Name)
+	delay := ctx.Int(delayFlag.Name)
+	amount := ctx.Uint64(amountFlag.Name)
+
+	return tps.StartSpamming(addr, delay, amount)
 }
