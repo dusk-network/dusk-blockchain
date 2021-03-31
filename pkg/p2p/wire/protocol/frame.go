@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	// MaxFrameSize is set at 250000 bytes.
-	MaxFrameSize = uint64(250000)
+	// MaxFrameSize is set at 1375000 bytes.
+	MaxFrameSize = uint64(1375000)
 )
 
 // WriteFrame mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message.
