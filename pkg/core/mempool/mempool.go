@@ -28,7 +28,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -179,7 +178,7 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 			WithField("txtype", t.tx.Type()).
 			WithField("txsize", t.size).
 			WithField("duration", elapsed.Microseconds()).
-			Info("accepted transaction")
+			Trace("accepted transaction")
 	}
 
 	return nil, err
@@ -194,7 +193,7 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	}
 
 	log.WithField("txid", txid).
-		Info("ensuring transaction rules satisfied")
+		Trace("ensuring transaction rules satisfied")
 
 	if t.tx.Type() == transactions.Distribute {
 		// coinbase tx should be built by block generator only
@@ -273,35 +272,18 @@ func (m *Mempool) removeAccepted(b block.Block) {
 		return
 	}
 
-	payloads := make([]merkletree.Payload, len(b.Txs))
-	for i, tx := range b.Txs {
-		payloads[i] = tx.(merkletree.Payload)
-	}
-
-	tree, err := merkletree.NewTree(payloads)
-	if err == nil && tree != nil {
-		s := m.newPool()
-		// Check if mempool verified tx is part of merkle tree of this block
-		// if not, then keep it in the mempool for the next block
-		err = m.verified.Range(func(k txHash, t TxDesc) error {
-			if r, _ := tree.VerifyContent(t.tx); !r {
-				if e := s.Put(t); e != nil {
-					return e
-				}
-			}
-			return nil
-		})
-
+	for _, tx := range b.Txs {
+		hash, err := tx.CalculateHash()
 		if err != nil {
 			log.
 				WithError(err).
 				WithField("height", b.Header.Height).
 				WithField("hash", blockHash).
 				WithField("len_txs", len(b.Txs)).
-				Error("could not check mempool verified tx")
+				Panic("could not calculate tx hash")
 		}
 
-		m.verified = s
+		m.verified.Delete(hash)
 	}
 
 	log.

@@ -37,6 +37,8 @@ type Pool interface {
 	Get(txID []byte) transactions.ContractCall
 	// Contains returns true if the given key is in the pool.
 	Contains(key []byte) bool
+	// Delete a key in the pool.
+	Delete(key []byte)
 	// Clone the entire pool.
 	Clone() []transactions.ContractCall
 
