@@ -64,7 +64,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("timeout.timeoutkeepalivetime", 30)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
-	viper.Set("logger.level", "trace")
+	viper.Set("logger.level", "info")
 
 	viper.Set("gql.address", node.Cfg.Gql.Address)
 	viper.Set("gql.network", node.Cfg.Gql.Network)
