@@ -279,7 +279,7 @@ func (t *Transactor) publishTx(tx transactions.ContractCall) ([]byte, error) {
 		return nil, err
 	}
 
-	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 2*time.Second)
+	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 5*time.Second)
 	return hash, err
 }
 
