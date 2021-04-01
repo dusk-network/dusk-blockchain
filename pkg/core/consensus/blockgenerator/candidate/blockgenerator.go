@@ -29,7 +29,7 @@ var lg = log.WithField("process", "candidate generator")
 
 // MaxTxSetSize defines the maximum amount of transactions.
 // It is TBD along with block size and processing.MaxFrameSize.
-const MaxTxSetSize = 150000
+const MaxTxSetSize = 825000
 
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
