@@ -149,6 +149,14 @@ func (m *HashMap) Delete(txID []byte) {
 	var k txHash
 
 	copy(k[:], txID)
+
+	tx, ok := m.data[k]
+	if !ok {
+		return
+	}
+
+	m.txsSize -= uint32(tx.size)
+
 	delete(m.data, k)
 
 	// TODO: this is naive, and may be improved upon.
