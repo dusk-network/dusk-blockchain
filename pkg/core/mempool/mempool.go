@@ -142,7 +142,7 @@ func (m *Mempool) Run(ctx context.Context) {
 			select {
 			// rpcbus methods.
 			case r := <-m.sendTxChan:
-				handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
+				go handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
 			case r := <-m.getMempoolTxsChan:
 				handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
 			case r := <-m.getMempoolTxsBySizeChan:
