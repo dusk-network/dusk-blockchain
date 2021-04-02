@@ -166,6 +166,11 @@ var (
 		Value: 0,
 	}
 
+	cpuProfileFlag = cli.StringFlag{
+		Name:  "cpuprofile",
+		Usage: "cpu.prof output profiling file",
+	}
+
 	metricsCMD = cli.Command{
 		Name:      "metrics",
 		Usage:     "expose a metrics endpoint",
@@ -218,6 +223,7 @@ var (
 			walletStoreFlag,
 			walletFileFlag,
 			configFileFlag,
+			cpuProfileFlag,
 		},
 		Description: `Execute/Query transactions for a Dusk node`,
 	}
@@ -311,6 +317,7 @@ func mockRuskAction(ctx *cli.Context) error {
 	walletStore := ctx.String(walletStoreFlag.Name)
 	walletFile := ctx.String(walletFileFlag.Name)
 	configFile := ctx.String(configFileFlag.Name)
+	cpuProfileFile := ctx.String(cpuProfileFlag.Name)
 
 	fmt.Println(configFile)
 
@@ -328,7 +335,7 @@ func mockRuskAction(ctx *cli.Context) error {
 
 	log.SetOutput(logFile)
 
-	err = mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile)
+	err = mock.RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile, cpuProfileFile)
 	return err
 }
 

@@ -9,6 +9,9 @@ package mock
 import (
 	"fmt"
 	"net"
+	"os"
+	"os/signal"
+	"runtime/pprof"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
@@ -37,7 +40,24 @@ func RunMock(grpcMockHost string) error {
 }
 
 // RunRUSKMock will run a RUSK mock.
-func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile string) error {
+func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile, cpuprofile string) error {
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+
+	// Enable CPU Profile
+	if cpuprofile != "" {
+		f, err := os.Create(cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal(err)
+		}
+
+		defer pprof.StopCPUProfile()
+	}
+
 	r := new(config.Registry)
 
 	r.Wallet.File = walletFile
@@ -53,5 +73,7 @@ func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile string) error
 		return err
 	}
 
-	select {}
+	<-interrupt
+
+	return nil
 }
