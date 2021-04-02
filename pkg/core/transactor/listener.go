@@ -219,6 +219,8 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 		return nil, err
 	}
 
+	start := time.Now().UnixNano()
+
 	tx, err := t.proxy.Provider().NewTransfer(ctx, req.Amount, pb)
 	if err != nil {
 		log.
@@ -227,6 +229,10 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 			Error("handleSendStandardTx, failed to create NewTransactionTx")
 		return nil, err
 	}
+
+	t.stats.transferCumulativeTime += (time.Now().UnixNano() - start)
+	t.stats.transferTxsCount++
+	t.stats.report()
 
 	// Publish transaction to the mempool processing
 	hash, err := t.publishTx(tx)
