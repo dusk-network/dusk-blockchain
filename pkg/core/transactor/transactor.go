@@ -23,11 +23,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-type transactorStats struct {
-	transferCumulativeTime int64
-	transferTxsCount       int64
-}
-
 // Transactor is the implementation of both the Waller and the Transactor GRPC servers.
 type Transactor struct {
 	db database.DB
@@ -45,8 +40,6 @@ type Transactor struct {
 	getSyncProgress func() float64
 
 	w *wallet.Wallet
-
-	stats transactorStats
 }
 
 // New Instantiate a new Transactor struct.
@@ -187,16 +180,4 @@ func (t *Transactor) GetAddress(ctx context.Context, e *node.EmptyRequest) (*nod
 // GetBalance returns the balance of the loaded wallet.
 func (t *Transactor) GetBalance(ctx context.Context, e *node.EmptyRequest) (*node.BalanceResponse, error) {
 	return t.handleBalance()
-}
-
-func (s *transactorStats) report() {
-	if s.transferTxsCount%30 == 0 {
-		// Report each 30 txs
-		cumulativeMilli := s.transferCumulativeTime / (1000 * 1000)
-		log.
-			WithField("cumulative_time_ms", cumulativeMilli).
-			WithField("txs_count", s.transferTxsCount).
-			WithField("average_ms", float64(cumulativeMilli)/float64(s.transferTxsCount)).
-			Info("transfer grpc call stats")
-	}
 }

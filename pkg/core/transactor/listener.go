@@ -230,9 +230,8 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 		return nil, err
 	}
 
-	t.stats.transferCumulativeTime += (time.Now().UnixNano() - start)
-	t.stats.transferTxsCount++
-	t.stats.report()
+	d := (time.Now().UnixNano() - start) / (1000 * 1000)
+	log.WithField("duration_ms", d).Debug("NewTransfer grpc call")
 
 	// Publish transaction to the mempool processing
 	hash, err := t.publishTx(tx)

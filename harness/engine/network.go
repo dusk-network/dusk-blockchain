@@ -246,6 +246,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 			"--walletstore", node.Cfg.Wallet.Store,
 			"--walletfile", node.Cfg.Wallet.File,
 			"--configfile", tomlFilePath,
+			// Optional "--cpuprofile", nodeDir+"/mockrusk_cpu.prof",
 		); startErr != nil {
 			return startErr
 		}
