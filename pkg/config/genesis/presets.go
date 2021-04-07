@@ -7,7 +7,7 @@
 package genesis
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 )
@@ -17,7 +17,7 @@ import (
 func GetPresetConfig(name string) (Config, error) {
 	c, ok := configurations[name]
 	if !ok {
-		return Config{}, errors.New("config not found")
+		return Config{}, fmt.Errorf("config not found - %s", name)
 	}
 
 	return c, nil
