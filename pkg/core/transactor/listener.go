@@ -219,6 +219,8 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 		return nil, err
 	}
 
+	start := time.Now().UnixNano()
+
 	tx, err := t.proxy.Provider().NewTransfer(ctx, req.Amount, pb)
 	if err != nil {
 		log.
@@ -227,6 +229,9 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 			Error("handleSendStandardTx, failed to create NewTransactionTx")
 		return nil, err
 	}
+
+	d := (time.Now().UnixNano() - start) / (1000 * 1000)
+	log.WithField("duration_ms", d).Debug("NewTransfer grpc call")
 
 	// Publish transaction to the mempool processing
 	hash, err := t.publishTx(tx)

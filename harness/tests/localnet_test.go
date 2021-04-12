@@ -348,7 +348,7 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	batchSize, _ := strconv.Atoi(batchSizeEnv)
 
 	if batchSize == 0 {
-		batchSize = 100
+		batchSize = 180
 	}
 
 	for i := uint(0); i < uint(localNet.Size()); i++ {
