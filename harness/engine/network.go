@@ -7,6 +7,7 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -61,16 +62,21 @@ type sessionlessClient struct {
 
 // GetSessionConn returns a connection to the grpc server.
 func (s *sessionlessClient) GetSessionConn(opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-	var err error
-
 	addr := s.addr
 
 	if s.network == "unix" { //nolint
 		addr = "unix://" + addr
 	}
 
-	s.conn, err = grpc.Dial(addr, opts...)
-	return s.conn, err
+	var cancel context.CancelFunc
+	var dialCtx context.Context
+
+	dialCtx, cancel = context.WithTimeout(context.Background(),
+		5*time.Second)
+	defer cancel()
+
+	// Set up a connection to the server.
+	return grpc.DialContext(dialCtx, addr, opts...)
 }
 
 // GracefulClose closes the connection.
