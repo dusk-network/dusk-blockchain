@@ -574,6 +574,8 @@ func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSiz
 		_, err := client.Transfer(ctx, &req)
 		if err != nil {
 			logrus.WithField("sender_index", senderNodeInd).Error(err)
+			cancel()
+			return nil
 		}
 
 		cancel()
@@ -589,6 +591,9 @@ func (n *Network) MonitorTPS(delay time.Duration) {
 
 	lastHeight := uint64(0)
 	cumulativeTxsCount := 0
+
+	blockTimeSum := int64(0)
+	blocksCount := int64(0)
 
 	for {
 		time.Sleep(delay)
@@ -616,8 +621,13 @@ func (n *Network) MonitorTPS(delay time.Duration) {
 		cumulativeTxsCount += lastTxsCount
 		lastHeight = h
 
+		blocksCount++
+
+		blockTimeSum += blockTime
+
 		logrus.WithField("height", h).
-			WithField("cumulative_tx_count", cumulativeTxsCount).
-			Infof("Measured TPS %.2f (%d/%d) %d", tps, lastTxsCount, blockTime, cumulativeTxsCount)
+			WithField("cumulative_txs_count", cumulativeTxsCount).
+			WithField("average_block_time", blockTimeSum/blocksCount).
+			Infof("Measured TPS %.2f (%d/%d)", tps, lastTxsCount, blockTime)
 	}
 }

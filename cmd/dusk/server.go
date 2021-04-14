@@ -377,13 +377,18 @@ func registerPeerServices(processor *peer.MessageProcessor, db database.DB, even
 }
 
 func setupGRPCClients(ctx context.Context) (transactions.Proxy, *grpc.ClientConn) {
-	ruskClient, ruskConn := client.CreateStateClient(ctx, cfg.Get().RPC.Rusk.Address)
-	keysClient, _ := client.CreateKeysClient(ctx, cfg.Get().RPC.Rusk.Address)
-	blindbidServiceClient, _ := client.CreateBlindBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
-	bidServiceClient, _ := client.CreateBidServiceClient(ctx, cfg.Get().RPC.Rusk.Address)
-	transferClient, _ := client.CreateTransferClient(ctx, cfg.Get().RPC.Rusk.Address)
-	stakeClient, _ := client.CreateStakeClient(ctx, cfg.Get().RPC.Rusk.Address)
-	walletClient, _ := client.CreateWalletClient(ctx, cfg.Get().RPC.Rusk.Address)
+	addr := cfg.Get().RPC.Rusk.Address
+	if cfg.Get().RPC.Rusk.Network == "unix" {
+		addr = "unix://" + cfg.Get().RPC.Rusk.Address
+	}
+
+	ruskClient, ruskConn := client.CreateStateClient(ctx, addr)
+	keysClient, _ := client.CreateKeysClient(ctx, addr)
+	blindbidServiceClient, _ := client.CreateBlindBidServiceClient(ctx, addr)
+	bidServiceClient, _ := client.CreateBidServiceClient(ctx, addr)
+	transferClient, _ := client.CreateTransferClient(ctx, addr)
+	stakeClient, _ := client.CreateStakeClient(ctx, addr)
+	walletClient, _ := client.CreateWalletClient(ctx, addr)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
