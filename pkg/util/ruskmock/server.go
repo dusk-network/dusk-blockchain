@@ -340,8 +340,8 @@ func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey
 
 // NewTransfer creates a transaction and returns it to the caller.
 func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionRequest) (*rusk.Transaction, error) {
-	log.Infoln("call received to FindBid")
-	defer log.Infoln("finished call to FindBid")
+	log.Infoln("call received to NewTransfer")
+	defer log.Infoln("finished call to NewTransfer")
 
 	tx, err := transactions.NewStandard(0, byte(2), int64(100))
 	if err != nil {

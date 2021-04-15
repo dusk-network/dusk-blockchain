@@ -300,19 +300,17 @@ func TestMeasureNetworkTPS(t *testing.T) {
 		t.SkipNow()
 	}
 
-	// Recent results on 2021-03-29T:
+	// Recent results on 2021-04-14:
 	/*
-	 msg="Measured TPS 11.20 (56/5)" height=14
-	 msg="Measured TPS 9.33 (56/6)" height=15
-	 msg="Measured TPS 9.33 (56/6)" height=15
-	 msg="Measured TPS 9.33 (56/6)" height=16
-	 msg="Measured TPS 11.20 (56/5)" height=17
-	 msg="Measured TPS 11.20 (56/5)" height=17
-	 msg="Measured TPS 9.33 (56/6)" height=18
-	 msg="Measured TPS 9.33 (56/6)" height=19
-	 msg="Measured TPS 9.33 (56/6)" height=19
-	 msg="Measured TPS 9.33 (56/6)" height=19
-	 msg="Measured TPS 9.33 (56/6)" height=19
+		 	"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=393 height=8
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=770 height=9
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=1147 height=10
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=1524 height=11
+			"Measured TPS 75.40 (377/5)" average_block_time=5 cumulative_txs_count=1901 height=12
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=2278 height=13
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=2655 height=14
+			"Measured TPS 75.40 (377/5)" average_block_time=5 cumulative_txs_count=3032 height=15
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=3409 height=16
 	*/
 
 	defaultLocktime := uint64(100000)
@@ -321,10 +319,10 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	// All nodes are Block Generators
 	for i := uint(0); i < uint(localNet.Size()); i++ {
 		time.Sleep(100 * time.Millisecond)
-		t.Logf("Node %d sending a Bid transaction", i)
+		logrus.Infof("Node %d sending a Bid transaction", i)
 
 		if _, err := localNet.SendBidCmd(i, 100, defaultLocktime); err != nil {
-			t.Log(err.Error())
+			logrus.Error(err.Error())
 		}
 	}
 
@@ -332,10 +330,10 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	// All nodes are Provisioners
 	for i := uint(0); i < uint(localNet.Size()); i++ {
 		time.Sleep(100 * time.Millisecond)
-		t.Logf("Node %d sending a Stake transaction", i)
+		logrus.Infof("Node %d sending a Stake transaction", i)
 
 		if _, err := localNet.SendStakeCmd(i, 100, defaultLocktime); err != nil {
-			t.Log(err.Error())
+			logrus.Error(err.Error())
 		}
 	}
 
@@ -348,7 +346,7 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	batchSize, _ := strconv.Atoi(batchSizeEnv)
 
 	if batchSize == 0 {
-		batchSize = 180
+		batchSize = 200
 	}
 
 	for i := uint(0); i < uint(localNet.Size()); i++ {

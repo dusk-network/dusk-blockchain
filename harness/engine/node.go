@@ -53,8 +53,13 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string, requireSession bool)
 		node.Cfg.RPC.Address = "127.0.0.1:" + node.Id
 	}
 
-	node.Cfg.RPC.Rusk.Network = "tcp" //nolint
-	node.Cfg.RPC.Rusk.Address = "127.0.0.1:" + strconv.Itoa(nodeID+1000)
+	/*
+		node.Cfg.RPC.Rusk.Network = "tcp" //nolint
+		node.Cfg.RPC.Rusk.Address = "127.0.0.1:" + strconv.Itoa(nodeID+1000)
+	*/
+	node.Cfg.RPC.Rusk.Network = "unix" //nolint
+	node.Cfg.RPC.Rusk.Address = "/rusk-grpc.sock"
+
 	node.Cfg.RPC.Rusk.ContractTimeout = 6000
 	node.Cfg.RPC.Rusk.DefaultTimeout = 1000
 	node.Cfg.RPC.Rusk.ConnectionTimeout = 10000
