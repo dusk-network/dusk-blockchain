@@ -8,6 +8,7 @@ Messages sent over the wire are length-prefixed frames of data, with the followi
 | :--- | :--- |
 | Packet Length | 8 |
 | Magic | 4 |
+| Reserved | 8 |
 | Checksum | 4 |
 | Topic | 1 |
 | Payload | Any |
