@@ -36,8 +36,8 @@ func TestProcess(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write([]byte("pippo"))
-	// First 8 bytes of `msg` are the magic and checksum
-	assert.Equal(t, buf.Bytes(), msg[8:])
+	// First 16 bytes of `msg` are the magic, checksum and reserved bytes
+	assert.Equal(t, buf.Bytes(), msg[16:])
 }
 
 func TestUnpackLength(t *testing.T) {

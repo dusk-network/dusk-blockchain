@@ -8,6 +8,7 @@ package protocol
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -59,9 +60,18 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 		return 0, errors.New("magic mismatch")
 	}
 
+	// Reserved field is the message timestamp in DevNet/TestNet
+	_, rfSize, err := g.extractReservedField(r)
+	if err != nil {
+		return 0, errors.New("reserved field mismatch")
+	}
+
+	// Uncomment on measuring average arrival time
+	// s.registerPacket(packetLength, reservedFieldValue)
+
 	// If packetLength is less than magic.Len(), ln is close to MaxUint64
 	// due to integer overflow
-	ln := packetLength - uint64(magic.Len())
+	ln := packetLength - uint64(rfSize) - uint64(magic.Len())
 
 	if ln > MaxFrameSize {
 		return 0, fmt.Errorf("invalid packet length %d", packetLength)
@@ -114,4 +124,15 @@ func (g *Gossip) ReadFrame(src io.Reader) ([]byte, error) {
 	}
 
 	return message, nil
+}
+
+func (g *Gossip) extractReservedField(r io.Reader) (int64, int, error) {
+	size := 8
+	// Read timestamp
+	buffer := make([]byte, size)
+	if _, err := io.ReadFull(r, buffer); err != nil {
+		return 0, 0, err
+	}
+
+	return int64(binary.LittleEndian.Uint64(buffer)), size, nil
 }
