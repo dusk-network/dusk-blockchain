@@ -191,9 +191,9 @@ func (p *Reader) Accept() error {
 	return nil
 }
 
-// Create two-way communication with a peer. The function creates a shared context
-// between both goroutines, which allows one to cancel the other in case of a
-// fatal error being encountered.
+// Create two-way communication with a peer. This function will allow both
+// goroutines to run as long as no errors are encountered. Once the first error
+// comes through, the context is canceled, and both goroutines are cleaned up.
 func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan <-chan bytes.Buffer) {
 	pCtx, cancel := context.WithCancel(ctx)
 
