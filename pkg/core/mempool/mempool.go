@@ -265,6 +265,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 		WithField("height", b.Header.Height).
 		WithField("hash", blockHash).
 		WithField("len_txs", len(b.Txs)).
+		WithField("mempool_size", float32(m.verified.Size())/1000).
 		Info("process an accepted block")
 
 	if m.verified.Len() == 0 {
@@ -280,6 +281,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 				WithField("height", b.Header.Height).
 				WithField("hash", blockHash).
 				WithField("len_txs", len(b.Txs)).
+				WithField("mempool_size", float32(m.verified.Size())/1000).
 				Panic("could not calculate tx hash")
 		}
 
@@ -290,6 +292,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 		WithField("height", b.Header.Height).
 		WithField("hash", blockHash).
 		WithField("len_txs", len(b.Txs)).
+		WithField("mempool_size", float32(m.verified.Size())/1000).
 		Info("processing_block_completed")
 }
 

@@ -30,6 +30,7 @@ func StartSpamming(addr string, delay int, amount uint64) error {
 		return errors.New("no GRPC address provided")
 	}
 
+	// Add UNIX prefix in case we're using unix sockets.
 	if strings.Contains(addr, ".sock") {
 		addr = "unix://" + addr
 	}
