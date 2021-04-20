@@ -55,7 +55,7 @@ func TestReader(t *testing.T) {
 	responseChan := make(chan bytes.Buffer, 100)
 	peerReader := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), responseChan)
 
-	go peerReader.ReadLoop(context.Background(), make(chan error, 1))
+	go peerReader.ReadLoop(context.Background())
 
 	errChan := make(chan error, 1)
 	go func(eChan chan error) {
@@ -116,7 +116,7 @@ func TestWriteLoop(t *testing.T) {
 		responseChan := make(chan bytes.Buffer)
 
 		writer := NewWriter(client, g, bus, 30*time.Millisecond)
-		go writer.Serve(context.Background(), responseChan, make(chan error, 1))
+		go writer.Serve(context.Background(), responseChan)
 
 		bufCopy := buf
 		responseChan <- bufCopy

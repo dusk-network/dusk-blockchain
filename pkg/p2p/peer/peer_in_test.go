@@ -229,7 +229,7 @@ func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, ch
 	peer := f.SpawnReader(r, g, respChan)
 
 	// Run the non-recover readLoop to watch for panics
-	go assert.NotPanics(t, func() { peer.readLoop(context.Background(), make(chan error, 1)) })
+	go assert.NotPanics(t, func() { peer.readLoop(context.Background()) })
 
 	time.Sleep(200 * time.Millisecond)
 
