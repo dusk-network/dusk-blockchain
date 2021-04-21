@@ -161,6 +161,14 @@ func (m *Mempool) Run(ctx context.Context) {
 
 // ProcessTx handles a submitted tx from any source (rpcBus or eventBus).
 func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buffer, error) {
+	maxSizeBytes := config.Get().Mempool.MaxSizeMB * 1000 * 1000
+	if m.verified.Size() > maxSizeBytes {
+		log.WithField("max_size_mb", maxSizeBytes).
+			WithField("current_size", m.verified.Size()).
+			Warn("mempool is full, dropping transaction")
+		return nil, errors.New("mempool is full, dropping transaction")
+	}
+
 	t := TxDesc{tx: msg.Payload().(transactions.ContractCall), received: time.Now(), size: uint(len(msg.Id()))}
 	start := time.Now()
 	txid, err := m.processTx(t)
