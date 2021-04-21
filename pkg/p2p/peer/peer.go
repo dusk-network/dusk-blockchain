@@ -191,30 +191,25 @@ func (p *Reader) Accept() error {
 	return nil
 }
 
-// Create two-way communication with a peer. This function will allow both
-// goroutines to run as long as no errors are encountered. Once the first error
-// comes through, the context is canceled, and both goroutines are cleaned up.
-func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan <-chan bytes.Buffer) error {
-	errChan := make(chan error, 1)
-	defer close(errChan)
+// Create two-way communication with a peer. The function creates a shared context
+// between both goroutines, which allows one to cancel the other in case of a
+// fatal error being encountered.
+func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan <-chan bytes.Buffer) {
+	pCtx, cancel := context.WithCancel(ctx)
 
-	go reader.ReadLoop(ctx, errChan)
-	go writer.Serve(ctx, writeQueueChan, errChan)
+	go func() {
+		reader.ReadLoop(pCtx)
+		cancel()
+	}()
 
-	return <-errChan
-}
-
-// This attempts a non-blocking send to the errChan, which prevents panics
-// from sending to a closed channel.
-func sendError(errChan chan error, err error) {
-	select {
-	case errChan <- err:
-	default:
-	}
+	go func() {
+		writer.Serve(ctx, writeQueueChan)
+		cancel()
+	}()
 }
 
 // Serve utilizes two different methods for writing to the open connection.
-func (w *Writer) Serve(ctx context.Context, writeQueueChan <-chan bytes.Buffer, errChan chan error) {
+func (w *Writer) Serve(ctx context.Context, writeQueueChan <-chan bytes.Buffer) {
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
 	g := &GossipConnector{w.gossip, w.Connection}
@@ -222,7 +217,7 @@ func (w *Writer) Serve(ctx context.Context, writeQueueChan <-chan bytes.Buffer, 
 
 	// writeQueue - FIFO queue
 	// writeLoop pushes first-in message to the socket
-	w.writeLoop(ctx, writeQueueChan, errChan)
+	w.writeLoop(ctx, writeQueueChan)
 	w.onDisconnect()
 }
 
@@ -262,7 +257,7 @@ func (w *Writer) onDisconnect() {
 	}
 }
 
-func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buffer, errChan chan error) {
+func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buffer) {
 	defer func() {
 		if config.Get().API.Enabled {
 			go func() {
@@ -292,8 +287,6 @@ func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buff
 
 			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
 				l.WithField("process", "writeloop").WithError(err).Warnln("error writing message")
-				sendError(errChan, err)
-
 				return
 			}
 		case <-ctx.Done():
@@ -306,7 +299,7 @@ func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buff
 // ReadLoop will block on the read until a message is read, or until the deadline
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
-func (p *Reader) ReadLoop(ctx context.Context, errChan chan error) {
+func (p *Reader) ReadLoop(ctx context.Context) {
 	// As the peer ReadLoop is at the front-line of P2P network, receiving a
 	// malformed frame by an adversary node could lead to a panic.
 	// In such situation, the node should survive but adversary conn gets dropped
@@ -315,10 +308,10 @@ func (p *Reader) ReadLoop(ctx context.Context, errChan chan error) {
 	// 		log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
 	// 	}
 	// }()
-	p.readLoop(ctx, errChan)
+	p.readLoop(ctx)
 }
 
-func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
+func (p *Reader) readLoop(ctx context.Context) {
 	defer func() {
 		_ = p.Conn.Close()
 	}()
@@ -344,27 +337,23 @@ func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
 		err := p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
 		if err != nil {
 			l.WithError(err).Warnf("error setting read timeout")
-			sendError(errChan, err)
 			return
 		}
 
 		b, err := p.gossip.ReadMessage(p.Conn)
 		if err != nil {
 			l.WithError(err).Warnln("error reading message")
-			sendError(errChan, err)
 			return
 		}
 
 		message, cs, err := checksum.Extract(b)
 		if err != nil {
 			l.WithError(err).Warnln("error reading Extract message")
-			sendError(errChan, err)
 			return
 		}
 
 		if !checksum.Verify(message, cs) {
 			l.WithError(errors.New("invalid checksum")).Warnln("error reading message")
-			sendError(errChan, err)
 			return
 		}
 
