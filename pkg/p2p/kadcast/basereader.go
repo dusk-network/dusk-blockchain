@@ -71,7 +71,7 @@ func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
 		return err
 	}
 
-	if err = r.processor.Collect(raddr, message, nil, p.Height); err != nil {
+	if err = r.processor.Collect(raddr, message, nil, []byte{p.Height}); err != nil {
 		log.WithField("process", "kadcast_reader").
 			WithError(err).Error("failed to process message")
 	}

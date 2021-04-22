@@ -369,12 +369,11 @@ func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
 		}
 
 		go func() {
-			// TODO: error here should be checked in order to decrease reputation
+			// TODO: error here should be checked in order to       reputation
 			// or blacklist spammers
 			startTime := time.Now().UnixNano()
 
-			// TODO: use constants
-			if err = p.processor.Collect(p.Addr(), message, p.responseChan, 255); err != nil {
+			if err = p.processor.Collect(p.Addr(), message, p.responseChan, nil); err != nil {
 				l.WithField("process", "readloop").WithField("cs", hex.EncodeToString(cs)).
 					WithError(err).Error("failed to process message")
 			}
