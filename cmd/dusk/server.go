@@ -52,15 +52,14 @@ var (
 
 // Server is the main process of the node.
 type Server struct {
-	eventBus          *eventbus.EventBus
-	rpcBus            *rpcbus.RPCBus
-	c                 *chain.Chain
-	gossip            *protocol.Gossip
-	grpcServer        *grpc.Server
-	ruskConn          *grpc.ClientConn
-	readerFactory     *peer.ReaderFactory
-	activeConnections map[string]time.Time
-	kadPeer           *kadcast.Peer
+	eventBus      *eventbus.EventBus
+	rpcBus        *rpcbus.RPCBus
+	c             *chain.Chain
+	gossip        *protocol.Gossip
+	grpcServer    *grpc.Server
+	ruskConn      *grpc.ClientConn
+	readerFactory *peer.ReaderFactory
+	kadPeer       *kadcast.Peer
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
@@ -244,16 +243,25 @@ func Setup() *Server {
 	// Creating the peer factory
 	readerFactory := peer.NewReaderFactory(processor)
 
+	// Create the listener and contact the voucher seeder
+	connector := peer.NewConnector(cfg.Get().Network.Port)
+
+	seeders := cfg.Get().Network.Seeder.Addresses
+	if len(seeders) != 0 {
+		if err := connector.Connect(seeders[0]); err != nil {
+			log.WithError(err).Error("could not contact voucher seeder")
+		}
+	}
+
 	// creating the Server
 	srv := &Server{
-		eventBus:          eventBus,
-		rpcBus:            rpcBus,
-		c:                 c,
-		gossip:            protocol.NewGossip(protocol.TestNet),
-		grpcServer:        grpcServer,
-		ruskConn:          ruskConn,
-		readerFactory:     readerFactory,
-		activeConnections: make(map[string]time.Time),
+		eventBus:      eventBus,
+		rpcBus:        rpcBus,
+		c:             c,
+		gossip:        protocol.NewGossip(protocol.TestNet),
+		grpcServer:    grpcServer,
+		ruskConn:      ruskConn,
+		readerFactory: readerFactory,
 	}
 
 	// Setting up the transactor component
@@ -292,41 +300,6 @@ func Setup() *Server {
 	}
 
 	return srv
-}
-
-// OnAccept read incoming packet from the peers.
-func (s *Server) OnAccept(conn net.Conn) {
-	writeQueueChan := make(chan bytes.Buffer, 1000)
-
-	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, writeQueueChan)
-	if err := peerReader.Accept(); err != nil {
-		logServer.WithError(err).Warnln("OnAccept, problem performing handshake")
-		return
-	}
-
-	logServer.WithField("address", peerReader.Addr()).Debugln("connection established")
-
-	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
-	go peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
-}
-
-// OnConnection is the callback for writing to the peers.
-func (s *Server) OnConnection(conn net.Conn, addr string) {
-	writeQueueChan := make(chan bytes.Buffer, 1000)
-	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
-
-	if err := peerWriter.Connect(); err != nil {
-		logServer.WithError(err).Warnln("OnConnection, problem performing handshake")
-		return
-	}
-
-	address := peerWriter.Addr()
-
-	logServer.WithField("address", address).
-		Debugln("connection established")
-
-	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, writeQueueChan)
-	go peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
 
 // Close the chain and the connections created through the RPC bus.
