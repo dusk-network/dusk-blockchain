@@ -21,6 +21,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
@@ -64,8 +65,8 @@ type Loader interface {
 
 // Ledger is the Chain interface used in tests.
 type Ledger interface {
-	TryNextConsecutiveBlockInSync(block.Block) error
-	TryNextConsecutiveBlockOutSync(block.Block) error
+	TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error
+	TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error
 	ProduceBlock() error
 	StopBlockProduction()
 	ProcessSyncTimerExpired(strPeerAddr string) error
@@ -172,10 +173,17 @@ func (c *Chain) StopBlockProduction() {
 func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	blk := m.Payload().(block.Block)
 
-	log.WithField("height", blk.Header.Height).Trace("received block")
-
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	var kadcastHeight byte = 255
+	if len(m.Header()) > 0 {
+		kadcastHeight = m.Header()[0]
+		log.WithField("blk_height", blk.Header.Height).WithField("kadcast", kadcastHeight).
+			Trace("received block")
+	} else {
+		log.WithField("blk_height", blk.Header.Height).Trace("received block")
+	}
 
 	// Is it worth looking at this?
 	if blk.Header.Height <= c.tip.Header.Height {
@@ -187,7 +195,7 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 		c.highestSeen = blk.Header.Height
 	}
 
-	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk)
+	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kadcastHeight)
 }
 
 // ProduceBlock will start the consensus loop. It can be halted at any point by
@@ -232,7 +240,7 @@ func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan cons
 				return
 			}
 
-			if err = c.AcceptSuccessiveBlock(block); err != nil {
+			if err = c.AcceptSuccessiveBlock(block, kadcast.InitHeight); err != nil {
 				log.WithError(err).Error("block acceptance failed")
 				c.lock.Unlock()
 				return
@@ -275,17 +283,17 @@ func (c *Chain) produceBlock(ctx context.Context, winnerChan chan consensus.Resu
 
 // TryNextConsecutiveBlockOutSync is the processing path for accepting a block
 // from the network during out-of-sync state.
-func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block) error {
+func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting sync block")
 	return c.AcceptBlock(blk)
 }
 
 // TryNextConsecutiveBlockInSync is the processing path for accepting a block
 // from the network during in-sync state.
-func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block) error {
+func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error {
 	c.StopBlockProduction()
 
-	if err := c.AcceptSuccessiveBlock(blk); err != nil {
+	if err := c.AcceptSuccessiveBlock(blk, kadcastHeight); err != nil {
 		return err
 	}
 
@@ -294,7 +302,7 @@ func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block) error {
 
 // AcceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
-func (c *Chain) AcceptSuccessiveBlock(blk block.Block) error {
+func (c *Chain) AcceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
 
 	if err := c.AcceptBlock(blk); err != nil {
@@ -305,10 +313,8 @@ func (c *Chain) AcceptSuccessiveBlock(blk block.Block) error {
 		c.highestSeen = blk.Header.Height
 	}
 
-	log.Trace("gossiping block")
-
-	if err := c.advertiseBlock(blk); err != nil {
-		log.WithError(err).Error("block advertising failed")
+	if err := c.propagateBlock(blk, kadcastHeight); err != nil {
+		log.WithError(err).Error("block propagation failed")
 		return err
 	}
 
@@ -407,12 +413,16 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 	return err
 }
 
-// Send Inventory message to all peers.
-func (c *Chain) advertiseBlock(b block.Block) error {
+// propagateBlock send inventory message to all peers in gossip network or rebroadcast block in kadcast network.
+func (c *Chain) propagateBlock(b block.Block, kadcastHeight byte) error {
 	// Disable gossiping messages if kadcast mode
 	if config.Get().Kadcast.Enabled {
-		return nil
+		log.WithField("blk_height", b.Header.Height).
+			WithField("kadcast_h", kadcastHeight).Trace("propagate block")
+		return c.kadcastBlock(b, kadcastHeight)
 	}
+
+	log.WithField("blk_height", b.Header.Height).Trace("propagate block")
 
 	msg := &message.Inv{}
 
@@ -436,20 +446,9 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	return nil
 }
 
-//nolint:unused
-func (c *Chain) kadcastBlock(m message.Message) error {
-	var kadHeight byte = 255
-	if len(m.Header()) > 0 {
-		kadHeight = m.Header()[0]
-	}
-
-	b, ok := m.Payload().(block.Block)
-	if !ok {
-		return errors.New("message payload not a block")
-	}
-
+func (c *Chain) kadcastBlock(blk block.Block, kadcastHeight byte) error {
 	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, &b); err != nil {
+	if err := message.MarshalBlock(buf, &blk); err != nil {
 		return err
 	}
 
@@ -458,7 +457,7 @@ func (c *Chain) kadcastBlock(m message.Message) error {
 	}
 
 	c.eventBus.Publish(topics.Kadcast,
-		message.NewWithHeader(topics.Block, *buf, []byte{kadHeight}))
+		message.NewWithHeader(topics.Block, *buf, []byte{kadcastHeight}))
 	return nil
 }
 
