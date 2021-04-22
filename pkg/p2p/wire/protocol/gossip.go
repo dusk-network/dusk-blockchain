@@ -61,13 +61,13 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 	}
 
 	// Reserved field is the message timestamp in DevNet/TestNet
-	_, rfSize, err := g.extractReservedField(r)
+	reservedFieldValue, rfSize, err := g.extractReservedField(r)
 	if err != nil {
 		return 0, errors.New("reserved field mismatch")
 	}
 
 	// Uncomment on measuring average arrival time
-	// s.registerPacket(packetLength, reservedFieldValue)
+	s.registerPacket(packetLength, reservedFieldValue)
 
 	// If packetLength is less than magic.Len(), ln is close to MaxUint64
 	// due to integer overflow

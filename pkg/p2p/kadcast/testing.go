@@ -147,11 +147,13 @@ func TestNode(port int) *Node {
 	// Reader forwards the message to the eventbus
 	// Reader repropagates any valid kadcast wire messages
 
+	// TODO: messageProcessor
+
 	if raptorEnabled {
-		r := NewRaptorCodeReader(router.LpeerInfo, eb, g, d)
+		r := NewRaptorCodeReader(router.LpeerInfo, eb, g, d, nil)
 		go r.Serve()
 	} else {
-		r := NewReader(router.LpeerInfo, eb, g, d)
+		r := NewReader(router.LpeerInfo, eb, g, d, nil)
 		go r.Serve()
 	}
 

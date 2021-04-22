@@ -44,13 +44,18 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
-func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan chan<- bytes.Buffer) error {
+func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan chan<- bytes.Buffer, kadcastHeight byte) error {
 	b := bytes.NewBuffer(packet)
 
 	msg, err := message.Unmarshal(b)
 	if err != nil {
 		return err
 	}
+
+	if kadcastHeight < 255 {
+		msg = message.NewWithHeader(msg.Category(), msg.Payload(), []byte{kadcastHeight})
+	}
+
 	return m.process(srcPeerID, msg, respChan)
 }
 
@@ -90,8 +95,10 @@ func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respCh
 		return err
 	}
 
-	for _, buf := range bufs {
-		respChan <- buf
+	if respChan != nil {
+		for _, buf := range bufs {
+			respChan <- buf
+		}
 	}
 
 	return nil
