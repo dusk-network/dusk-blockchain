@@ -28,6 +28,7 @@ import (
 var (
 	localNetSizeStr = os.Getenv("DUSK_NETWORK_SIZE")
 	localNetSize    = 10
+	tomlProfile     = "default"
 )
 
 var (
@@ -65,7 +66,7 @@ func TestMain(m *testing.M) {
 
 	// Create a network of N nodes
 	for i := 0; i < localNetSize; i++ {
-		node := engine.NewDuskNode(9500+i, 9000+i, "default", localNet.IsSessionRequired())
+		node := engine.NewDuskNode(9500+i, 9000+i, tomlProfile, localNet.IsSessionRequired())
 		localNet.AddNode(node)
 	}
 
@@ -193,7 +194,7 @@ func TestCatchup(t *testing.T) {
 
 	ind := localNetSize
 
-	node := engine.NewDuskNode(9500+ind, 9000+ind, "default", localNet.IsSessionRequired())
+	node := engine.NewDuskNode(9500+ind, 9000+ind, tomlProfile, localNet.IsSessionRequired())
 	localNet.AddNode(node)
 
 	if err := localNet.StartNode(ind, node, workspace); err != nil {
@@ -279,7 +280,7 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 
 	deployNewNode := func() {
 		ind := localNetSize
-		node := engine.NewDuskNode(9500+ind, 9000+ind, "default", localNet.IsSessionRequired())
+		node := engine.NewDuskNode(9500+ind, 9000+ind, tomlProfile, localNet.IsSessionRequired())
 		localNet.AddNode(node)
 
 		if err := localNet.StartNode(ind, node, workspace); err != nil {
@@ -346,7 +347,7 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	batchSize, _ := strconv.Atoi(batchSizeEnv)
 
 	if batchSize == 0 {
-		batchSize = 200
+		batchSize = 2000
 	}
 
 	for i := uint(0); i < uint(localNet.Size()); i++ {

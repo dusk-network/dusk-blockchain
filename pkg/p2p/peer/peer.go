@@ -369,7 +369,7 @@ func (p *Reader) readLoop(ctx context.Context, errChan chan error) {
 		}
 
 		go func() {
-			// TODO: error here should be checked in order to       reputation
+			// TODO: error here should be checked in order to decrease reputation
 			// or blacklist spammers
 			startTime := time.Now().UnixNano()
 
