@@ -65,10 +65,10 @@ func (p *Peer) Launch(addr string, bootstrapAddrs []string, beta uint8) {
 
 	if p.raptorCodeEnabled {
 		// A reader for Kadcast broadcast messsages
-		r := NewRaptorCodeReader(router.LpeerInfo, p.eventBus, p.gossip, p.dupemap, p.processor)
+		r := NewRaptorCodeReader(router.LpeerInfo, p.eventBus, p.gossip, p.processor)
 		go r.Serve()
 	} else {
-		r := NewReader(peerInfo, p.eventBus, p.gossip, p.dupemap, p.processor)
+		r := NewReader(peerInfo, p.eventBus, p.gossip, p.processor)
 		go r.Serve()
 	}
 

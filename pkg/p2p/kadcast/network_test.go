@@ -86,7 +86,7 @@ func TestBroadcastChunksMsg(t *testing.T) {
 		t.Error(err)
 	}
 
-	// 	log.SetLevel(log.TraceLevel)
+	// log.SetLevel(log.TraceLevel)
 	for _, r := range nodes {
 		kadcast.TraceRoutingState(r.Router)
 	}

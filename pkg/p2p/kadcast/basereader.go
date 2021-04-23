@@ -12,7 +12,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
@@ -30,7 +29,7 @@ type baseReader struct {
 }
 
 func newBaseReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher,
-	gossip *protocol.Gossip, dupeMap *dupemap.DupeMap, processor *peer.MessageProcessor) *baseReader {
+	gossip *protocol.Gossip, processor *peer.MessageProcessor) *baseReader {
 	return &baseReader{
 		lpeer:     lpeerInfo,
 		publisher: publisher,
@@ -70,6 +69,9 @@ func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
 		log.WithError(err).Warnln("could not read the gossip frame")
 		return err
 	}
+
+	// Register message in the global message registry for stats collecting
+	// diagnostics.RegisterWireMsg(topics.Kadcast.String(), packet)
 
 	if err = r.processor.Collect(raddr, message, nil, []byte{p.Height}); err != nil {
 		log.WithField("process", "kadcast_reader").

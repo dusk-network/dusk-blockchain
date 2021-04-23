@@ -15,7 +15,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	gpeer "github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -75,7 +75,7 @@ type Node struct {
 	Duplicated bool
 }
 
-func (n *Node) onAcceptBlock(m message.Message) {
+func (n *Node) processBlockFromNetwork(_ string, m message.Message) ([]bytes.Buffer, error) {
 	n.Lock.Lock()
 	defer n.Lock.Unlock()
 
@@ -99,6 +99,8 @@ func (n *Node) onAcceptBlock(m message.Message) {
 
 	repropagateMsg := message.NewWithHeader(topics.Block, *buf, m.Header())
 	n.EventBus.Publish(topics.Kadcast, repropagateMsg)
+
+	return nil, nil
 }
 
 func newKadcastNode(r *RoutingTable, eb *eventbus.EventBus) *Node {
@@ -108,11 +110,6 @@ func newKadcastNode(r *RoutingTable, eb *eventbus.EventBus) *Node {
 		Blocks:   make([]*block.Block, 0),
 	}
 
-	// Subscribe for topics.Block so we can ensure the kadcast-ed block has been
-	// successfully published to the bus
-	cbListener := eventbus.NewCallbackListener(n.onAcceptBlock)
-	eb.Subscribe(topics.Block, cbListener)
-
 	return n
 }
 
@@ -121,11 +118,15 @@ func newKadcastNode(r *RoutingTable, eb *eventbus.EventBus) *Node {
 func TestNode(port int) *Node {
 	eb := eventbus.New()
 	g := protocol.NewGossip(protocol.TestNet)
-	d := dupemap.NewDupeMap(1, 10000)
 
 	// Instantiate Kadcast Router
 	peer := testPeerInfo(uint16(port))
 	router := makeRoutingTableFromPeer(peer)
+
+	n := newKadcastNode(&router, eb)
+
+	processor := gpeer.NewMessageProcessor(eb)
+	processor.Register(topics.Block, n.processBlockFromNetwork)
 
 	// Set beta delegates to 1 so we can expect only one message per node
 	// optimal broadcast (no duplicates)
@@ -147,20 +148,18 @@ func TestNode(port int) *Node {
 	// Reader forwards the message to the eventbus
 	// Reader repropagates any valid kadcast wire messages
 
-	// TODO: messageProcessor
-
 	if raptorEnabled {
-		r := NewRaptorCodeReader(router.LpeerInfo, eb, g, d, nil)
+		r := NewRaptorCodeReader(router.LpeerInfo, eb, g, processor)
 		go r.Serve()
 	} else {
-		r := NewReader(router.LpeerInfo, eb, g, d, nil)
+		r := NewReader(router.LpeerInfo, eb, g, processor)
 		go r.Serve()
 	}
 
 	w := NewWriter(&router, eb, g, raptorEnabled)
 	go w.Serve()
 
-	return newKadcastNode(&router, eb)
+	return n
 }
 
 // TestNetwork initiates kadcast network bootstraping of N nodes. This will run
