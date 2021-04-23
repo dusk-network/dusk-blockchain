@@ -117,7 +117,7 @@ func TestAcceptFromPeer(t *testing.T) {
 
 	blk := mockAcceptableBlock(*c.tip)
 
-	c.TryNextConsecutiveBlockInSync(*blk)
+	c.TryNextConsecutiveBlockInSync(*blk, 0)
 
 	// the order of received stuff cannot be guaranteed. So we just search for
 	// getRoundResult topic. If it hasn't been received the test fails.

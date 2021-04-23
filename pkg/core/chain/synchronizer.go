@@ -147,7 +147,7 @@ func (s *synchronizer) processBlock(srcPeerID string, currentHeight uint64, blk 
 	return
 }
 
-func (s *synchronizer) startSync(strPeerAddr string, tipHeight, currentHeight uint64, kadcastHeight byte) ([]bytes.Buffer, error) {
+func (s *synchronizer) startSync(strPeerAddr string, tipHeight, currentHeight uint64, _ byte) ([]bytes.Buffer, error) {
 	s.setSyncTarget(tipHeight, currentHeight+config.MaxInvBlocks)
 
 	log.WithField("curr", currentHeight).

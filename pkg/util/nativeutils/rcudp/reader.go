@@ -93,7 +93,7 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 	defer func() {
 		if r := recover(); r != nil {
 			// Panicking here might be caused by corrupted packets
-			log.Error("processPacket recovered from %v", r)
+			log.Errorf("processPacket recovered from %v", r)
 		}
 	}()
 
