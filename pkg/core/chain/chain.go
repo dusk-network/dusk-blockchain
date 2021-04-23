@@ -21,7 +21,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
@@ -240,7 +239,7 @@ func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan cons
 				return
 			}
 
-			if err = c.AcceptSuccessiveBlock(block, kadcast.InitHeight); err != nil {
+			if err = c.AcceptSuccessiveBlock(block, config.KadcastInitialHeight); err != nil {
 				log.WithError(err).Error("block acceptance failed")
 				c.lock.Unlock()
 				return

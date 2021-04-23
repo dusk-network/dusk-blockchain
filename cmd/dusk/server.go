@@ -84,7 +84,7 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 	return chainProcess, nil
 }
 
-func (s *Server) launchKadcastPeer(procesor *peer.MessageProcessor) {
+func (s *Server) launchKadcastPeer(p *peer.MessageProcessor) {
 	kcfg := cfg.Get().Kadcast
 
 	if !kcfg.Enabled {
@@ -92,7 +92,7 @@ func (s *Server) launchKadcastPeer(procesor *peer.MessageProcessor) {
 		return
 	}
 
-	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, nil, procesor, kcfg.Raptor)
+	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, nil, p, kcfg.Raptor)
 	// Launch kadcast peer services and join network defined by bootstrappers
 	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
 	s.kadPeer = kadPeer

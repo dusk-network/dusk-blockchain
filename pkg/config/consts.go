@@ -31,6 +31,9 @@ const (
 
 	// Protocol-based consensus step time.
 	ConsensusTimeOut = 5 * time.Second
+
+	// KadcastInitialHeight sets the default initial height for Kadcast broadcast algorithm.
+	KadcastInitialHeight byte = 128
 )
 
 // DecodeGenesis marshals a genesis block into a buffer.

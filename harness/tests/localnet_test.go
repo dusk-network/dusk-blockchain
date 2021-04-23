@@ -28,7 +28,9 @@ import (
 var (
 	localNetSizeStr = os.Getenv("DUSK_NETWORK_SIZE")
 	localNetSize    = 10
-	tomlProfile     = "default"
+
+	// tomlProfile could be 'default' or 'kadcast'.
+	tomlProfile = os.Getenv("DUSK_NETWORK_PROFILE")
 )
 
 var (
@@ -60,6 +62,10 @@ func TestMain(m *testing.M) {
 
 		fmt.Println("Going to setup NETWORK_SIZE with custom value", "currentLocalNetSize", currentLocalNetSize)
 		localNetSize = currentLocalNetSize
+	}
+
+	if tomlProfile == "" {
+		tomlProfile = "default"
 	}
 
 	fmt.Println("GRPC Session enabled?", localNet.IsSessionRequired())
