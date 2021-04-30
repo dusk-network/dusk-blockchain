@@ -37,6 +37,7 @@ func main() {
 		mockRUSKCMD,
 		setConfigCMD,
 		tpsCMD,
+		automateCMD,
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -256,6 +257,17 @@ var (
 		},
 		Description: `Send transactions from the given node until process exits`,
 	}
+
+	automateCMD = cli.Command{
+		Name:      "automate",
+		Usage:     "automate the sending of stakes and bids in a node",
+		Action:    automateAction,
+		ArgsUsage: "",
+		Flags: []cli.Flag{
+			grpcAddressFlag,
+		},
+		Description: `Automate consensus participation of a node until the process exits`,
+	}
 )
 
 // metricsAction will expose the metrics endpoint.
@@ -355,4 +367,9 @@ func tpsAction(ctx *cli.Context) error {
 	amount := ctx.Uint64(amountFlag.Name)
 
 	return tps.StartSpamming(addr, delay, amount)
+}
+
+func automateAction(ctx *cli.Context) error {
+	address := ctx.String(grpcAddressFlag.Name)
+	return grpcclient.AutomateStakesAndBids(address)
 }
