@@ -17,8 +17,8 @@ import (
 )
 
 // Handshake with another peer.
-func (w *Writer) Handshake() error {
-	if err := w.writeLocalMsgVersion(w.gossip); err != nil {
+func (w *Writer) Handshake(services protocol.ServiceFlag) error {
+	if err := w.writeLocalMsgVersion(w.gossip, services); err != nil {
 		return err
 	}
 
@@ -26,32 +26,37 @@ func (w *Writer) Handshake() error {
 		return err
 	}
 
-	if err := w.readRemoteMsgVersion(); err != nil {
+	peerServices, err := w.readRemoteMsgVersion()
+	if err != nil {
 		return err
 	}
 
+	w.services = peerServices
 	return w.writeVerAck(w.gossip)
 }
 
 // Handshake with another peer.
-func (p *Reader) Handshake() error {
-	if err := p.readRemoteMsgVersion(); err != nil {
+func (p *Reader) Handshake(services protocol.ServiceFlag) error {
+	peerServices, err := p.readRemoteMsgVersion()
+	if err != nil {
 		return err
 	}
+
+	p.services = peerServices
 
 	if err := p.writeVerAck(p.gossip); err != nil {
 		return err
 	}
 
-	if err := p.writeLocalMsgVersion(p.gossip); err != nil {
+	if err := p.writeLocalMsgVersion(p.gossip, services); err != nil {
 		return err
 	}
 
 	return p.readVerAck()
 }
 
-func (c *Connection) writeLocalMsgVersion(g *protocol.Gossip) error {
-	message, e := c.createVersionBuffer()
+func (c *Connection) writeLocalMsgVersion(g *protocol.Gossip, services protocol.ServiceFlag) error {
+	message, e := c.createVersionBuffer(services)
 	if e != nil {
 		return e
 	}
@@ -68,39 +73,39 @@ func (c *Connection) writeLocalMsgVersion(g *protocol.Gossip) error {
 	return e
 }
 
-func (c *Connection) readRemoteMsgVersion() error {
+func (c *Connection) readRemoteMsgVersion() (protocol.ServiceFlag, error) {
 	msgBytes, err := c.ReadMessage()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	m, cs, err := checksum.Extract(msgBytes)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if !checksum.Verify(m, cs) {
-		return errors.New("invalid checksum")
+		return 0, errors.New("invalid checksum")
 	}
 
 	decodedMsg := bytes.NewBuffer(m)
 
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if topic != topics.Version {
-		return fmt.Errorf("did not receive the expected '%s' message - got %s",
+		return 0, fmt.Errorf("did not receive the expected '%s' message - got %s",
 			topics.Version, topic)
 	}
 
 	version, err := decodeVersionMessage(decodedMsg)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return verifyVersion(version.Version)
+	return version.Services, verifyVersionMessage(version)
 }
 
 func (c *Connection) readVerAck() error {
@@ -150,10 +155,10 @@ func (c *Connection) writeVerAck(g *protocol.Gossip) error {
 	return nil
 }
 
-func (c *Connection) createVersionBuffer() (*bytes.Buffer, error) {
+func (c *Connection) createVersionBuffer(services protocol.ServiceFlag) (*bytes.Buffer, error) {
 	version := protocol.NodeVer
 
-	message, err := newVersionMessageBuffer(version, protocol.FullNode)
+	message, err := newVersionMessageBuffer(version, services)
 	if err != nil {
 		return nil, err
 	}
@@ -161,9 +166,13 @@ func (c *Connection) createVersionBuffer() (*bytes.Buffer, error) {
 	return message, nil
 }
 
-func verifyVersion(v *protocol.Version) error {
-	if protocol.NodeVer.Major != v.Major {
+func verifyVersionMessage(v *VersionMessage) error {
+	if protocol.NodeVer.Major != v.Version.Major {
 		return errors.New("version mismatch")
+	}
+
+	if v.Services != protocol.FullNode && v.Services != protocol.VoucherNode {
+		return errors.New("unknown service flag")
 	}
 
 	return nil

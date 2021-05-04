@@ -13,21 +13,31 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
 // Connector is responsible for accepting incoming connection requests, and
 // establishing outward connections with desired peers.
 type Connector struct {
-	l        net.Listener
+	eventBus      eventbus.Broker
+	gossip        *protocol.Gossip
+	readerFactory *ReaderFactory
+
+	l net.Listener
+
 	lock     sync.RWMutex
 	registry map[string]struct{}
+
+	services protocol.ServiceFlag
 }
 
 // NewConnector creates a new peer connector, and spawns a goroutine that will
 // accept incoming connection requests on the current address, with the given port.
-func NewConnector(port string) *Connector {
+func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
+	processor *MessageProcessor, services protocol.ServiceFlag) *Connector {
 	addrPort := ":" + port
 
 	listener, err := net.Listen("tcp", addrPort)
@@ -37,7 +47,14 @@ func NewConnector(port string) *Connector {
 			Panic("could not establish a listener")
 	}
 
-	c := &Connector{l: listener, registry: make(map[string]struct{})}
+	c := &Connector{
+		eventBus:      eb,
+		gossip:        gossip,
+		readerFactory: NewReaderFactory(processor),
+		l:             listener,
+		registry:      make(map[string]struct{}),
+		services:      services,
+	}
 
 	go func(c *Connector) {
 		for {
@@ -87,41 +104,41 @@ func (c *Connector) Dial(addr string) (net.Conn, error) {
 func (c *Connector) acceptConnection(conn net.Conn) {
 	writeQueueChan := make(chan bytes.Buffer, 1000)
 
-	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, writeQueueChan)
-	if err := peerReader.Accept(); err != nil {
-		logServer.WithField("process", "peer connector").
+	peerReader := c.readerFactory.SpawnReader(conn, c.gossip, writeQueueChan)
+	if err := peerReader.Accept(c.services); err != nil {
+		log.WithField("process", "peer connector").
 			WithError(err).Warnln("problem performing incoming handshake")
 		return
 	}
 
-	logServer.WithField("address", peerReader.Addr()).
+	log.WithField("address", peerReader.Addr()).
 		Debugln("incoming connection established")
 
-	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
+	peerWriter := NewWriter(conn, c.gossip, c.eventBus)
 
 	c.addPeer(peerReader.Addr())
-	go peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
+	go Create(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
 
 func (c *Connector) proposeConnection(conn net.Conn) {
 	writeQueueChan := make(chan bytes.Buffer, 1000)
-	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
+	peerWriter := NewWriter(conn, c.gossip, c.eventBus)
 
-	if err := peerWriter.Connect(); err != nil {
-		logServer.WithField("process", "peer connector").
+	if err := peerWriter.Connect(c.services); err != nil {
+		log.WithField("process", "peer connector").
 			WithError(err).Warnln("problem performing outgoing handshake")
 		return
 	}
 
 	address := peerWriter.Addr()
 
-	logServer.WithField("address", address).
+	log.WithField("address", address).
 		Debugln("outgoing connection established")
 
-	peerReader := s.readerFactory.SpawnReader(conn, s.gossip, writeQueueChan)
+	peerReader := c.readerFactory.SpawnReader(conn, c.gossip, writeQueueChan)
 
 	c.addPeer(peerWriter.Addr())
-	go peer.Create(context.Background(), peerReader, peerWriter, writeQueueChan)
+	go Create(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
 
 func (c *Connector) addPeer(address string) {

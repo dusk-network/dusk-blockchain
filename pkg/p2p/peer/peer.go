@@ -62,7 +62,7 @@ type Writer struct {
 	subscriber eventbus.Subscriber
 	gossipID   uint32
 	keepAlive  time.Duration
-	// TODO: add service flag
+	services   protocol.ServiceFlag
 }
 
 // Reader abstracts all of the logic and fields needed to receive messages from
@@ -71,7 +71,7 @@ type Reader struct {
 	*Connection
 	processor    *MessageProcessor
 	responseChan chan<- bytes.Buffer
-	// TODO: add service flag
+	services     protocol.ServiceFlag
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -114,8 +114,8 @@ func (c *Connection) ReadMessage() ([]byte, error) {
 }
 
 // Connect will perform the protocol handshake with the peer. If successful...
-func (w *Writer) Connect() error {
-	if err := w.Handshake(); err != nil {
+func (w *Writer) Connect(services protocol.ServiceFlag) error {
+	if err := w.Handshake(services); err != nil {
 		_ = w.Conn.Close()
 		return err
 	}
@@ -153,8 +153,8 @@ func (w *Writer) Connect() error {
 }
 
 // Accept will perform the protocol handshake with the peer.
-func (p *Reader) Accept() error {
-	if err := p.Handshake(); err != nil {
+func (p *Reader) Accept(services protocol.ServiceFlag) error {
+	if err := p.Handshake(services); err != nil {
 		_ = p.Conn.Close()
 		return err
 	}
