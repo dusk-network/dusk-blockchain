@@ -244,11 +244,12 @@ func Setup() *Server {
 	readerFactory := peer.NewReaderFactory(processor)
 
 	// Create the listener and contact the voucher seeder
-	connector := peer.NewConnector(cfg.Get().Network.Port)
+	gossip := protocol.NewGossip(protocol.TestNet)
+	connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag))
 
 	seeders := cfg.Get().Network.Seeder.Addresses
-	if len(seeders) != 0 {
-		if err := connector.Connect(seeders[0]); err != nil {
+	for _, seeder := range seeders {
+		if err := connector.Connect(seeder); err != nil {
 			log.WithError(err).Error("could not contact voucher seeder")
 		}
 	}
@@ -258,7 +259,7 @@ func Setup() *Server {
 		eventBus:      eventBus,
 		rpcBus:        rpcBus,
 		c:             c,
-		gossip:        protocol.NewGossip(protocol.TestNet),
+		gossip:        gossip,
 		grpcServer:    grpcServer,
 		ruskConn:      ruskConn,
 		readerFactory: readerFactory,
@@ -333,6 +334,7 @@ func registerPeerServices(processor *peer.MessageProcessor, db database.DB, even
 	processor.Register(topics.Score, cp.Process)
 	processor.Register(topics.Reduction, cp.Process)
 	processor.Register(topics.Agreement, cp.Process)
+	processor.Register(topics.Challenge, responding.CompleteChallenge)
 }
 
 func setupGRPCClients(ctx context.Context) (transactions.Proxy, *grpc.ClientConn) {

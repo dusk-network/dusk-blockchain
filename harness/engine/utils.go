@@ -138,7 +138,7 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 	w := peer.NewWriter(conn, gossip, nil)
 
 	// Run handshake procedure
-	if err = w.Connect(); err != nil {
+	if err = w.Connect(protocol.FullNode); err != nil {
 		return err
 	}
 

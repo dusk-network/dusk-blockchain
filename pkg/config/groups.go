@@ -53,6 +53,10 @@ type networkConfiguration struct {
 
 	MaxDupeMapItems  uint32
 	MaxDupeMapExpire uint32
+
+	MinimumConnections int
+
+	ServiceFlag uint8
 }
 
 type kadcastConfiguration struct {

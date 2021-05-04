@@ -63,6 +63,14 @@ maxDupeMapItems=300000
 # Ideally should be less than 15s - average consensus time
 maxDupeMapExpire=5
 
+minimumConnections = 5
+
+# Node service flag
+# 1 = full node
+# 2 = light node (unimplemented)
+# 3 = voucher node
+serviceFlag = 1
+
 [network.seeder]
 # array of seeder servers
 addresses=["127.0.0.1:8081"]

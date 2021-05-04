@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
@@ -56,6 +58,8 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 		services:      services,
 	}
 
+	processor.Register(topics.Addr, c.ProcessNewAddress)
+
 	go func(c *Connector) {
 		for {
 			conn, err := c.l.Accept()
@@ -75,6 +79,13 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 
 func (c *Connector) Close() error {
 	return c.l.Close()
+}
+
+// ProcessNewAddress will handle a new Addr message from the network.
+// Satisfies the peer.ProcessorFunc interface.
+func (c *Connector) ProcessNewAddress(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
+	a := m.Payload().(message.Addr)
+	return nil, c.Connect(a.NetAddr)
 }
 
 // Connect dials a connection with its string, then on succession

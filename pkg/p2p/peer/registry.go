@@ -14,7 +14,7 @@ import (
 // TODO: implement light node registry
 var routingRegistry = map[protocol.ServiceFlag]map[topics.Topic]struct{}{
 	// Full node
-	1: map[topics.Topic]struct{}{
+	protocol.FullNode: map[topics.Topic]struct{}{
 		topics.Tx:           struct{}{},
 		topics.Candidate:    struct{}{},
 		topics.Score:        struct{}{},
@@ -31,7 +31,7 @@ var routingRegistry = map[protocol.ServiceFlag]map[topics.Topic]struct{}{
 	},
 	// Voucher node
 	// TODO: add message types
-	3: map[topics.Topic]struct{}{},
+	protocol.VoucherNode: map[topics.Topic]struct{}{},
 }
 
 func canRoute(services protocol.ServiceFlag, topic topics.Topic) bool {

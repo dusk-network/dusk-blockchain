@@ -113,23 +113,6 @@ func action(ctx *cli.Context) error {
 	s := setupProfiles(srv.rpcBus)
 	defer s.Close()
 
-	// start the connection manager
-	connMgr := newConnMgr(CmgrConfig{
-		Port:     port,
-		OnAccept: srv.OnAccept,
-		OnConn:   srv.OnConnection,
-	})
-
-	// fetch neighbors addresses from the Voucher
-	ips := ConnectToVoucher()
-
-	// trying to connect to the peers
-	for _, ip := range ips {
-		if err := connMgr.Connect(ip); err != nil {
-			log.WithField("IP", ip).Warnln(err)
-		}
-	}
-
 	log.Info("initialization complete")
 
 	// Wait until the interrupt signal is received from an OS signal or

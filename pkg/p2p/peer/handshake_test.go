@@ -41,7 +41,7 @@ func TestHandshake(t *testing.T) {
 		responseChan := make(chan bytes.Buffer, 100)
 
 		peerReader := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), responseChan)
-		if err := peerReader.Accept(); err != nil {
+		if err := peerReader.Accept(protocol.FullNode); err != nil {
 			panic(err)
 		}
 	}()
@@ -55,7 +55,7 @@ func TestHandshake(t *testing.T) {
 		_ = pw.Conn.Close()
 	}()
 
-	if err := pw.Handshake(); err != nil {
+	if err := pw.Handshake(protocol.FullNode); err != nil {
 		t.Fatal(err)
 	}
 }

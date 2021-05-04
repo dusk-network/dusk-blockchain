@@ -23,6 +23,12 @@ const (
 	Ping
 	Pong
 
+	// Seeder communications topics.
+	Challenge
+	Response
+	GetAddrs
+	Addr
+
 	// Data exchange topics.
 	GetData
 	GetBlocks
@@ -101,6 +107,10 @@ var Topics = [...]topicBuf{
 	{VerAck, *(bytes.NewBuffer([]byte{byte(VerAck)})), "verack"},
 	{Ping, *(bytes.NewBuffer([]byte{byte(Ping)})), "ping"},
 	{Pong, *(bytes.NewBuffer([]byte{byte(Pong)})), "pong"},
+	{Challenge, *(bytes.NewBuffer([]byte{byte(Challenge)})), "challenge"},
+	{Response, *(bytes.NewBuffer([]byte{byte(Response)})), "response"},
+	{GetAddrs, *(bytes.NewBuffer([]byte{byte(GetAddrs)})), "getaddrs"},
+	{Addr, *(bytes.NewBuffer([]byte{byte(Addr)})), "addr"},
 	{GetData, *(bytes.NewBuffer([]byte{byte(GetData)})), "getdata"},
 	{GetBlocks, *(bytes.NewBuffer([]byte{byte(GetBlocks)})), "getblocks"},
 	{Tx, *(bytes.NewBuffer([]byte{byte(Tx)})), "tx"},
