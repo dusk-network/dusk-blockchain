@@ -27,6 +27,9 @@ const (
 
 	// LightNode indicates that a user is running a Dusk light node.
 	// LightNode ServiceFlag = 2 // Not implemented.
+
+	// VoucherNode indicates that a user is running a voucher seeder.
+	VoucherNode ServiceFlag = 3
 )
 
 // NodeVer is the current node version.
