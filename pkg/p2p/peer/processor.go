@@ -8,6 +8,7 @@ package peer
 
 import (
 	"bytes"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 
@@ -25,17 +26,15 @@ type ProcessorFunc func(srcPeerID string, m message.Message) ([]bytes.Buffer, er
 // MessageProcessor is connected to all of the processing units that are tied to the peer.
 // It sends an incoming message in the right direction, according to its topic.
 type MessageProcessor struct {
-	dupeMap       *dupemap.DupeMap
-	processors    map[topics.Topic]ProcessorFunc
-	topicRegistry map[protocol.ServiceFlag]map[topics.Topic]struct{}
+	dupeMap    *dupemap.DupeMap
+	processors map[topics.Topic]ProcessorFunc
 }
 
 // NewMessageProcessor returns an initialized MessageProcessor.
 func NewMessageProcessor(bus eventbus.Broker) *MessageProcessor {
 	return &MessageProcessor{
-		dupeMap:       dupemap.NewDupeMapDefault(),
-		processors:    make(map[topics.Topic]ProcessorFunc),
-		topicRegistry: routingRegistry,
+		dupeMap:    dupemap.NewDupeMapDefault(),
+		processors: make(map[topics.Topic]ProcessorFunc),
 	}
 }
 
@@ -62,16 +61,27 @@ func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan cha
 	return m.process(srcPeerID, msg, respChan, services)
 }
 
-// CanRoute determines whether or not a message needs to be filtered by the
-// dupemap.
-func (m *MessageProcessor) canRoute(topic topics.Topic, services protocol.ServiceFlag) bool {
-	_, ok := m.topicRegistry[services][topic]
-	return ok
+func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
+	switch t {
+	case topics.Tx,
+		topics.Candidate,
+		topics.Score,
+		topics.Reduction,
+		topics.Agreement,
+		topics.GetCandidate:
+		return true
+	default:
+		return false
+	}
 }
 
 func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respChan chan<- bytes.Buffer, services protocol.ServiceFlag) ([]bytes.Buffer, error) {
 	category := msg.Category()
-	if m.canRoute(category, services) {
+	if !canRoute(services, category) {
+		return fmt.Errorf("attempted to process an illegal topic - %s", category)
+	}
+
+	if m.shouldBeCached(category) {
 		if !m.dupeMap.HasAnywhere(bytes.NewBuffer(msg.Id())) {
 			return nil, nil
 		}

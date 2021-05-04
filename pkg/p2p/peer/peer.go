@@ -35,7 +35,8 @@ var l = log.WithField("process", "peer")
 type Connection struct {
 	lock sync.Mutex
 	net.Conn
-	gossip *protocol.Gossip
+	gossip   *protocol.Gossip
+	services protocol.ServiceFlag
 }
 
 // GossipConnector calls Gossip.Process on the message stream incoming from the
@@ -47,6 +48,13 @@ type GossipConnector struct {
 }
 
 func (g *GossipConnector) Write(b []byte) (int, error) {
+	if !canRoute(g.services, topics.Topic(b[0])) {
+		l.WithField("topic", topics.Topic(b[0]).String()).
+			WithField("service flag", g.services).
+			Trace("dropping message")
+		return 0, nil
+	}
+
 	buf := bytes.NewBuffer(b)
 	if err := g.gossip.Process(buf); err != nil {
 		return 0, err
@@ -62,7 +70,6 @@ type Writer struct {
 	subscriber eventbus.Subscriber
 	gossipID   uint32
 	keepAlive  time.Duration
-	services   protocol.ServiceFlag
 }
 
 // Reader abstracts all of the logic and fields needed to receive messages from
@@ -71,7 +78,6 @@ type Reader struct {
 	*Connection
 	processor    *MessageProcessor
 	responseChan chan<- bytes.Buffer
-	services     protocol.ServiceFlag
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -280,13 +286,21 @@ func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buff
 	for {
 		select {
 		case buf := <-writeQueueChan:
+			if !canRoute(w.services, topics.Topic(buf.Bytes()[0])) {
+				l.WithField("topic", topics.Topic(buf.Bytes()[0]).String()).
+					WithField("service flag", w.services).
+					Warnln("dropping message")
+				continue
+			}
+
 			if err := w.gossip.Process(&buf); err != nil {
 				l.WithError(err).Warnln("error processing outgoing message")
 				continue
 			}
 
 			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
-				l.WithField("process", "writeloop").WithError(err).Warnln("error writing message")
+				l.WithField("process", "writeloop").
+					WithError(err).Warnln("error writing message")
 				return
 			}
 		case <-ctx.Done():
