@@ -140,15 +140,6 @@ var (
 		Usage: "dusk.toml configuration file",
 	}
 
-	// XXX: This seems unused now. We should figure out if that's alright,
-	// or if we need to update some of the logic on wallet creation.
-	//nolint
-	walletPasswordFlag = cli.StringFlag{
-		Name:  "walletpassword",
-		Usage: "Dusk Wallet Password, eg: --walletpassword=password",
-		Value: "password",
-	}
-
 	configNameFlag = cli.StringFlag{
 		Name:  "configname",
 		Usage: "Config ID from dusk.toml, eg: logger.level",
@@ -170,6 +161,18 @@ var (
 	cpuProfileFlag = cli.StringFlag{
 		Name:  "cpuprofile",
 		Usage: "cpu.prof output profiling file",
+	}
+
+	sendStakeTimeoutFlag = cli.IntFlag{
+		Name:  "sendstaketimeout",
+		Usage: "timeout for sending a stake request to Provisioner client",
+		Value: 5,
+	}
+
+	sendBidTimeoutFlag = cli.IntFlag{
+		Name:  "sendbidtimeout",
+		Usage: "timeout for sending a bid request to BlockGenerator client",
+		Value: 5,
 	}
 
 	metricsCMD = cli.Command{
@@ -265,6 +268,8 @@ var (
 		ArgsUsage: "",
 		Flags: []cli.Flag{
 			grpcAddressFlag,
+			sendStakeTimeoutFlag,
+			sendBidTimeoutFlag,
 		},
 		Description: `Automate consensus participation of a node until the process exits`,
 	}
@@ -371,5 +376,7 @@ func tpsAction(ctx *cli.Context) error {
 
 func automateAction(ctx *cli.Context) error {
 	address := ctx.String(grpcAddressFlag.Name)
-	return grpcclient.AutomateStakesAndBids(address)
+	sendStakeTimeout := ctx.Int(sendStakeTimeoutFlag.Name)
+	sendBidTimeout := ctx.Int(sendBidTimeoutFlag.Name)
+	return grpcclient.AutomateStakesAndBids(address, sendStakeTimeout, sendBidTimeout)
 }
