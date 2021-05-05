@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"net"
 
-	"golang.org/x/crypto/sha3"
+	"golang.org/x/crypto/blake2b"
 )
 
 // PeerBytesSize represents the amount of bytes
@@ -170,7 +170,7 @@ func computePeerID(ip [4]byte, port uint16) [16]byte {
 	binary.LittleEndian.PutUint16(seed, port)
 
 	seed = append(seed, ip[:]...)
-	doubleLenID := sha3.Sum256(seed[:])
+	doubleLenID := blake2b.Sum256(seed[:])
 
 	var halfLenID [16]byte
 	copy(halfLenID[:], doubleLenID[0:16])

@@ -9,10 +9,10 @@ package encoding
 import (
 	"errors"
 
-	"golang.org/x/crypto/sha3"
+	"golang.org/x/crypto/blake2b"
 )
 
-// verifyIDNonce performs sha3 over concatenated id and nonce to ensure last
+// verifyIDNonce performs blake2b Sum256 over concatenated id and nonce to ensure last
 // byte is zero.
 func verifyIDNonce(id [16]byte, nonce []byte) error {
 	if len(nonce) != 4 {
@@ -23,12 +23,12 @@ func verifyIDNonce(id [16]byte, nonce []byte) error {
 	data = append(data, id[:]...)
 	data = append(data, nonce[:]...)
 
-	hash := sha3.Sum256(data)
+	hash := blake2b.Sum256(data)
 	if (hash[31]) == 0 {
 		return nil
 	}
 
-	return errors.New("Id and Nonce are not valid parameters")
+	return errors.New("id and Nonce are not valid parameters")
 }
 
 // MsgTypeToString translates wire message into string name.
@@ -67,7 +67,7 @@ func ComputeNonce(id []byte) uint32 {
 		copy(data[0:16], id[0:16])
 		copy(data[16:20], nonceBytes[0:4])
 
-		hash = sha3.Sum256(data[:])
+		hash = blake2b.Sum256(data[:])
 		if (hash[31]) == 0 {
 			return nonce
 		}
