@@ -87,7 +87,9 @@ func (s *sessionlessClient) GracefulClose(options ...grpc.DialOption) {
 		}
 	}()
 
-	_ = s.conn.Close()
+	if s != nil && s.conn != nil {
+		_ = s.conn.Close()
+	}
 }
 
 // Network describes the current network configuration in terms of nodes and

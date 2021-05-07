@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
@@ -45,7 +46,7 @@ func kadcastRandomBlock(eventbus *eventbus.EventBus) (*block.Block, error) {
 		return b, err
 	}
 
-	header := []byte{kadcast.InitHeight}
+	header := []byte{config.KadcastInitialHeight}
 	m := message.NewWithHeader(topics.Block, *buf, header)
 
 	eventbus.Publish(topics.Kadcast, m)
@@ -86,7 +87,7 @@ func TestBroadcastChunksMsg(t *testing.T) {
 		t.Error(err)
 	}
 
-	// 	log.SetLevel(log.TraceLevel)
+	// log.SetLevel(log.TraceLevel)
 	for _, r := range nodes {
 		kadcast.TraceRoutingState(r.Router)
 	}

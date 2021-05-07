@@ -10,7 +10,7 @@ import (
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rcudp"
@@ -29,7 +29,7 @@ type RaptorCodeReader struct {
 
 // NewRaptorCodeReader makes an instance of RaptorCodeReader.
 func NewRaptorCodeReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher,
-	gossip *protocol.Gossip, dupeMap *dupemap.DupeMap) *RaptorCodeReader {
+	gossip *protocol.Gossip, processor *peer.MessageProcessor) *RaptorCodeReader {
 	// TODO: handle this by configs
 	lpeerInfo.Port += 10000
 	addr := lpeerInfo.Address()
@@ -40,7 +40,7 @@ func NewRaptorCodeReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publish
 	}
 
 	r := new(RaptorCodeReader)
-	r.base = newBaseReader(lpeerInfo, publisher, gossip, dupeMap)
+	r.base = newBaseReader(lpeerInfo, publisher, gossip, processor)
 
 	r.rcUDPReader, err = rcudp.NewUDPReader(lAddr, rcudp.MessageCollector(r.base.handleBroadcast))
 	if err != nil {

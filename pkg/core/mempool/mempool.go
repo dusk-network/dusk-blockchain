@@ -22,7 +22,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -519,7 +518,7 @@ func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, err
 		return nil, err
 	}
 
-	t := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len()), kadHeight: kadcast.InitHeight}
+	t := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len()), kadHeight: config.KadcastInitialHeight}
 	return m.processTx(t)
 }
 
@@ -549,7 +548,7 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 
 // kadcastTx (re)propagates transaction in kadcast network.
 func (m *Mempool) kadcastTx(t TxDesc) error {
-	if t.kadHeight > kadcast.InitHeight {
+	if t.kadHeight > config.KadcastInitialHeight {
 		return errors.New("invalid kadcast height")
 	}
 

@@ -25,7 +25,7 @@ func TestSuccessiveBlocks(t *testing.T) {
 
 	// tipHeight will be 0, so make the successive block
 	blk := helper.RandomBlock(1, 1)
-	res, err := s.processBlock("", 0, *blk)
+	res, err := s.processBlock("", 0, *blk, 0)
 	assert.NoError(err)
 	assert.Nil(res)
 
@@ -40,7 +40,7 @@ func TestFutureBlocks(t *testing.T) {
 
 	height := uint64(10)
 	blk := helper.RandomBlock(height, 1)
-	resp, err := s.processBlock("", 0, *blk)
+	resp, err := s.processBlock("", 0, *blk, 0)
 	assert.NoError(err)
 
 	// Response should be of the GetBlocks topic
@@ -75,12 +75,12 @@ func (m *mockChain) CurrentHeight() uint64 {
 	return m.tipHeight
 }
 
-func (m *mockChain) TryNextConsecutiveBlockInSync(blk block.Block) error {
+func (m *mockChain) TryNextConsecutiveBlockInSync(blk block.Block, _ byte) error {
 	m.catchBlockChan <- consensus.Results{Blk: blk, Err: nil}
 	return nil
 }
 
-func (m *mockChain) TryNextConsecutiveBlockOutSync(_ block.Block) error {
+func (m *mockChain) TryNextConsecutiveBlockOutSync(_ block.Block, _ byte) error {
 	return nil
 }
 

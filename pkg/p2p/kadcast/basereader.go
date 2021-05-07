@@ -11,7 +11,7 @@ import (
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
@@ -20,21 +20,21 @@ import (
 // RaptorCodeReader Both readers are capable of processing Broadcast-type
 // messages in kadcast but in different transport.
 type baseReader struct {
-	publisher     eventbus.Publisher
-	gossip        *protocol.Gossip
-	messageRouter messageRouter
+	publisher eventbus.Publisher
+	gossip    *protocol.Gossip
+	processor *peer.MessageProcessor
 
 	// lpeer is the tuple identifying this peer
 	lpeer encoding.PeerInfo
 }
 
 func newBaseReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher,
-	gossip *protocol.Gossip, dupeMap *dupemap.DupeMap) *baseReader {
+	gossip *protocol.Gossip, processor *peer.MessageProcessor) *baseReader {
 	return &baseReader{
-		lpeer:         lpeerInfo,
-		messageRouter: messageRouter{publisher: publisher, dupeMap: dupeMap},
-		publisher:     publisher,
-		gossip:        gossip,
+		lpeer:     lpeerInfo,
+		publisher: publisher,
+		gossip:    gossip,
+		processor: processor,
 	}
 }
 
@@ -70,12 +70,12 @@ func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
 		return err
 	}
 
-	// Propagate message to the node router respectively eventbus
-	// Non-routable and duplicated messages are not repropagated
-	err = r.messageRouter.Collect(message, p.Height)
-	if err != nil {
-		log.WithError(err).Errorln("error routing message")
-		return err
+	// Register message in the global message registry for stats collecting
+	// diagnostics.RegisterWireMsg(topics.Kadcast.String(), packet)
+
+	if err = r.processor.Collect(raddr, message, nil, []byte{p.Height}); err != nil {
+		log.WithField("process", "kadcast_reader").
+			WithError(err).Error("failed to process message")
 	}
 
 	// Repropagate message here

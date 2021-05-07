@@ -8,6 +8,7 @@
 package protocol
 
 import (
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -24,11 +25,16 @@ type stats struct {
 
 	// maxPacketLength recently registered
 	maxPacketLength uint64
+
+	lock sync.Mutex
 }
 
 // registerPacket reports stats based on collected data of the last 1000 messages.
 // this can be enabled manually in case of evaluating network performance.
 func (s *stats) registerPacket(packetLength uint64, timestamp int64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	s.cumulativeDuration += (time.Now().UnixNano() - timestamp) / 1000000
 	s.messageCounter++
 

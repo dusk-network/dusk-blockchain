@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
@@ -30,7 +30,7 @@ type Reader struct {
 }
 
 // NewReader makes a new kadcast reader that handles TCP packets of broadcasting.
-func NewReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher, gossip *protocol.Gossip, dupeMap *dupemap.DupeMap) *Reader {
+func NewReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher, gossip *protocol.Gossip, processor *peer.MessageProcessor) *Reader {
 	addr := lpeerInfo.Address()
 
 	lAddr, err := net.ResolveTCPAddr("tcp4", addr)
@@ -44,7 +44,7 @@ func NewReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher, gossip
 	}
 
 	r := new(Reader)
-	r.base = newBaseReader(lpeerInfo, publisher, gossip, dupeMap)
+	r.base = newBaseReader(lpeerInfo, publisher, gossip, processor)
 	r.listener = l
 
 	log.WithField("l_addr", lAddr.String()).Infoln("Starting Reader")

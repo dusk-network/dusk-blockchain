@@ -20,10 +20,6 @@ import (
 // ask for new nodes with `FIND_NODES` messages.
 const Alpha int = 3
 
-// InitHeight sets the default initial height for a
-// broadcast process.
-const InitHeight byte = 128
-
 // RoutingTable holds all of the data needed to interact with
 // the routing data and also the networking utils.
 type RoutingTable struct {

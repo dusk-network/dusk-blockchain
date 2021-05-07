@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -19,9 +20,10 @@ import (
 // Peer is a wrapper of all 2 kadcast processing routing.
 type Peer struct {
 	// dusk node components
-	eventBus *eventbus.EventBus
-	gossip   *protocol.Gossip
-	dupemap  *dupemap.DupeMap
+	eventBus  *eventbus.EventBus
+	gossip    *protocol.Gossip
+	dupemap   *dupemap.DupeMap
+	processor *peer.MessageProcessor
 
 	// processors
 	m *Maintainer
@@ -32,8 +34,8 @@ type Peer struct {
 }
 
 // NewPeer makes a kadcast peer instance.
-func NewPeer(eventBus *eventbus.EventBus, g *protocol.Gossip, dp *dupemap.DupeMap, raptorCodeEnabled bool) *Peer {
-	return &Peer{eventBus: eventBus, gossip: g, dupemap: dp, raptorCodeEnabled: raptorCodeEnabled}
+func NewPeer(eventBus *eventbus.EventBus, g *protocol.Gossip, dp *dupemap.DupeMap, processor *peer.MessageProcessor, raptorCodeEnabled bool) *Peer {
+	return &Peer{eventBus: eventBus, gossip: g, dupemap: dp, processor: processor, raptorCodeEnabled: raptorCodeEnabled}
 }
 
 // Launch starts kadcast service.
@@ -63,10 +65,10 @@ func (p *Peer) Launch(addr string, bootstrapAddrs []string, beta uint8) {
 
 	if p.raptorCodeEnabled {
 		// A reader for Kadcast broadcast messsages
-		r := NewRaptorCodeReader(router.LpeerInfo, p.eventBus, p.gossip, p.dupemap)
+		r := NewRaptorCodeReader(router.LpeerInfo, p.eventBus, p.gossip, p.processor)
 		go r.Serve()
 	} else {
-		r := NewReader(peerInfo, p.eventBus, p.gossip, p.dupemap)
+		r := NewReader(peerInfo, p.eventBus, p.gossip, p.processor)
 		go r.Serve()
 	}
 
