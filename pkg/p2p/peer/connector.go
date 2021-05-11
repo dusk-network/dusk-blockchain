@@ -49,7 +49,7 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 
 	listener, err := net.Listen("tcp", addrPort)
 	if err != nil {
-		log.WithField("process", "peer listener").
+		log.WithField("process", "peer connector").
 			WithError(err).
 			Panic("could not establish a listener")
 	}
@@ -70,7 +70,7 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 		for {
 			conn, err := c.l.Accept()
 			if err != nil {
-				log.WithField("process", "connection manager").
+				log.WithField("process", "peer connector").
 					WithError(err).
 					Warnln("error accepting connection request")
 				return
@@ -129,7 +129,8 @@ func (c *Connector) acceptConnection(conn net.Conn) {
 		return
 	}
 
-	log.WithField("address", peerReader.Addr()).
+	log.WithField("process", "peer connector").
+		WithField("address", peerReader.Addr()).
 		Debugln("incoming connection established")
 
 	peerWriter := NewWriter(conn, c.gossip, c.eventBus)
@@ -150,7 +151,8 @@ func (c *Connector) proposeConnection(conn net.Conn) {
 
 	address := peerWriter.Addr()
 
-	log.WithField("address", address).
+	log.WithField("process", "peer connector").
+		WithField("address", address).
 		Debugln("outgoing connection established")
 
 	peerReader := c.readerFactory.SpawnReader(conn, c.gossip, writeQueueChan)
@@ -174,6 +176,14 @@ func (c *Connector) removePeer(address string) {
 
 	// Ensure we are still above the minimum connections threshold.
 	if len(c.registry) < config.Get().Network.MinimumConnections {
-		// Gossip address request to vouchers
+		buf := new(bytes.Buffer)
+		if err := topics.Prepend(buf, topics.GetAddrs); err != nil {
+			log.WithField("process", "peer connector").
+				WithError(err).
+				Panic("could not create topic buffer")
+			}
+		}
+
+		c.eventBus.Publish(topics.Gossip, message.New(topics.GetAddrs, *buf))
 	}
 }
