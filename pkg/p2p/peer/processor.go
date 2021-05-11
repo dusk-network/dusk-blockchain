@@ -44,12 +44,12 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
-func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan chan<- bytes.Buffer, header []byte) error {
+func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan chan<- bytes.Buffer, header []byte) ([]bytes.Buffer, error) {
 	b := bytes.NewBuffer(packet)
 
 	msg, err := message.Unmarshal(b)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if header != nil {
@@ -76,23 +76,23 @@ func (m *MessageProcessor) CanRoute(topic topics.Topic) bool {
 	return false
 }
 
-func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respChan chan<- bytes.Buffer) error {
+func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respChan chan<- bytes.Buffer) ([]bytes.Buffer, error) {
 	category := msg.Category()
 	if m.CanRoute(category) {
 		if !m.dupeMap.HasAnywhere(bytes.NewBuffer(msg.Id())) {
-			return nil
+			return nil, nil
 		}
 	}
 
 	processFn, ok := m.processors[category]
 	if !ok {
 		log.WithField("topic", category).Debugln("received message with unknown topic")
-		return nil
+		return nil, nil
 	}
 
 	bufs, err := processFn(srcPeerID, msg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if respChan != nil {
@@ -101,5 +101,5 @@ func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respCh
 		}
 	}
 
-	return nil
+	return bufs, nil
 }
