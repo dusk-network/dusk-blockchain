@@ -181,7 +181,6 @@ func (c *Connector) removePeer(address string) {
 			log.WithField("process", "peer connector").
 				WithError(err).
 				Panic("could not create topic buffer")
-			}
 		}
 
 		c.eventBus.Publish(topics.Gossip, message.New(topics.GetAddrs, *buf))

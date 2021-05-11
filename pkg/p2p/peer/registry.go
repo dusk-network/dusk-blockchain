@@ -28,10 +28,16 @@ var routingRegistry = map[protocol.ServiceFlag]map[topics.Topic]struct{}{
 		topics.MemPool:      struct{}{},
 		topics.Inv:          struct{}{},
 		topics.GetCandidate: struct{}{},
+		topics.Addr:         struct{}{},
+		topics.Challenge:    struct{}{},
 	},
 	// Voucher node
-	// TODO: add message types
-	protocol.VoucherNode: map[topics.Topic]struct{}{},
+	protocol.VoucherNode: map[topics.Topic]struct{}{
+		topics.Response: struct{}{},
+		topics.GetAddrs: struct{}{},
+		topics.Ping:     struct{}{},
+		topics.Pong:     struct{}{},
+	},
 }
 
 func canRoute(services protocol.ServiceFlag, topic topics.Topic) bool {
