@@ -245,7 +245,7 @@ func Setup() *Server {
 
 	// Create the listener and contact the voucher seeder
 	gossip := protocol.NewGossip(protocol.TestNet)
-	connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag))
+	connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag), peer.Create)
 
 	seeders := cfg.Get().Network.Seeder.Addresses
 	for _, seeder := range seeders {

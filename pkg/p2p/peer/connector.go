@@ -21,6 +21,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type connectFunc func(context.Context, *Reader, *Writer, chan bytes.Buffer)
+
 // Connector is responsible for accepting incoming connection requests, and
 // establishing outward connections with desired peers.
 type Connector struct {
@@ -34,12 +36,15 @@ type Connector struct {
 	registry map[string]struct{}
 
 	services protocol.ServiceFlag
+
+	connectFunc connectFunc
 }
 
 // NewConnector creates a new peer connector, and spawns a goroutine that will
 // accept incoming connection requests on the current address, with the given port.
 func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
-	processor *MessageProcessor, services protocol.ServiceFlag) *Connector {
+	processor *MessageProcessor, services protocol.ServiceFlag,
+	connectFunc connectFunc) *Connector {
 	addrPort := ":" + port
 
 	listener, err := net.Listen("tcp", addrPort)
@@ -56,6 +61,7 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 		l:             listener,
 		registry:      make(map[string]struct{}),
 		services:      services,
+		connectFunc:   connectFunc,
 	}
 
 	processor.Register(topics.Addr, c.ProcessNewAddress)
@@ -77,6 +83,7 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 	return c
 }
 
+// Close the listener.
 func (c *Connector) Close() error {
 	return c.l.Close()
 }
@@ -128,7 +135,7 @@ func (c *Connector) acceptConnection(conn net.Conn) {
 	peerWriter := NewWriter(conn, c.gossip, c.eventBus)
 
 	c.addPeer(peerReader.Addr())
-	go Create(context.Background(), peerReader, peerWriter, writeQueueChan)
+	go c.connectFunc(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
 
 func (c *Connector) proposeConnection(conn net.Conn) {
@@ -149,7 +156,7 @@ func (c *Connector) proposeConnection(conn net.Conn) {
 	peerReader := c.readerFactory.SpawnReader(conn, c.gossip, writeQueueChan)
 
 	c.addPeer(peerWriter.Addr())
-	go Create(context.Background(), peerReader, peerWriter, writeQueueChan)
+	go c.connectFunc(context.Background(), peerReader, peerWriter, writeQueueChan)
 }
 
 func (c *Connector) addPeer(address string) {
