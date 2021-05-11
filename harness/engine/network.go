@@ -148,7 +148,7 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	// Start voucher seeder.
 	if len(seederExec) > 0 {
-		if err := n.start("", seederExec); err != nil {
+		if err := n.start(workspace, seederExec); err != nil {
 			return err
 		}
 	} else {

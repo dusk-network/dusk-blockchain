@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 // Node defines the status of a Dusk node.
@@ -32,7 +33,7 @@ type Store struct {
 	Nodes map[string]*Node
 }
 
-// New creates a new instance of Store.
+// NewStore creates a new instance of Store.
 func NewStore() *Store {
 	return &Store{
 		Nodes: make(map[string]*Node),
@@ -59,7 +60,8 @@ func (d *Store) Get(ip string) Node {
 	return *d.Nodes[ip]
 }
 
-// Set the listeningPort on a node, which is used when sending addresses to other nodes.
+// SetPort will the listeningPort on a node, which is used when sending addresses to
+// other nodes.
 func (d *Store) SetPort(ip, port string) {
 	d.Lock()
 	defer d.Unlock()
@@ -110,6 +112,10 @@ func (d *Store) DumpNodes(srcPeerID string, _ message.Message) ([]bytes.Buffer, 
 		if !d.IsBlackListed(ip) && strings.TrimSpace(ip) != srcPeerID &&
 			n.online {
 			buf := bytes.NewBuffer([]byte(d.getListeningAddr(ip)))
+			if err := topics.Prepend(buf, topics.Addr); err != nil {
+				return nil, err
+			}
+
 			ips = append(ips, *buf)
 		}
 

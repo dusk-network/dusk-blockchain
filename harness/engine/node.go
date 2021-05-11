@@ -39,6 +39,7 @@ func NewDuskNode(graphqlPort, nodeID int, profileID string, requireSession bool)
 	node.Cfg = config.Registry{}
 	node.Cfg.General.TestHarness = true
 	node.Cfg.General.Network = "devnet"
+	node.Cfg.Network.ServiceFlag = 1
 	node.Cfg.Gql.Address = "127.0.0.1:" + strconv.Itoa(graphqlPort)
 	node.Cfg.Gql.Network = "tcp" //nolint
 

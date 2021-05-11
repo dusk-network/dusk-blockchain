@@ -19,12 +19,15 @@ type Response struct {
 	Port            string
 }
 
+// Copy a Response.
+// Implements the payload.Safe interface.
 func (r Response) Copy() payload.Safe {
 	b := make([]byte, len(r.HashedChallenge))
 	copy(b, r.HashedChallenge)
 	return Response{HashedChallenge: b, Port: r.Port}
 }
 
+// Encode a Response object into a buffer.
 func (r *Response) Encode(w *bytes.Buffer) error {
 	if err := encoding.WriteVarBytes(w, r.HashedChallenge); err != nil {
 		return err
@@ -33,6 +36,7 @@ func (r *Response) Encode(w *bytes.Buffer) error {
 	return encoding.WriteString(w, r.Port)
 }
 
+// UnmarshalResponseMessage into a SerializableMessage.
 func UnmarshalResponseMessage(r *bytes.Buffer, m SerializableMessage) error {
 	resp := &Response{}
 	if err := resp.Decode(r); err != nil {
@@ -43,6 +47,7 @@ func UnmarshalResponseMessage(r *bytes.Buffer, m SerializableMessage) error {
 	return nil
 }
 
+// Decode a Response message from a buffer.
 func (r *Response) Decode(b *bytes.Buffer) error {
 	hc := make([]byte, 0)
 	if err := encoding.ReadVarBytes(b, &hc); err != nil {

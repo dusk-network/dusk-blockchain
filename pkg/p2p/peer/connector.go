@@ -121,8 +121,9 @@ func (c *Connector) Dial(addr string) (net.Conn, error) {
 
 func (c *Connector) acceptConnection(conn net.Conn) {
 	writeQueueChan := make(chan bytes.Buffer, 1000)
+	pConn := NewConnection(conn, c.gossip)
+	peerReader := c.readerFactory.SpawnReader(pConn, writeQueueChan)
 
-	peerReader := c.readerFactory.SpawnReader(conn, c.gossip, writeQueueChan)
 	if err := peerReader.Accept(c.services); err != nil {
 		log.WithField("process", "peer connector").
 			WithError(err).Warnln("problem performing incoming handshake")
@@ -133,15 +134,20 @@ func (c *Connector) acceptConnection(conn net.Conn) {
 		WithField("address", peerReader.Addr()).
 		Debugln("incoming connection established")
 
-	peerWriter := NewWriter(conn, c.gossip, c.eventBus)
+	peerWriter := NewWriter(pConn, c.eventBus)
 
 	c.addPeer(peerReader.Addr())
-	go c.connectFunc(context.Background(), peerReader, peerWriter, writeQueueChan)
+
+	go func() {
+		c.connectFunc(context.Background(), peerReader, peerWriter, writeQueueChan)
+		c.removePeer(peerReader.Addr())
+	}()
 }
 
 func (c *Connector) proposeConnection(conn net.Conn) {
 	writeQueueChan := make(chan bytes.Buffer, 1000)
-	peerWriter := NewWriter(conn, c.gossip, c.eventBus)
+	pConn := NewConnection(conn, c.gossip)
+	peerWriter := NewWriter(pConn, c.eventBus)
 
 	if err := peerWriter.Connect(c.services); err != nil {
 		log.WithField("process", "peer connector").
@@ -155,10 +161,14 @@ func (c *Connector) proposeConnection(conn net.Conn) {
 		WithField("address", address).
 		Debugln("outgoing connection established")
 
-	peerReader := c.readerFactory.SpawnReader(conn, c.gossip, writeQueueChan)
+	peerReader := c.readerFactory.SpawnReader(pConn, writeQueueChan)
 
 	c.addPeer(peerWriter.Addr())
-	go c.connectFunc(context.Background(), peerReader, peerWriter, writeQueueChan)
+
+	go func() {
+		c.connectFunc(context.Background(), peerReader, peerWriter, writeQueueChan)
+		c.removePeer(peerWriter.Addr())
+	}()
 }
 
 func (c *Connector) addPeer(address string) {

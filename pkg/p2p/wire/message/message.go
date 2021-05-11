@@ -261,6 +261,12 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 		err = UnmarshalReductionMessage(b, msg)
 	case topics.Agreement:
 		err = UnmarshalAgreementMessage(b, msg)
+	case topics.Challenge:
+		UnmarshalChallengeMessage(b, msg)
+	case topics.Response:
+		err = UnmarshalResponseMessage(b, msg)
+	case topics.Addr:
+		UnmarshalAddrMessage(b, msg)
 	}
 
 	if err != nil {

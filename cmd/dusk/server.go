@@ -40,15 +40,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh/terminal"
 	"google.golang.org/grpc"
 )
 
-var (
-	logServer = logrus.WithField("process", "server")
-	testnet   = byte(2)
-)
+var testnet = byte(2)
 
 // Server is the main process of the node.
 type Server struct {
@@ -249,7 +245,7 @@ func Setup() *Server {
 
 	seeders := cfg.Get().Network.Seeder.Addresses
 	for _, seeder := range seeders {
-		if err := connector.Connect(seeder); err != nil {
+		if err = connector.Connect(seeder); err != nil {
 			log.WithError(err).Error("could not contact voucher seeder")
 		}
 	}

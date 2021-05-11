@@ -78,7 +78,7 @@ func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
 func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respChan chan<- bytes.Buffer, services protocol.ServiceFlag) ([]bytes.Buffer, error) {
 	category := msg.Category()
 	if !canRoute(services, category) {
-		return fmt.Errorf("attempted to process an illegal topic - %s", category)
+		return nil, fmt.Errorf("attempted to process an illegal topic %s for node type %v", category, services)
 	}
 
 	if m.shouldBeCached(category) {

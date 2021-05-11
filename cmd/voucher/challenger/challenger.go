@@ -23,14 +23,17 @@ import (
 
 const challengeLength = 20
 
+// Challenger is the component responsible for vetting incoming connections.
 type Challenger struct {
 	nodes *node.Store
 }
 
+// New creates a new, initialized Challenger.
 func New(store *node.Store) *Challenger {
 	return &Challenger{nodes: store}
 }
 
+// SendChallenge to a connecting peer.
 func (c *Challenger) SendChallenge(ctx context.Context, r *peer.Reader, w *peer.Writer, ch chan bytes.Buffer) {
 	challenge, err := generateRandomBytes(challengeLength)
 	if err != nil {
@@ -52,6 +55,7 @@ func (c *Challenger) SendChallenge(ctx context.Context, r *peer.Reader, w *peer.
 	c.nodes.SetInactive(r.Addr())
 }
 
+// ProcessResponse will process the response to a connection challenge.
 func (c *Challenger) ProcessResponse(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	node := c.nodes.Get(srcPeerID)
 	resp := m.Payload().(message.Response)

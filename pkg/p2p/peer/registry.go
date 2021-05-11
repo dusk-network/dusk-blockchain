@@ -11,32 +11,36 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-// TODO: implement light node registry
+// TODO: implement light node registry.
 var routingRegistry = map[protocol.ServiceFlag]map[topics.Topic]struct{}{
 	// Full node
-	protocol.FullNode: map[topics.Topic]struct{}{
-		topics.Tx:           struct{}{},
-		topics.Candidate:    struct{}{},
-		topics.Score:        struct{}{},
-		topics.Reduction:    struct{}{},
-		topics.Agreement:    struct{}{},
-		topics.Ping:         struct{}{},
-		topics.Pong:         struct{}{},
-		topics.GetData:      struct{}{},
-		topics.GetBlocks:    struct{}{},
-		topics.Block:        struct{}{},
-		topics.MemPool:      struct{}{},
-		topics.Inv:          struct{}{},
-		topics.GetCandidate: struct{}{},
-		topics.Addr:         struct{}{},
-		topics.Challenge:    struct{}{},
+	protocol.FullNode: {
+		topics.Tx:           {},
+		topics.Candidate:    {},
+		topics.Score:        {},
+		topics.Reduction:    {},
+		topics.Agreement:    {},
+		topics.Ping:         {},
+		topics.Pong:         {},
+		topics.GetData:      {},
+		topics.GetBlocks:    {},
+		topics.Block:        {},
+		topics.MemPool:      {},
+		topics.Inv:          {},
+		topics.GetCandidate: {},
+		topics.Addr:         {},
+		topics.Challenge:    {},
+		topics.Response:     {},
+		topics.GetAddrs:     {},
 	},
 	// Voucher node
-	protocol.VoucherNode: map[topics.Topic]struct{}{
-		topics.Response: struct{}{},
-		topics.GetAddrs: struct{}{},
-		topics.Ping:     struct{}{},
-		topics.Pong:     struct{}{},
+	protocol.VoucherNode: {
+		topics.Addr:      {},
+		topics.Challenge: {},
+		topics.Response:  {},
+		topics.GetAddrs:  {},
+		topics.Ping:      {},
+		topics.Pong:      {},
 	},
 }
 

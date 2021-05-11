@@ -18,7 +18,7 @@ import (
 
 // CompleteChallenge given by a voucher seeder.
 func CompleteChallenge(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
-	challenge := m.Payload().(*message.Challenge)
+	challenge := m.Payload().(message.Challenge)
 
 	hash := sha256.New()
 	if _, err := hash.Write(append(challenge.ChallengeString, []byte(os.Getenv("SEEDER_KEY"))...)); err != nil {

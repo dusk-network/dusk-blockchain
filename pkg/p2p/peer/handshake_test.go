@@ -39,8 +39,9 @@ func TestHandshake(t *testing.T) {
 
 	go func() {
 		responseChan := make(chan bytes.Buffer, 100)
+		pConn := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
 
-		peerReader := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), responseChan)
+		peerReader := factory.SpawnReader(pConn, responseChan)
 		if err := peerReader.Accept(protocol.FullNode); err != nil {
 			panic(err)
 		}
@@ -49,7 +50,8 @@ func TestHandshake(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	g := protocol.NewGossip(protocol.TestNet)
-	pw := NewWriter(client, g, eb)
+	pConn := NewConnection(client, g)
+	pw := NewWriter(pConn, eb)
 
 	defer func() {
 		_ = pw.Conn.Close()
