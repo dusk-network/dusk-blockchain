@@ -80,20 +80,19 @@ func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
 	// Register message in the global message registry for stats collecting
 	// diagnostics.RegisterWireMsg(topics.Kadcast.String(), packet)
 
-	bufs, err := r.processor.Collect(raddr, m, nil, []byte{p.Height})
+	respBufs, err := r.processor.Collect(raddr, m, nil, []byte{p.Height})
 	if err != nil {
 		ll.WithError(err).Error("messageProcessor failed to collect message")
 	}
 
 	// Any response message is translated into Kadcast Point-to-Point wire message.
 	// In other words, any bufs item is sent back to the sender node (remotePeer).
-	// Based on that Request-Response messaging is implemented in Kadcast.
-	for i := 0; i < len(bufs); i++ {
+	for i := 0; i < len(respBufs); i++ {
 		ll.WithField("raddr", remotePeer.Address()).Trace("send point-to-point message")
 
 		// Send Kadcast point-to-point message with destination raddr
 		r.publisher.Publish(topics.KadcastPoint,
-			message.NewWithHeader(topics.Unknown, bufs[i], []byte(remotePeer.Address())))
+			message.NewWithHeader(topics.KadcastPoint, respBufs[i], []byte(remotePeer.Address())))
 	}
 
 	// Repropagate message here

@@ -92,6 +92,11 @@ func (w *Writer) Write(m message.Message) error {
 // WriteToPoint writes a message to a single destination.
 // The receiver address is read from message Header.
 func (w *Writer) WriteToPoint(m message.Message) error {
+	// Height = 0 disables re-broadcast algorithm in the receiver node. That
+	// said, sending a message to peer with height 0 will be received by the
+	// destination peer but will not be repropagated to any other node.
+	const height = byte(0)
+
 	h := m.Header()
 	if len(h) == 0 {
 		return errors.New("empty header")
@@ -116,8 +121,7 @@ func (w *Writer) WriteToPoint(m message.Message) error {
 	}
 
 	// Send message to a single destination using height = 0.
-	// Height = 0 disables re-broadcast algorithm in the receiver node.
-	w.sendToDelegates(delegates, 0, buf.Bytes())
+	w.sendToDelegates(delegates, height, buf.Bytes())
 	return nil
 }
 
