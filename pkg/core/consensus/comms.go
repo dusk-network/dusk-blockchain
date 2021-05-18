@@ -136,7 +136,7 @@ func (e *Emitter) Gossip(msg message.Message) error {
 	return nil
 }
 
-// Kadcast propagates a message in Kadcast network
+// Kadcast propagates a message in Kadcast network.
 func (e *Emitter) Kadcast(msg message.Message, h byte) error {
 	buf, err := message.Marshal(msg)
 	if err != nil {

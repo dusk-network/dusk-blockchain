@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -106,9 +107,8 @@ func (p *Phase) generateCandidate(ctx context.Context, round consensus.RoundUpda
 	// create the message
 	msg := message.New(topics.Score, *scr)
 
-	// gossip externally
-	if err := p.Gossip(msg); err != nil {
-		lg.WithError(err).Errorln("candidate block gossip failed")
+	if err := p.Republish(msg, []byte{config.KadcastInitialHeight}); err != nil {
+		lg.WithError(err).Errorln("topics.Score publishing failed")
 	}
 
 	// communicate our own score to the selection
@@ -142,17 +142,17 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Score {
-			p.collectScore(ctx, ev.Payload().(message.Score))
+			p.collectScore(ctx, ev.Payload().(message.Score), ev.Header())
 		}
 	}
 
 	for {
 		select {
 		case internalScoreResult := <-internalScoreChan:
-			p.collectScore(ctx, internalScoreResult.Payload().(message.Score))
+			p.collectScore(ctx, internalScoreResult.Payload().(message.Score), internalScoreResult.Header())
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
-				p.collectScore(ctx, ev.Payload().(message.Score))
+				p.collectScore(ctx, ev.Payload().(message.Score), ev.Header())
 			}
 
 		case <-timeoutChan:
@@ -192,7 +192,7 @@ func (p *Phase) endSelection(_ uint64, _ uint8) consensus.PhaseFn {
 	return p.next.Initialize(e)
 }
 
-func (p *Phase) collectScore(ctx context.Context, sc message.Score) {
+func (p *Phase) collectScore(ctx context.Context, sc message.Score, msgHeader []byte) {
 	// Sanity-check the candidate message
 	if err := candidate.ValidateCandidate(sc.Candidate); err != nil {
 		lg.Warn("Invalid candidate message")
@@ -214,23 +214,25 @@ func (p *Phase) collectScore(ctx context.Context, sc message.Score) {
 		}
 	}
 
-	h := sc.State()
-	if err := p.handler.Verify(ctx, h.Round, h.Step, sc); err != nil {
+	header := sc.State()
+	if err := p.handler.Verify(ctx, header.Round, header.Step, sc); err != nil {
 		lg.WithError(err).Warn("Invalid score message")
 		return
 	}
 
 	lg.
-		WithField("step", h.Step).
-		WithField("round", h.Round).
+		WithField("step", header.Step).
+		WithField("round", header.Round).
 		WithFields(log.Fields{
 			"new_best": sc.Score,
 		}).Debugln("swapping best score")
 
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
-	if err := p.Emitter.Gossip(message.New(topics.Score, sc)); err != nil {
-		lg.WithError(err).Error("could not republish score event")
+
+	if err := p.Republish(message.New(topics.Score, sc), msgHeader); err != nil {
+		lg.WithError(err).WithField("kadcast_enabled", config.Get().Kadcast.Enabled).
+			Error("could not republish score event")
 	}
 
 	p.bestEvent = sc
