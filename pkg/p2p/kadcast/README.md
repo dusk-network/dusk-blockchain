@@ -40,12 +40,24 @@ event = message.NewWithHeader(topics.Block, *buf, []byte{255})
 eventBus.Publish(topics.Kadcast, event)
 ```
 
-## Message Propagation flow
+## Broadcast Message flow
 --------------
 
 
 1. Publish `topics.Kadcast` event with message payload and kadcast height 
 2. `kadcast.Writer` handles `topics.Kadcast` event
+3. `kadcast.Writer` serialize the event into `Kadcast Wire Message` of type `Broadcast`
+4. kadcast.Writer performs kadcast propagation algorithm where transport protocol is
+ - ` RC-UDP`, if `kadcast.raptor=true` (config)
+- `TCP Dial and Send`, if `kadcast.raptor=false`
+
+## Point-to-point Message flow
+--------------
+
+Point-to-point messaging is a protocol extension that allows any node to request data from a specified peer. An example situation is a peer requesting missing blocks from a peer on synchronization procedure. 
+
+1. Publish `topics.KadcastPoint` event with message payload,  destination peer and kadcast height = 0, 
+2. `kadcast.Writer` handles `topics.KadcastPoint` event
 3. `kadcast.Writer` serialize the event into `Kadcast Wire Message` of type `Broadcast`
 4. kadcast.Writer performs kadcast propagation algorithm where transport protocol is
  - ` RC-UDP`, if `kadcast.raptor=true` (config)

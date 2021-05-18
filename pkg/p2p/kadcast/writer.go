@@ -20,15 +20,13 @@ import (
 // Writer abstracts all of the logic and fields needed to write messages to
 // other network nodes.
 type Writer struct {
-	subscriber     eventbus.Subscriber
-	subscriptionID uint32
-	gossip         *protocol.Gossip
-
+	subscriber eventbus.Subscriber
+	gossip     *protocol.Gossip
 	// Kademlia routing state
-	router *RoutingTable
-
-	writeQueue        chan message.Message
+	router            *RoutingTable
 	raptorCodeEnabled bool
+
+	kadcastSubscription, kadcastPointSubscription uint32
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -48,13 +46,24 @@ func (w *Writer) Serve() {
 	// NewChanListener is preferred here as it passes message.Message to the
 	// Write, where NewStreamListener works with bytes.Buffer only.
 	// Later this could be change if perf issue noticed.
-	w.writeQueue = make(chan message.Message, 1000)
-	w.subscriptionID = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(w.writeQueue))
+	writeQueue := make(chan message.Message, 1000)
+	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(writeQueue))
 
 	go func() {
-		for msg := range w.writeQueue {
+		for msg := range writeQueue {
 			if err := w.Write(msg); err != nil {
-				log.WithError(err).Trace("kadcast writer problem")
+				log.WithError(err).Warn("kadcast writer problem")
+			}
+		}
+	}()
+
+	writePointMsgQueue := make(chan message.Message, 1000)
+	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, eventbus.NewChanListener(writePointMsgQueue))
+
+	go func() {
+		for msg := range writePointMsgQueue {
+			if err := w.WriteToPoint(msg); err != nil {
+				log.WithError(err).Warn("kadcast-point writer problem")
 			}
 		}
 	}()
@@ -76,6 +85,43 @@ func (w *Writer) Write(m message.Message) error {
 	}
 
 	w.broadcastPacket(header[0], buf.Bytes())
+
+	return nil
+}
+
+// WriteToPoint writes a message to a single destination.
+// The receiver address is read from message Header.
+func (w *Writer) WriteToPoint(m message.Message) error {
+	// Height = 0 disables re-broadcast algorithm in the receiver node. That
+	// said, sending a message to peer with height 0 will be received by the
+	// destination peer but will not be repropagated to any other node.
+	const height = byte(0)
+
+	h := m.Header()
+	if len(h) == 0 {
+		return errors.New("empty header")
+	}
+
+	raddr := string(h)
+
+	delegates := make([]encoding.PeerInfo, 1)
+
+	var err error
+
+	delegates[0], err = encoding.MakePeerFromAddr(raddr)
+	if err != nil {
+		return err
+	}
+
+	// Constuct gossip frame.
+	buf := m.Payload().(message.SafeBuffer)
+	if err := w.gossip.Process(&buf.Buffer); err != nil {
+		log.WithError(err).Error("reading gossip frame failed")
+		return err
+	}
+
+	// Send message to a single destination using height = 0.
+	w.sendToDelegates(delegates, height, buf.Bytes())
 	return nil
 }
 
@@ -179,7 +225,8 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []b
 			WithField("r_addr", destPeer.String()).
 			WithField("height", H).
 			WithField("raptor", w.raptorCodeEnabled).
-			Tracef("Sending Broadcast message (len: %d)", buf.Len())
+			WithField("len", buf.Len()).
+			Trace("Sending message")
 
 		// Send message to the dest peer with rc-udp or tcp
 		if w.raptorCodeEnabled {
@@ -200,6 +247,7 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []b
 
 // Close unsubscribes from eventbus events.
 func (w *Writer) Close() error {
-	w.subscriber.Unsubscribe(topics.Kadcast, w.subscriptionID)
+	w.subscriber.Unsubscribe(topics.Kadcast, w.kadcastSubscription)
+	w.subscriber.Unsubscribe(topics.KadcastPoint, w.kadcastPointSubscription)
 	return nil
 }

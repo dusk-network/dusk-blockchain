@@ -82,6 +82,9 @@ const (
 
 	// Kadcast wire messaging.
 	Kadcast
+
+	// Kadcast wire point-to-point messaging.
+	KadcastPoint
 )
 
 type topicBuf struct {
