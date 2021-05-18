@@ -80,17 +80,21 @@ init_dusk_func() {
 
   cat <<EOF > "${DDIR}"/dusk.toml
 [consensus]
-  defaultamount = 50
-  defaultlocktime = 1000
-  defaultoffset = 10
+  defaultamount = 5
+  defaultlocktime = 250000
+  #defaultoffset = 10
   consensustimeout = 5
+
+[performance]
+  # Number of workers to spawn on an accumulator component
+  accumulatorWorkers = 4
 
 [database]
   dir = "${DDIR}/chain/"
   driver = "heavy_v0.1.0"
 
 [general]
-  network = "testnet"
+  network = "devnet"
   walletonly = "false"
   safecallbacklistener = "true"
 
@@ -111,12 +115,30 @@ init_dusk_func() {
   timeoutreadwrite = 60
   timeoutkeepalivetime = 30
 [genesis]
-  legacy = true
+  legacy = false
 
 [gql]
   address = "127.0.0.1:$((9500+$i))"
   enabled = "true"
   network = "tcp"
+
+  # enable/disable both HTTPS and WSS
+  enableTLS = false
+  # server TLS certificate file
+  certFile = ""
+  # server TLS key file
+  keyFile = ""
+
+  # maximum requests per second
+  # uniqueness of a request is based on:
+  # Remote IP, Request method and path
+  maxRequestLimit = 20
+
+  [gql.notification]
+    # Number of pub/sub brokers to broadcast new blocks.
+    # 0 brokersNum disables notifications system
+    brokersNum = 1
+    clientsPerBroker = 1000
 
 [logger]
   output = "stdout"
@@ -128,10 +150,18 @@ init_dusk_func() {
 enabled = false
 
 [mempool]
-  maxinvitems = "10000"
-  maxsizemb = "100"
-  pooltype = "hashmap"
-  prealloctxs = "100"
+  # Max size of memory of the accepted txs to keep
+  maxSizeMB = 100
+
+  # Possible values: "hashmap", "syncpool", "memcached"
+  poolType = "hashmap"
+
+  # number of txs slots to allocate on each reseting mempool
+  preallocTxs = 100
+
+  # Max number of items to respond with on topics.Mempool request
+  # To disable topics.Mempool handling, set it to 0
+  maxInvItems = 10000
 
 [network]
   port = "$((7100+$i))"
@@ -144,18 +174,32 @@ enabled = false
   enabled = "true"
   network = "unix"
 
+  # duration of the session for the grpc services exposed by the node
+  sessionDurationMins = 5
+
+  # do not require session
+  requireSession = true
+
+  enableTLS=false
+
+  # server TLS certificate file
+  certFile=""
+
+  # server TLS key file
+  keyFile=""
+
   [rpc.rusk]
     address = "127.0.0.1:$((10000+$i))"
-    contracttimeout = 6000
-    defaulttimeout = 1000
-    network = "tcp"
+    contractTimeout = 6000
+    defaultTimeout = 1000
+    connectionTimeout = 10000
 
 [wallet]
-  file = "${currentDir}/harness/data/wallet-$((9000+$i)).dat"
+  file = "${currentDir}/devnet-wallets/wallet$(($i)).dat"
   store = "${DDIR}/walletDB/"
 [api]
   enabled=false
-  enableTLS = false
+  enabletls = false
   address="127.0.0.1:$((9490+$i))"
   dbfile="${DDIR}/chain/api.db"
   #5 mins
@@ -256,9 +300,9 @@ start_dusk_mock_rusk_func() {
   echo "starting Dusk Rusk mock $i ..."
 
   DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
-  WALLET_FILE="${currentDir}/harness/data/wallet-$((9000+$i)).dat"
+  WALLET_FILE="${currentDir}/devnet-wallets/wallet$(($i)).dat"
 
-  CMD="${currentDir}/bin/utils mockrusk --rusknetwork tcp --ruskaddress 127.0.0.1:$((10000+$i)) --walletstore ${DDIR}/walletDB/ --walletfile ${WALLET_FILE}"
+  CMD="${currentDir}/bin/utils mockrusk --rusknetwork tcp --ruskaddress 127.0.0.1:$((10000+$i)) --walletstore ${DDIR}/walletDB/ --walletfile ${WALLET_FILE} --configfile ${DDIR}/dusk.toml"
   ${CMD} >> "${currentDir}/devnet/dusk_data/logs/mock_rusk$i.log" 2>&1 &
 
   EXEC_PID=$!
@@ -276,11 +320,7 @@ start_dusk_func() {
 
   EXEC_PID=$!
   echo "started Dusk node $i, pid=$EXEC_PID"
-  sleep 1
-
-  # load wallet cmd
-  LOADWALLET_CMD="./bin/utils walletutils --grpcaddr unix://${DDIR}/dusk-grpc.sock --walletcmd loadwallet --walletpassword password"
-  ${LOADWALLET_CMD} >> "${currentDir}/devnet/dusk_data/logs/load_wallet$i.log" 2>&1 &
+#  sleep 1
 
 }
 
@@ -331,13 +371,13 @@ if [ "${INIT}" == "true" ]; then
 
 fi
 
-sleep 1
+#sleep 1
 
 if [ "${VOUCHER}" == "true" ]; then
   start_voucher_func
 fi
 
-sleep 1
+#sleep 1
 
 if [ "${MOCK}" == "true" ]; then
   start_dusk_mock_func
@@ -356,7 +396,7 @@ if [ "${FILEBEAT}" == "true" ]; then
 
 fi
 
-sleep 1
+#sleep 1
 
 for i in $(seq 0 "$QTD"); do
   start_dusk_func "$i"
