@@ -92,6 +92,10 @@ func (d *Store) IsBlackListed(ip string) bool {
 	d.RLock()
 	defer d.RUnlock()
 
+	return d.isBlackListed(ip)
+}
+
+func (d *Store) isBlackListed(ip string) bool {
 	node, ok := d.Nodes[ip]
 	if !ok || time.Now().Unix()-node.blackListedTime > 86400 {
 		return false
@@ -109,7 +113,7 @@ func (d *Store) DumpNodes(srcPeerID string, _ message.Message) ([]bytes.Buffer, 
 	defer d.RUnlock()
 
 	for ip, n := range d.Nodes {
-		if !d.IsBlackListed(ip) && strings.TrimSpace(ip) != srcPeerID &&
+		if !d.isBlackListed(ip) && strings.TrimSpace(ip) != srcPeerID &&
 			n.online {
 			buf := bytes.NewBuffer([]byte(d.getListeningAddr(ip)))
 			if err := topics.Prepend(buf, topics.Addr); err != nil {
@@ -140,9 +144,6 @@ func (d *Store) SetInactive(ip string) {
 }
 
 func (d *Store) getListeningAddr(ip string) string {
-	d.RLock()
-	defer d.RUnlock()
-
 	node := d.Nodes[ip]
 	trimmedIP := strings.Split(ip, ":")[0]
 	return trimmedIP + ":" + node.listeningPort
