@@ -15,7 +15,7 @@ import (
 )
 
 // AutomateStakesAndBids will enable the use of the stake and bid automaton in a node.
-func AutomateStakesAndBids(address string) error {
+func AutomateStakesAndBids(address string, sendStakeTimeout, sendBidTimeout int) error {
 	// Add UNIX prefix in case we're using unix sockets.
 	if strings.Contains(address, ".sock") {
 		address = "unix://" + address
@@ -31,23 +31,23 @@ func AutomateStakesAndBids(address string) error {
 	stakeClient := node.NewProvisionerClient(c.conn)
 	bidClient := node.NewBlockGeneratorClient(c.conn)
 
-	if err := automateStakes(stakeClient); err != nil {
+	if err := automateStakes(stakeClient, sendStakeTimeout); err != nil {
 		return err
 	}
 
-	return automateBids(bidClient)
+	return automateBids(bidClient, sendBidTimeout)
 }
 
-func automateStakes(c node.ProvisionerClient) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func automateStakes(c node.ProvisionerClient, sendBidTimeout int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(sendBidTimeout)*time.Second)
 	defer cancel()
 
 	_, err := c.AutomateStakes(ctx, &node.EmptyRequest{})
 	return err
 }
 
-func automateBids(c node.BlockGeneratorClient) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func automateBids(c node.BlockGeneratorClient, sendStakeTimeout int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(sendStakeTimeout)*time.Second)
 	defer cancel()
 
 	_, err := c.AutomateBids(ctx, &node.EmptyRequest{})
