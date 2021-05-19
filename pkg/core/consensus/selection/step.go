@@ -102,14 +102,7 @@ func (p *Phase) generateCandidate(ctx context.Context, round consensus.RoundUpda
 	log.
 		WithField("step", step).
 		WithField("round", round.Round).
-		Debugln("sending score")
-
-	// create the message
-	msg := message.New(topics.Score, *scr)
-
-	if err := p.Republish(msg, []byte{config.KadcastInitialHeight}); err != nil {
-		lg.WithError(err).Errorln("topics.Score publishing failed")
-	}
+		Debugln("sending score internally")
 
 	// communicate our own score to the selection
 	internalScoreChan <- message.New(topics.Score, *scr)
@@ -149,7 +142,12 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 	for {
 		select {
 		case internalScoreResult := <-internalScoreChan:
-			p.collectScore(ctx, internalScoreResult.Payload().(message.Score), internalScoreResult.Header())
+			header := internalScoreResult.Header()
+			if header == nil {
+				header = []byte{config.KadcastInitialHeight}
+			}
+
+			p.collectScore(ctx, internalScoreResult.Payload().(message.Score), header)
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
 				p.collectScore(ctx, ev.Payload().(message.Score), ev.Header())
@@ -220,12 +218,8 @@ func (p *Phase) collectScore(ctx context.Context, sc message.Score, msgHeader []
 		return
 	}
 
-	lg.
-		WithField("step", header.Step).
-		WithField("round", header.Round).
-		WithFields(log.Fields{
-			"new_best": sc.Score,
-		}).Debugln("swapping best score")
+	lg.WithField("step", header.Step).
+		WithField("round", header.Round).Debugln("publishing best score")
 
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
@@ -234,6 +228,13 @@ func (p *Phase) collectScore(ctx context.Context, sc message.Score, msgHeader []
 		lg.WithError(err).WithField("kadcast_enabled", config.Get().Kadcast.Enabled).
 			Error("could not republish score event")
 	}
+
+	lg.
+		WithField("step", header.Step).
+		WithField("round", header.Round).
+		WithFields(log.Fields{
+			"new_best": sc.Score,
+		}).Debugln("swapping best score")
 
 	p.bestEvent = sc
 }
