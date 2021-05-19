@@ -8,8 +8,10 @@ package consensus
 
 import (
 	"bytes"
+	"errors"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -132,4 +134,30 @@ func (e *Emitter) Gossip(msg message.Message) error {
 	// gossip away
 	_ = e.EventBus.Publish(topics.Gossip, serialized)
 	return nil
+}
+
+// Kadcast propagates a message in Kadcast network.
+func (e *Emitter) Kadcast(msg message.Message, h byte) error {
+	buf, err := message.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	serialized := message.NewWithHeader(msg.Category(), buf, []byte{h})
+	e.EventBus.Publish(topics.Kadcast, serialized)
+	return nil
+}
+
+// Republish reroutes message propagation to either Gossip or Kadcast network.
+func (e *Emitter) Republish(msg message.Message, header []byte) error {
+	if config.Get().Kadcast.Enabled {
+		if len(header) > 0 && header[0] <= config.KadcastInitialHeight {
+			h := header[0]
+			return e.Kadcast(msg, h)
+		}
+
+		return errors.New("unknown kadcast height")
+	}
+
+	return e.Gossip(msg)
 }
