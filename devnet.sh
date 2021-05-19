@@ -10,6 +10,7 @@ VOUCHER=true
 FILEBEAT=false
 MOCK_ADDRESS=127.0.0.1:9191
 SEND_BID=false
+RUN_AUTOMATON=false
 
 currentDir=$(pwd)
 RACE=false
@@ -28,6 +29,7 @@ usage() {
   echo "-m <boolean>  -- MOCK instances (true or false). default: true"
   echo "-f <boolean>  -- FILEBEAT instances (true or false). default: false"
   echo "-b <boolean>  -- SEND_BID tx to instances (true or false). default: false"
+  echo "-a <boolean>  -- RUN_AUTOMATON to instances (true or false). default: false"
   echo "-r <number>  -- RACE enabled (true or false). eg: true"
   echo "-d <number>  -- DEBUG enabled (true or false). eg: true"
 
@@ -35,7 +37,7 @@ usage() {
 }
 
 
-while getopts "h?c:q:s:i:m:f:b:r:d:" args; do
+while getopts "h?c:q:s:i:m:f:b:a:r:d:" args; do
 case $args in
     h|\?)
       usage;
@@ -47,6 +49,7 @@ case $args in
     m ) MOCK=${OPTARG};;
     f ) FILEBEAT=${OPTARG};;
     b ) SEND_BID=${OPTARG};;
+    a ) RUN_AUTOMATON=${OPTARG};;
     r ) RACE=${OPTARG};;
     d ) DEBUG=${OPTARG};;
   esac
@@ -100,7 +103,8 @@ init_dusk_func() {
 
 # Timeout cfg for rpcBus calls
 [timeout]
-  timeoutsendbidtx = 5
+  timeoutsendbidtx = 50
+  timeoutsendstaketx = 50
   timeoutgetlastcommittee = 5
   timeoutgetlastcertificate = 5
   timeoutgetmempooltxsbysize = 4
@@ -108,7 +112,6 @@ init_dusk_func() {
   timeoutgetcandidate = 5
   timeoutclearwalletdatabase = 0
   timeoutverifycandidateblock = 5
-  timeoutsendstaketx = 5
   timeoutgetmempooltxs = 3
   timeoutgetroundresults = 5
   timeoutbrokergetcandidate = 2
@@ -143,7 +146,7 @@ init_dusk_func() {
 [logger]
   output = "stdout"
   #output = "${DDIR}/dusk"
-  level = "trace"
+  level = "info"
   format = "json"
 [logger.monitor]
 # enabling log based monitoring
@@ -178,7 +181,7 @@ enabled = false
   sessionDurationMins = 5
 
   # do not require session
-  requireSession = true
+  requireSession = false
 
   enableTLS=false
 
@@ -338,9 +341,22 @@ start_dusk_mock_func() {
 send_bid_func(){
   echo "Sending bid to node $i ..."
 
+  DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
+
   # send bid cmd
   SENDBID_CMD="./bin/utils transactions --grpcaddr unix://${DDIR}/dusk-grpc.sock --txtype consensus --amount 10 --locktime 10"
   ${SENDBID_CMD} >> "${currentDir}/devnet/dusk_data/logs/sendbid_bid$i.log" 2>&1 &
+}
+
+# automaton_func
+automaton_func(){
+  echo "Starting automaton, will be sending automated stakes and bids to node $i ..."
+
+  DDIR="${currentDir}/devnet/dusk_data/dusk${i}"
+
+  # send bid cmd
+  AUTOMATE_CMD="./bin/utils automate --grpcaddr unix://${DDIR}/dusk-grpc.sock --sendstaketimeout 10 --sendbidtimeout 10"
+  ${AUTOMATE_CMD} >> "${currentDir}/devnet/dusk_data/logs/automaton$i.log" 2>&1 &
 }
 
 start_voucher_func() {
@@ -407,6 +423,14 @@ sleep 5
 if [ "${SEND_BID}" == "true" ]; then
   for i in $(seq 0 "$QTD"); do
     send_bid_func "$i"
+  done
+fi
+
+sleep 5
+
+if [ "${RUN_AUTOMATON}" == "true" ]; then
+  for i in $(seq 0 "$QTD"); do
+    automaton_func "$i"
   done
 fi
 
