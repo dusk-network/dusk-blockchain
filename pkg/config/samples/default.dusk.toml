@@ -22,6 +22,7 @@ timeoutsendstaketx = 5
 timeoutgetmempooltxs = 3
 timeoutgetroundresults = 5
 timeoutbrokergetcandidate = 2
+timeoutdial = 5
 
 # timeoutkeepalivetime must be always smaller than timeoutreadwrite
 # otherwise the node will disconnect due to read timeout error
@@ -64,6 +65,7 @@ maxDupeMapItems=300000
 maxDupeMapExpire=5
 
 minimumConnections = 5
+maxConnections = 50
 
 # Node service flag
 # 1 = full node

@@ -32,6 +32,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("general.testharness", "true")
 
 	viper.Set("network.serviceflag", 1)
+	viper.Set("network.maxconnections", 50)
 
 	// bidautomaton.go
 	viper.Set("timeout.timeoutsendbidtx", 5)
@@ -64,9 +65,10 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("timeout.timeoutreadwrite", 60)
 	// peer.go
 	viper.Set("timeout.timeoutkeepalivetime", 30)
+	viper.Set("timeout.timeoutdial", 5)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
-	viper.Set("logger.level", "trace")
+	viper.Set("logger.level", "info")
 
 	viper.Set("gql.address", node.Cfg.Gql.Address)
 	viper.Set("gql.network", node.Cfg.Gql.Network)

@@ -250,6 +250,10 @@ func Setup() *Server {
 		}
 	}
 
+	if connector.GetConnectionsCount() == 0 {
+		panic("could not contact any voucher seeders")
+	}
+
 	// creating the Server
 	srv := &Server{
 		eventBus:      eventBus,

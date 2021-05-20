@@ -9,6 +9,7 @@ package peer
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -19,6 +20,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	defaultDialTimeout    = 5
+	defaultMaxConnections = 50
 )
 
 type connectFunc func(context.Context, *Reader, *Writer, chan bytes.Buffer)
@@ -76,7 +82,7 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 				return
 			}
 
-			go c.acceptConnection(conn)
+			c.acceptConnection(conn)
 		}
 	}(c)
 
@@ -91,6 +97,15 @@ func (c *Connector) Close() error {
 // ProcessNewAddress will handle a new Addr message from the network.
 // Satisfies the peer.ProcessorFunc interface.
 func (c *Connector) ProcessNewAddress(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
+	maxConn := config.Get().Network.MaxConnections
+	if maxConn == 0 {
+		maxConn = defaultMaxConnections
+	}
+
+	if c.GetConnectionsCount() > maxConn {
+		return nil, errors.New("max amount of connections reached")
+	}
+
 	a := m.Payload().(message.Addr)
 	return nil, c.Connect(a.NetAddr)
 }
@@ -103,13 +118,18 @@ func (c *Connector) Connect(addr string) error {
 		return err
 	}
 
-	go c.proposeConnection(conn)
+	c.proposeConnection(conn)
 	return nil
 }
 
 // Dial dials up a connection, given its address string.
 func (c *Connector) Dial(addr string) (net.Conn, error) {
-	dialTimeout := 1 * time.Second
+	t := config.Get().Timeout.TimeoutDial
+	if t == 0 {
+		t = defaultDialTimeout
+	}
+
+	dialTimeout := time.Duration(t) * time.Second
 
 	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 	if err != nil {
@@ -195,4 +215,12 @@ func (c *Connector) removePeer(address string) {
 
 		c.eventBus.Publish(topics.Gossip, message.New(topics.GetAddrs, *buf))
 	}
+}
+
+// GetConnectionsCount returns the amount of active connections the node has.
+func (c *Connector) GetConnectionsCount() int {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return len(c.registry)
 }
