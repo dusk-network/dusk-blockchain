@@ -93,7 +93,7 @@ func (m *BidAutomaton) sendBid() error {
 	l.WithFields(log.Fields{
 		"amount":   amount,
 		"locktime": lockTime,
-	}).Tracef("Sending bid tx")
+	}).Trace("Sending bid tx")
 
 	req := &node.BidRequest{
 		Amount:   amount,
@@ -103,6 +103,11 @@ func (m *BidAutomaton) sendBid() error {
 	timeoutSendBidTX := time.Duration(config.Get().Timeout.TimeoutSendBidTX) * time.Second
 	_, err := m.rpcBus.Call(topics.SendBidTx, rpcbus.NewRequest(req), timeoutSendBidTX)
 	if err != nil {
+		l.WithFields(log.Fields{
+			"amount":   amount,
+			"locktime": lockTime,
+			"err":      err,
+		}).Error("failed to send bid tx")
 		return err
 	}
 

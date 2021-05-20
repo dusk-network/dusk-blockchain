@@ -82,7 +82,7 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 	log.
 		WithField("amount", req.Amount).
 		WithField("locktime", req.Locktime).
-		Tracef("Creating a bid tx")
+		Info("Creating a bid tx")
 
 	// TODO context should be created from the parent one
 	ctx := context.Background()
@@ -132,6 +132,10 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 		var height uint64
 		height, err = t.FetchCurrentHeight()
 		if err != nil {
+			log.
+				WithField("amount", req.Amount).
+				WithField("locktime", req.Locktime).
+				Error("FetchCurrentHeight, failed to fetch")
 			return err
 		}
 
@@ -156,6 +160,12 @@ func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionRes
 			Panic("handleSendBidTx, failed to create publishTx")
 	}
 
+	// create and sign transaction
+	log.
+		WithField("amount", req.Amount).
+		WithField("locktime", req.Locktime).
+		Trace("Success creating a bid tx")
+
 	return &node.TransactionResponse{Hash: hash}, nil
 }
 
@@ -168,7 +178,7 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 	log.
 		WithField("amount", req.Amount).
 		WithField("locktime", req.Locktime).
-		Tracef("Creating a stake tx")
+		Trace("Creating a stake tx")
 
 	blsKey := t.w.Keys().BLSPubKey
 	if blsKey == nil {
@@ -198,6 +208,11 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 		return nil, err
 	}
 
+	log.
+		WithField("amount", req.Amount).
+		WithField("locktime", req.Locktime).
+		Trace("Success creating a stake tx")
+
 	return &node.TransactionResponse{Hash: hash}, nil
 }
 
@@ -210,7 +225,7 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 	log.
 		WithField("amount", req.Amount).
 		WithField("address", string(req.Address)).
-		Tracef("Create a standard tx")
+		Trace("Create a standard tx")
 
 	ctx := context.Background()
 
