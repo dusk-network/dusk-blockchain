@@ -97,7 +97,7 @@ func (m *StakeAutomaton) sendStake() error {
 	l.WithFields(log.Fields{
 		"amount":   amount,
 		"locktime": lockTime,
-	}).Tracef("Sending stake tx")
+	}).Trace("Sending stake tx")
 
 	req := &node.StakeRequest{
 		Amount:   amount,
@@ -109,6 +109,11 @@ func (m *StakeAutomaton) sendStake() error {
 
 	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(req), timeoutSendStakeTX)
 	if err != nil {
+		l.WithFields(log.Fields{
+			"amount":   amount,
+			"locktime": lockTime,
+			"err":      err,
+		}).Error("error sending stake tx")
 		return err
 	}
 

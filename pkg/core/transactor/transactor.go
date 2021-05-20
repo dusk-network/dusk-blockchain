@@ -7,6 +7,7 @@
 package transactor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"time"
@@ -92,20 +93,31 @@ func (t *Transactor) Listen() {
 				continue
 			}
 
-			// QUESTION: should we return the hash of the transaction back to
-			// the client?
-			if _, err := t.Stake(context.Background(), req); err != nil {
+			var hash *bytes.Buffer
+
+			resp, err := t.Stake(context.Background(), req)
+			if err != nil {
 				l.WithError(err).Error("error in creating a stake transaction")
+			} else {
+				hash = bytes.NewBuffer(resp.GetHash())
 			}
+			r.RespChan <- rpcbus.Response{Resp: hash, Err: err}
+
 		case r := <-t.bidChan:
 			req, ok := r.Params.(*node.BidRequest)
 			if !ok {
 				continue
 			}
 
-			if _, err := t.Bid(context.Background(), req); err != nil {
+			var hash *bytes.Buffer
+
+			resp, err := t.Bid(context.Background(), req)
+			if err != nil {
 				l.WithError(err).Error("error in creating a bid transaction")
+			} else {
+				hash = bytes.NewBuffer(resp.GetHash())
 			}
+			r.RespChan <- rpcbus.Response{Resp: hash, Err: err}
 		}
 	}
 }
@@ -116,7 +128,7 @@ func (t *Transactor) canStake() bool {
 		return true
 	}
 
-	log.WithField("progress", progress).Debugln("could not send stake tx - node is not synced")
+	log.WithField("progress", progress).Debug("could not send stake tx - node is not synced")
 
 	// Check for our sync progress three more times. If we still can't stake after
 	// the third check, it's better to just return false, and give the Transactor
@@ -131,7 +143,7 @@ func (t *Transactor) canStake() bool {
 			return true
 		}
 
-		log.WithField("progress", progress).Debugln("could not send stake tx - node is not synced")
+		log.WithField("progress", progress).Debug("could not send stake tx - node is not synced")
 	}
 
 	return false
