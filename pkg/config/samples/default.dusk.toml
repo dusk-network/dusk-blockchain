@@ -22,6 +22,7 @@ timeoutsendstaketx = 5
 timeoutgetmempooltxs = 3
 timeoutgetroundresults = 5
 timeoutbrokergetcandidate = 2
+timeoutdial = 5
 
 # timeoutkeepalivetime must be always smaller than timeoutreadwrite
 # otherwise the node will disconnect due to read timeout error
@@ -62,6 +63,15 @@ maxDupeMapItems=300000
 # Number of seconds before dupemap expires and gets reset. 
 # Ideally should be less than 15s - average consensus time
 maxDupeMapExpire=5
+
+minimumConnections = 5
+maxConnections = 50
+
+# Node service flag
+# 1 = full node
+# 2 = light node (unimplemented)
+# 3 = voucher node
+serviceFlag = 1
 
 [network.seeder]
 # array of seeder servers

@@ -53,7 +53,10 @@ func TestReader(t *testing.T) {
 	factory := NewReaderFactory(processor)
 
 	responseChan := make(chan bytes.Buffer, 100)
-	peerReader := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), responseChan)
+	pConn := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
+	peerReader := factory.SpawnReader(pConn, responseChan)
+
+	peerReader.services = protocol.FullNode
 
 	go peerReader.ReadLoop(context.Background())
 
@@ -115,7 +118,10 @@ func TestWriteLoop(t *testing.T) {
 	go func(g *protocol.Gossip) {
 		responseChan := make(chan bytes.Buffer)
 
-		writer := NewWriter(client, g, bus, 30*time.Millisecond)
+		pConn := NewConnection(client, g)
+		writer := NewWriter(pConn, bus, 30*time.Millisecond)
+
+		writer.services = protocol.FullNode
 		go writer.Serve(context.Background(), responseChan)
 
 		bufCopy := buf
@@ -164,7 +170,8 @@ func makeAgreementGossip(keyAmount int) message.Message {
 func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *Writer {
 	client, srv := net.Pipe()
 	g := protocol.NewGossip(protocol.TestNet)
-	pw := NewWriter(client, g, bus)
+	pConn := NewConnection(client, g)
+	pw := NewWriter(pConn, bus)
 
 	go receiveFunc(srv)
 	return pw

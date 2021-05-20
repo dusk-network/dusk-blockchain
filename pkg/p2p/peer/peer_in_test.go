@@ -51,20 +51,27 @@ func TestPingLoop(t *testing.T) {
 	cfg.Mock(&r)
 
 	responseChan := make(chan bytes.Buffer, 10)
-	writer := NewWriter(client, protocol.NewGossip(protocol.TestNet), bus)
+	pConn := NewConnection(client, protocol.NewGossip(protocol.TestNet))
+	writer := NewWriter(pConn, bus)
 
 	// Set up the other end of the exchange
 	responseChan2 := make(chan bytes.Buffer, 10)
-	writer2 := NewWriter(srv, protocol.NewGossip(protocol.TestNet), bus)
+	pConn2 := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
+	writer2 := NewWriter(pConn2, bus)
 
 	// Set up reader factory
 	processor := NewMessageProcessor(bus)
 	processor.Register(topics.Ping, responding.ProcessPing)
 	factory := NewReaderFactory(processor)
 
-	reader := factory.SpawnReader(client, protocol.NewGossip(protocol.TestNet), responseChan)
+	reader := factory.SpawnReader(pConn, responseChan)
 
-	reader2 := factory.SpawnReader(srv, protocol.NewGossip(protocol.TestNet), responseChan2)
+	reader2 := factory.SpawnReader(pConn2, responseChan2)
+
+	writer.services = protocol.FullNode
+	writer2.services = protocol.FullNode
+	reader.services = protocol.FullNode
+	reader2.services = protocol.FullNode
 
 	go Create(context.Background(), reader, writer, responseChan)
 	go Create(context.Background(), reader2, writer2, responseChan2)
@@ -226,7 +233,8 @@ func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, ch
 
 	respChan := make(chan bytes.Buffer, 10)
 	g := protocol.NewGossip(protocol.TestNet)
-	peer := f.SpawnReader(r, g, respChan)
+	c := NewConnection(r, g)
+	peer := f.SpawnReader(c, respChan)
 
 	// Run the non-recover readLoop to watch for panics
 	go assert.NotPanics(t, func() { peer.readLoop(context.Background()) })

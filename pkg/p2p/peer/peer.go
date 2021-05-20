@@ -29,24 +29,44 @@ import (
 
 var l = log.WithField("process", "peer")
 
+const (
+	defaultTimeoutReadWrite = 60
+	defaultKeepAliveTime    = 30
+)
+
 // Connection holds the TCP connection to another node, and it's known protocol magic.
 // The `net.Conn` is guarded by a mutex, to allow both multicast and one-to-one
 // communication between peers.
 type Connection struct {
 	lock sync.Mutex
 	net.Conn
-	gossip *protocol.Gossip
+	gossip   *protocol.Gossip
+	services protocol.ServiceFlag //nolint:structcheck
+}
+
+// NewConnection creates a peer connection struct.
+func NewConnection(conn net.Conn, gossip *protocol.Gossip) *Connection {
+	return &Connection{
+		Conn:   conn,
+		gossip: gossip,
+	}
 }
 
 // GossipConnector calls Gossip.Process on the message stream incoming from the
 // ringbuffer.
 // It absolves the function previously carried over by the Gossip preprocessor.
 type GossipConnector struct {
-	gossip *protocol.Gossip
 	*Connection
 }
 
 func (g *GossipConnector) Write(b []byte) (int, error) {
+	if !canRoute(g.services, topics.Topic(b[0])) {
+		l.WithField("topic", topics.Topic(b[0]).String()).
+			WithField("service flag", g.services).
+			Trace("dropping message")
+		return 0, nil
+	}
+
 	buf := bytes.NewBuffer(b)
 	if err := g.gossip.Process(buf); err != nil {
 		return 0, err
@@ -62,7 +82,6 @@ type Writer struct {
 	subscriber eventbus.Subscriber
 	gossipID   uint32
 	keepAlive  time.Duration
-	// TODO: add service flag
 }
 
 // Reader abstracts all of the logic and fields needed to receive messages from
@@ -71,23 +90,19 @@ type Reader struct {
 	*Connection
 	processor    *MessageProcessor
 	responseChan chan<- bytes.Buffer
-	// TODO: add service flag
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine.
-func NewWriter(conn net.Conn, gossip *protocol.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
+func NewWriter(conn *Connection, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
 	kas := 30 * time.Second
 	if len(keepAlive) > 0 {
 		kas = keepAlive[0]
 	}
 
 	pw := &Writer{
-		Connection: &Connection{
-			Conn:   conn,
-			gossip: gossip,
-		},
+		Connection: conn,
 		subscriber: subscriber,
 		keepAlive:  kas,
 	}
@@ -114,8 +129,8 @@ func (c *Connection) ReadMessage() ([]byte, error) {
 }
 
 // Connect will perform the protocol handshake with the peer. If successful...
-func (w *Writer) Connect() error {
-	if err := w.Handshake(); err != nil {
+func (w *Writer) Connect(services protocol.ServiceFlag) error {
+	if err := w.Handshake(services); err != nil {
 		_ = w.Conn.Close()
 		return err
 	}
@@ -153,8 +168,8 @@ func (w *Writer) Connect() error {
 }
 
 // Accept will perform the protocol handshake with the peer.
-func (p *Reader) Accept() error {
-	if err := p.Handshake(); err != nil {
+func (p *Reader) Accept(services protocol.ServiceFlag) error {
+	if err := p.Handshake(services); err != nil {
 		_ = p.Conn.Close()
 		return err
 	}
@@ -191,10 +206,10 @@ func (p *Reader) Accept() error {
 	return nil
 }
 
-// Create two-way communication with a peer. The function creates a shared context
-// between both goroutines, which allows one to cancel the other in case of a
-// fatal error being encountered.
-func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan <-chan bytes.Buffer) {
+// Create two-way communication with a peer. This function will allow both
+// goroutines to run as long as no errors are encountered. Once the first error
+// comes through, the context is canceled, and both goroutines are cleaned up.
+func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan chan bytes.Buffer) {
 	pCtx, cancel := context.WithCancel(ctx)
 
 	go func() {
@@ -202,17 +217,15 @@ func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan 
 		cancel()
 	}()
 
-	go func() {
-		writer.Serve(ctx, writeQueueChan)
-		cancel()
-	}()
+	writer.Serve(pCtx, writeQueueChan)
+	cancel()
 }
 
 // Serve utilizes two different methods for writing to the open connection.
 func (w *Writer) Serve(ctx context.Context, writeQueueChan <-chan bytes.Buffer) {
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
-	g := &GossipConnector{w.gossip, w.Connection}
+	g := &GossipConnector{w.Connection}
 	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
 
 	// writeQueue - FIFO queue
@@ -280,13 +293,21 @@ func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buff
 	for {
 		select {
 		case buf := <-writeQueueChan:
+			if !canRoute(w.services, topics.Topic(buf.Bytes()[0])) {
+				l.WithField("topic", topics.Topic(buf.Bytes()[0]).String()).
+					WithField("service flag", w.services).
+					Warnln("dropping message")
+				continue
+			}
+
 			if err := w.gossip.Process(&buf); err != nil {
 				l.WithError(err).Warnln("error processing outgoing message")
 				continue
 			}
 
 			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
-				l.WithField("process", "writeloop").WithError(err).Warnln("error writing message")
+				l.WithField("process", "writeloop").
+					WithError(err).Warnln("error writing message")
 				return
 			}
 		case <-ctx.Done():
@@ -316,11 +337,21 @@ func (p *Reader) readLoop(ctx context.Context) {
 		_ = p.Conn.Close()
 	}()
 
-	readWriteTimeout := time.Duration(config.Get().Timeout.TimeoutReadWrite) * time.Second // Max idle time for a peer
+	trw := config.Get().Timeout.TimeoutReadWrite
+	if trw == 0 {
+		trw = defaultTimeoutReadWrite
+	}
+
+	readWriteTimeout := time.Duration(trw) * time.Second
 
 	// Set up a timer, which triggers the sending of a `keepalive` message
 	// when fired.
-	keepAliveTime := time.Duration(config.Get().Timeout.TimeoutKeepAliveTime) * time.Second // Send keepalive message after inactivity for this amount of time
+	kat := config.Get().Timeout.TimeoutKeepAliveTime
+	if kat == 0 {
+		kat = defaultKeepAliveTime
+	}
+
+	keepAliveTime := time.Duration(kat) * time.Second
 
 	timer := time.NewTimer(keepAliveTime)
 	go p.keepAliveLoop(ctx, timer)
@@ -362,7 +393,7 @@ func (p *Reader) readLoop(ctx context.Context) {
 			// or blacklist spammers
 			startTime := time.Now().UnixNano()
 
-			if _, err = p.processor.Collect(p.Addr(), message, p.responseChan, nil); err != nil {
+			if _, err = p.processor.Collect(p.Addr(), message, p.responseChan, p.services, nil); err != nil {
 				l.WithField("process", "readloop").WithField("cs", hex.EncodeToString(cs)).
 					WithError(err).Error("failed to process message")
 			}
@@ -396,27 +427,24 @@ func (p *Reader) keepAliveLoop(ctx context.Context, timer *time.Timer) {
 	for {
 		select {
 		case <-timer.C:
-			// TODO: why was the error never checked ?
-			err := p.Connection.keepAlive()
-			if err != nil {
+			if err := p.Connection.keepAlive(); err != nil {
 				log.WithError(err).WithField("process", "keepaliveloop").Error("got error back from keepAlive")
+			}
 
-				if config.Get().API.Enabled {
-					go func() {
-						addr := p.Addr()
-						peerCount := capi.PeerCount{
-							ID: addr,
-						}
+			if config.Get().API.Enabled {
+				go func() {
+					addr := p.Addr()
+					peerCount := capi.PeerCount{
+						ID: addr,
+					}
 
-						store := capi.GetStormDBInstance()
+					store := capi.GetStormDBInstance()
 
-						// delete count
-						err = store.Delete(&peerCount)
-						if err != nil {
-							log.WithField("process", "keepaliveloop").Error("failed to Delete peerCount into StormDB")
-						}
-					}()
-				}
+					// delete count
+					if err := store.Delete(&peerCount); err != nil {
+						log.WithField("process", "keepaliveloop").Error("failed to Delete peerCount into StormDB")
+					}
+				}()
 			}
 
 		case <-ctx.Done():

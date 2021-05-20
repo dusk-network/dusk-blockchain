@@ -28,6 +28,7 @@ type timeoutConfiguration struct {
 	TimeoutBrokerGetCandidate   int64
 	TimeoutReadWrite            int64
 	TimeoutKeepAliveTime        int64
+	TimeoutDial                 int64
 }
 
 type loggerConfiguration struct {
@@ -53,6 +54,11 @@ type networkConfiguration struct {
 
 	MaxDupeMapItems  uint32
 	MaxDupeMapExpire uint32
+
+	MinimumConnections int
+	MaxConnections     int
+
+	ServiceFlag uint8
 }
 
 type kadcastConfiguration struct {

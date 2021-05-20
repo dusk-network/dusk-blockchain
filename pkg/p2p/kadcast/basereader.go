@@ -80,7 +80,8 @@ func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
 	// Register message in the global message registry for stats collecting
 	// diagnostics.RegisterWireMsg(topics.Kadcast.String(), packet)
 
-	respBufs, err := r.processor.Collect(raddr, m, nil, []byte{p.Height})
+	// TODO: set service flag properly
+	respBufs, err := r.processor.Collect(raddr, m, nil, protocol.FullNode, []byte{p.Height})
 	if err != nil {
 		ll.WithError(err).Error("messageProcessor failed to collect message")
 	}

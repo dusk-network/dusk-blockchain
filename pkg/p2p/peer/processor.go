@@ -8,11 +8,13 @@ package peer
 
 import (
 	"bytes"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
@@ -44,7 +46,7 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
-func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan chan<- bytes.Buffer, header []byte) ([]bytes.Buffer, error) {
+func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan chan<- bytes.Buffer, services protocol.ServiceFlag, header []byte) ([]bytes.Buffer, error) {
 	b := bytes.NewBuffer(packet)
 
 	msg, err := message.Unmarshal(b)
@@ -56,14 +58,11 @@ func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan cha
 		msg = message.NewWithHeader(msg.Category(), msg.Payload(), header)
 	}
 
-	return m.process(srcPeerID, msg, respChan)
+	return m.process(srcPeerID, msg, respChan, services)
 }
 
-// CanRoute determines whether or not a message needs to be filtered by the
-// dupemap.
-// TODO: rename.
-func (m *MessageProcessor) CanRoute(topic topics.Topic) bool {
-	switch topic {
+func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
+	switch t {
 	case topics.Tx,
 		topics.Candidate,
 		topics.Score,
@@ -71,14 +70,18 @@ func (m *MessageProcessor) CanRoute(topic topics.Topic) bool {
 		topics.Agreement,
 		topics.GetCandidate:
 		return true
+	default:
+		return false
 	}
-
-	return false
 }
 
-func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respChan chan<- bytes.Buffer) ([]bytes.Buffer, error) {
+func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respChan chan<- bytes.Buffer, services protocol.ServiceFlag) ([]bytes.Buffer, error) {
 	category := msg.Category()
-	if m.CanRoute(category) {
+	if !canRoute(services, category) {
+		return nil, fmt.Errorf("attempted to process an illegal topic %s for node type %v", category, services)
+	}
+
+	if m.shouldBeCached(category) {
 		if !m.dupeMap.HasAnywhere(bytes.NewBuffer(msg.Id())) {
 			return nil, nil
 		}

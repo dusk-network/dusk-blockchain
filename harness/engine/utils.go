@@ -135,10 +135,11 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 	}
 
 	gossip := protocol.NewGossip(protocol.TestNet)
-	w := peer.NewWriter(conn, gossip, nil)
+	pConn := peer.NewConnection(conn, gossip)
+	w := peer.NewWriter(pConn, nil)
 
 	// Run handshake procedure
-	if err = w.Connect(); err != nil {
+	if err = w.Connect(protocol.FullNode); err != nil {
 		return err
 	}
 
