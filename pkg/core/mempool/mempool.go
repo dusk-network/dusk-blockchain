@@ -168,7 +168,13 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 		return nil, errors.New("mempool is full, dropping transaction")
 	}
 
-	t := TxDesc{tx: msg.Payload().(transactions.ContractCall), received: time.Now(), size: uint(len(msg.Id()))}
+	var h byte
+	if len(msg.Header()) > 0 {
+		h = msg.Header()[0]
+	}
+
+	t := TxDesc{tx: msg.Payload().(transactions.ContractCall), received: time.Now(), size: uint(len(msg.Id())), kadHeight: h}
+
 	start := time.Now()
 	txid, err := m.processTx(t)
 	elapsed := time.Since(start)
@@ -266,73 +272,35 @@ func (m *Mempool) onBlock(b block.Block) {
 // The passed block is supposed to be the last one accepted. That said, it must
 // contain a valid TxRoot.
 func (m *Mempool) removeAccepted(b block.Block) {
-	blockHash := toHex(b.Header.Hash)
-
-	log.
-		WithField("height", b.Header.Height).
-		WithField("hash", blockHash).
-		WithField("len_txs", len(b.Txs)).
-		WithField("mempool_size", float32(m.verified.Size())/1000).
-		Info("process an accepted block")
-
 	if m.verified.Len() == 0 {
 		// No txs accepted then no cleanup needed
 		return
 	}
 
+	l := log.WithField("blk_height", b.Header.Height).
+		WithField("blk_txs_count", len(b.Txs)).
+		WithField("mem_alloc_size_kB", int64(m.verified.Size())/1000).
+		WithField("mem_txs_count", m.verified.Len())
+
 	for _, tx := range b.Txs {
 		hash, err := tx.CalculateHash()
 		if err != nil {
-			log.
-				WithError(err).
-				WithField("height", b.Header.Height).
-				WithField("hash", blockHash).
-				WithField("len_txs", len(b.Txs)).
-				WithField("mempool_size", float32(m.verified.Size())/1000).
-				Panic("could not calculate tx hash")
+			log.WithError(err).Panic("could not calculate tx hash")
 		}
 
 		m.verified.Delete(hash)
 	}
 
-	log.
-		WithField("height", b.Header.Height).
-		WithField("hash", blockHash).
-		WithField("len_txs", len(b.Txs)).
-		WithField("mempool_size", float32(m.verified.Size())/1000).
-		Info("processing_block_completed")
+	l.Info("processing_block_completed")
 }
 
 // TODO: Get rid of stuck/expired transactions
 // TODO: Check periodically the oldest txs if somehow were accepted into the
 // blockchain but were not removed from mempool verified list.
 func (m *Mempool) onIdle() {
-	// stats to log
-	poolSize := float32(m.verified.Size()) / 1000
-
 	log.
-		WithField("pool_txs_count", m.verified.Len()).
-		WithField("pool_size", poolSize).
-		Infof("process onidle")
-
-	// trigger alarms/notifications in case of abnormal state
-
-	// trigger alarms on too much txs memory allocated
-	maxSizeBytes := config.Get().Mempool.MaxSizeMB * 1000 * 1000
-	if m.verified.Size() > maxSizeBytes {
-		log.WithField("max_size_mb", config.Get().Mempool.MaxSizeMB).
-			WithField("current_size", m.verified.Size()).
-			Warn("exceeding max size")
-	}
-
-	if log.Logger.GetLevel() == logger.TraceLevel {
-		if m.verified.Len() > 0 {
-			_ = m.verified.Range(func(k txHash, t TxDesc) error {
-				log.WithField("txid", toHex(k[:])).Trace("accepted transaction")
-				return nil
-			})
-		}
-	}
+		WithField("mempool_alloc_size_kB", int64(m.verified.Size())/1000).
+		WithField("mempool_txs_count", m.verified.Len()).Info("process_on_idle")
 }
 
 func (m *Mempool) newPool() Pool {
