@@ -353,17 +353,21 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	batchSize, _ := strconv.Atoi(batchSizeEnv)
 
 	if batchSize == 0 {
-		batchSize = 2000
+		batchSize = 300
 	}
 
 	for i := uint(0); i < uint(localNet.Size()); i++ {
-		t.Logf("Node[%d] starts sending a batch of %d Transfer txs", i, batchSize)
+		logrus.WithField("node_id", i).WithField("batch_size", batchSize).
+			Info("start sending transfer txs ...")
 
 		// Start concurrently flooding the network with batch of Transfer transactions
 		go func(ind uint) {
 			if err := localNet.BatchSendTransferTx(t, ind, uint(batchSize), 100, 10, time.Minute); err != nil {
 				logrus.Error(err)
 			}
+
+			logrus.WithField("node_id", ind).WithField("batch_size", batchSize).
+				Info("batch of transfer txs completed")
 		}(i)
 	}
 
