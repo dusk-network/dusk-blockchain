@@ -7,7 +7,6 @@
 package rcudp
 
 import (
-	"bytes"
 	"net"
 	"time"
 
@@ -34,8 +33,9 @@ func sendRaptorRFC5053(conn *net.UDPConn, message []byte, redundancyFactor uint8
 			w.PaddingSize, uint32(w.TransferLength()),
 			uint32(b.BlockCode), b.Data)
 
-		var buf bytes.Buffer
-		if err = p.marshalBinary(&buf); err != nil {
+		var blob []byte
+
+		if blob, err = p.marshal(); err != nil {
 			log.WithError(err).Warnf("Error writing to UDP socket")
 			continue
 		}
@@ -46,7 +46,7 @@ func sendRaptorRFC5053(conn *net.UDPConn, message []byte, redundancyFactor uint8
 		time.Sleep(backoffTimeout)
 
 		// TODO: Consider if here we can get sender_buffer error here
-		if _, err = conn.Write(buf.Bytes()); err != nil {
+		if _, err = conn.Write(blob); err != nil {
 			log.WithError(err).Warnf("Error writing to UDP socket")
 		}
 	}
@@ -56,12 +56,6 @@ func sendRaptorRFC5053(conn *net.UDPConn, message []byte, redundancyFactor uint8
 
 // Write writes a message to UDP receiver in form of fountain codes.
 func Write(laddr, raddr *net.UDPAddr, message []byte, redundancyFactor uint8) error {
-	defer func() {
-		if r := recover(); r != nil {
-			log.WithField("err", r).Warn("Send failed")
-		}
-	}()
-
 	// Send from same IP that the UDP listener is bound on but choose random port
 	laddr.Port = 0
 

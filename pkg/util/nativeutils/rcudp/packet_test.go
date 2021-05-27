@@ -14,7 +14,7 @@ import (
 )
 
 func TestPacketMarshalBinary(t *testing.T) {
-	block, err := crypto.RandEntropy(11111)
+	block, err := crypto.RandEntropy(1000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,18 +22,31 @@ func TestPacketMarshalBinary(t *testing.T) {
 	objectID := block[0:8]
 	p := newPacket(objectID, 4, 3, 21, 222, block)
 
-	var buf bytes.Buffer
-	if err := p.marshalBinary(&buf); err != nil {
+	var buf []byte
+
+	if buf, err = p.marshal(); err != nil {
 		t.Error(err)
 	}
 
 	p2 := Packet{}
-	if err := p2.unmarshalBinary(&buf); err != nil {
+	if err := p2.unmarshal(buf); err != nil {
 		t.Error(err)
 	}
 
-	if p != p2 {
-		t.Fatal("not equal")
+	if p.blockID != p2.blockID {
+		t.Fatal("blockID not equal")
+	}
+
+	if p.PaddingSize != p2.PaddingSize {
+		t.Fatal("PaddingSize not equal")
+	}
+
+	if p.NumSourceSymbols != p2.NumSourceSymbols {
+		t.Fatal("NumSourceSymbols not equal")
+	}
+
+	if p.transferLength != p2.transferLength {
+		t.Fatal("transferLength not equal")
 	}
 
 	if !bytes.Equal(p.block[:], p2.block[:]) {
