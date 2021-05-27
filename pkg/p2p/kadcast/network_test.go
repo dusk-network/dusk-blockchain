@@ -30,13 +30,11 @@ const (
 	basePort = 10000
 	// Number of the TestNetwork nodes.
 	networkSize = 10
-
-	enableProfiling = false
 )
 
-func kadcastRandomBlock(eventbus *eventbus.EventBus) (*block.Block, error) {
-	b := helper.RandomBlock(1, 3)
+var enableProfiling = os.Getenv("CPU_PROFILE")
 
+func kadcastBlock(b *block.Block, e *eventbus.EventBus) (*block.Block, error) {
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, b); err != nil {
 		return b, err
@@ -49,7 +47,7 @@ func kadcastRandomBlock(eventbus *eventbus.EventBus) (*block.Block, error) {
 	header := []byte{config.KadcastInitialHeight}
 	m := message.NewWithHeader(topics.Block, *buf, header)
 
-	eventbus.Publish(topics.Kadcast, m)
+	e.Publish(topics.Kadcast, m)
 	return b, nil
 }
 
@@ -59,26 +57,21 @@ func TestBroadcastChunksMsg(t *testing.T) {
 	// suppressing annoying INFO messages
 	logrus.SetLevel(logrus.ErrorLevel)
 
-	if enableProfiling {
-		f, _ := os.Create("./cpu.prof")
+	randBlocks := make([]*block.Block, networkSize)
+	for i := 0; i < networkSize; i++ {
+		randBlocks[i] = helper.RandomBlock(1, 3)
+	}
+
+	if enableProfiling == "1" {
+		cwd, _ := os.Getwd()
+
+		f, _ := os.Create(cwd + "/cpu.prof")
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Error("Could not start CPU profile: ", err)
 		}
 
 		defer func() {
 			pprof.StopCPUProfile()
-
-			p := pprof.Lookup("mutex")
-			if p != nil && f != nil {
-				if err := p.WriteTo(f, 0); err != nil {
-					log.Errorf("Error on writing profile name %v", err)
-				} else {
-					log.WithFields(log.Fields{
-						"process": "profile",
-						"file":    f.Name(),
-					}).Infof(" profile saved")
-				}
-			}
 		}()
 	}
 
@@ -110,7 +103,7 @@ func TestBroadcastChunksMsg(t *testing.T) {
 		// Publish topics.Kadcast with payload of a random block data to the
 		// eventbus of this node. As a result, all of the network nodes should
 		// have received the block only once as per beta value = 1
-		blk, err := kadcastRandomBlock(nodes[i].EventBus)
+		blk, err := kadcastBlock(randBlocks[i], nodes[i].EventBus)
 		if err != nil {
 			t.Fatal(err)
 		}
