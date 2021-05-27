@@ -14,6 +14,7 @@ import (
 	"io"
 	"math/big"
 	"math/bits"
+	mathrand "math/rand"
 	"net"
 	"strconv"
 	"time"
@@ -221,9 +222,9 @@ func sendUDPPacket(laddr, raddr net.UDPAddr, payload []byte) {
 	_ = conn.Close()
 }
 
-// generateRandomDelegates selects n random and distinct items from `in` and
+// getRandDelegates selects n random and distinct items from `in` and
 // copy them into `out` slice (no duplicates).
-func generateRandomDelegates(beta uint8, in []encoding.PeerInfo, out *[]encoding.PeerInfo) error {
+func getRandDelegates(beta uint8, in []encoding.PeerInfo, out *[]encoding.PeerInfo) error {
 	if in == nil || out == nil {
 		return errors.New("invalid in/out params")
 	}
@@ -247,7 +248,42 @@ func generateRandomDelegates(beta uint8, in []encoding.PeerInfo, out *[]encoding
 	in[ind] = in[len(in)-1]
 	in = in[:len(in)-1]
 
-	return generateRandomDelegates(beta, in, out)
+	return getRandDelegates(beta, in, out)
+}
+
+// getRandDelegatesByShuffle selects n random and distinct items from `in` and
+// return them into `out` slice (no duplicates).
+// For the performance benefit, this is based on pseudo-randomizes.
+func getRandDelegatesByShuffle(beta uint8, in []encoding.PeerInfo) []encoding.PeerInfo {
+	mathrand.Seed(time.Now().UnixNano())
+	mathrand.Shuffle(len(in), func(i, j int) { in[i], in[j] = in[j], in[i] })
+
+	out := make([]encoding.PeerInfo, 0, beta)
+
+	for i := 0; i < int(beta); i++ {
+		if i >= len(in) {
+			break
+		}
+
+		out = append(out, in[i])
+	}
+
+	return out
+}
+
+// getNoRandDelegates selects n in a row items from `in` without any rand function.
+// Used for benchmarking.
+func getNoRandDelegates(beta uint8, in []encoding.PeerInfo) []encoding.PeerInfo {
+	out := make([]encoding.PeerInfo, 0, beta)
+
+	for i := 0; i < int(beta); i++ {
+		if i >= len(in) {
+			break
+		}
+
+		out = append(out, in[i])
+	}
+	return out
 }
 
 func makeHeader(t byte, rt *RoutingTable) encoding.Header {
