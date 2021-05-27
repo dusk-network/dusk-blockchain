@@ -15,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/sirupsen/logrus"
 )
 
 // Writer abstracts all of the logic and fields needed to write messages to
@@ -46,18 +47,18 @@ func (w *Writer) Serve() {
 	// NewChanListener is preferred here as it passes message.Message to the
 	// Write, where NewStreamListener works with bytes.Buffer only.
 	// Later this could be change if perf issue noticed.
-	writeQueue := make(chan message.Message, 1000)
+	writeQueue := make(chan message.Message, 5000)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(writeQueue))
 
 	go func() {
 		for msg := range writeQueue {
 			if err := w.Write(msg); err != nil {
-				log.WithError(err).Warn("kadcast writer problem")
+				log.WithError(err).Warn("kadcast write problem")
 			}
 		}
 	}()
 
-	writePointMsgQueue := make(chan message.Message, 1000)
+	writePointMsgQueue := make(chan message.Message, 5000)
 	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, eventbus.NewChanListener(writePointMsgQueue))
 
 	go func() {
@@ -115,43 +116,71 @@ func (w *Writer) WriteToPoint(m message.Message) error {
 
 	// Constuct gossip frame.
 	buf := m.Payload().(message.SafeBuffer)
-	if err := w.gossip.Process(&buf.Buffer); err != nil {
+	if err = w.gossip.Process(&buf.Buffer); err != nil {
 		log.WithError(err).Error("reading gossip frame failed")
 		return err
 	}
 
+	// Marshal message data
+	var packet []byte
+
+	packet, err = w.marshalBroadcastPacket(height, buf.Bytes())
+	if err != nil {
+		log.WithError(err).Warn("marshal broadcast packet failed")
+	}
+
 	// Send message to a single destination using height = 0.
-	w.sendToDelegates(delegates, height, buf.Bytes())
+	w.sendToDelegates(delegates, height, packet)
 	return nil
 }
 
 // BroadcastPacket sends a `CHUNKS` message across the network
 // following the Kadcast broadcasting rules with the specified height.
-func (w *Writer) broadcastPacket(height byte, payload []byte) {
-	router := w.router
-	myPeer := router.LpeerInfo
-
-	if height > byte(len(router.tree.buckets)) || height == 0 {
+func (w *Writer) broadcastPacket(maxHeight byte, payload []byte) {
+	if maxHeight > byte(len(w.router.tree.buckets)) || maxHeight == 0 {
 		return
 	}
 
-	log.WithField("l_addr", myPeer.String()).WithField("height", height).
-		Traceln("Run broadcasting algorithm")
+	if log.Logger.GetLevel() == logrus.TraceLevel {
+		log.WithField("l_addr", w.router.LpeerInfo.String()).WithField("max_height", maxHeight).
+			Traceln("broadcasting procedure")
+	}
 
-	var h byte
-	for h = 0; h <= height-1; h++ {
+	// Marshal message data
+	packet, err := w.marshalBroadcastPacket(0, payload)
+	if err != nil {
+		log.WithError(err).Warn("marshal broadcast packet failed")
+	}
+
+	for h := byte(0); h <= maxHeight-1; h++ {
 		// Fetch delegating nodes based on height value
 		delegates := w.fetchDelegates(h)
 
-		// Send to all delegates the payload
-		//
-		// TODO: Optional here could be to marshal binary once but tamper height field in
-		// the blob on each height change
-		w.sendToDelegates(delegates, h, payload)
+		// marshal binary once but adjust height field before each conn.Write
+		packet[encoding.HeaderFixedLength] = h
+
+		// Send to all delegates
+		w.sendToDelegates(delegates, h, packet)
 	}
 }
 
-func (w *Writer) fetchDelegates(H byte) []encoding.PeerInfo {
+func (w *Writer) marshalBroadcastPacket(h byte, payload []byte) ([]byte, error) {
+	encHeader := makeHeader(encoding.BroadcastMsg, w.router)
+
+	p := encoding.BroadcastPayload{
+		Height:      h,
+		GossipFrame: payload,
+	}
+
+	var buf bytes.Buffer
+	if err := encoding.MarshalBinary(encHeader, &p, &buf); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (w *Writer) fetchDelegates(h byte) []encoding.PeerInfo {
 	router := w.router
 	myPeer := w.router.LpeerInfo
 
@@ -159,7 +188,7 @@ func (w *Writer) fetchDelegates(H byte) []encoding.PeerInfo {
 	var b bucket
 
 	router.tree.mu.RLock()
-	b = router.tree.buckets[H]
+	b = router.tree.buckets[h]
 	router.tree.mu.RUnlock()
 
 	if len(b.entries) == 0 {
@@ -185,62 +214,48 @@ func (w *Writer) fetchDelegates(H byte) []encoding.PeerInfo {
 		in := make([]encoding.PeerInfo, len(b.entries))
 		copy(in, b.entries)
 
-		if err := generateRandomDelegates(router.beta, in, &delegates); err != nil {
-			log.WithError(err).Warn("generate random delegates failed")
+		delegates = getNoRandDelegates(router.beta, in)
+		if len(delegates) == 0 {
+			log.Warn("empty delegates list")
 		}
 	}
 
 	return delegates
 }
 
-func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, H byte, data []byte) {
+func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, packet []byte) {
 	if len(delegates) == 0 {
-		return
-	}
-
-	localPeer := w.router.LpeerInfo
-
-	// Marshal message data
-	h := makeHeader(encoding.BroadcastMsg, w.router)
-
-	p := encoding.BroadcastPayload{
-		Height:      H,
-		GossipFrame: data,
-	}
-
-	var buf bytes.Buffer
-	if err := encoding.MarshalBinary(h, &p, &buf); err != nil {
 		return
 	}
 
 	// For each of the delegates found from this bucket, make an attempt to
 	// repropagate Broadcast message
 	for _, destPeer := range delegates {
-		if localPeer.IsEqual(destPeer) {
+		if w.router.LpeerInfo.IsEqual(destPeer) {
 			log.Error("Destination peer must be different from the source peer")
 			continue
 		}
 
-		log.WithField("l_addr", localPeer.String()).
-			WithField("r_addr", destPeer.String()).
-			WithField("height", H).
-			WithField("raptor", w.raptorCodeEnabled).
-			WithField("len", buf.Len()).
-			Trace("Sending message")
+		if log.Logger.GetLevel() == logrus.TraceLevel {
+			// Avoid wasting CPU cycles for WithField construction in non-trace level
+			log.WithField("l_addr", w.router.LpeerInfo.String()).
+				WithField("r_addr", destPeer.String()).
+				WithField("height", height).
+				WithField("raptor", w.raptorCodeEnabled).
+				WithField("len", len(packet)).
+				Trace("Sending message")
+		}
 
 		// Send message to the dest peer with rc-udp or tcp
 		if w.raptorCodeEnabled {
-			// rc-udp write is destructive to the input message. If more than delegates are selected,
-			// duplicate the message
-			messageCopy := buf.Bytes()
-			if len(delegates) > 1 {
-				messageCopy = make([]byte, buf.Len())
-				copy(messageCopy, buf.Bytes())
-			}
+			// rc-udp write is destructive to the input message.
+			// If more than one delegates are selected, duplicate the message.
+			packetDup := make([]byte, len(packet))
+			copy(packetDup, packet)
 
-			go rcudpWrite(w.router.lpeerUDPAddr, destPeer.GetUDPAddr(), messageCopy)
+			go rcudpWrite(w.router.lpeerUDPAddr, destPeer.GetUDPAddr(), packetDup)
 		} else {
-			go tcpSend(destPeer.GetUDPAddr(), buf.Bytes())
+			go tcpSend(destPeer.GetUDPAddr(), packet)
 		}
 	}
 }
