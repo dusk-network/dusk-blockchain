@@ -13,21 +13,24 @@ import (
 	"github.com/dusk-network/dusk-crypto/hash"
 )
 
-// sendRaptorRFC5053 performs raptor RFC 5053 encoding and writes to the udp socket each of the blocks.
-func sendRaptorRFC5053(conn *net.UDPConn, message []byte, redundancyFactor uint8) error {
+// CompileRaptorRFC5053 compiles raptorRFC5053 blocks from message with a
+// specified redundancyFactor.
+// In Kadcast, one could compile blocks once but send them to multiple delegates.
+func CompileRaptorRFC5053(message []byte, redundancyFactor uint8) ([]byte, [][]byte, error) {
 	msgID, err := hash.Xxhash(message)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	w, err := NewEncoder(message, BlockSize, redundancyFactor, symbolAlignmentSize)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	blocks := w.GenerateBlocks()
+	fountainBlocks := w.GenerateBlocks()
+	blocks := make([][]byte, 0, len(fountainBlocks))
 
-	for _, b := range blocks {
+	for _, b := range fountainBlocks {
 		p := newPacket(
 			msgID, uint16(w.NumSourceSymbols),
 			w.PaddingSize, uint32(w.TransferLength()),
@@ -40,22 +43,15 @@ func sendRaptorRFC5053(conn *net.UDPConn, message []byte, redundancyFactor uint8
 			continue
 		}
 
-		// Artificial delay here to avoid exceeding sender buffer size
-		// Ideally, instead of a sleep here, the write could be embedded into fountain.EncodeLTBlocks.
-		// This might replace the need of the artificial delay.
-		time.Sleep(backoffTimeout)
-
-		// TODO: Consider if here we can get sender_buffer error here
-		if _, err = conn.Write(blob); err != nil {
-			log.WithError(err).Warnf("Error writing to UDP socket")
-		}
+		blocks = append(blocks, blob)
 	}
 
-	return err
+	return msgID, blocks, nil
 }
 
-// Write writes a message to UDP receiver in form of fountain codes.
-func Write(laddr, raddr *net.UDPAddr, message []byte, redundancyFactor uint8) error {
+// WriteBlocks writes already compiled raptor blocks to raddr via UDP.
+// It utilizes a simple back-off.
+func WriteBlocks(laddr, raddr *net.UDPAddr, blocks [][]byte) error {
 	// Send from same IP that the UDP listener is bound on but choose random port
 	laddr.Port = 0
 
@@ -68,7 +64,15 @@ func Write(laddr, raddr *net.UDPAddr, message []byte, redundancyFactor uint8) er
 		log.WithError(err).Traceln("SetWriteBuffer socket problem")
 	}
 
-	err = sendRaptorRFC5053(conn, message, redundancyFactor)
+	for _, blk := range blocks {
+		time.Sleep(backoffTimeout)
+
+		if _, err = conn.Write(blk); err != nil {
+			log.WithError(err).Warn("error writing to UDP socket")
+		}
+	}
+
 	_ = conn.Close()
+
 	return err
 }
