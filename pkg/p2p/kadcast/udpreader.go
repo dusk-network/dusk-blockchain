@@ -65,12 +65,12 @@ func (r *RaptorCodeReader) Serve() {
 	r.rcUDPReader.Serve()
 }
 
-func rcudpWrite(laddr, raddr net.UDPAddr, payload []byte) {
+func rcudpWrite(laddr, raddr net.UDPAddr, blocks [][]byte) {
 	raddr.Port += 10000
 
-	log.WithField("dest", raddr.String()).Tracef("Sending raptor udp packet of len %d", len(payload))
-
-	if err := rcudp.Write(&laddr, &raddr, payload, redundancyFactor); err != nil {
-		log.WithError(err).WithField("dest", raddr.String()).Warnf("Sending raptor udp packet of len %d failed", len(payload))
+	if err := rcudp.WriteBlocks(&laddr, &raddr, blocks); err != nil {
+		log.WithError(err).
+			WithField("dest", raddr.String()).
+			Error("rcudp write packet failed")
 	}
 }
