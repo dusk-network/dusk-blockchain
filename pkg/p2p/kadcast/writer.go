@@ -15,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rcudp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -47,24 +48,24 @@ func (w *Writer) Serve() {
 	// NewChanListener is preferred here as it passes message.Message to the
 	// Write, where NewStreamListener works with bytes.Buffer only.
 	// Later this could be change if perf issue noticed.
-	writeQueue := make(chan message.Message, 5000)
+	writeQueue := make(chan message.Message, 8000)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(writeQueue))
+
+	writePointMsgQueue := make(chan message.Message, 8000)
+	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, eventbus.NewChanListener(writePointMsgQueue))
 
 	go func() {
 		for msg := range writeQueue {
 			if err := w.Write(msg); err != nil {
-				log.WithError(err).Warn("kadcast write problem")
+				log.WithError(err).Warn("kadcast write failed")
 			}
 		}
 	}()
 
-	writePointMsgQueue := make(chan message.Message, 5000)
-	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, eventbus.NewChanListener(writePointMsgQueue))
-
 	go func() {
 		for msg := range writePointMsgQueue {
 			if err := w.WriteToPoint(msg); err != nil {
-				log.WithError(err).Warn("kadcast-point writer problem")
+				log.WithError(err).Warn("kadcast-point write failed")
 			}
 		}
 	}()
@@ -85,7 +86,7 @@ func (w *Writer) Write(m message.Message) error {
 		return err
 	}
 
-	w.broadcastPacket(header[0], buf.Bytes())
+	go w.broadcastPacket(header[0], buf.Bytes())
 
 	return nil
 }
@@ -130,7 +131,7 @@ func (w *Writer) WriteToPoint(m message.Message) error {
 	}
 
 	// Send message to a single destination using height = 0.
-	w.sendToDelegates(delegates, height, packet)
+	go w.sendToDelegates(delegates, height, packet)
 	return nil
 }
 
@@ -214,9 +215,9 @@ func (w *Writer) fetchDelegates(h byte) []encoding.PeerInfo {
 		in := make([]encoding.PeerInfo, len(b.entries))
 		copy(in, b.entries)
 
-		delegates = getNoRandDelegates(router.beta, in)
-		if len(delegates) == 0 {
-			log.Warn("empty delegates list")
+		err := getRandDelegates(router.beta, in, &delegates)
+		if err != nil {
+			log.WithError(err).Warn("get rand delegates failed")
 		}
 	}
 
@@ -228,11 +229,27 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, pac
 		return
 	}
 
+	var blocks [][]byte
+
+	if w.raptorCodeEnabled {
+		// rc-udp write is destructive to the input message
+		packetDup := make([]byte, len(packet))
+		copy(packetDup, packet)
+
+		var err error
+
+		// Compile blocks only once but send them to multiple delegates
+		_, blocks, err = rcudp.CompileRaptorRFC5053(packetDup, redundancyFactor)
+		if err != nil {
+			log.WithError(err).Error("rcudp write packet failed")
+		}
+	}
+
 	// For each of the delegates found from this bucket, make an attempt to
 	// repropagate Broadcast message
 	for _, destPeer := range delegates {
 		if w.router.LpeerInfo.IsEqual(destPeer) {
-			log.Error("Destination peer must be different from the source peer")
+			log.Error("destination peer must be different from the source peer")
 			continue
 		}
 
@@ -243,19 +260,14 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, pac
 				WithField("height", height).
 				WithField("raptor", w.raptorCodeEnabled).
 				WithField("len", len(packet)).
-				Trace("Sending message")
+				Trace("sending message")
 		}
 
 		// Send message to the dest peer with rc-udp or tcp
 		if w.raptorCodeEnabled {
-			// rc-udp write is destructive to the input message.
-			// If more than one delegates are selected, duplicate the message.
-			packetDup := make([]byte, len(packet))
-			copy(packetDup, packet)
-
-			go rcudpWrite(w.router.lpeerUDPAddr, destPeer.GetUDPAddr(), packetDup)
+			rcudpWrite(w.router.lpeerUDPAddr, destPeer.GetUDPAddr(), blocks)
 		} else {
-			go tcpSend(destPeer.GetUDPAddr(), packet)
+			tcpSend(destPeer.GetUDPAddr(), packet)
 		}
 	}
 }

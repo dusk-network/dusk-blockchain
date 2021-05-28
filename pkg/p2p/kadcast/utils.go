@@ -271,21 +271,6 @@ func getRandDelegatesByShuffle(beta uint8, in []encoding.PeerInfo) []encoding.Pe
 	return out
 }
 
-// getNoRandDelegates selects n in a row items from `in` without any rand function.
-// Used for benchmarking.
-func getNoRandDelegates(beta uint8, in []encoding.PeerInfo) []encoding.PeerInfo {
-	out := make([]encoding.PeerInfo, 0, beta)
-
-	for i := 0; i < int(beta); i++ {
-		if i >= len(in) {
-			break
-		}
-
-		out = append(out, in[i])
-	}
-	return out
-}
-
 func makeHeader(t byte, rt *RoutingTable) encoding.Header {
 	return encoding.Header{
 		MsgType:         t,
