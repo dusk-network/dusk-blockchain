@@ -279,12 +279,13 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, pac
 
 		// Send message to the dest peer with rc-udp or tcp
 		if w.raptorCodeEnabled {
+			laddr := w.router.lpeerUDPAddr
 			raddr := destPeer.GetUDPAddr()
 			raddr.Port += 10000
 
 			// Write all raptor blocks
 			// Failing to send message to a single delegate is not critical.
-			if err := rcudp.WriteBlocks(&w.router.lpeerUDPAddr, &raddr, blocks); err != nil {
+			if err := rcudp.WriteBlocks(&laddr, &raddr, blocks); err != nil {
 				failureRate++
 
 				log.WithError(err).
