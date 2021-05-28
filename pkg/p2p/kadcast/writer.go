@@ -9,6 +9,7 @@ package kadcast
 import (
 	"bytes"
 	"errors"
+	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -48,25 +49,29 @@ func (w *Writer) Serve() {
 	// NewChanListener is preferred here as it passes message.Message to the
 	// Write, where NewStreamListener works with bytes.Buffer only.
 	// Later this could be change if perf issue noticed.
-	writeQueue := make(chan message.Message, 8000)
+	writeQueue := make(chan message.Message, 1000)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(writeQueue))
 
-	writePointMsgQueue := make(chan message.Message, 8000)
+	writePointMsgQueue := make(chan message.Message, 1000)
 	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, eventbus.NewChanListener(writePointMsgQueue))
 
 	go func() {
 		for msg := range writeQueue {
-			if err := w.Write(msg); err != nil {
-				log.WithError(err).Warn("kadcast write failed")
-			}
+			go func(m message.Message) {
+				if err := w.Write(m); err != nil {
+					log.WithError(err).Warn("kadcast write failed")
+				}
+			}(msg)
 		}
 	}()
 
 	go func() {
 		for msg := range writePointMsgQueue {
-			if err := w.WriteToPoint(msg); err != nil {
-				log.WithError(err).Warn("kadcast-point write failed")
-			}
+			go func(m message.Message) {
+				if err := w.WriteToPoint(m); err != nil {
+					log.WithError(err).Warn("kadcast-point write failed")
+				}
+			}(msg)
 		}
 	}()
 }
@@ -77,18 +82,15 @@ func (w *Writer) Write(m message.Message) error {
 	buf := m.Payload().(message.SafeBuffer)
 
 	if len(header) == 0 {
-		return errors.New("invalid message height")
+		return errors.New("empty message header")
 	}
 
 	// Constuct gossip frame.
 	if err := w.gossip.Process(&buf.Buffer); err != nil {
-		log.WithError(err).Error("reading gossip frame failed")
 		return err
 	}
 
-	go w.broadcastPacket(header[0], buf.Bytes())
-
-	return nil
+	return w.broadcastPacket(header[0], buf.Bytes())
 }
 
 // WriteToPoint writes a message to a single destination.
@@ -101,7 +103,7 @@ func (w *Writer) WriteToPoint(m message.Message) error {
 
 	h := m.Header()
 	if len(h) == 0 {
-		return errors.New("empty header")
+		return errors.New("empty message header")
 	}
 
 	raddr := string(h)
@@ -118,7 +120,6 @@ func (w *Writer) WriteToPoint(m message.Message) error {
 	// Constuct gossip frame.
 	buf := m.Payload().(message.SafeBuffer)
 	if err = w.gossip.Process(&buf.Buffer); err != nil {
-		log.WithError(err).Error("reading gossip frame failed")
 		return err
 	}
 
@@ -127,19 +128,23 @@ func (w *Writer) WriteToPoint(m message.Message) error {
 
 	packet, err = w.marshalBroadcastPacket(height, buf.Bytes())
 	if err != nil {
-		log.WithError(err).Warn("marshal broadcast packet failed")
+		return err
 	}
 
 	// Send message to a single destination using height = 0.
-	go w.sendToDelegates(delegates, height, packet)
-	return nil
+	return w.sendToDelegates(delegates, height, packet)
 }
 
 // BroadcastPacket sends a `CHUNKS` message across the network
 // following the Kadcast broadcasting rules with the specified height.
-func (w *Writer) broadcastPacket(maxHeight byte, payload []byte) {
-	if maxHeight > byte(len(w.router.tree.buckets)) || maxHeight == 0 {
-		return
+func (w *Writer) broadcastPacket(maxHeight byte, payload []byte) error {
+	if maxHeight == 0 {
+		// last subtree, no more broadcast needed
+		return nil
+	}
+
+	if maxHeight > byte(len(w.router.tree.buckets)) {
+		return fmt.Errorf("invalid max height %d, %d", maxHeight, len(w.router.tree.buckets))
 	}
 
 	if log.Logger.GetLevel() == logrus.TraceLevel {
@@ -150,19 +155,26 @@ func (w *Writer) broadcastPacket(maxHeight byte, payload []byte) {
 	// Marshal message data
 	packet, err := w.marshalBroadcastPacket(0, payload)
 	if err != nil {
-		log.WithError(err).Warn("marshal broadcast packet failed")
+		return err
 	}
 
 	for h := byte(0); h <= maxHeight-1; h++ {
 		// Fetch delegating nodes based on height value
 		delegates := w.fetchDelegates(h)
+		if len(delegates) == 0 {
+			continue
+		}
 
 		// marshal binary once but adjust height field before each conn.Write
 		packet[encoding.HeaderFixedLength] = h
 
 		// Send to all delegates
-		w.sendToDelegates(delegates, h, packet)
+		if err := w.sendToDelegates(delegates, h, packet); err != nil {
+			log.WithError(err).Warnln("send to delegates failed")
+		}
 	}
+
+	return nil
 }
 
 func (w *Writer) marshalBroadcastPacket(h byte, payload []byte) ([]byte, error) {
@@ -224,9 +236,9 @@ func (w *Writer) fetchDelegates(h byte) []encoding.PeerInfo {
 	return delegates
 }
 
-func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, packet []byte) {
+func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, packet []byte) error {
 	if len(delegates) == 0 {
-		return
+		return errors.New("empty delegates list")
 	}
 
 	var blocks [][]byte
@@ -241,15 +253,17 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, pac
 		// Compile blocks only once but send them to multiple delegates
 		_, blocks, err = rcudp.CompileRaptorRFC5053(packetDup, redundancyFactor)
 		if err != nil {
-			log.WithError(err).Error("rcudp write packet failed")
+			return err
 		}
 	}
 
+	var failureRate int
 	// For each of the delegates found from this bucket, make an attempt to
 	// repropagate Broadcast message
 	for _, destPeer := range delegates {
 		if w.router.LpeerInfo.IsEqual(destPeer) {
-			log.Error("destination peer must be different from the source peer")
+			log.Warn("dest delegate same as sender")
+			failureRate++
 			continue
 		}
 
@@ -265,11 +279,29 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, pac
 
 		// Send message to the dest peer with rc-udp or tcp
 		if w.raptorCodeEnabled {
-			rcudpWrite(w.router.lpeerUDPAddr, destPeer.GetUDPAddr(), blocks)
+			raddr := destPeer.GetUDPAddr()
+			raddr.Port += 10000
+
+			// Write all raptor blocks
+			// Failing to send message to a single delegate is not critical.
+			if err := rcudp.WriteBlocks(&w.router.lpeerUDPAddr, &raddr, blocks); err != nil {
+				failureRate++
+
+				log.WithError(err).
+					WithField("dest", raddr.String()).
+					WithField("rate", failureRate).
+					Warnln("rcudp write failed")
+			}
 		} else {
 			tcpSend(destPeer.GetUDPAddr(), packet)
 		}
 	}
+
+	if failureRate == len(delegates) {
+		return fmt.Errorf("message sending failed for %d delegate(s)", len(delegates))
+	}
+
+	return nil
 }
 
 // Close unsubscribes from eventbus events.
