@@ -130,17 +130,29 @@ func (bus *RPCBus) Call(t topics.Topic, req Request, timeOut time.Duration) (int
 }
 
 func (bus *RPCBus) callTimeout(reqChan chan<- Request, req Request, timeOut time.Duration) (interface{}, error) {
+	timer := time.NewTimer(timeOut)
+
 	select {
 	case reqChan <- req:
-	case <-time.After(timeOut):
+	case <-timer.C:
 		return bytes.Buffer{}, ErrRequestTimeout
 	}
+
+	if !timer.Stop() {
+		<-timer.C
+	}
+
+	timer.Reset(timeOut)
 
 	var resp Response
 	select {
 	case resp = <-req.RespChan:
-	case <-time.After(timeOut):
+	case <-timer.C:
 		return bytes.Buffer{}, ErrRequestTimeout
+	}
+
+	if !timer.Stop() {
+		<-timer.C
 	}
 
 	return resp.Resp, resp.Err
