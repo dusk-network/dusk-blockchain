@@ -98,9 +98,7 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 	}()
 
 	p := Packet{}
-
-	buf := bytes.NewBuffer(data)
-	if err := p.unmarshalBinary(buf); err != nil {
+	if err := p.unmarshal(data); err != nil {
 		return err
 	}
 

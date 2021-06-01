@@ -11,6 +11,11 @@ import (
 	"errors"
 )
 
+const (
+	// HeaderFixedLength number of header bytes.
+	HeaderFixedLength = 25
+)
+
 // Header represents the header part of kadcast wire messages. Both TCP and
 // UDP are sharing same header structure.
 type Header struct {

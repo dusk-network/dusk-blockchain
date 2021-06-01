@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
+	"github.com/sirupsen/logrus"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -248,8 +249,10 @@ func (m *Maintainer) send(raddr net.UDPAddr, payload []byte) {
 
 	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
 
-	log.WithField("src", conn.LocalAddr().String()).
-		WithField("dest", raddr.String()).Traceln("Sending udp")
+	if log.Logger.GetLevel() == logrus.TraceLevel {
+		log.WithField("src", conn.LocalAddr().String()).
+			WithField("dest", raddr.String()).Traceln("Sending udp")
+	}
 
 	// Simple write
 	_, err = conn.Write(payload)

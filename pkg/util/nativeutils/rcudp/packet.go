@@ -7,7 +7,15 @@
 package rcudp
 
 import (
-	"bytes"
+	"errors"
+)
+
+const (
+	numSourceSymbolsFieldSize = 2
+	paddingSizeFieldSize      = 2
+	transferLengthFieldSize   = 4
+	blockIDFieldSize          = 4
+	packetMinSize             = 20
 )
 
 // Packet is the UDP packet that consists of encoding symbol data unit and raptor-specific data.
@@ -19,7 +27,7 @@ type Packet struct {
 
 	// payload fields
 	blockID uint32
-	block   [BlockSize]byte
+	block   []byte
 }
 
 func newPacket(msgID []byte, numSourceSymbols uint16,
@@ -33,102 +41,80 @@ func newPacket(msgID []byte, numSourceSymbols uint16,
 	}
 
 	copy(p.messageID[:], msgID)
-	copy(p.block[:], block)
+	p.block = block
 
 	return p
 }
 
-func (p *Packet) marshalBinary(buf *bytes.Buffer) error {
+// marshal serializes a packet struct to a byte blob.
+// Any mem alloc here would impact perf so bytes.Buffer is not used.
+func (p *Packet) marshal() ([]byte, error) {
+	blob := make([]byte, 0, packetMinSize+len(p.block))
+
 	// source object id
-	if _, err := buf.Write(p.messageID[:]); err != nil {
-		return err
-	}
+	blob = append(blob, p.messageID[:]...)
 
 	// NumSourceSymbols
-	b := make([]byte, 2)
-
+	b := make([]byte, numSourceSymbolsFieldSize)
 	byteOrder.PutUint16(b, p.NumSourceSymbols)
-
-	if _, err := buf.Write(b); err != nil {
-		return err
-	}
+	blob = append(blob, b...)
+	b[0] = 0
+	b[1] = 0
 
 	// PaddingSize
-	b = make([]byte, 2)
-
 	byteOrder.PutUint16(b, p.PaddingSize)
-
-	if _, err := buf.Write(b); err != nil {
-		return err
-	}
+	blob = append(blob, b...)
 
 	// transferLength
-	b = make([]byte, 4)
-
+	b = make([]byte, transferLengthFieldSize)
 	byteOrder.PutUint32(b, p.transferLength)
-
-	if _, err := buf.Write(b); err != nil {
-		return err
-	}
+	blob = append(blob, b...)
 
 	// blockID
-	b = make([]byte, 4)
-
+	b[0] = 0
+	b[1] = 0
+	b[2] = 0
+	b[3] = 0
 	byteOrder.PutUint32(b, p.blockID)
+	blob = append(blob, b...)
 
-	if _, err := buf.Write(b); err != nil {
-		return err
+	// block data
+	blob = append(blob, p.block[:]...)
+
+	if len(blob) > maxPacketLen {
+		return nil, ErrTooLargeUDP
 	}
 
-	if _, err := buf.Write(p.block[:]); err != nil {
-		return err
+	return blob, nil
+}
+
+// unmarshal constructs a packet struct from a byte blob.
+// Any mem alloc here would impact perf so bytes.Buffer is not used.
+func (p *Packet) unmarshal(buf []byte) error {
+	if len(buf) < packetMinSize {
+		return errors.New("invalid packet size")
 	}
 
-	if buf.Len() > maxPacketLen {
+	if len(buf) > maxPacketLen {
 		return ErrTooLargeUDP
 	}
 
-	return nil
-}
+	offset := 0
+	copy(p.messageID[:], buf[offset:len(p.messageID)])
+	offset += len(p.messageID)
 
-func (p *Packet) unmarshalBinary(buf *bytes.Buffer) error {
-	objectID := make([]byte, 8)
-	if _, err := buf.Read(objectID); err != nil {
-		return err
-	}
+	p.NumSourceSymbols = byteOrder.Uint16(buf[offset : offset+numSourceSymbolsFieldSize])
+	offset += numSourceSymbolsFieldSize
 
-	numSourceSymbols := make([]byte, 2)
-	if _, err := buf.Read(numSourceSymbols); err != nil {
-		return err
-	}
+	p.PaddingSize = byteOrder.Uint16(buf[offset : offset+paddingSizeFieldSize])
+	offset += paddingSizeFieldSize
 
-	PaddingSize := make([]byte, 2)
-	if _, err := buf.Read(PaddingSize); err != nil {
-		return err
-	}
+	p.transferLength = byteOrder.Uint32(buf[offset : offset+transferLengthFieldSize])
+	offset += transferLengthFieldSize
 
-	transferLength := make([]byte, 4)
-	if _, err := buf.Read(transferLength); err != nil {
-		return err
-	}
+	p.blockID = byteOrder.Uint32(buf[offset : offset+blockIDFieldSize])
+	offset += blockIDFieldSize
 
-	blockID := make([]byte, 4)
-	if _, err := buf.Read(blockID); err != nil {
-		return err
-	}
-
-	block := make([]byte, buf.Len())
-	if _, err := buf.Read(block); err != nil {
-		return err
-	}
-
-	copy(p.messageID[:], objectID)
-	copy(p.block[:], block)
-
-	p.NumSourceSymbols = byteOrder.Uint16(numSourceSymbols)
-	p.PaddingSize = byteOrder.Uint16(PaddingSize)
-	p.transferLength = byteOrder.Uint32(transferLength)
-	p.blockID = byteOrder.Uint32(blockID)
-
+	p.block = buf[offset:]
 	return nil
 }

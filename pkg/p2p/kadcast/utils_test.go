@@ -91,7 +91,7 @@ func TestClassifyDistance(t *testing.T) {
 	}
 }
 
-func TestGenerateRandomDelegates(t *testing.T) {
+func TestGetRandDelegates(t *testing.T) {
 	ip := [4]byte{127, 0, 0, 1}
 	id := [16]byte{1, 2, 3, 4}
 
@@ -108,7 +108,7 @@ func TestGenerateRandomDelegates(t *testing.T) {
 		var beta uint8 = uint8(i)
 
 		out := make([]encoding.PeerInfo, 0)
-		generateRandomDelegates(beta, in, &out)
+		getRandDelegates(beta, in, &out)
 
 		if len(out) != int(beta) {
 			t.Errorf("could not manage to generate %d delegates", beta)
@@ -117,7 +117,38 @@ func TestGenerateRandomDelegates(t *testing.T) {
 
 	beta := uint8(len(in) * 2)
 	out := make([]encoding.PeerInfo, 0)
-	generateRandomDelegates(beta, in, &out)
+	getRandDelegates(beta, in, &out)
+
+	if len(out) != len(in) {
+		t.Error("could not manage to generate n delegates")
+	}
+}
+
+func TestGetRandDelegatesByShuffle(t *testing.T) {
+	ip := [4]byte{127, 0, 0, 1}
+	id := [16]byte{1, 2, 3, 4}
+
+	in := make([]encoding.PeerInfo, 10)
+	for i := 0; i < len(in); i++ {
+		in[i] = encoding.PeerInfo{
+			IP:   ip,
+			Port: uint16(i),
+			ID:   id,
+		}
+	}
+
+	for i := 0; i < len(in); i++ {
+		var beta uint8 = uint8(i)
+
+		out := getRandDelegatesByShuffle(beta, in)
+
+		if len(out) != int(beta) {
+			t.Errorf("could not manage to generate %d delegates", beta)
+		}
+	}
+
+	beta := uint8(len(in) * 2)
+	out := getRandDelegatesByShuffle(beta, in)
 
 	if len(out) != len(in) {
 		t.Error("could not manage to generate n delegates")
