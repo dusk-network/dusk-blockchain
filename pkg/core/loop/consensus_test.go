@@ -4,7 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-package loop_test
+package loop
 
 import (
 	"context"
@@ -18,8 +18,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,7 +39,7 @@ func TestContextCancellation(t *testing.T) {
 		}
 	}
 
-	l := loop.New(e, keys.NewPublicKey())
+	l := New(e, keys.NewPublicKey())
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -101,7 +101,7 @@ func (c *succesfulAgreement) GetControlFn() consensus.ControlFn {
 func TestAgreementCompletion(t *testing.T) {
 	e := consensus.MockEmitter(time.Second, nil)
 	ctx := context.Background()
-	l := loop.New(e, keys.NewPublicKey())
+	l := New(e, keys.NewPublicKey())
 
 	var wg sync.WaitGroup
 
@@ -150,6 +150,44 @@ func (c *unsuccesfulAgreement) GetControlFn() consensus.ControlFn {
 func TestStall(t *testing.T) {
 	e := consensus.MockEmitter(time.Second, nil)
 	ctx := context.Background()
-	l := loop.New(e, keys.NewPublicKey())
+	l := New(e, keys.NewPublicKey())
 	_ = l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
+}
+
+type queueingStep struct {
+	wg *sync.WaitGroup
+}
+
+func (q *queueingStep) String() string {
+	return "queueing"
+}
+
+func (q *queueingStep) Run(ctx context.Context, queue *consensus.Queue, _ chan message.Message, round consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
+	queue.PutEvent(round.Round, 7, message.New(topics.Addr, message.Addr{}))
+
+	q.wg.Done()
+
+	<-ctx.Done()
+
+	return nil
+}
+
+// Fn returns a phase function that simply hangs until canceled.
+func (q *queueingStep) Initialize(_ consensus.InternalPacket) consensus.PhaseFn {
+	return q
+}
+
+// TestClearQueues tests that the queues are fully cleared upon finishing the round.
+func TestClearQueues(t *testing.T) {
+	e := consensus.MockEmitter(time.Second, nil)
+	ctx := context.Background()
+	l := New(e, keys.NewPublicKey())
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	_ = l.Spin(ctx, &queueingStep{&wg}, &succesfulAgreement{&wg}, consensus.RoundUpdate{Round: uint64(1)})
+
+	require.Empty(t, l.eventQueue.Flush(1))
 }

@@ -124,6 +124,9 @@ func (c *Consensus) CreateStateMachine(db database.DB, consensusTimeOut time.Dur
 // loop (acting step-wise).
 // TODO: consider stopping the phase loop with a Done phase, instead of nil.
 func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.Controller, round consensus.RoundUpdate) consensus.Results {
+	// Ensure the eventQueue is emptied when the round is finished.
+	defer c.eventQueue.Clear(round.Round)
+
 	// we create two context cancelation from the same parent context. This way
 	// we can let the agreement interrupt the stateMachine's loop cycle.
 	// Similarly, the loop can invoke the Agreement cancelation if it throws

@@ -61,11 +61,19 @@ func (eq *Queue) PutEvent(round uint64, step uint8, m message.Message) {
 	eq.entries[round][step] = append(eq.entries[round][step], m)
 }
 
-// Clear the queue.
+// Clear the queue. This method also checks the queue for any lingering
+// events from older rounds, and removes them as well.
 func (eq *Queue) Clear(round uint64) {
 	eq.lock.Lock()
 	defer eq.lock.Unlock()
+
 	eq.entries[round] = nil
+
+	for r := range eq.entries {
+		if r < round {
+			eq.entries[r] = nil
+		}
+	}
 }
 
 // Flush all events stored for a specific round from the queue, and return them.
