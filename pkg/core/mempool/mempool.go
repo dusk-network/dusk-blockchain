@@ -34,9 +34,7 @@ import (
 
 var log = logger.WithFields(logger.Fields{"prefix": "mempool"})
 
-const (
-// consensusSeconds = 20
-)
+const idleTime = 20 * time.Second
 
 var (
 	// ErrCoinbaseTxNotAllowed coinbase tx must be built by block generator only.
@@ -136,6 +134,9 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 // protection-by-mutex needed.
 func (m *Mempool) Run(ctx context.Context) {
 	go func() {
+		ticker := time.NewTicker(idleTime)
+		defer ticker.Stop()
+
 		for {
 			select {
 			// rpcbus methods.
@@ -147,13 +148,15 @@ func (m *Mempool) Run(ctx context.Context) {
 				handleRequest(r, m.processGetMempoolTxsBySizeRequest, "GetMempoolTxsBySize")
 			case b := <-m.acceptedBlockChan:
 				m.onBlock(b)
-			case <-time.After(20 * time.Second):
+			case <-ticker.C:
 				m.onIdle()
 			// Mempool terminating.
 			case <-ctx.Done():
 				// m.eventBus.Unsubscribe(topics.Tx, m.txSubscriberID)
 				return
 			}
+
+			ticker.Reset(idleTime)
 		}
 	}()
 }
