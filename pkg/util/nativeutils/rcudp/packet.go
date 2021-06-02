@@ -18,7 +18,7 @@ const (
 	blockIDFieldSize          = 4
 	bcastHeightSize           = 1
 
-	// BcastHeightPos
+	// BcastHeightPos is position in packet binary of height byte.
 	BcastHeightPos = 20
 
 	packetMinSize = messageIDFieldSize +

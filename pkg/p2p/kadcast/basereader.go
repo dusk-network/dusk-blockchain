@@ -40,7 +40,7 @@ func newBaseReader(lpeerInfo encoding.PeerInfo, publisher eventbus.Publisher,
 	}
 }
 
-func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
+func (r *baseReader) handleBroadcast(height byte, raddr string, b []byte) error {
 	ll := log.WithField("process", "handle_broadcast")
 
 	var header encoding.Header
@@ -81,7 +81,7 @@ func (r *baseReader) handleBroadcast(raddr string, b []byte) error {
 	// diagnostics.RegisterWireMsg(topics.Kadcast.String(), packet)
 
 	// TODO: set service flag properly
-	respBufs, err := r.processor.Collect(raddr, m, nil, protocol.FullNode, []byte{p.Height})
+	respBufs, err := r.processor.Collect(raddr, m, nil, protocol.FullNode, []byte{height})
 	if err != nil {
 		ll.WithError(err).Error("messageProcessor failed to collect message")
 	}
