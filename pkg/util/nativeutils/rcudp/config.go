@@ -26,7 +26,7 @@ const (
 	// Encoder configs.
 
 	// BlockSize - max length of an encoding symbol that can fit into a single wire packet.
-	BlockSize = maxUDPLength - 8 - 2 - 2 - 4 - 4
+	BlockSize = maxUDPLength - 8 - 2 - 2 - 4 - 4 - 8
 
 	// symbolAlignmentSize = Al is the size of each symbol in the source message in bytes.
 	// Usually 4. This is the XOR granularity in bytes. On 32-byte machines 4-byte XORs.

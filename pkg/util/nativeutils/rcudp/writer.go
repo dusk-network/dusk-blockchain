@@ -16,7 +16,7 @@ import (
 // CompileRaptorRFC5053 compiles raptorRFC5053 blocks from message with a
 // specified redundancyFactor.
 // In Kadcast, one could compile blocks once but send them to multiple delegates.
-func CompileRaptorRFC5053(message []byte, redundancyFactor uint8) ([]byte, [][]byte, error) {
+func CompileRaptorRFC5053(height byte, message []byte, redundancyFactor uint8) ([]byte, [][]byte, error) {
 	msgID, err := hash.Xxhash(message)
 	if err != nil {
 		return nil, nil, err
@@ -34,7 +34,7 @@ func CompileRaptorRFC5053(message []byte, redundancyFactor uint8) ([]byte, [][]b
 		p := newPacket(
 			msgID, uint16(w.NumSourceSymbols),
 			w.PaddingSize, uint32(w.TransferLength()),
-			uint32(b.BlockCode), b.Data)
+			uint32(b.BlockCode), b.Data, height)
 
 		var blob []byte
 
@@ -43,6 +43,7 @@ func CompileRaptorRFC5053(message []byte, redundancyFactor uint8) ([]byte, [][]b
 			continue
 		}
 
+		// append to list of all blocks
 		blocks = append(blocks, blob)
 	}
 
@@ -51,7 +52,7 @@ func CompileRaptorRFC5053(message []byte, redundancyFactor uint8) ([]byte, [][]b
 
 // WriteBlocks writes already compiled raptor blocks to raddr via UDP.
 // It utilizes a simple back-off.
-func WriteBlocks(laddr, raddr *net.UDPAddr, blocks [][]byte) error {
+func WriteBlocks(laddr, raddr *net.UDPAddr, blocks [][]byte, height byte) error {
 	// Send from same IP that the UDP listener is bound on but choose random port
 	laddr.Port = 0
 
@@ -65,6 +66,9 @@ func WriteBlocks(laddr, raddr *net.UDPAddr, blocks [][]byte) error {
 	}
 
 	for _, blk := range blocks {
+		// Update height field accordingly
+		blk[BcastHeightPos] = height
+
 		time.Sleep(backoffTimeout)
 
 		if _, err = conn.Write(blk); err != nil {

@@ -26,13 +26,14 @@ var log = logger.WithFields(logger.Fields{"process": "rcudp"})
 type msgID [8]byte
 
 type message struct {
-	decoder   *Decoder
-	srcAddr   net.UDPAddr
-	recv_time int64
+	decoder     *Decoder
+	srcAddr     net.UDPAddr
+	recv_time   int64
+	bcastHeight byte
 }
 
 // MessageCollector callback to be run on a newly decoded message.
-type MessageCollector func(addr string, decoded []byte) error
+type MessageCollector func(reserved byte, addr string, decoded []byte) error
 
 // UDPReader that supports decoding Raptor codes packets.
 type UDPReader struct {
@@ -117,11 +118,13 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 			int(p.PaddingSize))
 
 		m = &message{
-			decoder:   d,
-			srcAddr:   srcAddr,
-			recv_time: time.Now().Unix(),
+			decoder:     d,
+			srcAddr:     srcAddr,
+			recv_time:   time.Now().Unix(),
+			bcastHeight: p.bcastHeight,
 		}
 
+		// TODO: Limit max number of objects stored
 		r.objects[p.messageID] = m
 	}
 
@@ -162,14 +165,20 @@ func (r *UDPReader) processPacket(srcAddr net.UDPAddr, data []byte) error {
 			return fmt.Errorf("sanity check failed msgID: %s", hex.EncodeToString(p.messageID[:]))
 		}
 
-		if err := r.collector(srcAddr.String(), decoded); err != nil {
-			return err
+		if m.bcastHeight != p.bcastHeight {
+			return fmt.Errorf("broadcast height inconsistency")
 		}
+
+		go func() {
+			// At that point in time, the object(message) is already decoded and
+			// collected. However, we can not delete it immediately. This is because
+			// more blocks of this message will probably arrive in the next second
+			// or two. Here the staleTimeout plays its role
+			if err := r.collector(p.bcastHeight, srcAddr.String(), decoded); err != nil {
+				log.WithError(err).Warn("collector error")
+			}
+		}()
 	}
-	// At that point in time, the object(message) is already decoded and
-	// collected. However, we can not delete it immediately. This is because
-	// more blocks of this message will probably arrive in the next second
-	// or two. Here the staleTimeout plays its role
 
 	return nil
 }
