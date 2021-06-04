@@ -61,11 +61,29 @@ func (eq *Queue) PutEvent(round uint64, step uint8, m message.Message) {
 	eq.entries[round][step] = append(eq.entries[round][step], m)
 }
 
-// Clear the queue.
+// Clear the queue. This method swaps the internal `entries` map, to avoid
+// a situation where memory is continuously allocated and never freed.
 func (eq *Queue) Clear(round uint64) {
 	eq.lock.Lock()
 	defer eq.lock.Unlock()
-	eq.entries[round] = nil
+
+	newEntries := make(map[uint64]map[uint8][]message.Message)
+
+	for r := range eq.entries {
+		if r > round {
+			newEntries[r] = make(map[uint8][]message.Message)
+
+			for s, m := range eq.entries[r] {
+				newEntries[r][s] = m
+
+				delete(eq.entries[r], s)
+			}
+
+			delete(eq.entries, r)
+		}
+	}
+
+	eq.entries = newEntries
 }
 
 // Flush all events stored for a specific round from the queue, and return them.
