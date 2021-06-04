@@ -7,7 +7,6 @@
 package peer
 
 import (
-	"bytes"
 	"net"
 	"os"
 	"testing"
@@ -37,21 +36,20 @@ func TestHandshake(t *testing.T) {
 
 	client, srv := net.Pipe()
 
+	g := protocol.NewGossip(protocol.TestNet)
+	pConn := NewConnection(client, g)
+	pw := NewWriter(pConn, eb)
+
 	go func() {
-		responseChan := make(chan bytes.Buffer, 100)
 		pConn := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
 
-		peerReader := factory.SpawnReader(pConn, responseChan)
+		peerReader := factory.SpawnReader(pConn)
 		if err := peerReader.Accept(protocol.FullNode); err != nil {
 			panic(err)
 		}
 	}()
 
 	time.Sleep(500 * time.Millisecond)
-
-	g := protocol.NewGossip(protocol.TestNet)
-	pConn := NewConnection(client, g)
-	pw := NewWriter(pConn, eb)
 
 	defer func() {
 		_ = pw.Conn.Close()

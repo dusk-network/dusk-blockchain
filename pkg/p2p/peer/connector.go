@@ -29,7 +29,7 @@ const (
 	peerCountTime         = 30 * time.Second
 )
 
-type connectFunc func(context.Context, *Reader, *Writer, chan bytes.Buffer)
+type connectFunc func(context.Context, *Reader, *Writer)
 
 // Connector is responsible for accepting incoming connection requests, and
 // establishing outward connections with desired peers.
@@ -168,9 +168,8 @@ func (c *Connector) Dial(addr string) (net.Conn, error) {
 }
 
 func (c *Connector) acceptConnection(conn net.Conn) {
-	writeQueueChan := make(chan bytes.Buffer, 1000)
 	pConn := NewConnection(conn, c.gossip)
-	peerReader := c.readerFactory.SpawnReader(pConn, writeQueueChan)
+	peerReader := c.readerFactory.SpawnReader(pConn)
 
 	if err := peerReader.Accept(c.services); err != nil {
 		log.WithField("process", "peer connector").
@@ -182,18 +181,17 @@ func (c *Connector) acceptConnection(conn net.Conn) {
 		WithField("address", peerReader.Addr()).
 		Debugln("incoming connection established")
 
-	peerWriter := NewWriter(pConn, c.eventBus)
-
 	c.addPeer(peerReader.Addr())
 
+	peerWriter := NewWriter(pConn, c.eventBus)
+
 	go func() {
-		c.connectFunc(context.Background(), peerReader, peerWriter, writeQueueChan)
+		c.connectFunc(context.Background(), peerReader, peerWriter)
 		c.removePeer(peerReader.Addr())
 	}()
 }
 
 func (c *Connector) proposeConnection(conn net.Conn) {
-	writeQueueChan := make(chan bytes.Buffer, 1000)
 	pConn := NewConnection(conn, c.gossip)
 	peerWriter := NewWriter(pConn, c.eventBus)
 
@@ -209,12 +207,12 @@ func (c *Connector) proposeConnection(conn net.Conn) {
 		WithField("address", address).
 		Debugln("outgoing connection established")
 
-	peerReader := c.readerFactory.SpawnReader(pConn, writeQueueChan)
+	peerReader := c.readerFactory.SpawnReader(pConn)
 
 	c.addPeer(peerWriter.Addr())
 
 	go func() {
-		c.connectFunc(context.Background(), peerReader, peerWriter, writeQueueChan)
+		c.connectFunc(context.Background(), peerReader, peerWriter)
 		c.removePeer(peerWriter.Addr())
 	}()
 }

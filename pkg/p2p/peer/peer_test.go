@@ -9,7 +9,6 @@ package peer
 import (
 	"bytes"
 	"context"
-	"io"
 	"net"
 	"testing"
 	"time"
@@ -21,7 +20,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/stretchr/testify/assert"
 )
 
 var receiveFn = func(c net.Conn) {
@@ -52,13 +50,12 @@ func TestReader(t *testing.T) {
 	processor.Register(topics.Agreement, respFn)
 	factory := NewReaderFactory(processor)
 
-	responseChan := make(chan bytes.Buffer, 100)
 	pConn := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
-	peerReader := factory.SpawnReader(pConn, responseChan)
+	peerReader := factory.SpawnReader(pConn)
 
 	peerReader.services = protocol.FullNode
 
-	go peerReader.ReadLoop(context.Background())
+	go peerReader.ReadLoop(context.Background(), nil)
 
 	errChan := make(chan error, 1)
 	go func(eChan chan error) {
@@ -100,46 +97,6 @@ func TestWriteRingBuffer(t *testing.T) {
 		errList := bus.Publish(topics.Gossip, msg)
 		require.Empty(t, errList)
 	}
-}
-
-// Test the functionality of the peer.Writer through the use of the outgoing message queue.
-func TestWriteLoop(t *testing.T) {
-	bus := eventbus.New()
-	client, srv := net.Pipe()
-
-	g := protocol.NewGossip(protocol.TestNet)
-	msg := makeAgreementGossip(10)
-
-	buf, err := message.Marshal(msg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	go func(g *protocol.Gossip) {
-		responseChan := make(chan bytes.Buffer)
-
-		pConn := NewConnection(client, g)
-		writer := NewWriter(pConn, bus, 30*time.Millisecond)
-
-		writer.services = protocol.FullNode
-		go writer.Serve(context.Background(), responseChan)
-
-		bufCopy := buf
-		responseChan <- bufCopy
-	}(g)
-
-	// Decode and remove magic
-	length, err := g.UnpackLength(srv)
-	assert.NoError(t, err)
-
-	decoded := make([]byte, length)
-	_, err = io.ReadFull(srv, decoded)
-	assert.NoError(t, err)
-
-	// Remove checksum
-	decoded = decoded[4:]
-
-	assert.Equal(t, decoded, (&buf).Bytes())
 }
 
 func BenchmarkWriter(t *testing.B) {

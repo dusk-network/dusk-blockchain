@@ -75,7 +75,7 @@ type StreamListener struct {
 }
 
 // NewStreamListener creates a new StreamListener.
-func NewStreamListener(w io.WriteCloser) Listener {
+func NewStreamListener(w io.WriteCloser) (*ring.Buffer, Listener) {
 	// Each StreamListener uses its own ringBuffer to collect topic events
 	// Multiple-producers single-consumer approach utilizing a ringBuffer.
 	ringBuf := ring.NewBuffer(ringBufferLength)
@@ -83,7 +83,7 @@ func NewStreamListener(w io.WriteCloser) Listener {
 
 	// single-consumer
 	_ = ring.NewConsumer(ringBuf, Consume, w)
-	return sh
+	return ringBuf, sh
 }
 
 // Notify puts a message to the Listener's ringbuffer. It uses a goroutine so

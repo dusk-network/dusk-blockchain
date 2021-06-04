@@ -113,7 +113,8 @@ func TestAcceptFromPeer(t *testing.T) {
 	}
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
-	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+	_, l := eventbus.NewStreamListener(streamer)
+	eb.Subscribe(topics.Gossip, l)
 
 	blk := mockAcceptableBlock(*c.tip)
 
