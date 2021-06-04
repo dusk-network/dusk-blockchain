@@ -19,6 +19,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
@@ -89,7 +90,7 @@ type Writer struct {
 type Reader struct {
 	*Connection
 	processor    *MessageProcessor
-	responseChan chan<- bytes.Buffer
+	responseFunc func(bytes.Buffer) error
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -209,29 +210,24 @@ func (p *Reader) Accept(services protocol.ServiceFlag) error {
 // Create two-way communication with a peer. This function will allow both
 // goroutines to run as long as no errors are encountered. Once the first error
 // comes through, the context is canceled, and both goroutines are cleaned up.
-func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan chan bytes.Buffer) {
+func Create(ctx context.Context, reader *Reader, writer *Writer) {
 	pCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
+	g := &GossipConnector{writer.Connection}
+	writer.gossipID = writer.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
+
+	// On each new connection the node sends topics.Mempool to retrieve mempool
+	// txs from the new peer
 	go func() {
-		reader.ReadLoop(pCtx)
-		cancel()
+		if err := writer.Respond(topics.MemPool.ToBuffer()); err != nil {
+			logrus.WithField("process", "peer").WithError(err).
+				Errorln("could not send mempool message to peer")
+		}
 	}()
 
-	writer.Serve(pCtx, writeQueueChan)
-	cancel()
-}
-
-// Serve utilizes two different methods for writing to the open connection.
-func (w *Writer) Serve(ctx context.Context, writeQueueChan <-chan bytes.Buffer) {
-	// Any gossip topics are written into interrupt-driven ringBuffer
-	// Single-consumer pushes messages to the socket
-	g := &GossipConnector{w.Connection}
-	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
-
-	// writeQueue - FIFO queue
-	// writeLoop pushes first-in message to the socket
-	w.writeLoop(ctx, writeQueueChan)
-	w.onDisconnect()
+	reader.ReadLoop(pCtx)
+	writer.onDisconnect()
 }
 
 func (w *Writer) onDisconnect() {
@@ -270,51 +266,29 @@ func (w *Writer) onDisconnect() {
 	}
 }
 
-func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buffer) {
-	defer func() {
-		if config.Get().API.Enabled {
-			go func() {
-				addr := w.Addr()
-				peerCount := capi.PeerCount{
-					ID: addr,
-				}
-
-				store := capi.GetStormDBInstance()
-
-				// delete count
-				err := store.Delete(&peerCount)
-				if err != nil {
-					log.WithField("process", "writeloop").Error("failed to Delete peerCount into StormDB")
-				}
-			}()
-		}
-	}()
-
-	for {
-		select {
-		case buf := <-writeQueueChan:
-			if !canRoute(w.services, topics.Topic(buf.Bytes()[0])) {
-				l.WithField("topic", topics.Topic(buf.Bytes()[0]).String()).
-					WithField("service flag", w.services).
-					Warnln("dropping message")
-				continue
-			}
-
-			if err := w.gossip.Process(&buf); err != nil {
-				l.WithError(err).Warnln("error processing outgoing message")
-				continue
-			}
-
-			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
-				l.WithField("process", "writeloop").
-					WithError(err).Warnln("error writing message")
-				return
-			}
-		case <-ctx.Done():
-			log.WithField("process", "writeloop").Debug("context canceled")
-			return
-		}
+// Respond is a callback used to directly write to a peer. It is used predominantly
+// in the message processor, which uses it to send responses to certain messages
+// back to its sender.
+func (w *Writer) Respond(buf bytes.Buffer) error {
+	if !canRoute(w.services, topics.Topic(buf.Bytes()[0])) {
+		l.WithField("topic", topics.Topic(buf.Bytes()[0]).String()).
+			WithField("service flag", w.services).
+			Warnln("dropping message")
+		return nil
 	}
+
+	if err := w.gossip.Process(&buf); err != nil {
+		l.WithError(err).Warnln("error processing outgoing message")
+		return err
+	}
+
+	if _, err := w.Connection.Write(buf.Bytes()); err != nil {
+		l.WithField("process", "writeloop").
+			WithError(err).Warnln("error writing message")
+		return err
+	}
+
+	return nil
 }
 
 // ReadLoop will block on the read until a message is read, or until the deadline
@@ -393,7 +367,7 @@ func (p *Reader) readLoop(ctx context.Context) {
 			// or blacklist spammers
 			startTime := time.Now().UnixNano()
 
-			if _, err = p.processor.Collect(p.Addr(), message, p.responseChan, p.services, nil); err != nil {
+			if _, err = p.processor.Collect(p.Addr(), message, p.responseFunc, p.services, nil); err != nil {
 				l.WithField("process", "readloop").WithField("cs", hex.EncodeToString(cs)).
 					WithError(err).Error("failed to process message")
 			}

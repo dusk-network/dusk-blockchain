@@ -34,7 +34,7 @@ func New(store *node.Store) *Challenger {
 }
 
 // SendChallenge to a connecting peer.
-func (c *Challenger) SendChallenge(ctx context.Context, r *peer.Reader, w *peer.Writer, ch chan bytes.Buffer) {
+func (c *Challenger) SendChallenge(ctx context.Context, r *peer.Reader, w *peer.Writer) {
 	challenge, err := generateRandomBytes(challengeLength)
 	if err != nil {
 		log.Panic(err)
@@ -45,12 +45,15 @@ func (c *Challenger) SendChallenge(ctx context.Context, r *peer.Reader, w *peer.
 		log.Panic(err)
 	}
 
-	ch <- *buf
+	if err := w.Respond(*buf); err != nil {
+		log.WithError(err).Warnln("could not send challenge")
+		return
+	}
 
 	// Enter the node into the store, for future reference.
 	c.nodes.Add(r.Addr(), challenge)
 
-	peer.Create(ctx, r, w, ch)
+	peer.Create(ctx, r, w)
 
 	c.nodes.SetInactive(r.Addr())
 }

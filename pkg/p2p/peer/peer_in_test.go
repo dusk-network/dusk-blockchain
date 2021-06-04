@@ -20,6 +20,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -50,45 +51,39 @@ func TestPingLoop(t *testing.T) {
 
 	cfg.Mock(&r)
 
-	responseChan := make(chan bytes.Buffer, 10)
 	pConn := NewConnection(client, protocol.NewGossip(protocol.TestNet))
 	writer := NewWriter(pConn, bus)
 
 	// Set up the other end of the exchange
-	responseChan2 := make(chan bytes.Buffer, 10)
 	pConn2 := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
 	writer2 := NewWriter(pConn2, bus)
 
 	// Set up reader factory
 	processor := NewMessageProcessor(bus)
 	processor.Register(topics.Ping, responding.ProcessPing)
+
+	pongChan := make(chan struct{}, 1)
+	pongFunc := func(_ string, _ message.Message) ([]bytes.Buffer, error) {
+		pongChan <- struct{}{}
+		return nil, nil
+	}
+
+	processor.Register(topics.Pong, pongFunc)
+
 	factory := NewReaderFactory(processor)
-
-	reader := factory.SpawnReader(pConn, responseChan)
-
-	reader2 := factory.SpawnReader(pConn2, responseChan2)
+	reader := factory.SpawnReader(pConn, writer.Respond)
+	reader2 := factory.SpawnReader(pConn2, writer2.Respond)
 
 	writer.services = protocol.FullNode
 	writer2.services = protocol.FullNode
 	reader.services = protocol.FullNode
 	reader2.services = protocol.FullNode
 
-	go Create(context.Background(), reader, writer, responseChan)
-	go Create(context.Background(), reader2, writer2, responseChan2)
+	go Create(context.Background(), reader, writer)
+	go Create(context.Background(), reader2, writer2)
 
-	// We should eventually get a pong message out of responseChan2
-	for {
-		buf := <-responseChan2
-
-		topic, err := topics.Extract(&buf)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if topics.Pong.String() == topic.String() {
-			break
-		}
-	}
+	// We should eventually get a pong message out of pongChan
+	<-pongChan
 }
 
 // TestIncompleteChecksum ensures peer reader does not panic on
@@ -234,7 +229,7 @@ func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, ch
 	respChan := make(chan bytes.Buffer, 10)
 	g := protocol.NewGossip(protocol.TestNet)
 	c := NewConnection(r, g)
-	peer := f.SpawnReader(c, respChan)
+	peer := f.SpawnReader(c, func(bytes.Buffer) error { return nil })
 
 	// Run the non-recover readLoop to watch for panics
 	go assert.NotPanics(t, func() { peer.readLoop(context.Background()) })
