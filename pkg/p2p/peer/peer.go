@@ -215,8 +215,9 @@ func Create(ctx context.Context, reader *Reader, writer *Writer) {
 	defer cancel()
 
 	g := &GossipConnector{writer.Connection}
-	ringBuf, l := eventbus.NewStreamListener(g)
+	l := eventbus.NewStreamListener(g)
 	writer.gossipID = writer.subscriber.Subscribe(topics.Gossip, l)
+	ringBuf := ring.NewBuffer(1000)
 
 	// On each new connection the node sends topics.Mempool to retrieve mempool
 	// txs from the new peer
@@ -225,6 +226,8 @@ func Create(ctx context.Context, reader *Reader, writer *Writer) {
 		logrus.WithField("process", "peer").
 			Errorln("could not send mempool message to peer")
 	}
+
+	_ = ring.NewConsumer(ringBuf, eventbus.Consume, g)
 
 	reader.ReadLoop(pCtx, ringBuf)
 	writer.onDisconnect()

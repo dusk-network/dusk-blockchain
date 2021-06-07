@@ -147,7 +147,7 @@ func TestSecondStepReduction(t *testing.T) {
 	table := initiateTableTest(timeout, hash, round, step)
 	for name, ttest := range table {
 		streamer := eventbus.NewGossipStreamer(protocol.TestNet)
-		_, streamListener := eventbus.NewStreamListener(streamer)
+		streamListener := eventbus.NewStreamListener(streamer)
 
 		// creating the Helper
 		hlp := reduction.NewHelper(messageToSpawn, timeout)

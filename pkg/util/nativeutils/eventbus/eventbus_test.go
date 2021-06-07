@@ -34,7 +34,7 @@ func TestNewEventBus(t *testing.T) {
 func TestListenerMap(t *testing.T) {
 	lm := newListenerMap()
 	_, ss := CreateGossipStreamer()
-	_, listener := NewStreamListener(ss)
+	listener := NewStreamListener(ss)
 	lm.Store(topics.Test, listener)
 
 	listeners := lm.Load(topics.Test)
@@ -158,7 +158,7 @@ func TestExitChan(t *testing.T) {
 	logrus.SetLevel(logrus.FatalLevel)
 	eb := New()
 	topic := topics.Test
-	_, sl := NewStreamListener(&mockWriteCloser{})
+	sl := NewStreamListener(&mockWriteCloser{})
 	_ = eb.Subscribe(topic, sl)
 
 	// Put something on ring buffer

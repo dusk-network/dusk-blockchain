@@ -47,7 +47,7 @@ func (m *Collector) Collect(b message.Message) error {
 func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 	eb := New()
 	streamer := NewGossipStreamer(protocol.TestNet)
-	_, streamListener := NewStreamListener(streamer)
+	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topics.Gossip, streamListener)
 	return eb, streamer
 }
@@ -57,7 +57,7 @@ func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
 	eb := New()
 	streamer := NewSimpleStreamer(protocol.TestNet)
-	_, streamListener := NewStreamListener(streamer)
+	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topic, streamListener)
 	return eb, streamer
 }
