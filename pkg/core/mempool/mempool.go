@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+	"golang.org/x/time/rate"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -65,6 +66,8 @@ type Mempool struct {
 
 	// the magic function that knows best what is valid chain Tx.
 	verifier transactions.UnconfirmedTxProber
+
+	limiter *rate.Limiter
 }
 
 // checkTx is responsible to determine if a tx is valid or not.
@@ -85,6 +88,8 @@ func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 // NewMempool instantiates and initializes node mempool.
 func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
 	log.Infof("create instance")
+
+	limiter := rate.NewLimiter(rate.Every(time.Second/10), 1)
 
 	getMempoolTxsChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetMempoolTxs, getMempoolTxsChan); err != nil {
@@ -111,6 +116,7 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
 		sendTxChan:              sendTxChan,
 		verifier:                verifier,
+		limiter:                 limiter,
 	}
 
 	// Setting the pool where to cache verified transactions.
@@ -141,7 +147,15 @@ func (m *Mempool) Run(ctx context.Context) {
 			select {
 			// rpcbus methods.
 			case r := <-m.sendTxChan:
-				go handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
+				now := time.Now()
+				rv := m.limiter.ReserveN(now, 1)
+				if !rv.OK() {
+					//	return nil, fmt.Errorf("Exceeds limiter's burst")
+				}
+
+				delay := rv.DelayFrom(now)
+				time.Sleep(delay)
+				handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
 			case r := <-m.getMempoolTxsChan:
 				handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
 			case r := <-m.getMempoolTxsBySizeChan:
@@ -203,6 +217,7 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 // processTx ensures all transaction rules are satisfied before adding the tx
 // into the verified pool.
 func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
+
 	txid, err := t.tx.CalculateHash()
 	if err != nil {
 		return txid, fmt.Errorf("hash err: %s", err.Error())

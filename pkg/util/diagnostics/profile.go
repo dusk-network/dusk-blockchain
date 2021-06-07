@@ -264,6 +264,7 @@ func logMemstatsSample() {
 	l.Infof("# HeapReleased = %d\n", s.HeapReleased)
 	l.Infof("# HeapObjects = %d\n", s.HeapObjects)
 	l.Infof("# Stack = %d / %d\n", s.StackInuse, s.StackSys)
+	l.Infof("# GoroutineNum = %d", runtime.NumGoroutine())
 
 	// Record GC pause history, most recent 5 entries
 	l.Infof("# Stop-the-world Pause time")
