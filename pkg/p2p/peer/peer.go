@@ -263,18 +263,6 @@ func (w *Writer) onDisconnect() {
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
 func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
-	// As the peer ReadLoop is at the front-line of P2P network, receiving a
-	// malformed frame by an adversary node could lead to a panic.
-	// In such situation, the node should survive but adversary conn gets dropped
-	// defer func() {
-	// 	if r := recover(); r != nil {
-	// 		log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
-	// 	}
-	// }()
-	p.readLoop(ctx, ringBuf)
-}
-
-func (p *Reader) readLoop(ctx context.Context, ringBuf *ring.Buffer) {
 	defer func() {
 		_ = p.Conn.Close()
 	}()

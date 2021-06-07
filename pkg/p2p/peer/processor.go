@@ -47,7 +47,7 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
-func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, ringBuf *ring.Buffer, services protocol.ServiceFlag, header []byte) ([]bytes.Buffer, error) {
+func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf *ring.Buffer, services protocol.ServiceFlag, header []byte) ([]bytes.Buffer, error) {
 	b := bytes.NewBuffer(packet)
 
 	msg, err := message.Unmarshal(b)
@@ -59,7 +59,7 @@ func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, ringBuf *rin
 		msg = message.NewWithHeader(msg.Category(), msg.Payload(), header)
 	}
 
-	return m.process(srcPeerID, msg, ringBuf, services)
+	return m.process(srcPeerID, msg, respRingBuf, services)
 }
 
 func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
@@ -76,7 +76,7 @@ func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
 	}
 }
 
-func (m *MessageProcessor) process(srcPeerID string, msg message.Message, ringBuf *ring.Buffer, services protocol.ServiceFlag) ([]bytes.Buffer, error) {
+func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respRingBuf *ring.Buffer, services protocol.ServiceFlag) ([]bytes.Buffer, error) {
 	category := msg.Category()
 	if !canRoute(services, category) {
 		return nil, fmt.Errorf("attempted to process an illegal topic %s for node type %v", category, services)
@@ -99,9 +99,9 @@ func (m *MessageProcessor) process(srcPeerID string, msg message.Message, ringBu
 		return nil, err
 	}
 
-	if ringBuf != nil {
+	if respRingBuf != nil {
 		for _, buf := range bufs {
-			if !ringBuf.Put(buf.Bytes()) {
+			if !respRingBuf.Put(buf.Bytes()) {
 				log.WithError(err).Errorln("could not send response")
 				return nil, err
 			}
