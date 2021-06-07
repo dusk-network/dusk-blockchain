@@ -14,6 +14,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	"github.com/sirupsen/logrus"
 	assert "github.com/stretchr/testify/require"
 )
@@ -185,7 +186,7 @@ func TestExitChan(t *testing.T) {
 
 type mockWriteCloser struct{}
 
-func (m *mockWriteCloser) Write(data []byte) (int, error) {
+func (m *mockWriteCloser) Write(b []byte, h []byte, t topics.Topic, priority ring.MsgPriority) (int, error) {
 	return 0, errors.New("failed")
 }
 

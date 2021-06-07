@@ -6,22 +6,25 @@
 
 package ring
 
-import (
-	"io"
-)
+import "github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+
+type Writer interface {
+	Write(payload, header []byte, topic topics.Topic, priority MsgPriority) (n int, err error)
+	Close() error
+}
 
 // Consumer represents an entity which can read items from a ring buffer.
 // It maintains its own read index, and cache.
 type Consumer struct {
 	ring *Buffer
-	w    io.WriteCloser
+	w    Writer
 	// consumes the retrieved data and returns true if no error
 	// Returns false to terminate the consumer
-	consume func(items [][]byte, w io.WriteCloser) bool
+	consume func(items []Entry, w Writer) bool
 }
 
 // NewConsumer returns a Consumer, which can read from the passed Buffer.
-func NewConsumer(ring *Buffer, callback func(items [][]byte, w io.WriteCloser) bool, w io.WriteCloser) *Consumer {
+func NewConsumer(ring *Buffer, callback func(items []Entry, w Writer) bool, w Writer) *Consumer {
 	c := &Consumer{ring, w, callback}
 	go c.run()
 

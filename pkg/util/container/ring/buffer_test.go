@@ -8,7 +8,6 @@ package ring
 
 import (
 	"bytes"
-	"io"
 	"sync"
 	"testing"
 	"time"
@@ -36,16 +35,16 @@ func TestMultipleConsumersMultipleProducers(t *testing.T) {
 
 // Safe array of arrays.
 type safeSlice struct {
-	data [][]byte
+	data []Entry
 	mu   sync.RWMutex
 }
 
-func (s *safeSlice) append(items [][]byte) {
+func (s *safeSlice) append(items []Entry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.data == nil {
-		s.data = make([][]byte, 0)
+		s.data = make([]Entry, 0)
 	}
 
 	s.data = append(s.data, items...)
@@ -66,7 +65,7 @@ func (s *safeSlice) Equal(b *safeSlice) bool {
 
 		b.mu.RLock()
 		for _, bItem := range b.data {
-			if bytes.Equal(sItem, bItem) {
+			if bytes.Equal(sItem.Data, bItem.Data) {
 				found = true
 				break
 			}
@@ -89,7 +88,7 @@ func testConsumerProducer(t *testing.T, bufferSize int, consumersNum int, produc
 	// items slice read from ring buffer
 	var rItems safeSlice
 
-	consumeFunc := func(items [][]byte, w io.WriteCloser) bool {
+	consumeFunc := func(items []Entry, w Writer) bool {
 		rItems.append(items)
 		return true
 	}
@@ -106,9 +105,9 @@ func testConsumerProducer(t *testing.T, bufferSize int, consumersNum int, produc
 
 	// Init a producer
 	producer := func(id int, wg *sync.WaitGroup) {
-		data := make([][]byte, 20*consumersNum)
+		data := make([]Entry, 20*consumersNum)
 		for j := 0; j < len(data); j++ {
-			data[j] = []byte{byte(id + j)}
+			data[j].Data = []byte{byte(id + j)}
 			// put some bytes on the ring
 			ring.Put(data[j])
 		}

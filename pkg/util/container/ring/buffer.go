@@ -10,12 +10,28 @@ import (
 	"bytes"
 	"sync"
 	"sync/atomic"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
+
+type MsgPriority byte
+
+const (
+	Low MsgPriority = iota
+	High
+)
+
+type Entry struct {
+	Data     []byte
+	Header   []byte
+	Topic    topics.Topic
+	Priority MsgPriority
+}
 
 // Buffer represents a circular array of data items.
 // It is suitable for (single/multiple) consumers (single/multiple) producers data transfer.
 type Buffer struct {
-	items      [][]byte
+	items      []Entry
 	mu         *sync.Mutex
 	notEmpty   *sync.Cond
 	writeIndex int32
@@ -28,7 +44,7 @@ func NewBuffer(length int) *Buffer {
 	cv := sync.NewCond(m)
 
 	return &Buffer{
-		items:      make([][]byte, length),
+		items:      make([]Entry, length),
 		notEmpty:   cv,
 		mu:         m,
 		writeIndex: -1,
@@ -36,15 +52,15 @@ func NewBuffer(length int) *Buffer {
 }
 
 // Put an item on the ring buffer.
-func (r *Buffer) Put(item []byte) bool {
-	if item == nil || r.closed.Load() {
+func (r *Buffer) Put(i Entry) bool {
+	if i.Data == nil || r.closed.Load() {
 		return false
 	}
 
 	// Protect the slice and the writeIndex
 	r.mu.Lock()
 
-	if !r.Has(item) {
+	if !r.Has(i.Data) {
 		// Store the new item
 		r.writeIndex++
 		// Reset the writeIndex as this is ringBuffer
@@ -52,7 +68,25 @@ func (r *Buffer) Put(item []byte) bool {
 			r.writeIndex = 0
 		}
 
-		r.items[r.writeIndex] = item
+		r.items[r.writeIndex] = i
+
+		// Simple sorting by priority. If most recent item is High Priority
+		// then search for any Low Priority message pushed before. If found, swap
+		// them.
+		if r.items[r.writeIndex].Priority == High {
+			for i := 0; i < len(r.items); i++ {
+				if r.items[i].Data == nil {
+					continue
+				}
+
+				if r.items[i].Priority == Low {
+					// found Low Priority message
+					// swap them
+					r.items[i], r.items[r.writeIndex] = r.items[r.writeIndex], r.items[i]
+					break
+				}
+			}
+		}
 	}
 
 	r.mu.Unlock()
@@ -71,21 +105,28 @@ func (r *Buffer) Close() {
 }
 
 // GetAll gets all items in a buffer.
-func (r *Buffer) GetAll() ([][]byte, bool) {
+func (r *Buffer) GetAll() ([]Entry, bool) {
 	r.mu.Lock()
 
 	for int(r.writeIndex) < 0 && !r.closed.Load() {
 		r.notEmpty.Wait()
 	}
 
-	items := make([][]byte, 0)
-	for i, itemPtr := range r.items {
-		if itemPtr == nil {
+	items := make([]Entry, 0)
+	cap := 0
+
+	for ind, item := range r.items {
+		cap++
+		if cap == 1000 {
 			break
 		}
 
-		items = append(items, itemPtr)
-		r.items[i] = nil
+		if item.Data == nil {
+			break
+		}
+
+		items = append(items, item)
+		r.items[ind].Data = nil
 	}
 
 	r.writeIndex = -1
@@ -100,8 +141,8 @@ func (r *Buffer) Has(item []byte) bool {
 		return false
 	}
 
-	for _, existing := range r.items {
-		if bytes.Equal(existing, item) {
+	for _, bufItem := range r.items {
+		if bytes.Equal(bufItem.Data, item) {
 			return true
 		}
 	}
