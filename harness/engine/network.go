@@ -298,6 +298,23 @@ func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, erro
 		return "", fmt.Errorf("config profile err '%s' for node index %d", err.Error(), nodeIndex)
 	}
 
+	entry := `
+       [[profile]]
+      [[profile]]
+       start = true
+       name ="memstats"
+       interval = 5
+       duration = 1
+       `
+
+	f, _ := os.OpenFile(configPath,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	defer f.Close()
+	if _, err := f.WriteString("\n" + entry); err != nil {
+		log.Println(err)
+	}
+
 	// Finally load sandbox configuration and setting it in the node
 	var err error
 

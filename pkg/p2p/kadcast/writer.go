@@ -51,7 +51,9 @@ func (w *Writer) Serve() {
 	// This should happen in order to follow priority-sorting in ring buffer
 	l := eventbus.NewStreamListener(w)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, l)
-	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l)
+
+	l2 := eventbus.NewStreamListener(w)
+	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l2)
 }
 
 // Write expects the actual payload in a marshaled form.

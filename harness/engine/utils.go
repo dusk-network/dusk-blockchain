@@ -572,6 +572,9 @@ func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSiz
 		clientDeadline := time.Now().Add(timeout)
 		ctx, cancel := context.WithDeadline(context.Background(), clientDeadline)
 
+		// 100TPS throughput
+		time.Sleep(5 * time.Millisecond)
+
 		_, err := client.Transfer(ctx, &req)
 		if err != nil {
 			logrus.WithField("sender_index", senderNodeInd).Error(err)

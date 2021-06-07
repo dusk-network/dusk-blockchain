@@ -557,3 +557,35 @@ func ConvStr(p payload.Safe) (string, error) {
 func (u swrap) Copy() payload.Safe {
 	return u
 }
+
+// IsLowPriority determines which message can be considered low priority.
+// This should be any topics.Tx or topics.GetData with InvTypeMempoolTx objects.
+func IsLowPriority(m Message) bool {
+	switch m.Category() {
+	case topics.Inv: /*
+			msg := m.Payload().(Inv)
+			for _, obj := range msg.InvList {
+				// Finding even a single object of type InvTypeMempoolTx marks
+				// the message as low priority
+				if obj.Type == InvTypeMempoolTx {
+					return true
+				}
+			}
+		*/
+	case topics.Tx:
+		return true
+	case topics.GetData:
+		/*
+			msg := m.Payload().(Inv)
+			for _, obj := range msg.InvList {
+				// Finding even a single object of type InvTypeMempoolTx marks
+				// the message as low priority
+				if obj.Type == InvTypeMempoolTx {
+					return true
+				}
+			}
+		*/
+	}
+
+	return false
+}

@@ -113,14 +113,8 @@ func (r *Buffer) GetAll() ([]Entry, bool) {
 	}
 
 	items := make([]Entry, 0)
-	cap := 0
 
 	for ind, item := range r.items {
-		cap++
-		if cap == 1000 {
-			break
-		}
-
 		if item.Data == nil {
 			break
 		}

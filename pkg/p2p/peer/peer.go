@@ -24,6 +24,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
@@ -59,7 +60,7 @@ type GossipConnector struct {
 	*Connection
 }
 
-func (g *GossipConnector) Write(b []byte) (int, error) {
+func (g *GossipConnector) Write(b []byte, h []byte, t topics.Topic, priority ring.MsgPriority) (int, error) {
 	if !canRoute(g.services, topics.Topic(b[0])) {
 		l.WithField("topic", topics.Topic(b[0]).String()).
 			WithField("service flag", g.services).
