@@ -12,9 +12,9 @@ import (
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rcudp"
 	"github.com/sirupsen/logrus"
@@ -46,62 +46,41 @@ func NewWriter(router *RoutingTable, subscriber eventbus.Subscriber, gossip *pro
 
 // Serve processes any kadcast messaging to the wire.
 func (w *Writer) Serve() {
-	// NewChanListener is preferred here as it passes message.Message to the
-	// Write, where NewStreamListener works with bytes.Buffer only.
-	// Later this could be change if perf issue noticed.
-	writeQueue := make(chan message.Message, 1000)
-	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(writeQueue))
 
-	writePointMsgQueue := make(chan message.Message, 1000)
-	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, eventbus.NewChanListener(writePointMsgQueue))
-
-	go func() {
-		for msg := range writeQueue {
-			go func(m message.Message) {
-				if err := w.Write(m); err != nil {
-					log.WithError(err).Warn("kadcast write failed")
-				}
-			}(msg)
-		}
-	}()
-
-	go func() {
-		for msg := range writePointMsgQueue {
-			go func(m message.Message) {
-				if err := w.WriteToPoint(m); err != nil {
-					log.WithError(err).Warn("kadcast-point write failed")
-				}
-			}(msg)
-		}
-	}()
+	// A single instance of ring buffer is reused by both topics (topics.Kadcast and topics.KadcastPoint).
+	// This should happen in order to follow priority-sorting in ring buffer
+	l := eventbus.NewStreamListener(w)
+	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, l)
+	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l)
 }
 
 // Write expects the actual payload in a marshaled form.
-func (w *Writer) Write(m message.Message) error {
-	header := m.Header()
-	buf := m.Payload().(message.SafeBuffer)
+func (w *Writer) Write(p []byte, h []byte, t topics.Topic, priority ring.MsgPriority) (int, error) {
+	if t == topics.KadcastPoint {
+		return len(p), w.WriteToPoint(p, h)
+	}
 
-	if len(header) == 0 {
-		return errors.New("empty message header")
+	if len(h) == 0 {
+		return 0, errors.New("empty message header")
 	}
 
 	// Constuct gossip frame.
-	if err := w.gossip.Process(&buf.Buffer); err != nil {
-		return err
+	buf := bytes.NewBuffer(p)
+	if err := w.gossip.Process(buf); err != nil {
+		return 0, err
 	}
 
-	return w.broadcastPacket(header[0], buf.Bytes())
+	return len(buf.Bytes()), w.broadcastPacket(h[0], buf.Bytes())
 }
 
 // WriteToPoint writes a message to a single destination.
 // The receiver address is read from message Header.
-func (w *Writer) WriteToPoint(m message.Message) error {
+func (w *Writer) WriteToPoint(p []byte, h []byte) error {
 	// Height = 0 disables re-broadcast algorithm in the receiver node. That
 	// said, sending a message to peer with height 0 will be received by the
 	// destination peer but will not be repropagated to any other node.
 	const height = byte(0)
 
-	h := m.Header()
 	if len(h) == 0 {
 		return errors.New("empty message header")
 	}
@@ -118,8 +97,8 @@ func (w *Writer) WriteToPoint(m message.Message) error {
 	}
 
 	// Constuct gossip frame.
-	buf := m.Payload().(message.SafeBuffer)
-	if err = w.gossip.Process(&buf.Buffer); err != nil {
+	buf := bytes.NewBuffer(p)
+	if err = w.gossip.Process(buf); err != nil {
 		return err
 	}
 
