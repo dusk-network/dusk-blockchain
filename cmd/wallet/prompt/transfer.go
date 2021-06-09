@@ -42,13 +42,6 @@ func transferDusk(client node.TransactorClient) (*node.TransactionResponse, erro
 	return client.Transfer(context.Background(), &node.TransferRequest{Amount: amount, Address: []byte(address)})
 }
 
-func bidDusk(client node.TransactorClient) (*node.TransactionResponse, error) {
-	amount := getAmount()
-	lockTime := getLockTime()
-	// TODO: parameterize fee
-	return client.Bid(context.Background(), &node.BidRequest{Amount: amount, Fee: 100, Locktime: lockTime})
-}
-
 func stakeDusk(client node.TransactorClient) (*node.TransactionResponse, error) {
 	amount := getAmount()
 	lockTime := getLockTime()

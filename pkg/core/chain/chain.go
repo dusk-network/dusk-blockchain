@@ -135,14 +135,6 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, loade
 
 	chain.tip = prevBlock
 
-	if prevBlock.Header.Height == 0 {
-		// TODO: this is currently mocking bid values, and should be removed when
-		// RUSK integration is finished, and testnet is ready to launch.
-		if errV := setupBidValues(chain.db); errV != nil {
-			return nil, errV
-		}
-	}
-
 	if srv != nil {
 		node.RegisterChainServer(srv, chain)
 	}

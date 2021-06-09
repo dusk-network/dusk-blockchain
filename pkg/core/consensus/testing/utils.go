@@ -56,11 +56,9 @@ func setupProvisioners(assert *assert.Assertions, amount int) (user.Provisioners
 
 func mockProxy(p user.Provisioners) transactions.Proxy {
 	return transactions.MockProxy{
-		P: &transactions.PermissiveProvisioner{},
 		E: &transactions.PermissiveExecutor{
 			P: &p,
 		},
-		BG: &transactions.MockBlockGenerator{},
 	}
 }
 

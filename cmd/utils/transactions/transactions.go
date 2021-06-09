@@ -46,11 +46,6 @@ func RunTransactions(grpcHost string, transaction Transaction) (*node.Transactio
 	var resp *node.TransactionResponse
 
 	switch transaction.TXtype {
-	case "consensus":
-		log.WithField("transaction", transaction).Info("Sending consensus tx")
-
-		req := node.BidRequest{Amount: transaction.Amount}
-		resp, err = client.Bid(ctx, &req)
 	case "stake":
 		log.WithField("transaction", transaction).Info("Sending stake tx")
 

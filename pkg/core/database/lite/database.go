@@ -27,7 +27,6 @@ const (
 	keyImagesInd
 	heightInd
 	stateInd
-	bidValuesInd
 	outputKeyInd
 	candidateInd
 	maxInd

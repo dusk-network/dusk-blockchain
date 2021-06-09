@@ -14,8 +14,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-crypto/bls"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -34,7 +36,7 @@ const MaxTxSetSize = 825000
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator interface {
-	GenerateCandidateMessage(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) (*message.Score, error)
+	GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.Score, error)
 }
 
 type generator struct {
@@ -62,14 +64,19 @@ func (bg *generator) regenerateCommittee(r consensus.RoundUpdate) [][]byte {
 // PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`.
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
-func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
+func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
 	log := lg.
-		WithField("round", sev.State().Round).
-		WithField("step", sev.State().Step)
+		WithField("round", r.Round).
+		WithField("step", step)
 
 	committee := bg.regenerateCommittee(r)
 
-	blk, err := bg.Generate(sev, committee, r)
+	seed, err := bg.sign(r.Seed)
+	if err != nil {
+		return nil, err
+	}
+
+	blk, err := bg.Generate(seed, committee, r)
 	if err != nil {
 		log.
 			WithError(err).
@@ -77,21 +84,36 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, sev message.S
 		return nil, err
 	}
 
+	hdr := header.Header{
+		PubKeyBLS: bg.Keys.BLSPubKeyBytes,
+		Round:     r.Round,
+		Step:      step,
+		BlockHash: blk.Header.Hash,
+	}
+
 	// Since the Candidate message goes straight to the Chain, there is
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
-	return message.NewScore(sev, bg.Keys.BLSPubKeyBytes, r.Hash, *blk), nil
+	scr := message.NewScore(hdr, r.Hash, *blk)
+
+	sig, err := bg.Sign(hdr)
+	if err != nil {
+		return nil, err
+	}
+
+	scr.SignedHash = sig
+	return scr, nil
 }
 
 // Generate a Block.
-func (bg *generator) Generate(sev message.ScoreProposal, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
-	return bg.GenerateBlock(r.Round, sev.Seed, sev.Proof, sev.Score, r.Hash, keys)
+func (bg *generator) Generate(seed []byte, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
+	return bg.GenerateBlock(r.Round, seed, r.Hash, keys)
 }
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
-func (bg *generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
-	txs, err := bg.ConstructBlockTxs(proof, score, keys)
+func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
+	txs, err := bg.ConstructBlockTxs(keys)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +158,7 @@ func (bg *generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 
 // ConstructBlockTxs will fetch all valid transactions from the mempool, append a coinbase
 // transaction, and return them all.
-func (bg *generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]transactions.ContractCall, error) {
+func (bg *generator) ConstructBlockTxs(keys [][]byte) ([]transactions.ContractCall, error) {
 	txs := make([]transactions.ContractCall, 0)
 
 	// Retrieve and append the verified transactions from Mempool
@@ -162,4 +184,14 @@ func (bg *generator) ConstructBlockTxs(proof, score []byte, keys [][]byte) ([]tr
 	txs = append(txs, coinbaseTx)
 
 	return txs, nil
+}
+
+func (bg *generator) sign(seed []byte) ([]byte, error) {
+	signedSeed, err := bls.Sign(bg.Keys.BLSSecretKey, bg.Keys.BLSPubKey, seed)
+	if err != nil {
+		return nil, err
+	}
+
+	compSeed := signedSeed.Compress()
+	return compSeed, nil
 }

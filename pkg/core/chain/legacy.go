@@ -14,22 +14,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
-
-func setupBidValues(db database.DB) error {
-	// We can just use anything for the D and K, since the blind bid is currently
-	// mocked.
-	// NOTE: this should be changed if we choose to use the actual blind bid.
-	return db.Update(func(t database.Transaction) error {
-		k, _ := crypto.RandEntropy(32)
-		d, _ := crypto.RandEntropy(32)
-		indexStoredBidBytes, _ := crypto.RandEntropy(8)
-		return t.StoreBidValues(d, k, binary.LittleEndian.Uint64(indexStoredBidBytes), 250000)
-	})
-}
 
 // ReconstructCommittee will fill in the committee members that are present from genesis.
 //nolint

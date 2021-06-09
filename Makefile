@@ -21,7 +21,7 @@ test-harness-ci: build
 	MOCK_ADDRESS=127.0.0.1:8080 DUSK_NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" make test-harness
 test-harness-ci-kadcast: stop build
 	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=20 DUSK_NETWORK_PROFILE=kadcast DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
-	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestSendBidTransaction -args -enable
+	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestSendStakeTransaction -args -enable
 test-harness-alive: stop build
 	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestMultipleBiddersProvisioners -args -enable -keepalive

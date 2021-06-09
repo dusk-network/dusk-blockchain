@@ -94,19 +94,6 @@ type Transaction interface {
 	// given a destination public key.
 	FetchOutputUnlockHeight(destkey []byte) (uint64, error)
 
-	// StoreBidValues stores the D and K values passed by the caller in
-	// the database, as well as the expiry height. It should be passed
-	// the transaction lock time as a third argument, as the database
-	// can infer the current height and consequently, the expiry height,
-	// on its own.
-	// XXX the Unused value was erroneously marked as Seed.
-	StoreBidValues(D []byte, K []byte, BidIndex uint64, ExpiryHeight uint64) error
-
-	// FetchBidValues retrieves the D and K values with the lowest
-	// expiry height from the database.
-	// XXX the Unused value was erroneously marked as Seed.
-	FetchBidValues() (D []byte, K []byte, BidIndex uint64, err error)
-
 	// FetchBlockHeightSince try to find height of a block generated around
 	// sinceUnixTime starting the search from height (tip - offset).
 	FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error)

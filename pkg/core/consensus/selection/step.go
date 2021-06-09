@@ -20,7 +20,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
@@ -31,14 +30,13 @@ var lg = log.WithField("process", "selector")
 // Phase is the implementation of the Selection step component.
 type Phase struct {
 	*consensus.Emitter
-	handler   Handler
+	handler   *Handler
 	bestEvent message.Score
 
 	timeout time.Duration
 
-	provisioner transactions.Provisioner
-	next        consensus.Phase
-	keys        key.Keys
+	next consensus.Phase
+	keys key.Keys
 
 	g blockgenerator.BlockGenerator
 
@@ -50,13 +48,12 @@ type Phase struct {
 // the topic BestScoreTopic.
 func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emitter, timeout time.Duration, db database.DB) *Phase {
 	selector := &Phase{
-		Emitter:     e,
-		timeout:     timeout,
-		bestEvent:   message.EmptyScore(),
-		provisioner: e.Proxy.Provisioner(),
-		keys:        e.Keys,
-		g:           g,
-		db:          db,
+		Emitter:   e,
+		timeout:   timeout,
+		bestEvent: message.EmptyScore(),
+		keys:      e.Keys,
+		g:         g,
+		db:        db,
 
 		next: next,
 	}
@@ -87,27 +84,6 @@ func (p *Phase) Initialize(_ consensus.InternalPacket) consensus.PhaseFn {
 	return p
 }
 
-func (p *Phase) generateCandidate(ctx context.Context, round consensus.RoundUpdate, step uint8, internalScoreChan chan<- message.Message) {
-	score := p.g.Generate(ctx, round, step)
-	if score.IsEmpty() {
-		return
-	}
-
-	scr, err := p.g.GenerateCandidateMessage(ctx, score, round, step)
-	if err != nil {
-		lg.WithError(err).Errorln("candidate block generation failed")
-		return
-	}
-
-	log.
-		WithField("step", step).
-		WithField("round", round.Round).
-		Debugln("sending score internally")
-
-	// communicate our own score to the selection
-	internalScoreChan <- message.New(topics.Score, *scr)
-}
-
 // String as required by the interface PhaseFn.
 func (p *Phase) String() string {
 	return "selection"
@@ -120,41 +96,47 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 	// this makes sure that the internal score channel gets canceled
 	defer cancel()
 
-	// channel for the blockgenerator to communicate a score message as soon as
-	// it gets generated
-	internalScoreChan := make(chan message.Message, 1)
+	defer func() {
+		p.increaseTimeOut()
+	}()
 
-	// Since the generator can be nil in the case of the node not being a
-	// block generator, let's check to see first if we actually have something.
-	if p.g != nil {
-		go p.generateCandidate(ctx, r, step, internalScoreChan)
+	p.handler = NewHandler(p.Keys, r.P)
+
+	if p.handler.AmMember(r.Round, step) {
+		scr, err := p.g.GenerateCandidateMessage(ctx, r, step)
+		if err != nil {
+			lg.WithError(err).Errorln("candidate block generation failed")
+		}
+
+		evChan <- message.NewWithHeader(topics.Score, *scr, []byte{config.KadcastInitialHeight})
 	}
 
-	p.handler = NewScoreHandler(p.provisioner)
 	timeoutChan := time.After(p.timeout)
 
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Score {
-			p.collectScore(ctx, ev.Payload().(message.Score), ev.Header())
+			if err := p.collectScore(ev.Payload().(message.Score), ev.Header()); err != nil {
+				continue
+			}
 		}
 	}
 
 	for {
 		select {
-		case internalScoreResult := <-internalScoreChan:
-			header := internalScoreResult.Header()
-			if header == nil {
-				header = []byte{config.KadcastInitialHeight}
-			}
-
-			p.collectScore(ctx, internalScoreResult.Payload().(message.Score), header)
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
-				p.collectScore(ctx, ev.Payload().(message.Score), ev.Header())
-			}
+				if err := p.collectScore(ev.Payload().(message.Score), ev.Header()); err != nil {
+					continue
+				}
 
+				// preventing timeout leakage
+				go func() {
+					<-timeoutChan
+				}()
+				return p.endSelection(ev.Payload().(message.Score))
+			}
 		case <-timeoutChan:
-			return p.endSelection(r.Round, step)
+			return p.endSelection(message.EmptyScore())
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
@@ -165,36 +147,23 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 	}
 }
 
-func (p *Phase) endSelection(_ uint64, _ uint8) consensus.PhaseFn {
-	defer func() {
-		p.handler.LowerThreshold()
-		p.increaseTimeOut()
-	}()
-
-	if p.bestEvent.IsEmpty() {
-		//TODO: check if this is required
-		//hdr := header.Header{
-		//	Round:     round,
-		//	Step:      step,
-		//	PubKeyBLS: p.keys.BLSPubKeyBytes,
-		//	BlockHash: emptyScore[:],
-		//}
-		log.Debug("endSelection, p.next.Fn(message.EmptyScore())")
-		return p.next.Initialize(message.EmptyScore())
-	}
-
-	log.Debug("endSelection, p.next.Fn(p.bestEvent)")
-
-	e := p.bestEvent
-	p.bestEvent = message.EmptyScore()
-	return p.next.Initialize(e)
+func (p *Phase) endSelection(result message.Score) consensus.PhaseFn {
+	log.WithField("empty", result.IsEmpty()).
+		Debug("endSelection, p.next.Fn(p.bestEvent)")
+	return p.next.Initialize(result)
 }
 
-func (p *Phase) collectScore(ctx context.Context, sc message.Score, msgHeader []byte) {
+func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
 	// Sanity-check the candidate message
 	if err := candidate.ValidateCandidate(sc.Candidate); err != nil {
 		lg.Warn("Invalid candidate message")
-		return
+		return err
+	}
+
+	// Consensus-check the candidate message
+	if err := p.handler.VerifySignature(sc); err != nil {
+		lg.Warn("incorrect candidate message")
+		return err
 	}
 
 	// Publish internally topics.Candidate with bestEvent(highest score candidate block)
@@ -204,39 +173,14 @@ func (p *Phase) collectScore(ctx context.Context, sc message.Score, msgHeader []
 		lg.WithError(err).Errorln("could not store candidate")
 	}
 
-	// Only check for priority if we already have a best event
-	if !p.bestEvent.IsEmpty() {
-		if p.handler.Priority(p.bestEvent, sc) {
-			// if the current best score has priority, we return
-			return
-		}
-	}
-
-	header := sc.State()
-	if err := p.handler.Verify(ctx, header.Round, header.Step, sc); err != nil {
-		lg.WithError(err).Warn("Invalid score message")
-		return
-	}
-
-	lg.WithField("step", header.Step).
-		WithField("round", header.Round).Debugln("publishing best score")
-
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
-
 	if err := p.Republish(message.New(topics.Score, sc), msgHeader); err != nil {
 		lg.WithError(err).WithField("kadcast_enabled", config.Get().Kadcast.Enabled).
 			Error("could not republish score event")
 	}
 
-	lg.
-		WithField("step", header.Step).
-		WithField("round", header.Round).
-		WithFields(log.Fields{
-			"new_best": sc.Score,
-		}).Debugln("swapping best score")
-
-	p.bestEvent = sc
+	return nil
 }
 
 // increaseTimeOut increases the timeout after a failed selection.

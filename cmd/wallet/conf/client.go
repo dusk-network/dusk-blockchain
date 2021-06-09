@@ -18,14 +18,13 @@ import (
 
 // NodeClient holds node related fields.
 type NodeClient struct {
-	dialTimeout          int64
-	WalletClient         node.WalletClient
-	TransactorClient     node.TransactorClient
-	ProvisionerClient    node.ProvisionerClient
-	BlockGeneratorClient node.BlockGeneratorClient
-	ChainClient          node.ChainClient
-	MempoolClient        node.MempoolClient
-	conn                 *grpc.ClientConn
+	dialTimeout       int64
+	WalletClient      node.WalletClient
+	TransactorClient  node.TransactorClient
+	ProvisionerClient node.ProvisionerClient
+	ChainClient       node.ChainClient
+	MempoolClient     node.MempoolClient
+	conn              *grpc.ClientConn
 }
 
 // NewNodeClient returns a nodeClient with fixed dialTimeout of 5s.
@@ -98,7 +97,6 @@ func (c *NodeClient) Connect(conf rpcConfiguration) error {
 	c.WalletClient = node.NewWalletClient(conn)
 	c.TransactorClient = node.NewTransactorClient(conn)
 	c.ProvisionerClient = node.NewProvisionerClient(conn)
-	c.BlockGeneratorClient = node.NewBlockGeneratorClient(conn)
 	c.ChainClient = node.NewChainClient(conn)
 	c.MempoolClient = node.NewMempoolClient(conn)
 

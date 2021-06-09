@@ -10,7 +10,6 @@ safecallbacklistener = "true"
 
 # Timeout cfg for rpcBus calls
 [timeout]
-timeoutsendbidtx = 5
 timeoutgetlastcommittee = 5
 timeoutgetlastcertificate = 5
 timeoutgetmempooltxsbysize = 4

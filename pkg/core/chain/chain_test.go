@@ -14,7 +14,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -103,14 +102,6 @@ func TestAcceptFromPeer(t *testing.T) {
 
 	startingHeight := uint64(1)
 	eb, c := setupChainTest(t, startingHeight)
-	d, _ := crypto.RandEntropy(32)
-	k, _ := crypto.RandEntropy(32)
-
-	if err := c.db.Update(func(t database.Transaction) error {
-		return t.StoreBidValues(d, k, 0, 100000)
-	}); err != nil {
-		t.Fatal(err)
-	}
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 	l := eventbus.NewStreamListener(streamer)
@@ -243,8 +234,7 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 	loader := createLoader(db)
 
 	proxy := &transactions.MockProxy{
-		E:  transactions.MockExecutor(startAtHeight),
-		BG: transactions.MockBlockGenerator{},
+		E: transactions.MockExecutor(startAtHeight),
 	}
 
 	BLSKeys, _ := key.NewRandKeys()
@@ -257,16 +247,12 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 		EventBus:    eb,
 		RPCBus:      rpc,
 		Keys:        BLSKeys,
-		Proxy:       proxy,
 		TimerLength: 5 * time.Second,
 	}
 	l := loop.New(e, &pk)
 
 	c, err := New(context.Background(), db, eb, loader, &MockVerifier{}, nil, proxy, l)
 	assert.NoError(t, err)
-	assert.NoError(t, db.Update(func(tx database.Transaction) error {
-		return tx.StoreBidValues(make([]byte, 32), make([]byte, 32), 0, 100000)
-	}))
 
 	c.ProduceBlock()
 	return eb, c

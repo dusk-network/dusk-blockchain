@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/require"
 
@@ -69,11 +68,7 @@ type Helper struct {
 func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	p, provisionersKeys := consensus.MockProvisioners(provisioners)
 
-	mockProxy := transactions.MockProxy{
-		P:  transactions.PermissiveProvisioner{},
-		BG: transactions.MockBlockGenerator{},
-	}
-	emitter := consensus.MockEmitter(timeOut, mockProxy)
+	emitter := consensus.MockEmitter(timeOut)
 	emitter.Keys = provisionersKeys[0]
 
 	hlp := &Helper{

@@ -59,34 +59,6 @@ func Generate(c Config) *block.Block {
 		txs = append(txs, stake)
 	}
 
-	for i := uint(0); i < c.initialBlockGenerators; i++ {
-		buf := new(bytes.Buffer)
-		if err := encoding.WriteUint64LE(buf, 250000); err != nil {
-			panic(err)
-		}
-
-		m := make([]byte, 32)
-		if err := encoding.Write256(buf, m); err != nil {
-			panic(err)
-		}
-
-		bid := transactions.NewTransaction()
-		bid.Payload.CallData = buf.Bytes()
-		amount := c.bidValue * wallet.DUSK
-		amountBytes := make([]byte, 32)
-		binary.LittleEndian.PutUint64(amountBytes[0:8], amount)
-
-		bid.Payload.Notes = append(bid.Payload.Notes, &transactions.Note{
-			Randomness:    make([]byte, 32),
-			PkR:           c.initialParticipants[i].AG,
-			Commitment:    amountBytes,
-			Nonce:         make([]byte, 32),
-			EncryptedData: make([]byte, 96),
-		})
-		bid.TxType = transactions.Bid
-		txs = append(txs, bid)
-	}
-
 	for _, pk := range c.initialParticipants {
 		// Add 200 coinbase outputs
 		for i := uint(0); i < c.coinbaseAmount; i++ {

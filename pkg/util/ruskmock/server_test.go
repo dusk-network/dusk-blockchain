@@ -19,7 +19,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -157,59 +156,6 @@ func TestFailedExecuteStateTransition(t *testing.T) {
 	assert.False(t, resp.Success)
 }
 
-func TestGenerateScore(t *testing.T) {
-	s := setupRuskMockTest(t, DefaultConfig())
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateBlindBidServiceClient(ctx, "localhost:10000")
-
-	resp, err := c.GenerateScore(ctx, &rusk.GenerateScoreRequest{})
-	assert.NoError(t, err)
-
-	// Ensure the returned score has all fields populated
-	assert.NotEmpty(t, resp.BlindbidProof)
-	assert.NotEmpty(t, resp.Score)
-	assert.NotEmpty(t, resp.ProverIdentity)
-}
-
-func TestVerifyScore(t *testing.T) {
-	s := setupRuskMockTest(t, DefaultConfig())
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateBlindBidServiceClient(ctx, "localhost:10000")
-
-	resp, err := c.VerifyScore(ctx, &rusk.VerifyScoreRequest{})
-	assert.NoError(t, err)
-
-	// Should have gotten `true`
-	assert.True(t, resp.Success)
-}
-
-func TestFailedVerifyScore(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.PassScoreValidation = false
-
-	s := setupRuskMockTest(t, cfg)
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateBlindBidServiceClient(ctx, "localhost:10000")
-
-	resp, err := c.VerifyScore(ctx, &rusk.VerifyScoreRequest{})
-	assert.NoError(t, err)
-
-	// Should have gotten `false`
-	assert.False(t, resp.Success)
-}
-
 func TestGenerateStealthAddress(t *testing.T) {
 	s := setupRuskMockTest(t, DefaultConfig())
 	defer cleanup(s)
@@ -334,50 +280,6 @@ func TestNewStake(t *testing.T) {
 
 	assert.Equal(t, s.w.ConsensusKeys().BLSPubKeyBytes, pkBLS)
 	assert.Equal(t, uint32(4), resp.Type)
-}
-
-func TestNewBid(t *testing.T) {
-	s := setupRuskMockTest(t, DefaultConfig())
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateBidServiceClient(ctx, "localhost:10000")
-
-	// Generate a K
-	var k ristretto.Scalar
-	k.Rand()
-
-	resp, err := c.NewBid(ctx, &rusk.BidTransactionRequest{
-		K:     k.Bytes(),
-		Value: 100,
-	})
-	assert.NoError(t, err)
-
-	// The M and locktime should be encoded in the call data
-	var locktime uint64
-
-	plBuf := bytes.NewBuffer(resp.Tx.Payload)
-
-	pl := transactions.NewTransactionPayload()
-	assert.NoError(t, transactions.UnmarshalTransactionPayload(plBuf, pl))
-
-	buf := bytes.NewBuffer(pl.CallData)
-
-	err = encoding.ReadUint64LE(buf, &locktime)
-	assert.NoError(t, err)
-
-	assert.Equal(t, uint64(250000), locktime)
-
-	m := zkproof.CalculateM(k)
-	mBytes := make([]byte, 32)
-
-	err = encoding.Read256(buf, mBytes)
-	assert.NoError(t, err)
-
-	assert.Equal(t, m.Bytes(), mBytes)
-	assert.Equal(t, uint32(3), resp.Tx.Type)
 }
 
 func setupRuskMockTest(t *testing.T, cfg *Config) *Server {

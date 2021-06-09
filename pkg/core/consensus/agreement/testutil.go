@@ -12,7 +12,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
@@ -28,10 +27,7 @@ type Helper struct {
 // NewHelper creates a Helper.
 func NewHelper(provisioners int) *Helper {
 	p, provisionersKeys := consensus.MockProvisioners(provisioners)
-	mockProxy := transactions.MockProxy{
-		P: transactions.PermissiveProvisioner{},
-	}
-	emitter := consensus.MockEmitter(time.Second, mockProxy)
+	emitter := consensus.MockEmitter(time.Second)
 	emitter.Keys = provisionersKeys[0]
 
 	return &Helper{

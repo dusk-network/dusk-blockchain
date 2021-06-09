@@ -27,10 +27,8 @@ func GenerateGenesisBlock(e *consensus.Emitter, generatorPubKey *keys.PublicKey)
 
 	// TODO: do we need to generate correct proof and score
 	seed, _ := crypto.RandEntropy(33)
-	proof, _ := crypto.RandEntropy(32)
-	score, _ := crypto.RandEntropy(32)
 
-	b, err := g.GenerateBlock(0, seed, proof, score, make([]byte, 32), [][]byte{{0}})
+	b, err := g.GenerateBlock(0, seed, make([]byte, 32), [][]byte{{0}})
 	if err != nil {
 		return "", err
 	}

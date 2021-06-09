@@ -8,14 +8,12 @@ package transactor
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"os"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
@@ -74,99 +72,7 @@ func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
 }
 
 func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionResponse, error) {
-	if t.w == nil {
-		return nil, errWalletNotLoaded
-	}
-
-	// create and sign transaction
-	log.
-		WithField("amount", req.Amount).
-		WithField("locktime", req.Locktime).
-		Info("Creating a bid tx")
-
-	// TODO context should be created from the parent one
-	ctx := context.Background()
-
-	// FIXME: 476 - here we need to create K, EdPk; retrieve seed somehow and decide
-	// an ExpirationHeight (most likely the last 2 should be retrieved from he DB)
-	// Create the Ed25519 Keypair
-	// XXX: We need to get the proper values, and not just make some up out of thin air.
-	k := make([]byte, 32)
-	if _, err := rand.Read(k); err != nil {
-		return nil, err
-	}
-
-	secret := make([]byte, 32)
-	if _, err := rand.Read(secret); err != nil {
-		return nil, err
-	}
-
-	pkR := &keys.StealthAddress{
-		RG:  make([]byte, 32),
-		PkR: make([]byte, 32),
-	}
-
-	if _, err := rand.Read(pkR.RG); err != nil {
-		return nil, err
-	}
-
-	if _, err := rand.Read(pkR.PkR); err != nil {
-		return nil, err
-	}
-
-	seed := make([]byte, 32)
-	if _, err := rand.Read(seed); err != nil {
-		return nil, err
-	}
-
-	tx, err := t.proxy.Provider().NewBid(ctx, k, req.Amount, secret, pkR, seed, 0, 0)
-	if err != nil {
-		log.
-			WithField("amount", req.Amount).
-			WithField("locktime", req.Locktime).
-			Error("handleSendBidTx, failed to create NewBidTx")
-		return nil, err
-	}
-
-	if err = t.db.Update(func(t database.Transaction) error {
-		var height uint64
-		height, err = t.FetchCurrentHeight()
-		if err != nil {
-			log.
-				WithField("amount", req.Amount).
-				WithField("locktime", req.Locktime).
-				Error("FetchCurrentHeight, failed to fetch")
-			return err
-		}
-
-		return t.StoreBidValues(secret, k, tx.BidTreeStorageIndex, height+250000)
-	}); err != nil {
-		log.
-			WithField("amount", req.Amount).
-			WithField("locktime", req.Locktime).
-			Error("handleSendBidTx, failed to store bid values")
-		return nil, err
-	}
-
-	hash, err := t.publishTx(tx.Tx)
-	if err != nil {
-		// DB operations should never fail. If for some reason during runtime we
-		// can no longer use the DB, we should panic.
-		// TODO: maybe we can figure out a recovery procedure if this is the case.
-		log.
-			WithError(err).
-			WithField("amount", req.Amount).
-			WithField("locktime", req.Locktime).
-			Panic("handleSendBidTx, failed to create publishTx")
-	}
-
-	// create and sign transaction
-	log.
-		WithField("amount", req.Amount).
-		WithField("locktime", req.Locktime).
-		Trace("Success creating a bid tx")
-
-	return &node.TransactionResponse{Hash: hash}, nil
+	return nil, errors.New("no longer using bids")
 }
 
 func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.TransactionResponse, error) {
@@ -330,16 +236,4 @@ func (t *Transactor) handleSendContract(c *node.CallContractRequest) (*node.Tran
 func loadResponseFromPub(pubKey keys.PublicKey) *node.LoadResponse {
 	pk := &node.PubKey{PublicKey: pubKey.ToAddr()}
 	return &node.LoadResponse{Key: pk}
-}
-
-//nolint:unused
-func (t *Transactor) writeBidValues(tx *node.TransactionResponse) error {
-	// return t.db.Update(func(tr database.Transaction) error {
-	// 	k, err := t.w.ReconstructK()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return tr.StoreBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes(), tx.LockTime())
-	// })
-	return nil
 }

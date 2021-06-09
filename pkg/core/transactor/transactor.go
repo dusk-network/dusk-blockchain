@@ -32,7 +32,6 @@ type Transactor struct {
 
 	// RPCBus channels
 	stakeChan <-chan rpcbus.Request
-	bidChan   <-chan rpcbus.Request
 
 	// Passed to the consensus component startup
 	proxy transactions.Proxy
@@ -50,14 +49,12 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 	}
 
 	stakeChan := make(chan rpcbus.Request, 1)
-	bidChan := make(chan rpcbus.Request, 1)
 
 	t := &Transactor{
 		db:              db,
 		eb:              eb,
 		rb:              rb,
 		stakeChan:       stakeChan,
-		bidChan:         bidChan,
 		proxy:           proxy,
 		w:               w,
 		getSyncProgress: getSyncProgress,
@@ -72,10 +69,6 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 		return nil, err
 	}
 
-	if err := rb.Register(topics.SendBidTx, bidChan); err != nil {
-		return nil, err
-	}
-
 	go t.Listen()
 	return t, nil
 }
@@ -85,40 +78,21 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB, srv *grpc.Ser
 func (t *Transactor) Listen() {
 	l := log.WithField("action", "listen")
 
-	for {
-		select {
-		case r := <-t.stakeChan:
-			req, ok := r.Params.(*node.StakeRequest)
-			if !ok {
-				continue
-			}
-
-			var hash *bytes.Buffer
-
-			resp, err := t.Stake(context.Background(), req)
-			if err != nil {
-				l.WithError(err).Error("error in creating a stake transaction")
-			} else {
-				hash = bytes.NewBuffer(resp.GetHash())
-			}
-			r.RespChan <- rpcbus.Response{Resp: hash, Err: err}
-
-		case r := <-t.bidChan:
-			req, ok := r.Params.(*node.BidRequest)
-			if !ok {
-				continue
-			}
-
-			var hash *bytes.Buffer
-
-			resp, err := t.Bid(context.Background(), req)
-			if err != nil {
-				l.WithError(err).Error("error in creating a bid transaction")
-			} else {
-				hash = bytes.NewBuffer(resp.GetHash())
-			}
-			r.RespChan <- rpcbus.Response{Resp: hash, Err: err}
+	for r := range t.stakeChan {
+		req, ok := r.Params.(*node.StakeRequest)
+		if !ok {
+			continue
 		}
+
+		var hash *bytes.Buffer
+
+		resp, err := t.Stake(context.Background(), req)
+		if err != nil {
+			l.WithError(err).Error("error in creating a stake transaction")
+		} else {
+			hash = bytes.NewBuffer(resp.GetHash())
+		}
+		r.RespChan <- rpcbus.Response{Resp: hash, Err: err}
 	}
 }
 

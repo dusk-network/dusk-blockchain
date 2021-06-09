@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -17,14 +18,14 @@ import (
 )
 
 // MockCandidate ...
-func (m *mock) MockCandidate(sev message.ScoreProposal, previousBlock []byte) block.Block {
+func (m *mock) MockCandidate(hdr header.Header, previousBlock []byte) block.Block {
 	if previousBlock == nil {
 		previousBlock, _ = crypto.RandEntropy(32)
 	}
 
-	hdr := sev.State()
+	seed, _ := crypto.RandEntropy(32)
 
-	b, err := m.GenerateBlock(hdr.Round, sev.Seed, sev.Proof, sev.Score, previousBlock, [][]byte{hdr.PubKeyBLS})
+	b, err := m.GenerateBlock(hdr.Round, seed, previousBlock, [][]byte{hdr.PubKeyBLS})
 	if err != nil {
 		panic(err)
 	}
@@ -36,8 +37,16 @@ type mock struct {
 	*generator
 }
 
-func (m *mock) GenerateCandidateMessage(ctx context.Context, sev message.ScoreProposal, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
-	mockScore := message.MockScore(sev.State(), m.MockCandidate(sev, nil))
+func (m *mock) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
+	hdr := header.Header{
+		PubKeyBLS: make([]byte, 129),
+		Round:     r.Round,
+		Step:      step,
+		BlockHash: make([]byte, 32),
+	}
+
+	cand := m.MockCandidate(hdr, nil)
+	mockScore := message.MockScore(hdr, cand)
 	return &mockScore, nil
 }
 

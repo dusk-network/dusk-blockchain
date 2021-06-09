@@ -113,7 +113,6 @@ func (s *Server) InitRouting() *pat.Router {
 	// init consensus API services
 	capi.StartAPI(s.eventBus, s.rpcBus)
 
-	r.HandleFunc("/consensus/bidders", capi.GetBiddersHandler).Methods("GET")
 	r.HandleFunc("/consensus/provisioners", capi.GetProvisionersHandler).Methods("GET")
 	r.HandleFunc("/consensus/roundinfo", capi.GetRoundInfoHandler).Methods("GET")
 	r.HandleFunc("/consensus/eventqueuestatus", capi.GetEventQueueStatusHandler).Methods("GET")

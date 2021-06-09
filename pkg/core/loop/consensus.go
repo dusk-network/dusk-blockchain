@@ -56,14 +56,7 @@ type Consensus struct {
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing.
 func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc, requestor *candidate.Requestor) (consensus.Phase, consensus.Controller, error) {
-	generator, err := blockgenerator.New(e, pubKey, db)
-	if err != nil {
-		// This error means (in all cases) that there are no bid values present
-		// in the db, meaning that this node is not a block generator. We will
-		// not return the error, but we will log it.
-		lg.WithError(err).Warnln("starting consensus loop without block generator")
-	}
-
+	generator := blockgenerator.New(e, pubKey)
 	selectionStep := CreateInitialStep(e, consensusTimeOut, generator, verifyFn, db, requestor)
 	agreementStep := agreement.New(e, db, requestor)
 	return selectionStep, agreementStep, nil

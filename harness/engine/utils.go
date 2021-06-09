@@ -270,7 +270,7 @@ func (n *Network) SendStakeCmd(ind uint, amount, locktime uint64) ([]byte, error
 
 	client := pb.NewTransactorClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	req := pb.StakeRequest{Amount: amount, Locktime: locktime}

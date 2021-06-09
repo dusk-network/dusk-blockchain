@@ -10,13 +10,13 @@ import (
 	"context"
 	"math/big"
 	"net"
+	"time"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/dusk-network/dusk-wallet/v2/block"
@@ -24,12 +24,13 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 var log = logrus.WithField("process", "mock rusk server")
+
+const stateTransitionDelay = 1 * time.Second
 
 // Server is a stand-in Rusk server, which can be used during any kind of
 // testing. Its behavior can be modified depending on the settings of the
@@ -152,6 +153,8 @@ func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStat
 	log.Infoln("call received to VerifyStateTransition")
 	defer log.Infoln("finished call to VerifyStateTransition")
 
+	time.Sleep(stateTransitionDelay)
+
 	if !s.cfg.PassStateTransitionValidation {
 		indices := make([]uint64, len(req.Txs))
 		for i := range indices {
@@ -173,6 +176,8 @@ func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStat
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
 	log.Infoln("call received to ExecuteStateTransition")
 	defer log.Infoln("finished call to ExecuteStateTransition")
+
+	time.Sleep(stateTransitionDelay)
 
 	if !s.cfg.PassStateTransition {
 		return &rusk.ExecuteStateTransitionResponse{
@@ -249,29 +254,7 @@ func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreReque
 	log.Infoln("call received to GenerateScore")
 	defer log.Infoln("finished call to GenerateScore")
 
-	proof, err := crypto.RandEntropy(400)
-	if err != nil {
-		log.WithError(err).Errorln("could not generate random bytes")
-		return nil, err
-	}
-
-	score, err := crypto.RandEntropy(32)
-	if err != nil {
-		log.WithError(err).Errorln("could not generate random bytes")
-		return nil, err
-	}
-
-	identity, err := crypto.RandEntropy(32)
-	if err != nil {
-		log.WithError(err).Errorln("could not generate random bytes")
-		return nil, err
-	}
-
-	return &rusk.GenerateScoreResponse{
-		BlindbidProof:  proof,
-		Score:          score,
-		ProverIdentity: identity,
-	}, nil
+	return nil, nil
 }
 
 // VerifyScore will return either true or false, depending on the server configuration.
@@ -279,9 +262,7 @@ func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) 
 	log.Infoln("call received to VerifyScore")
 	defer log.Infoln("finished call to VerifyScore")
 
-	return &rusk.VerifyScoreResponse{
-		Success: s.cfg.PassScoreValidation,
-	}, nil
+	return nil, nil
 }
 
 // GenerateKeys returns the server's wallet private key, and a stealth address.
@@ -419,23 +400,7 @@ func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*
 	log.Infoln("call received to NewBid")
 	defer log.Infoln("finished call to NewBid")
 
-	var k ristretto.Scalar
-
-	_ = k.UnmarshalBinary(req.K)
-	m := zkproof.CalculateM(k)
-
-	bid, err := transactions.NewBid(0, byte(2), int64(0), 250000, m.Bytes())
-	if err != nil {
-		log.WithError(err).Errorln("error creating new bid")
-		return nil, err
-	}
-
-	if err := s.w.Sign(bid); err != nil {
-		log.WithError(err).Errorln("error signing bid")
-		return nil, err
-	}
-
-	return legacy.BidToRuskBid(bid)
+	return nil, nil
 }
 
 // FindBid will return all of the bids for a given stealth address.
