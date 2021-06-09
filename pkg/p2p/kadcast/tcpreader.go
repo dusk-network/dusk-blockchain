@@ -101,5 +101,5 @@ func (r *Reader) processPacket(conn *net.TCPConn) {
 		return
 	}
 
-	_ = r.base.handleBroadcast(raddr, b)
+	_ = r.base.handleBroadcast(0, raddr, b)
 }

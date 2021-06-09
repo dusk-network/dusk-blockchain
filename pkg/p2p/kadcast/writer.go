@@ -131,8 +131,20 @@ func (w *Writer) WriteToPoint(m message.Message) error {
 		return err
 	}
 
+	var blocks [][]byte
+
+	if w.raptorCodeEnabled {
+		var err error
+
+		// Compile blocks only once but send them to multiple delegates
+		_, blocks, err = rcudp.CompileRaptorRFC5053(0, packet, redundancyFactor)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Send message to a single destination using height = 0.
-	return w.sendToDelegates(delegates, height, packet)
+	return w.sendToDelegates(delegates, height, blocks, packet)
 }
 
 // BroadcastPacket sends a `CHUNKS` message across the network
@@ -158,6 +170,20 @@ func (w *Writer) broadcastPacket(maxHeight byte, payload []byte) error {
 		return err
 	}
 
+	var blocks [][]byte
+
+	if w.raptorCodeEnabled {
+		var err error
+
+		// RaptroRFC5053 algorithm is performed only once to compile raptor
+		// blocks for a single message. Broadcast Height field is modified
+		// accordingly depending on destination sub-tree
+		_, blocks, err = rcudp.CompileRaptorRFC5053(0, packet, redundancyFactor)
+		if err != nil {
+			return err
+		}
+	}
+
 	for h := byte(0); h <= maxHeight-1; h++ {
 		// Fetch delegating nodes based on height value
 		delegates := w.fetchDelegates(h)
@@ -165,11 +191,8 @@ func (w *Writer) broadcastPacket(maxHeight byte, payload []byte) error {
 			continue
 		}
 
-		// marshal binary once but adjust height field before each conn.Write
-		packet[encoding.HeaderFixedLength] = h
-
 		// Send to all delegates
-		if err := w.sendToDelegates(delegates, h, packet); err != nil {
+		if err := w.sendToDelegates(delegates, h, blocks, packet); err != nil {
 			log.WithError(err).Warnln("send to delegates failed")
 		}
 	}
@@ -236,25 +259,9 @@ func (w *Writer) fetchDelegates(h byte) []encoding.PeerInfo {
 	return delegates
 }
 
-func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, packet []byte) error {
+func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, blocks [][]byte, packet []byte) error {
 	if len(delegates) == 0 {
 		return errors.New("empty delegates list")
-	}
-
-	var blocks [][]byte
-
-	if w.raptorCodeEnabled {
-		// rc-udp write is destructive to the input message
-		packetDup := make([]byte, len(packet))
-		copy(packetDup, packet)
-
-		var err error
-
-		// Compile blocks only once but send them to multiple delegates
-		_, blocks, err = rcudp.CompileRaptorRFC5053(packetDup, redundancyFactor)
-		if err != nil {
-			return err
-		}
 	}
 
 	var failureRate int
@@ -273,7 +280,6 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, pac
 				WithField("r_addr", destPeer.String()).
 				WithField("height", height).
 				WithField("raptor", w.raptorCodeEnabled).
-				WithField("len", len(packet)).
 				Trace("sending message")
 		}
 
@@ -285,7 +291,7 @@ func (w *Writer) sendToDelegates(delegates []encoding.PeerInfo, height byte, pac
 
 			// Write all raptor blocks
 			// Failing to send message to a single delegate is not critical.
-			if err := rcudp.WriteBlocks(&laddr, &raddr, blocks); err != nil {
+			if err := rcudp.WriteBlocks(&laddr, &raddr, blocks, height); err != nil {
 				failureRate++
 
 				log.WithError(err).

@@ -20,7 +20,7 @@ func TestPacketMarshalBinary(t *testing.T) {
 	}
 
 	objectID := block[0:8]
-	p := newPacket(objectID, 4, 3, 21, 222, block)
+	p := newPacket(objectID, 4, 3, 21, 222, block, 128)
 
 	var buf []byte
 
@@ -55,5 +55,9 @@ func TestPacketMarshalBinary(t *testing.T) {
 
 	if !bytes.Equal(p.messageID[:], p2.messageID[:]) {
 		t.Fatal("objectID not equal")
+	}
+
+	if p.bcastHeight != p2.bcastHeight {
+		t.Fatal("bcastHeight not equal")
 	}
 }

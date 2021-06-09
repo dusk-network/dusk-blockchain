@@ -11,11 +11,22 @@ import (
 )
 
 const (
+	messageIDFieldSize        = 8
 	numSourceSymbolsFieldSize = 2
 	paddingSizeFieldSize      = 2
 	transferLengthFieldSize   = 4
 	blockIDFieldSize          = 4
-	packetMinSize             = 20
+	bcastHeightSize           = 1
+
+	// BcastHeightPos is position in packet binary of height byte.
+	BcastHeightPos = 20
+
+	packetMinSize = messageIDFieldSize +
+		numSourceSymbolsFieldSize +
+		paddingSizeFieldSize +
+		transferLengthFieldSize +
+		blockIDFieldSize +
+		bcastHeightSize
 )
 
 // Packet is the UDP packet that consists of encoding symbol data unit and raptor-specific data.
@@ -28,21 +39,23 @@ type Packet struct {
 	// payload fields
 	blockID uint32
 	block   []byte
+
+	bcastHeight byte
 }
 
 func newPacket(msgID []byte, numSourceSymbols uint16,
 	paddingSize uint16, transferLength uint32,
-	blockID uint32, block []byte) Packet {
+	blockID uint32, block []byte, bcastHeight byte) Packet {
 	p := Packet{
 		NumSourceSymbols: numSourceSymbols,
 		PaddingSize:      paddingSize,
 		transferLength:   transferLength,
 		blockID:          blockID,
+		bcastHeight:      bcastHeight,
+		block:            block,
 	}
 
 	copy(p.messageID[:], msgID)
-	p.block = block
-
 	return p
 }
 
@@ -77,6 +90,9 @@ func (p *Packet) marshal() ([]byte, error) {
 	b[3] = 0
 	byteOrder.PutUint32(b, p.blockID)
 	blob = append(blob, b...)
+
+	// BCAST_HEIGHT field
+	blob = append(blob, p.bcastHeight)
 
 	// block data
 	blob = append(blob, p.block[:]...)
@@ -114,6 +130,9 @@ func (p *Packet) unmarshal(buf []byte) error {
 
 	p.blockID = byteOrder.Uint32(buf[offset : offset+blockIDFieldSize])
 	offset += blockIDFieldSize
+
+	p.bcastHeight = buf[offset]
+	offset += bcastHeightSize
 
 	p.block = buf[offset:]
 	return nil
