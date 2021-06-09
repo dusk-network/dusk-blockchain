@@ -256,40 +256,11 @@ func (w *Writer) onDisconnect() {
 			if err != nil {
 				log.Error("failed to save peer into StormDB")
 			}
-
-			// delete count
-			peerCount := capi.PeerCount{
-				ID: addr,
-			}
-
-			err = store.Delete(&peerCount)
-			if err != nil {
-				log.Error("failed to Delete peerCount into StormDB")
-			}
 		}()
 	}
 }
 
 func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buffer) {
-	defer func() {
-		if config.Get().API.Enabled {
-			go func() {
-				addr := w.Addr()
-				peerCount := capi.PeerCount{
-					ID: addr,
-				}
-
-				store := capi.GetStormDBInstance()
-
-				// delete count
-				err := store.Delete(&peerCount)
-				if err != nil {
-					log.WithField("process", "writeloop").Error("failed to Delete peerCount into StormDB")
-				}
-			}()
-		}
-	}()
-
 	for {
 		select {
 		case buf := <-writeQueueChan:
@@ -403,23 +374,6 @@ func (p *Reader) readLoop(ctx context.Context) {
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)
-
-		if config.Get().API.Enabled {
-			go func() {
-				store := capi.GetStormDBInstance()
-				addr := p.Addr()
-				// save count
-				peerCount := capi.PeerCount{
-					ID:       addr,
-					LastSeen: time.Now(),
-				}
-
-				err = store.Save(&peerCount)
-				if err != nil {
-					log.Error("failed to save peerCount into StormDB")
-				}
-			}()
-		}
 	}
 }
 
@@ -430,23 +384,6 @@ func (p *Reader) keepAliveLoop(ctx context.Context, timer *time.Timer) {
 			if err := p.Connection.keepAlive(); err != nil {
 				log.WithError(err).WithField("process", "keepaliveloop").Error("got error back from keepAlive")
 			}
-
-			if config.Get().API.Enabled {
-				go func() {
-					addr := p.Addr()
-					peerCount := capi.PeerCount{
-						ID: addr,
-					}
-
-					store := capi.GetStormDBInstance()
-
-					// delete count
-					if err := store.Delete(&peerCount); err != nil {
-						log.WithField("process", "keepaliveloop").Error("failed to Delete peerCount into StormDB")
-					}
-				}()
-			}
-
 		case <-ctx.Done():
 			timer.Stop()
 			return

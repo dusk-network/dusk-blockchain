@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -25,6 +26,7 @@ import (
 const (
 	defaultDialTimeout    = 5
 	defaultMaxConnections = 50
+	peerCountTime         = 30 * time.Second
 )
 
 type connectFunc func(context.Context, *Reader, *Writer, chan bytes.Buffer)
@@ -86,12 +88,38 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 		}
 	}(c)
 
+	if config.Get().API.Enabled {
+		go c.logPeerCount()
+	}
+
 	return c
 }
 
 // Close the listener.
 func (c *Connector) Close() error {
 	return c.l.Close()
+}
+
+func (c *Connector) logPeerCount() {
+	ticker := time.NewTicker(peerCountTime)
+
+	for {
+		<-ticker.C
+
+		store := capi.GetStormDBInstance()
+
+		for addr := range c.registry {
+			// save count
+			peerCount := capi.PeerCount{
+				ID:       addr,
+				LastSeen: time.Now(),
+			}
+
+			if err := store.Save(&peerCount); err != nil {
+				log.Error("failed to save peerCount into StormDB")
+			}
+		}
+	}
 }
 
 // ProcessNewAddress will handle a new Addr message from the network.
@@ -203,6 +231,21 @@ func (c *Connector) removePeer(address string) {
 	defer c.lock.Unlock()
 
 	delete(c.registry, address)
+
+	if config.Get().API.Enabled {
+		go func() {
+			peerCount := capi.PeerCount{
+				ID: address,
+			}
+
+			store := capi.GetStormDBInstance()
+
+			// delete count
+			if err := store.Delete(&peerCount); err != nil {
+				log.WithField("process", "peer connector").Error("failed to Delete peerCount into StormDB")
+			}
+		}()
+	}
 
 	// Ensure we are still above the minimum connections threshold.
 	if len(c.registry) < config.Get().Network.MinimumConnections {
