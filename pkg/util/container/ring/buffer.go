@@ -124,7 +124,7 @@ func (r *Buffer) Closed() bool {
 	return r.closed.Load()
 }
 
-// ElemArray a sortable array of Elem.
+// ElemArray a sortable array of Elem in descending order.
 type ElemArray []Elem
 
 // Len complies with the Sort interface.
@@ -134,7 +134,7 @@ func (e ElemArray) Len() int { return len(e) }
 func (e ElemArray) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
 
 // Less complies with the Sort interface.
-func (e ElemArray) Less(i, j int) bool { return e[i].Priority < e[j].Priority }
+func (e ElemArray) Less(i, j int) bool { return e[i].Priority > e[j].Priority }
 
 // syncBool provides atomic Load/Store for bool type.
 type syncBool struct {
