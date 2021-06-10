@@ -36,7 +36,7 @@ const (
 var NodeVer = &Version{
 	Major: 0,
 	Minor: 4,
-	Patch: 1,
+	Patch: 3,
 }
 
 // Magic is the network that Dusk is running on.
