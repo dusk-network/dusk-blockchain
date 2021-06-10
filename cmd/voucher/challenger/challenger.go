@@ -17,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/cmd/voucher/node"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
 )
@@ -25,16 +26,17 @@ const challengeLength = 20
 
 // Challenger is the component responsible for vetting incoming connections.
 type Challenger struct {
-	nodes *node.Store
+	nodes  *node.Store
+	gossip *protocol.Gossip
 }
 
 // New creates a new, initialized Challenger.
 func New(store *node.Store) *Challenger {
-	return &Challenger{nodes: store}
+	return &Challenger{nodes: store, gossip: protocol.NewGossip(protocol.TestNet)}
 }
 
 // SendChallenge to a connecting peer.
-func (c *Challenger) SendChallenge(ctx context.Context, r *peer.Reader, w *peer.Writer, ch chan bytes.Buffer) {
+func (c *Challenger) SendChallenge(ctx context.Context, r *peer.Reader, w *peer.Writer) {
 	challenge, err := generateRandomBytes(challengeLength)
 	if err != nil {
 		log.Panic(err)
@@ -45,12 +47,20 @@ func (c *Challenger) SendChallenge(ctx context.Context, r *peer.Reader, w *peer.
 		log.Panic(err)
 	}
 
-	ch <- *buf
+	if err := c.gossip.Process(buf); err != nil {
+		log.WithError(err).Warnln("could not send challenge")
+		return
+	}
+
+	if _, err := w.Write(buf.Bytes()); err != nil {
+		log.WithError(err).Warnln("could not send challenge")
+		return
+	}
 
 	// Enter the node into the store, for future reference.
 	c.nodes.Add(r.Addr(), challenge)
 
-	peer.Create(ctx, r, w, ch)
+	peer.Create(ctx, r, w)
 
 	c.nodes.SetInactive(r.Addr())
 }

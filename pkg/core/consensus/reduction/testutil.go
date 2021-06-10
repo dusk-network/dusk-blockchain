@@ -35,7 +35,8 @@ func PrepareSendReductionTest(hlp *Helper, stepFn consensus.PhaseFn) func(t *tes
 		require := require.New(t)
 
 		streamer := eventbus.NewGossipStreamer(protocol.TestNet)
-		hlp.EventBus.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+		l := eventbus.NewStreamListener(streamer)
+		hlp.EventBus.Subscribe(topics.Gossip, l)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		go func(cancel context.CancelFunc) {

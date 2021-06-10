@@ -19,11 +19,13 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
@@ -88,8 +90,7 @@ type Writer struct {
 // other network nodes.
 type Reader struct {
 	*Connection
-	processor    *MessageProcessor
-	responseChan chan<- bytes.Buffer
+	processor *MessageProcessor
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -209,29 +210,27 @@ func (p *Reader) Accept(services protocol.ServiceFlag) error {
 // Create two-way communication with a peer. This function will allow both
 // goroutines to run as long as no errors are encountered. Once the first error
 // comes through, the context is canceled, and both goroutines are cleaned up.
-func Create(ctx context.Context, reader *Reader, writer *Writer, writeQueueChan chan bytes.Buffer) {
+func Create(ctx context.Context, reader *Reader, writer *Writer) {
 	pCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	go func() {
-		reader.ReadLoop(pCtx)
-		cancel()
-	}()
+	g := &GossipConnector{writer.Connection}
+	l := eventbus.NewStreamListener(g)
+	writer.gossipID = writer.subscriber.Subscribe(topics.Gossip, l)
+	ringBuf := ring.NewBuffer(1000)
 
-	writer.Serve(pCtx, writeQueueChan)
-	cancel()
-}
+	// On each new connection the node sends topics.Mempool to retrieve mempool
+	// txs from the new peer
+	buf := topics.MemPool.ToBuffer()
+	if !ringBuf.Put(buf.Bytes()) {
+		logrus.WithField("process", "peer").
+			Errorln("could not send mempool message to peer")
+	}
 
-// Serve utilizes two different methods for writing to the open connection.
-func (w *Writer) Serve(ctx context.Context, writeQueueChan <-chan bytes.Buffer) {
-	// Any gossip topics are written into interrupt-driven ringBuffer
-	// Single-consumer pushes messages to the socket
-	g := &GossipConnector{w.Connection}
-	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
+	_ = ring.NewConsumer(ringBuf, eventbus.Consume, g)
 
-	// writeQueue - FIFO queue
-	// writeLoop pushes first-in message to the socket
-	w.writeLoop(ctx, writeQueueChan)
-	w.onDisconnect()
+	reader.ReadLoop(pCtx, ringBuf)
+	writer.onDisconnect()
 }
 
 func (w *Writer) onDisconnect() {
@@ -260,50 +259,10 @@ func (w *Writer) onDisconnect() {
 	}
 }
 
-func (w *Writer) writeLoop(ctx context.Context, writeQueueChan <-chan bytes.Buffer) {
-	for {
-		select {
-		case buf := <-writeQueueChan:
-			if !canRoute(w.services, topics.Topic(buf.Bytes()[0])) {
-				l.WithField("topic", topics.Topic(buf.Bytes()[0]).String()).
-					WithField("service flag", w.services).
-					Warnln("dropping message")
-				continue
-			}
-
-			if err := w.gossip.Process(&buf); err != nil {
-				l.WithError(err).Warnln("error processing outgoing message")
-				continue
-			}
-
-			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
-				l.WithField("process", "writeloop").
-					WithError(err).Warnln("error writing message")
-				return
-			}
-		case <-ctx.Done():
-			log.WithField("process", "writeloop").Debug("context canceled")
-			return
-		}
-	}
-}
-
 // ReadLoop will block on the read until a message is read, or until the deadline
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
-func (p *Reader) ReadLoop(ctx context.Context) {
-	// As the peer ReadLoop is at the front-line of P2P network, receiving a
-	// malformed frame by an adversary node could lead to a panic.
-	// In such situation, the node should survive but adversary conn gets dropped
-	// defer func() {
-	// 	if r := recover(); r != nil {
-	// 		log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
-	// 	}
-	// }()
-	p.readLoop(ctx)
-}
-
-func (p *Reader) readLoop(ctx context.Context) {
+func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 	defer func() {
 		_ = p.Conn.Close()
 	}()
@@ -364,7 +323,7 @@ func (p *Reader) readLoop(ctx context.Context) {
 			// or blacklist spammers
 			startTime := time.Now().UnixNano()
 
-			if _, err = p.processor.Collect(p.Addr(), message, p.responseChan, p.services, nil); err != nil {
+			if _, err = p.processor.Collect(p.Addr(), message, ringBuf, p.services, nil); err != nil {
 				l.WithField("process", "readloop").WithField("cs", hex.EncodeToString(cs)).
 					WithError(err).Error("failed to process message")
 			}

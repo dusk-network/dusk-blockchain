@@ -16,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
@@ -46,7 +47,7 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
-func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan chan<- bytes.Buffer, services protocol.ServiceFlag, header []byte) ([]bytes.Buffer, error) {
+func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf *ring.Buffer, services protocol.ServiceFlag, header []byte) ([]bytes.Buffer, error) {
 	b := bytes.NewBuffer(packet)
 
 	msg, err := message.Unmarshal(b)
@@ -58,7 +59,7 @@ func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respChan cha
 		msg = message.NewWithHeader(msg.Category(), msg.Payload(), header)
 	}
 
-	return m.process(srcPeerID, msg, respChan, services)
+	return m.process(srcPeerID, msg, respRingBuf, services)
 }
 
 func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
@@ -75,7 +76,7 @@ func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
 	}
 }
 
-func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respChan chan<- bytes.Buffer, services protocol.ServiceFlag) ([]bytes.Buffer, error) {
+func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respRingBuf *ring.Buffer, services protocol.ServiceFlag) ([]bytes.Buffer, error) {
 	category := msg.Category()
 	if !canRoute(services, category) {
 		return nil, fmt.Errorf("attempted to process an illegal topic %s for node type %v", category, services)
@@ -98,9 +99,12 @@ func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respCh
 		return nil, err
 	}
 
-	if respChan != nil {
+	if respRingBuf != nil {
 		for _, buf := range bufs {
-			respChan <- buf
+			if !respRingBuf.Put(buf.Bytes()) {
+				log.WithError(err).Errorln("could not send response")
+				return nil, err
+			}
 		}
 	}
 
