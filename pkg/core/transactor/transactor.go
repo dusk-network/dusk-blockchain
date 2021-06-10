@@ -145,7 +145,7 @@ func (t *Transactor) Transfer(ctx context.Context, tr *node.TransferRequest) (*n
 
 // Bid will create a bidding transaction.
 func (t *Transactor) Bid(ctx context.Context, c *node.BidRequest) (*node.TransactionResponse, error) {
-	return t.handleSendBidTx(c)
+	return nil, nil
 }
 
 // Stake will create a staking transaction.

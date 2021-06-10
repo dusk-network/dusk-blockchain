@@ -71,10 +71,6 @@ func (t *Transactor) handleGetTxHistory() (*node.TxHistoryResponse, error) {
 	return resp, nil
 }
 
-func (t *Transactor) handleSendBidTx(req *node.BidRequest) (*node.TransactionResponse, error) {
-	return nil, errors.New("no longer using bids")
-}
-
 func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.TransactionResponse, error) {
 	if t.w == nil {
 		return nil, errWalletNotLoaded

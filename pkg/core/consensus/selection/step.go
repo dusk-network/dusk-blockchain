@@ -30,8 +30,7 @@ var lg = log.WithField("process", "selector")
 // Phase is the implementation of the Selection step component.
 type Phase struct {
 	*consensus.Emitter
-	handler   *Handler
-	bestEvent message.Score
+	handler *Handler
 
 	timeout time.Duration
 
@@ -48,12 +47,11 @@ type Phase struct {
 // the topic BestScoreTopic.
 func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emitter, timeout time.Duration, db database.DB) *Phase {
 	selector := &Phase{
-		Emitter:   e,
-		timeout:   timeout,
-		bestEvent: message.EmptyScore(),
-		keys:      e.Keys,
-		g:         g,
-		db:        db,
+		Emitter: e,
+		timeout: timeout,
+		keys:    e.Keys,
+		g:       g,
+		db:      db,
 
 		next: next,
 	}
@@ -93,11 +91,10 @@ func (p *Phase) String() string {
 // In this case the selection listens to new Score/Candidate messages.
 func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	ctx, cancel := context.WithCancel(parentCtx)
-	// this makes sure that the internal score channel gets canceled
-	defer cancel()
 
 	defer func() {
 		p.increaseTimeOut()
+		cancel()
 	}()
 
 	p.handler = NewHandler(p.Keys, r.P)
@@ -115,9 +112,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Score {
-			if err := p.collectScore(ev.Payload().(message.Score), ev.Header()); err != nil {
-				continue
-			}
+			evChan <- ev
 		}
 	}
 
@@ -149,7 +144,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 func (p *Phase) endSelection(result message.Score) consensus.PhaseFn {
 	log.WithField("empty", result.IsEmpty()).
-		Debug("endSelection, p.next.Fn(p.bestEvent)")
+		Debug("endSelection")
 	return p.next.Initialize(result)
 }
 
@@ -166,7 +161,6 @@ func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
 		return err
 	}
 
-	// Publish internally topics.Candidate with bestEvent(highest score candidate block)
 	if err := p.db.Update(func(t database.Transaction) error {
 		return t.StoreCandidateMessage(sc.Candidate)
 	}); err != nil {
@@ -188,8 +182,6 @@ func (p *Phase) increaseTimeOut() {
 	p.timeout = p.timeout * 2
 	if p.timeout > 60*time.Second {
 		lg.
-			WithField("step", p.bestEvent.State().Step).
-			WithField("round", p.bestEvent.State().Round).
 			WithField("timeout", p.timeout).
 			Error("max_timeout_reached")
 
@@ -197,8 +189,6 @@ func (p *Phase) increaseTimeOut() {
 	}
 
 	lg.
-		WithField("step", p.bestEvent.State().Step).
-		WithField("round", p.bestEvent.State().Round).
 		WithField("timeout", p.timeout).
 		Trace("increase_timeout")
 }
