@@ -76,18 +76,23 @@ type StreamListener struct {
 
 // NewStreamListener creates a new StreamListener.
 func NewStreamListener(w ring.Writer) Listener {
-	return NewStreamListenerWithLen(w, ringBufferLength, nil)
+	return NewStreamListenerWithParams(w, ringBufferLength, nil)
 }
 
-// NewStreamListenerWithLen instantiate and configure a Stream Listener.
-func NewStreamListenerWithLen(w ring.Writer, bufLen int, mapper func(topic topics.Topic) byte) Listener {
+// NewStreamListenerWithParams instantiate and configure a Stream Listener.
+func NewStreamListenerWithParams(w ring.Writer, bufLen int, mapper func(topic topics.Topic) byte) Listener {
 	// Each StreamListener uses its own ringBuffer to collect topic events
 	// Multiple-producers single-consumer approach utilizing a ringBuffer.
 	ringBuf := ring.NewBuffer(bufLen)
 	sh := &StreamListener{ringbuffer: ringBuf, priorityMapper: mapper}
 
+	sortByPriority := false
+	if mapper != nil {
+		sortByPriority = true
+	}
+
 	// single-consumer
-	_ = ring.NewConsumer(ringBuf, Consume, w, true)
+	_ = ring.NewConsumer(ringBuf, Consume, w, sortByPriority)
 	return sh
 }
 

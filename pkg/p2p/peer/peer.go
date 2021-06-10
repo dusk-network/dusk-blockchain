@@ -222,12 +222,17 @@ func Create(ctx context.Context, reader *Reader, writer *Writer) {
 	// On each new connection the node sends topics.Mempool to retrieve mempool
 	// txs from the new peer
 	buf := topics.MemPool.ToBuffer()
-	if !ringBuf.Put(buf.Bytes()) {
+
+	e := ring.Elem{
+		Data: buf.Bytes(),
+	}
+
+	if !ringBuf.Put(e) {
 		logrus.WithField("process", "peer").
 			Errorln("could not send mempool message to peer")
 	}
 
-	_ = ring.NewConsumer(ringBuf, eventbus.Consume, g)
+	_ = ring.NewConsumer(ringBuf, eventbus.Consume, g, false)
 
 	reader.ReadLoop(pCtx, ringBuf)
 	writer.onDisconnect()

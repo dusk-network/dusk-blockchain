@@ -10,6 +10,7 @@ import (
 	"sort"
 )
 
+// Writer defines a Writer interface compatible with ring.Elem.
 type Writer interface {
 	Write(data, header []byte, priority byte) (int, error)
 	Close() error

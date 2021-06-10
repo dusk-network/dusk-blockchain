@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -18,6 +19,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rcudp"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -37,6 +39,9 @@ type Writer struct {
 	raptorCodeEnabled bool
 
 	kadcastSubscription, kadcastPointSubscription uint32
+
+	// Low Priority message rate limiter
+	limiter *rate.Limiter
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -48,6 +53,7 @@ func NewWriter(router *RoutingTable, subscriber eventbus.Subscriber, gossip *pro
 		router:            router,
 		gossip:            gossip,
 		raptorCodeEnabled: raptorCodeEnabled,
+		limiter:           rate.NewLimiter(rate.Every(time.Second/60), 1),
 	}
 }
 
@@ -94,22 +100,30 @@ func (w *Writer) Serve() {
 			return 0
 		case topics.Block:
 			return 2
-		case topics.Candidate:
+		case topics.Score:
 			return 3
 		}
 
 		return 1
 	}
 
-	l1 := eventbus.NewStreamListenerWithLen(w, MaxWriterQueueSize, priorityMapper)
+	l1 := eventbus.NewStreamListenerWithParams(w, MaxWriterQueueSize, priorityMapper)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, l1)
 
-	l2 := eventbus.NewStreamListenerWithLen(w, MaxWriterQueueSize, priorityMapper)
+	l2 := eventbus.NewStreamListenerWithParams(w, MaxWriterQueueSize, priorityMapper)
 	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l2)
 }
 
 func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
 	go func() {
+		// Rate limiter for 0-priority messages
+		if priority == 0 {
+			now := time.Now()
+			rv := w.limiter.ReserveN(now, 1)
+			delay := rv.DelayFrom(now)
+			time.Sleep(delay)
+		}
+
 		var err error
 
 		if len(header) > 1 {
