@@ -11,7 +11,7 @@ import (
 )
 
 type Writer interface {
-	Write(e Elem) (int, error)
+	Write(data, header []byte, priority byte) (int, error)
 	Close() error
 }
 

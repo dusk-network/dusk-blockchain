@@ -9,7 +9,6 @@ package eventbus
 import (
 	"crypto/rand"
 	"errors"
-	"io"
 	"math/big"
 	"sync"
 
@@ -75,14 +74,25 @@ type StreamListener struct {
 }
 
 // NewStreamListener creates a new StreamListener.
-func NewStreamListener(w io.WriteCloser) Listener {
+func NewStreamListener(w ring.Writer) Listener {
 	// Each StreamListener uses its own ringBuffer to collect topic events
 	// Multiple-producers single-consumer approach utilizing a ringBuffer.
 	ringBuf := ring.NewBuffer(ringBufferLength)
 	sh := &StreamListener{ringBuf}
 
 	// single-consumer
-	_ = ring.NewConsumer(ringBuf, Consume, w)
+	_ = ring.NewConsumer(ringBuf, Consume, w, true)
+	return sh
+}
+
+func NewStreamListenerWithLen(w ring.Writer, bufLen int) Listener {
+	// Each StreamListener uses its own ringBuffer to collect topic events
+	// Multiple-producers single-consumer approach utilizing a ringBuffer.
+	ringBuf := ring.NewBuffer(bufLen)
+	sh := &StreamListener{ringBuf}
+
+	// single-consumer
+	_ = ring.NewConsumer(ringBuf, Consume, w, true)
 	return sh
 }
 
@@ -118,7 +128,7 @@ func (s *StreamListener) Close() {
 // Consume an item by writing it to the specified WriteCloser. This is used in the StreamListener creation.
 func Consume(elems []ring.Elem, w ring.Writer) bool {
 	for _, e := range elems {
-		if _, err := w.Write(e); err != nil {
+		if _, err := w.Write(e.Data, e.Header, e.Priority); err != nil {
 			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("error in writing to WriteCloser")
 			return false
 		}

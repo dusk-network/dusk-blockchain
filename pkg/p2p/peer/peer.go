@@ -61,7 +61,7 @@ type GossipConnector struct {
 	*Connection
 }
 
-func (g *GossipConnector) Write(b []byte) (int, error) {
+func (g *GossipConnector) Write(b, header []byte, priority byte) (int, error) {
 	if !canRoute(g.services, topics.Topic(b[0])) {
 		l.WithField("topic", topics.Topic(b[0]).String()).
 			WithField("service flag", g.services).
