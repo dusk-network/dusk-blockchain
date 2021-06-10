@@ -20,6 +20,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	// MaxWriterQueueSize max number of messages queued for broadcasting.
+	// While in Gossip there is a Writer per a peer, in Kadcast there a single Writer.
+	// That's why it should be higher than queue size in Gossip.
+	MaxWriterQueueSize = 10000
+)
+
 // Writer abstracts all of the logic and fields needed to write messages to
 // other network nodes.
 type Writer struct {
@@ -49,10 +56,10 @@ func (w *Writer) Serve() {
 	// NewChanListener is preferred here as it passes message.Message to the
 	// Write, where NewStreamListener works with bytes.Buffer only.
 	// Later this could be change if perf issue noticed.
-	writeQueue := make(chan message.Message, 1000)
+	writeQueue := make(chan message.Message, MaxWriterQueueSize)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(writeQueue))
 
-	writePointMsgQueue := make(chan message.Message, 1000)
+	writePointMsgQueue := make(chan message.Message, MaxWriterQueueSize)
 	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, eventbus.NewChanListener(writePointMsgQueue))
 
 	go func() {
