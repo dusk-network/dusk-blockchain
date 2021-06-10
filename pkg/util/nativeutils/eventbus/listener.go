@@ -70,26 +70,21 @@ var ringBufferLength = 2000
 // StreamListener uses a ring buffer to dispatch messages. It is inherently
 // thread-safe.
 type StreamListener struct {
-	ringbuffer *ring.Buffer
+	ringbuffer     *ring.Buffer
+	priorityMapper func(topic topics.Topic) byte
 }
 
 // NewStreamListener creates a new StreamListener.
 func NewStreamListener(w ring.Writer) Listener {
-	// Each StreamListener uses its own ringBuffer to collect topic events
-	// Multiple-producers single-consumer approach utilizing a ringBuffer.
-	ringBuf := ring.NewBuffer(ringBufferLength)
-	sh := &StreamListener{ringBuf}
-
-	// single-consumer
-	_ = ring.NewConsumer(ringBuf, Consume, w, true)
-	return sh
+	return NewStreamListenerWithLen(w, ringBufferLength, nil)
 }
 
-func NewStreamListenerWithLen(w ring.Writer, bufLen int) Listener {
+// NewStreamListenerWithLen instantiate and configure a Stream Listener.
+func NewStreamListenerWithLen(w ring.Writer, bufLen int, mapper func(topic topics.Topic) byte) Listener {
 	// Each StreamListener uses its own ringBuffer to collect topic events
 	// Multiple-producers single-consumer approach utilizing a ringBuffer.
 	ringBuf := ring.NewBuffer(bufLen)
-	sh := &StreamListener{ringBuf}
+	sh := &StreamListener{ringbuffer: ringBuf, priorityMapper: mapper}
 
 	// single-consumer
 	_ = ring.NewConsumer(ringBuf, Consume, w, true)
@@ -107,6 +102,10 @@ func (s *StreamListener) Notify(m message.Message) error {
 			Data:     buf.Bytes(),
 			Header:   m.Header(),
 			Priority: 0,
+		}
+
+		if s.priorityMapper != nil {
+			e.Priority = s.priorityMapper(m.Category())
 		}
 
 		if !s.ringbuffer.Put(e) {
