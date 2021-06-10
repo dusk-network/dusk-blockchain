@@ -16,12 +16,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,10 +40,6 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 	_, err := l.LoadTip()
 	assert.NoError(err)
 
-	// Create some arbitrary bid values - they won't matter anyway, since
-	// we are mocking proof verification.
-	writeArbitraryBidValues(assert, db)
-
 	pk := keys.PublicKey{
 		AG: make([]byte, 32),
 		BG: make([]byte, 32),
@@ -55,7 +49,6 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 		EventBus:    eb,
 		RPCBus:      rb,
 		Keys:        BLSKeys,
-		Proxy:       proxy,
 		TimerLength: 5 * time.Second,
 	}
 	lp := loop.New(e, &pk)
@@ -63,19 +56,4 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 	c, err := chain.New(ctx, db, eb, l, l, nil, proxy, lp)
 	assert.NoError(err)
 	return &node{chain: c}
-}
-
-func writeArbitraryBidValues(assert *assert.Assertions, db database.DB) {
-	d, err := crypto.RandEntropy(32)
-	assert.NoError(err)
-
-	k, err := crypto.RandEntropy(32)
-	assert.NoError(err)
-
-	index := uint64(0)
-	lockTime := uint64(250000)
-
-	assert.NoError(db.Update(func(t database.Transaction) error {
-		return t.StoreBidValues(d, k, index, lockTime)
-	}))
 }

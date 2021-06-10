@@ -82,16 +82,6 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 	// Map stateKey to chain state (tip)
 	t.batch[stateInd][toKey(stateKey)] = b.Header.Hash
 
-	// Remove expired bid values
-	for k := range t.db.storage[bidValuesInd] {
-		heightBytes := k[9:]
-
-		height := binary.LittleEndian.Uint64(heightBytes)
-		if height < b.Header.Height {
-			delete(t.db.storage[bidValuesInd], k)
-		}
-	}
-
 	return nil
 }
 
@@ -281,54 +271,6 @@ func (t *transaction) FetchCurrentHeight() (uint64, error) {
 	}
 
 	return header.Height, nil
-}
-
-func (t *transaction) StoreBidValues(d, k []byte, index uint64, lockTime uint64) error {
-	currentHeight, err := t.FetchCurrentHeight()
-	if err != nil {
-		return err
-	}
-
-	// marshal height
-	heightBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(heightBytes, lockTime+currentHeight)
-
-	// marshal index
-	idxBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(idxBytes, index)
-
-	key := append([]byte("bidvalues"), heightBytes...)
-	bidKey := toKey(key)
-
-	t.batch[bidValuesInd][bidKey] = append(d, append(k, idxBytes...)...)
-	return nil
-}
-
-// BidEncodingSize is the expected size of the serialized encoding of the bid.
-var BidEncodingSize = 72
-
-func (t *transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
-	// Get bid values with lowest expiry height
-	lowestSeen := uint64(1<<64 - 1)
-
-	var values []byte
-
-	for k, v := range t.db.storage[bidValuesInd] {
-		heightBytes := k[9:]
-
-		height := binary.LittleEndian.Uint64(heightBytes)
-		if height < lowestSeen {
-			lowestSeen = height
-			values = v
-		}
-	}
-
-	if values == nil {
-		return nil, nil, uint64(0), errors.New("could not fetch bid values")
-	}
-
-	index := binary.LittleEndian.Uint64(values[64:72])
-	return values[0:32], values[32:64], index, nil
 }
 
 // FetchBlockHeightSince uses binary search to find a block height.

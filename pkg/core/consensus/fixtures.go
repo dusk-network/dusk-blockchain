@@ -16,7 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -26,7 +25,7 @@ import (
 )
 
 // MockEmitter is a utility to quickly wire up an emitter in tests.
-func MockEmitter(consTimeout time.Duration, proxy transactions.Proxy) *Emitter {
+func MockEmitter(consTimeout time.Duration) *Emitter {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 	keys, _ := key.NewRandKeys()
@@ -35,7 +34,6 @@ func MockEmitter(consTimeout time.Duration, proxy transactions.Proxy) *Emitter {
 		EventBus:    eb,
 		RPCBus:      rpc,
 		Keys:        keys,
-		Proxy:       proxy,
 		TimerLength: consTimeout,
 	}
 }
@@ -45,12 +43,7 @@ func StupidEmitter() (*Emitter, *user.Provisioners) {
 	committeeSize := 50
 	p, provisionersKeys := MockProvisioners(committeeSize)
 
-	mockProxy := transactions.MockProxy{
-		P:  transactions.PermissiveProvisioner{},
-		BG: transactions.MockBlockGenerator{},
-	}
-
-	emitter := MockEmitter(time.Second, mockProxy)
+	emitter := MockEmitter(time.Second)
 	emitter.Keys = provisionersKeys[0]
 
 	return emitter, p

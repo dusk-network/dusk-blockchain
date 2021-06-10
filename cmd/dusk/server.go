@@ -19,7 +19,6 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/bidautomaton"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
@@ -211,7 +210,6 @@ func Setup() *Server {
 		EventBus:    eventBus,
 		RPCBus:      rpcBus,
 		Keys:        w.Keys(),
-		Proxy:       proxy,
 		TimerLength: cfg.ConsensusTimeOut,
 	}
 
@@ -272,7 +270,6 @@ func Setup() *Server {
 	}
 
 	_ = stakeautomaton.New(eventBus, rpcBus, grpcServer)
-	_ = bidautomaton.New(eventBus, rpcBus, grpcServer)
 
 	// Setting up and launch kadcast peer
 	srv.launchKadcastPeer(processor)
@@ -345,15 +342,13 @@ func setupGRPCClients(ctx context.Context) (transactions.Proxy, *grpc.ClientConn
 
 	ruskClient, ruskConn := client.CreateStateClient(ctx, addr)
 	keysClient, _ := client.CreateKeysClient(ctx, addr)
-	blindbidServiceClient, _ := client.CreateBlindBidServiceClient(ctx, addr)
-	bidServiceClient, _ := client.CreateBidServiceClient(ctx, addr)
 	transferClient, _ := client.CreateTransferClient(ctx, addr)
 	stakeClient, _ := client.CreateStakeClient(ctx, addr)
 	walletClient, _ := client.CreateWalletClient(ctx, addr)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	return transactions.NewProxy(ruskClient, keysClient, blindbidServiceClient, bidServiceClient, transferClient, stakeClient, walletClient, txTimeout, defaultTimeout), ruskConn
+	return transactions.NewProxy(ruskClient, keysClient, transferClient, stakeClient, walletClient, txTimeout, defaultTimeout), ruskConn
 }
 
 func loadWallet(password string) (*wallet.Wallet, error) {

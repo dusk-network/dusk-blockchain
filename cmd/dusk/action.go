@@ -56,7 +56,6 @@ func action(ctx *cli.Context) error {
 	}
 
 	log.WithFields(logrus.Fields{
-		"config.timeout.timeoutsendbidtx":            cfg.Get().Timeout.TimeoutSendBidTX,
 		"config.timeout.timeoutgetlastcommittee":     cfg.Get().Timeout.TimeoutGetLastCommittee,
 		"config.timeout.timeoutgetlastcertificate":   cfg.Get().Timeout.TimeoutGetLastCertificate,
 		"config.timeout.timeoutgetmempooltxsbysize":  cfg.Get().Timeout.TimeoutGetMempoolTXsBySize,

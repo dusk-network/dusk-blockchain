@@ -8,87 +8,63 @@ package selection
 
 import (
 	"bytes"
-	"context"
-	"errors"
-	"sync"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
-var _ Handler = (*ScoreHandler)(nil)
+const maxCommitteeSize = 1
 
 type (
-	// ScoreHandler manages the score threshold, performs verification of
-	// message.Score, keeps tab of the highest score so far.
-	ScoreHandler struct {
-		// Threshold number that a score needs to be greater than in order to be considered
-		// for selection. Messages with scores lower than this threshold should not be
-		// repropagated.
-		lock      sync.RWMutex
-		threshold *consensus.Threshold
-
-		scoreVerifier transactions.Provisioner
-	}
-
-	// Handler is an abstraction of the selection component event handler.
-	// It is primarily used for testing purposes, to bypass the zkproof verification.
-	Handler interface {
-		Verify(context.Context, uint64, uint8, message.Score) error
-		ResetThreshold()
-		LowerThreshold()
-		Priority(message.Score, message.Score) bool
+	// Handler is responsible for performing operations that need to know
+	// about specific event fields.
+	Handler struct {
+		*committee.Handler
 	}
 )
 
-// NewScoreHandler returns a new instance if ScoreHandler.
-func NewScoreHandler(scoreVerifier transactions.Provisioner) *ScoreHandler {
-	return &ScoreHandler{
-		threshold:     consensus.NewThreshold(),
-		scoreVerifier: scoreVerifier,
+// NewHandler will return a Handler, injected with the passed committee
+// and an unmarshaller which uses the injected validation function.
+func NewHandler(keys key.Keys, p user.Provisioners) *Handler {
+	return &Handler{
+		Handler: committee.NewHandler(keys, p),
 	}
 }
 
-// ResetThreshold resets the score threshold that sets the absolute minimum for
-// a score to be eligible for sending.
-func (sh *ScoreHandler) ResetThreshold() {
-	sh.lock.Lock()
-	defer sh.lock.Unlock()
-	sh.threshold.Reset()
+// AmMember checks if we are part of the committee.
+func (b *Handler) AmMember(round uint64, step uint8) bool {
+	return b.Handler.AmMember(round, step, maxCommitteeSize)
 }
 
-// LowerThreshold lowers the threshold after a timespan when no BlockGenerator
-// could send a valid score.
-func (sh *ScoreHandler) LowerThreshold() {
-	sh.lock.Lock()
-	defer sh.lock.Unlock()
-	sh.threshold.Lower()
+// IsMember delegates the committee.Handler to check if a BLS public key belongs
+// to a committee for the specified round and step.
+func (b *Handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
+	return b.Handler.IsMember(pubKeyBLS, round, step, maxCommitteeSize)
 }
 
-// Priority returns true if the first element has priority over the second, false otherwise.
-func (sh *ScoreHandler) Priority(first, second message.Score) bool {
-	return bytes.Compare(second.Score, first.Score) != 1
-}
+// VerifySignature verifies the BLS signature of the Score event. Since the
+// payload is nil, verifying the signature equates to verifying solely the Header.
+func (b *Handler) VerifySignature(scr message.Score) error {
+	packet := new(bytes.Buffer)
 
-// Verify a score by delegating the ZK library to validate the proof.
-func (sh *ScoreHandler) Verify(ctx context.Context, round uint64, step uint8, m message.Score) error {
-	// Check threshold
-	sh.lock.RLock()
-	defer sh.lock.RUnlock()
-
-	score := m.Score
-	if sh.threshold.Exceeds(score) {
-		return errors.New("threshold exceeds score")
+	hdr := scr.State()
+	if err := header.MarshalSignableVote(packet, hdr); err != nil {
+		return err
 	}
 
-	return sh.scoreVerifier.VerifyScore(ctx, round, step, blindbid.VerifyScoreRequest{
-		Proof:    m.Proof,
-		Score:    score,
-		Seed:     m.Seed,
-		ProverID: m.Identity,
-		Round:    round,
-		Step:     uint32(step),
-	})
+	// we make a copy of the signature because the crypto package apparently mutates the byte array when
+	// Compressing/Decompressing a point
+	// see https://github.com/dusk-network/dusk-crypto/issues/16
+	sig := make([]byte, len(scr.SignedHash))
+	copy(sig, scr.SignedHash)
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
+}
+
+// Committee returns a VotingCommittee for a given round and step.
+func (b *Handler) Committee(round uint64, step uint8) user.VotingCommittee {
+	return b.Handler.Committee(round, step, maxCommitteeSize)
 }

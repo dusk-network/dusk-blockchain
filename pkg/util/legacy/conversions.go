@@ -167,18 +167,6 @@ func txsToContractCalls(txs []transactions.Transaction) ([]newtx.ContractCall, e
 			}
 
 			calls[i] = tx
-		case transactions.BidType:
-			call, err := BidToRuskBid(c.(*transactions.Bid))
-			if err != nil {
-				return nil, err
-			}
-
-			tx := newtx.NewTransaction()
-			if err := newtx.UTransaction(call.Tx, tx); err != nil {
-				return nil, err
-			}
-
-			calls[i] = tx
 		}
 	}
 
@@ -206,18 +194,6 @@ func ContractCallsToTxs(calls []*rusk.Transaction) ([]transactions.Transaction, 
 		// Distribute
 		case 1:
 			tx, err := RuskDistributeToCoinbase(call)
-			if err != nil {
-				log.WithError(err).
-					WithField("type", call.Type).
-					WithField("index", i).
-					Errorln("error RuskTxToTx")
-				return nil, err
-			}
-
-			txs[i] = tx
-		// Bid
-		case 3:
-			tx, err := RuskBidToBid(call)
 			if err != nil {
 				log.WithError(err).
 					WithField("type", call.Type).
@@ -400,75 +376,6 @@ func RuskStakeToStake(tx *rusk.Transaction) (*transactions.Stake, error) {
 			Lock:     expirationHeight,
 		},
 		PubKeyBLS: blsKey,
-	}, nil
-}
-
-// BidToRuskBid turns a legacy bid into a rusk bid.
-func BidToRuskBid(tx *transactions.Bid) (*rusk.BidTransaction, error) {
-	rtx, err := txToRuskTx(tx.StandardTx())
-	if err != nil {
-		return nil, err
-	}
-
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, tx.Lock); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.Write256(buf, tx.M); err != nil {
-		return nil, err
-	}
-
-	rtx.Payload.CallData = buf.Bytes()
-
-	plBuf := new(bytes.Buffer)
-	if err := newtx.MarshalTransactionPayload(plBuf, rtx.Payload); err != nil {
-		return nil, err
-	}
-
-	return &rusk.BidTransaction{
-		BidTreeStorageIndex: 0,
-		Tx: &rusk.Transaction{
-			Version: 0,
-			Type:    3,
-			Payload: plBuf.Bytes(),
-		},
-	}, nil
-}
-
-// RuskBidToBid turns a rusk bid into a legacy bid.
-func RuskBidToBid(tx *rusk.Transaction) (*transactions.Bid, error) {
-	stx, err := RuskTxToTx(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	stx.TxType = transactions.BidType
-	plBuf := bytes.NewBuffer(tx.Payload)
-
-	pl := newtx.NewTransactionPayload()
-	if err := newtx.UnmarshalTransactionPayload(plBuf, pl); err != nil {
-		return nil, err
-	}
-
-	buf := bytes.NewBuffer(pl.CallData)
-
-	var expirationHeight uint64
-	if err := encoding.ReadUint64LE(buf, &expirationHeight); err != nil {
-		return nil, err
-	}
-
-	M := make([]byte, 32)
-	if err := encoding.Read256(buf, M); err != nil {
-		return nil, err
-	}
-
-	return &transactions.Bid{
-		Timelock: &transactions.Timelock{
-			Standard: stx,
-			Lock:     expirationHeight,
-		},
-		M: M,
 	}, nil
 }
 

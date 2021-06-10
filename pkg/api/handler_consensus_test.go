@@ -33,11 +33,6 @@ func TestConsensusAPISmokeTest(t *testing.T) {
 		Data      string
 	}{
 		{
-			targetURL: "/consensus/bidders?height=0",
-			name:      "Get bidders",
-			Data:      `{}`,
-		},
-		{
 			targetURL: "/consensus/provisioners?height=0",
 			name:      "Get provisioners",
 			Data:      `{}`,

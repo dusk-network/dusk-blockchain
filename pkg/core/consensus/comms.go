@@ -17,7 +17,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -43,7 +42,6 @@ type (
 		EventBus    *eventbus.EventBus
 		RPCBus      *rpcbus.RPCBus
 		Keys        key.Keys
-		Proxy       transactions.Proxy
 		TimerLength time.Duration
 	}
 

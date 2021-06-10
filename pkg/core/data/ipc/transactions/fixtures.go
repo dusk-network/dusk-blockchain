@@ -16,10 +16,8 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
@@ -56,50 +54,13 @@ func (p *PermissiveExecutor) GetProvisioners(ctx context.Context) (user.Provisio
 	return *p.P, nil
 }
 
-// PermissiveProvisioner mocks verification of scores.
-type PermissiveProvisioner struct{}
-
-// VerifyScore returns nil all the time.
-func (p PermissiveProvisioner) VerifyScore(context.Context, uint64, uint8, blindbid.VerifyScoreRequest) error {
-	return nil
-}
-
-// MockBlockGenerator mocks a blockgenerator.
-type MockBlockGenerator struct{}
-
-// GenerateScore obeys the BlockGenerator interface.
-func (b MockBlockGenerator) GenerateScore(context.Context, blindbid.GenerateScoreRequest) (blindbid.GenerateScoreResponse, error) {
-	limit, _ := big.NewInt(0).SetString("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 16)
-	prove, _ := crypto.RandEntropy(256)
-	prover, _ := crypto.RandEntropy(32)
-	score, _ := crypto.RandEntropy(32)
-	scoreInt := big.NewInt(0).SetBytes(score)
-
-	// making sure that the score exceeds the threshold
-	for scoreInt.Cmp(limit) <= 0 {
-		score, _ = crypto.RandEntropy(32)
-		scoreInt = big.NewInt(0).SetBytes(score)
-	}
-
-	return blindbid.GenerateScoreResponse{
-		BlindbidProof:  prove,
-		Score:          score,
-		ProverIdentity: prover,
-	}, nil
-}
-
 // MockProxy mocks a proxy for ease of testing.
 type MockProxy struct {
-	P  Provisioner
 	Pr Provider
 	V  UnconfirmedTxProber
 	KM KeyMaster
 	E  Executor
-	BG BlockGenerator
 }
-
-// Provisioner ...
-func (m MockProxy) Provisioner() Provisioner { return m.P }
 
 // Provider ...
 func (m MockProxy) Provider() Provider { return m.Pr }
@@ -139,9 +100,6 @@ func (m MockProxy) KeyMaster() KeyMaster { return m.KM }
 
 // Executor ...
 func (m MockProxy) Executor() Executor { return m.E }
-
-// BlockGenerator ...
-func (m MockProxy) BlockGenerator() BlockGenerator { return m.BG }
 
 // MockKeys mocks the keys.
 func MockKeys() (*keys.SecretKey, *keys.PublicKey) {

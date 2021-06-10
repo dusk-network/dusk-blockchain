@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/blindbid"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -59,9 +58,6 @@ type Provider interface {
 	// NewStake creates a staking transaction.
 	NewStake(context.Context, []byte, uint64) (*Transaction, error)
 
-	// NewBid creates a new bidding transaction.
-	NewBid(context.Context, []byte, uint64, []byte, *keys.StealthAddress, []byte, uint64, uint64) (*BidTransaction, error)
-
 	// NewTransaction creates a new transaction using the user's PrivateKey
 	// It accepts the PublicKey of the recipient, a value, a fee and whether
 	// the transaction should be obfuscated or otherwise.
@@ -91,34 +87,17 @@ type Executor interface {
 	GetProvisioners(ctx context.Context) (user.Provisioners, error)
 }
 
-// Provisioner encapsulates the operations common to a Provisioner during the
-// consensus.
-type Provisioner interface {
-	// VerifyScore created by the BlockGenerator.
-	VerifyScore(context.Context, uint64, uint8, blindbid.VerifyScoreRequest) error
-}
-
-// BlockGenerator encapsulates the operations performed by the BlockGenerator.
-type BlockGenerator interface {
-	// GenerateScore to participate in the block generation lottery.
-	GenerateScore(context.Context, blindbid.GenerateScoreRequest) (blindbid.GenerateScoreResponse, error)
-}
-
 // Proxy toward the rusk client.
 type Proxy interface {
-	Provisioner() Provisioner
 	Provider() Provider
 	Prober() UnconfirmedTxProber
 	KeyMaster() KeyMaster
 	Executor() Executor
-	BlockGenerator() BlockGenerator
 }
 
 type proxy struct {
 	stateClient    rusk.StateClient
 	keysClient     rusk.KeysClient
-	blindbidClient rusk.BlindBidServiceClient
-	bidClient      rusk.BidServiceClient
 	transferClient rusk.TransferClient
 	stakeClient    rusk.StakeServiceClient
 	walletClient   rusk.WalletClient
@@ -127,14 +106,11 @@ type proxy struct {
 }
 
 // NewProxy creates a new Proxy.
-func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, blindbidClient rusk.BlindBidServiceClient,
-	bidClient rusk.BidServiceClient, transferClient rusk.TransferClient, stakeClient rusk.StakeServiceClient, walletClient rusk.WalletClient,
-	txTimeout, defaultTimeout time.Duration) Proxy {
+func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, transferClient rusk.TransferClient,
+	stakeClient rusk.StakeServiceClient, walletClient rusk.WalletClient, txTimeout, defaultTimeout time.Duration) Proxy {
 	return &proxy{
 		stateClient:    stateClient,
 		keysClient:     keysClient,
-		blindbidClient: blindbidClient,
-		bidClient:      bidClient,
 		transferClient: transferClient,
 		stakeClient:    stakeClient,
 		walletClient:   walletClient,
@@ -158,19 +134,9 @@ func (p *proxy) Executor() Executor {
 	return &executor{p}
 }
 
-// Provisioner returned by the Proxy.
-func (p *proxy) Provisioner() Provisioner {
-	return &provisioner{p}
-}
-
 // Provider returned by the Proxy.
 func (p *proxy) Provider() Provider {
 	return &provider{p}
-}
-
-// BlockGenerator returned by the Proxy.
-func (p *proxy) BlockGenerator() BlockGenerator {
-	return &blockgenerator{p}
 }
 
 type verifier struct {
@@ -240,35 +206,6 @@ func (p *provider) NewStake(ctx context.Context, pubKeyBLS []byte, value uint64)
 
 	trans := NewTransaction()
 	err = UTransaction(res, trans)
-	return trans, err
-}
-
-// NewBid creates a new transaction using the user's PrivateKey
-// It accepts the PublicKey of the recipient, a value, a fee and whether
-// the transaction should be obfuscated or otherwise.
-func (p *provider) NewBid(ctx context.Context, k []byte, value uint64, secret []byte, pkR *keys.StealthAddress, seed []byte, round uint64, step uint64) (*BidTransaction, error) {
-	tr := new(rusk.BidTransactionRequest)
-	tr.K = k
-	tr.Value = value
-	tr.Secret = secret
-
-	tr.StealthAddress = new(rusk.StealthAddress)
-	keys.MStealthAddress(tr.StealthAddress, pkR)
-
-	tr.Seed = seed
-	tr.LatestConsensusRound = round
-	tr.LatestConsensusStep = step
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
-	defer cancel()
-
-	res, err := p.bidClient.NewBid(ctx, tr)
-	if err != nil {
-		return nil, err
-	}
-
-	trans := NewBidTransaction()
-	err = UBidTransaction(res, trans)
 	return trans, err
 }
 
@@ -433,48 +370,6 @@ func (e *executor) GetProvisioners(ctx context.Context) (user.Provisioners, erro
 
 	provisioners.Members = memberMap
 	return *provisioners, nil
-}
-
-type provisioner struct {
-	*proxy
-}
-
-// VerifyScore to participate in the block generation lottery.
-func (p *provisioner) VerifyScore(ctx context.Context, round uint64, step uint8, score blindbid.VerifyScoreRequest) error {
-	gsr := new(rusk.VerifyScoreRequest)
-	blindbid.MVerifyScoreRequest(gsr, &score)
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.timeout))
-	defer cancel()
-
-	if _, err := p.blindbidClient.VerifyScore(ctx, gsr); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-type blockgenerator struct {
-	*proxy
-}
-
-// GenerateScore to participate in the block generation lottery.
-func (b *blockgenerator) GenerateScore(ctx context.Context, s blindbid.GenerateScoreRequest) (blindbid.GenerateScoreResponse, error) {
-	gsr := new(rusk.GenerateScoreRequest)
-	blindbid.MGenerateScoreRequest(gsr, &s)
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(b.txTimeout))
-	defer cancel()
-
-	score, err := b.blindbidClient.GenerateScore(ctx, gsr)
-	if err != nil {
-		return blindbid.GenerateScoreResponse{}, err
-	}
-
-	g := blindbid.NewGenerateScoreResponse()
-	blindbid.UGenerateScoreResponse(score, g)
-
-	return *g, nil
 }
 
 // UMember deep copies from the rusk.Provisioner.

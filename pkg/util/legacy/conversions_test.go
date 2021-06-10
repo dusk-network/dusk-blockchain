@@ -12,7 +12,6 @@ import (
 	"os"
 	"testing"
 
-	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
@@ -54,41 +53,6 @@ func TestStandardTxIntegrity(t *testing.T) {
 
 	tx2 := transactions.NewTransaction()
 	transactions.UTransaction(resp2, tx2)
-
-	assert.True(t, transactions.Equal(tx, tx2))
-}
-
-func TestBidTxIntegrity(t *testing.T) {
-	s := setupRuskMock(t)
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateBidServiceClient(ctx, "localhost:10000")
-
-	// Generate a K
-	var k ristretto.Scalar
-	k.Rand()
-
-	resp, err := c.NewBid(ctx, &rusk.BidTransactionRequest{
-		K:     k.Bytes(),
-		Value: 100,
-	})
-	assert.NoError(t, err)
-
-	tx := transactions.NewTransaction()
-	transactions.UTransaction(resp.Tx, tx)
-
-	// Check conversion integrity
-	legacyTx, err := legacy.RuskBidToBid(resp.Tx)
-	assert.NoError(t, err)
-
-	resp2, err := legacy.BidToRuskBid(legacyTx)
-	assert.NoError(t, err)
-
-	tx2 := transactions.NewTransaction()
-	transactions.UTransaction(resp2.Tx, tx2)
 
 	assert.True(t, transactions.Equal(tx, tx2))
 }

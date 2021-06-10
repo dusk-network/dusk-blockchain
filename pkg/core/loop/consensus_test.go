@@ -26,7 +26,7 @@ import (
 // TestContextCancellation tests that the loop returns in case of a
 // cancellation.
 func TestContextCancellation(t *testing.T) {
-	e := consensus.MockEmitter(time.Second, nil)
+	e := consensus.MockEmitter(time.Second)
 
 	cb := func(ctx context.Context) bool {
 		// avoiding spinning too fast
@@ -99,7 +99,7 @@ func (c *succesfulAgreement) GetControlFn() consensus.ControlFn {
 // TestAgreementCompletion tests that the loop returns with no error when the
 // agreement completes normally.
 func TestAgreementCompletion(t *testing.T) {
-	e := consensus.MockEmitter(time.Second, nil)
+	e := consensus.MockEmitter(time.Second)
 	ctx := context.Background()
 	l := New(e, keys.NewPublicKey())
 
@@ -148,7 +148,7 @@ func (c *unsuccesfulAgreement) GetControlFn() consensus.ControlFn {
 // TestStall tests that the agreement loop gets canceled when the
 // state machine reeaches the maximum amount of steps.
 func TestStall(t *testing.T) {
-	e := consensus.MockEmitter(time.Second, nil)
+	e := consensus.MockEmitter(time.Second)
 	ctx := context.Background()
 	l := New(e, keys.NewPublicKey())
 	_ = l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
@@ -179,7 +179,7 @@ func (q *queueingStep) Initialize(_ consensus.InternalPacket) consensus.PhaseFn 
 
 // TestClearQueues tests that the queues are fully cleared upon finishing the round.
 func TestClearQueues(t *testing.T) {
-	e := consensus.MockEmitter(time.Second, nil)
+	e := consensus.MockEmitter(time.Second)
 	ctx := context.Background()
 	l := New(e, keys.NewPublicKey())
 

@@ -24,8 +24,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/stretchr/testify/assert"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	// Import here any supported drivers to verify if they are fully compliant
@@ -656,62 +654,6 @@ func TestClearDatabase(test *testing.T) {
 	if err := storeBlocks(db, blocks); err != nil {
 		test.Fatal(err)
 	}
-}
-
-func TestStoreFetchBidValues(test *testing.T) {
-	test.Parallel()
-
-	d1, _ := crypto.RandEntropy(32)
-	k1, _ := crypto.RandEntropy(32)
-	idx1Bytes, _ := crypto.RandEntropy(8)
-	idx1 := binary.LittleEndian.Uint64(idx1Bytes)
-
-	d2, _ := crypto.RandEntropy(32)
-	k2, _ := crypto.RandEntropy(32)
-	idx2Bytes, _ := crypto.RandEntropy(8)
-	idx2 := binary.LittleEndian.Uint64(idx2Bytes)
-
-	// Store bid values at different heights
-	assert.NoError(test, db.Update(func(t database.Transaction) error {
-		if err := t.StoreBidValues(d1, k1, idx1, 1000); err != nil {
-			return err
-		}
-
-		return t.StoreBidValues(d2, k2, idx2, 2000)
-	}))
-
-	// Fetching bid values should give us d1 and k1 right now
-	assert.NoError(test, db.View(func(t database.Transaction) error {
-		d, k, index, err := t.FetchBidValues()
-		if err != nil {
-			return err
-		}
-
-		assert.Equal(test, d1, d)
-		assert.Equal(test, k1, k)
-		assert.Equal(test, idx1, index)
-		return nil
-	}))
-
-	// Update state to after 1000
-	blk := helper.RandomBlock(1200, 1)
-
-	assert.NoError(test, db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(blk)
-	}))
-
-	// Fetching bid values now should give us d2 and k2
-	assert.NoError(test, db.View(func(t database.Transaction) error {
-		d, k, EdPk, err := t.FetchBidValues()
-		if err != nil {
-			return err
-		}
-
-		assert.Equal(test, d2, d)
-		assert.Equal(test, k2, k)
-		assert.Equal(test, idx2, EdPk)
-		return nil
-	}))
 }
 
 // _TestPersistence tries to ensure if driver provides persistence storage.

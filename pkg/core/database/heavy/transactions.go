@@ -56,10 +56,8 @@ var (
 	StatePrefix = []byte{0x06}
 	// OutputKeyPrefix is the prefix to identify the Output.
 	OutputKeyPrefix = []byte{0x07}
-	// BidValuesPrefix is the prefix to identify Bid Values.
-	BidValuesPrefix = []byte{0x08}
 	// CandidatePrefix is the prefix to identify Candidate messages.
-	CandidatePrefix = []byte{0x09}
+	CandidatePrefix = []byte{0x08}
 )
 
 type transaction struct {
@@ -176,34 +174,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 
 	t.put(key, value)
 
-	// Delete expired bid values
-	key = BidValuesPrefix
-
-	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
-	defer iterator.Release()
-
-	for iterator.Next() {
-		if len(iterator.Key()) != 9 {
-			// Malformed key found, however we should not abort the entire
-			// operation just because of it.
-			log.WithFields(log.Fields{
-				"process": "database",
-				"key":     iterator.Key(),
-			}).WithError(errors.New("bid values entry with malformed key found")).Errorln("error when iterating over bid values")
-
-			// Let's remove it though, so that we don't keep logging errors
-			// for the same entry.
-			t.batch.Delete(iterator.Key())
-			continue
-		}
-
-		height := binary.LittleEndian.Uint64(iterator.Key()[1:])
-		if height < b.Header.Height {
-			t.batch.Delete(iterator.Key())
-		}
-	}
-
-	return iterator.Error()
+	return nil
 }
 
 // Commit writes a batch to LevelDB storage. See also fsyncEnabled variable.
@@ -505,80 +476,6 @@ func (t transaction) FetchCurrentHeight() (uint64, error) {
 	}
 
 	return header.Height, nil
-}
-
-func (t transaction) StoreBidValues(d, k []byte, index uint64, lockTime uint64) error {
-	// First, delete the old values (if any)
-	heightBytes := make([]byte, 8)
-
-	currentHeight, err := t.FetchCurrentHeight()
-	if err != nil {
-		return err
-	}
-
-	// NOTE: this expiry height is not accurate, and is just an
-	// approximation. On average, it will vary only a few blocks, but
-	// we can not know beforehand when a bid transaction is accepted.
-	binary.LittleEndian.PutUint64(heightBytes, lockTime+currentHeight)
-
-	// marshal index
-	idxBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(idxBytes, index)
-
-	key := append(BidValuesPrefix, heightBytes...)
-	t.put(key, append(d, append(k, idxBytes...)...))
-
-	return nil
-}
-
-// BidEncodingSize is the expected size of the serialized encoding of the bid.
-var BidEncodingSize = 72
-
-func (t transaction) FetchBidValues() ([]byte, []byte, uint64, error) {
-	key := BidValuesPrefix
-
-	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
-	defer iterator.Release()
-
-	// Let's always return the bid values with the lowest height as
-	// those are most likely to be valid.
-	lowestSeen := uint64(1<<64 - 1)
-
-	var value []byte
-
-	for iterator.Next() {
-		if len(iterator.Key()) != 9 {
-			// Malformed key found, however we should not abort the entire
-			// operation just because of it.
-			log.WithFields(log.Fields{
-				"process": "database",
-				"key":     iterator.Key(),
-			}).WithError(errors.New("bid values entry with malformed key found")).Errorln("error when iterating over bid values")
-			continue
-		}
-
-		// height is the last 8 bytes
-		height := binary.LittleEndian.Uint64(iterator.Key()[1:])
-
-		if height < lowestSeen {
-			lowestSeen = height
-			value = iterator.Value()
-		}
-	}
-
-	if err := iterator.Error(); err != nil {
-		return nil, nil, uint64(0), err
-	}
-
-	// Let's avoid any runtime panics by doing a sanity check on the value length before
-	if len(value) != BidEncodingSize {
-		return nil, nil, uint64(0), fmt.Errorf("bid values non-existent or incorrectly encoded, expected %d bytes but found %d", BidEncodingSize, len(value))
-	}
-
-	D := value[0:32]
-	K := value[32:64]
-	index := binary.LittleEndian.Uint64(value[64:72])
-	return D, K, index, nil
 }
 
 // FetchBlockHeightSince uses binary search to find a block height.

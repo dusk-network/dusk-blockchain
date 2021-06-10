@@ -48,7 +48,7 @@ func TestSelection(t *testing.T) {
 			ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) {
 				require.NotNil(p)
 				messageScore := p.(message.Score)
-				require.NotEmpty(messageScore.Score)
+				require.NotEmpty(messageScore)
 			}
 
 			testPhase := consensus.NewTestPhase(t, ttestCB, nil)

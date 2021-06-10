@@ -14,7 +14,6 @@ type generalConfiguration struct {
 }
 
 type timeoutConfiguration struct {
-	TimeoutSendBidTX            int64
 	TimeoutGetLastCommittee     int64
 	TimeoutGetLastCertificate   int64
 	TimeoutGetMempoolTXsBySize  int64

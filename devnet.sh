@@ -103,7 +103,6 @@ init_dusk_func() {
 
 # Timeout cfg for rpcBus calls
 [timeout]
-  timeoutsendbidtx = 50
   timeoutsendstaketx = 50
   timeoutgetlastcommittee = 5
   timeoutgetlastcertificate = 5

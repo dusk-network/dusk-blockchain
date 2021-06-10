@@ -377,6 +377,5 @@ func tpsAction(ctx *cli.Context) error {
 func automateAction(ctx *cli.Context) error {
 	address := ctx.String(grpcAddressFlag.Name)
 	sendStakeTimeout := ctx.Int(sendStakeTimeoutFlag.Name)
-	sendBidTimeout := ctx.Int(sendBidTimeoutFlag.Name)
-	return grpcclient.AutomateStakesAndBids(address, sendStakeTimeout, sendBidTimeout)
+	return grpcclient.AutomateStakes(address, sendStakeTimeout)
 }

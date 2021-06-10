@@ -96,7 +96,7 @@ func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respRi
 
 	bufs, err := processFn(srcPeerID, msg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s - topic %s", err, msg.Category())
 	}
 
 	if respRingBuf != nil {

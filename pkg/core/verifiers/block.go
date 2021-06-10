@@ -91,7 +91,7 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 	}
 
 	// blk.Timestamp > prevTimestamp
-	if blk.Header.Timestamp <= prevBlock.Header.Timestamp {
+	if blk.Header.Timestamp < prevBlock.Header.Timestamp {
 		return errors.New("current timestamp is less than the previous timestamp")
 	}
 
