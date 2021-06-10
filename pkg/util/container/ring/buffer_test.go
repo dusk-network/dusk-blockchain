@@ -10,7 +10,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
-	"io"
 	"math/big"
 	"sync"
 	"testing"
@@ -59,9 +58,8 @@ func TestBufferSorting(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	callback := func(elems []Elem, w io.WriteCloser) bool {
+	callback := func(elems []Elem, w Writer) bool {
 		// Ensure elements are in descending order
-
 		p := elems[0].Priority
 		for i := 1; i < len(elems); i++ {
 			if p < elems[i].Priority {
@@ -145,7 +143,7 @@ func testConsumerProducer(t *testing.T, bufferSize int, consumersNum int, produc
 	// items slice read from ring buffer
 	var rItems safeSlice
 
-	consumeFunc := func(items []Elem, w io.WriteCloser) bool {
+	consumeFunc := func(items []Elem, w Writer) bool {
 		rItems.append(items)
 		return true
 	}

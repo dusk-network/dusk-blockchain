@@ -92,7 +92,14 @@ func (s *StreamListener) Notify(m message.Message) error {
 	// writing on the ringbuffer happens asynchronously
 	go func() {
 		buf := m.Payload().(message.SafeBuffer)
-		if !s.ringbuffer.Put(buf.Bytes()) {
+
+		e := ring.Elem{
+			Data:     buf.Bytes(),
+			Header:   m.Header(),
+			Priority: 0,
+		}
+
+		if !s.ringbuffer.Put(e) {
 			err := errors.New("ringbuffer is closed")
 			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("ringbuffer closed")
 		}
@@ -109,9 +116,9 @@ func (s *StreamListener) Close() {
 }
 
 // Consume an item by writing it to the specified WriteCloser. This is used in the StreamListener creation.
-func Consume(items [][]byte, w io.WriteCloser) bool {
-	for _, data := range items {
-		if _, err := w.Write(data); err != nil {
+func Consume(elems []ring.Elem, w ring.Writer) bool {
+	for _, e := range elems {
+		if _, err := w.Write(e); err != nil {
 			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("error in writing to WriteCloser")
 			return false
 		}

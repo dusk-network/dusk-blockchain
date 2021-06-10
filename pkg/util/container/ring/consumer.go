@@ -7,24 +7,28 @@
 package ring
 
 import (
-	"io"
 	"sort"
 )
+
+type Writer interface {
+	Write(e Elem) (int, error)
+	Close() error
+}
 
 // Consumer represents an entity which can read items from a ring buffer.
 // It maintains its own read index, and cache.
 type Consumer struct {
 	ring *Buffer
-	w    io.WriteCloser
+	w    Writer
 	// consumes the retrieved data and returns true if no error
 	// Returns false to terminate the consumer
-	consume func(items []Elem, w io.WriteCloser) bool
+	consume func(items []Elem, w Writer) bool
 
 	sortByPriority bool
 }
 
 // NewConsumer returns a Consumer, which can read from the passed Buffer.
-func NewConsumer(ring *Buffer, callback func(items []Elem, w io.WriteCloser) bool, w io.WriteCloser, sortByPriority bool) *Consumer {
+func NewConsumer(ring *Buffer, callback func(items []Elem, w Writer) bool, w Writer, sortByPriority bool) *Consumer {
 	c := &Consumer{
 		ring:           ring,
 		w:              w,
