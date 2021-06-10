@@ -117,6 +117,8 @@ init_dusk_func() {
   timeoutbrokergetcandidate = 2
   timeoutreadwrite = 60
   timeoutkeepalivetime = 30
+  timeoutdial = 5
+
 [genesis]
   legacy = false
 
@@ -168,6 +170,10 @@ enabled = false
 
 [network]
   port = "$((7100+$i))"
+  minimumConnections = 5
+  maxConnections = 50
+  serviceFlag = 1
+
 
   [network.seeder]
     addresses = ["127.0.0.1:8081"]
