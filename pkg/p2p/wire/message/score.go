@@ -18,17 +18,15 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
-type (
-	// Score extends the ScoreProposal with additional fields related to the
-	// candidate it pairs up with. The Score is supposed to be immutable once
-	// created and it gets forwarded to the other nodes.
-	Score struct {
-		hdr        header.Header
-		PrevHash   []byte
-		Candidate  block.Block
-		SignedHash []byte
-	}
-)
+// Score extends the ScoreProposal with additional fields related to the
+// candidate it pairs up with. The Score is supposed to be immutable once
+// created and it gets forwarded to the other nodes.
+type Score struct {
+	hdr        header.Header
+	PrevHash   []byte
+	Candidate  block.Block
+	SignedHash []byte
+}
 
 // NewScore creates a new Score from a proposal.
 func NewScore(hdr header.Header, prevHash []byte, candidate block.Block) *Score {

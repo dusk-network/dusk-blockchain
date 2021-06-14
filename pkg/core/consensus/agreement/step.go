@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -52,7 +51,7 @@ func (s *Loop) GetControlFn() consensus.ControlFn {
 func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) consensus.Results {
 	// creating accumulator and handler
 	h := NewHandler(s.Keys, r.P)
-	acc := newAccumulator(h, WorkerAmount)
+	acc := newAccumulator(s.Emitter, h, WorkerAmount)
 
 	// deferring queue cleanup at the end of the execution of this round
 	defer func() {
@@ -149,11 +148,6 @@ func collectEvent(h *handler, accumulator *Accumulator, a message.Agreement, e *
 	hdr := a.State()
 	if !h.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step) {
 		return
-	}
-
-	// Once the event is verified, we can republish it.
-	if err := e.Gossip(message.New(topics.Agreement, a.Copy().(message.Agreement))); err != nil {
-		lg.WithError(err).Error("could not republish agreement event")
 	}
 
 	accumulator.Process(a)

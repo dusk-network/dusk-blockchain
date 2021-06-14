@@ -9,13 +9,16 @@ package agreement
 import (
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
 )
 
 // Accumulator is an event accumulator, that will accumulate events until it
 // reaches a certain threshold.
 type Accumulator struct {
+	*consensus.Emitter
 	handler            Handler
 	verificationChan   chan message.Agreement
 	eventChan          chan message.Agreement
@@ -26,9 +29,10 @@ type Accumulator struct {
 }
 
 // NewAccumulator initializes a worker pool, starts up an Accumulator and returns it.
-func newAccumulator(handler Handler, workerAmount int) *Accumulator {
+func newAccumulator(e *consensus.Emitter, handler Handler, workerAmount int) *Accumulator {
 	// create accumulator
 	a := &Accumulator{
+		Emitter:            e,
 		handler:            handler,
 		verificationChan:   make(chan message.Agreement, 100),
 		eventChan:          make(chan message.Agreement, 100),
@@ -60,8 +64,10 @@ func (a *Accumulator) Process(ev message.Agreement) {
 // Accumulate agreements per block hash until a quorum is reached or a stop is detected (by closing the internal event channel). Supposed to run in a goroutine.
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
-		// FIXME: republish here to avoid race conditions for slower but safer
-		// re-propagation
+		if err := a.Gossip(message.New(topics.Agreement, ev.Copy().(message.Agreement))); err != nil {
+			lg.WithError(err).Error("could not republish agreement event")
+		}
+
 		hdr := ev.State()
 		collected := a.store.Get(hdr.Step)
 		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
