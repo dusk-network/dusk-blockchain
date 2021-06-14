@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -18,6 +19,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rcudp"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
+)
+
+const (
+	// MaxWriterQueueSize max number of messages queued for broadcasting.
+	// While in Gossip there is a Writer per a peer, in Kadcast there a single Writer.
+	// That's why it should be higher than queue size in Gossip.
+	MaxWriterQueueSize = 10000
 )
 
 // Writer abstracts all of the logic and fields needed to write messages to
@@ -30,6 +39,9 @@ type Writer struct {
 	raptorCodeEnabled bool
 
 	kadcastSubscription, kadcastPointSubscription uint32
+
+	// Low Priority message rate limiter
+	limiter *rate.Limiter
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -41,24 +53,27 @@ func NewWriter(router *RoutingTable, subscriber eventbus.Subscriber, gossip *pro
 		router:            router,
 		gossip:            gossip,
 		raptorCodeEnabled: raptorCodeEnabled,
+		limiter:           rate.NewLimiter(rate.Every(time.Second/60), 1),
 	}
 }
 
-// Serve processes any kadcast messaging to the wire.
-func (w *Writer) Serve() {
+// ServeOverChan processes any kadcast messaging to the wire.
+//nolint
+func (w *Writer) ServeOverChan() {
 	// NewChanListener is preferred here as it passes message.Message to the
 	// Write, where NewStreamListener works with bytes.Buffer only.
 	// Later this could be change if perf issue noticed.
-	writeQueue := make(chan message.Message, 1000)
+	writeQueue := make(chan message.Message, MaxWriterQueueSize)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, eventbus.NewChanListener(writeQueue))
 
-	writePointMsgQueue := make(chan message.Message, 1000)
+	writePointMsgQueue := make(chan message.Message, MaxWriterQueueSize)
 	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, eventbus.NewChanListener(writePointMsgQueue))
 
 	go func() {
 		for msg := range writeQueue {
 			go func(m message.Message) {
-				if err := w.Write(m); err != nil {
+				buf := m.Payload().(message.SafeBuffer)
+				if err := w.WriteToAll(buf.Bytes(), m.Header(), 0); err != nil {
 					log.WithError(err).Warn("kadcast write failed")
 				}
 			}(msg)
@@ -68,7 +83,8 @@ func (w *Writer) Serve() {
 	go func() {
 		for msg := range writePointMsgQueue {
 			go func(m message.Message) {
-				if err := w.WriteToPoint(m); err != nil {
+				buf := m.Payload().(message.SafeBuffer)
+				if err := w.WriteToPoint(buf.Bytes(), m.Header(), 0); err != nil {
 					log.WithError(err).Warn("kadcast-point write failed")
 				}
 			}(msg)
@@ -76,17 +92,65 @@ func (w *Writer) Serve() {
 	}()
 }
 
-// Write expects the actual payload in a marshaled form.
-func (w *Writer) Write(m message.Message) error {
-	header := m.Header()
-	buf := m.Payload().(message.SafeBuffer)
+// Serve is based on StreamListener while ServeOverChan is based on ChanListener.
+func (w *Writer) Serve() {
+	priorityMapper := func(t topics.Topic) byte {
+		switch t {
+		case topics.Tx:
+			return 0
+		case topics.Block:
+			return 2
+		case topics.Score:
+			return 3
+		}
 
+		return 1
+	}
+
+	l1 := eventbus.NewStreamListenerWithParams(w, MaxWriterQueueSize, priorityMapper)
+	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, l1)
+
+	l2 := eventbus.NewStreamListenerWithParams(w, MaxWriterQueueSize, priorityMapper)
+	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l2)
+}
+
+func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
+	go func() {
+		// Rate limiter for 0-priority messages
+		if priority == 0 {
+			now := time.Now()
+			rv := w.limiter.ReserveN(now, 1)
+			delay := rv.DelayFrom(now)
+			time.Sleep(delay)
+		}
+
+		var err error
+
+		if len(header) > 1 {
+			err = w.WriteToPoint(data, header, priority)
+		}
+
+		if len(header) == 1 {
+			err = w.WriteToAll(data, header, priority)
+		}
+
+		if err != nil {
+			log.WithError(err).Warn("write failed")
+		}
+	}()
+
+	return 0, nil
+}
+
+// WriteToAll broadcasts message to the entire network.
+func (w *Writer) WriteToAll(data, header []byte, priority byte) error {
 	if len(header) == 0 {
 		return errors.New("empty message header")
 	}
 
 	// Constuct gossip frame.
-	if err := w.gossip.Process(&buf.Buffer); err != nil {
+	buf := bytes.NewBuffer(data)
+	if err := w.gossip.Process(buf); err != nil {
 		return err
 	}
 
@@ -95,18 +159,17 @@ func (w *Writer) Write(m message.Message) error {
 
 // WriteToPoint writes a message to a single destination.
 // The receiver address is read from message Header.
-func (w *Writer) WriteToPoint(m message.Message) error {
+func (w *Writer) WriteToPoint(data, header []byte, priority byte) error {
 	// Height = 0 disables re-broadcast algorithm in the receiver node. That
 	// said, sending a message to peer with height 0 will be received by the
 	// destination peer but will not be repropagated to any other node.
 	const height = byte(0)
 
-	h := m.Header()
-	if len(h) == 0 {
+	if len(header) == 0 {
 		return errors.New("empty message header")
 	}
 
-	raddr := string(h)
+	raddr := string(header)
 
 	delegates := make([]encoding.PeerInfo, 1)
 
@@ -118,8 +181,8 @@ func (w *Writer) WriteToPoint(m message.Message) error {
 	}
 
 	// Constuct gossip frame.
-	buf := m.Payload().(message.SafeBuffer)
-	if err = w.gossip.Process(&buf.Buffer); err != nil {
+	buf := bytes.NewBuffer(data)
+	if err = w.gossip.Process(buf); err != nil {
 		return err
 	}
 

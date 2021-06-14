@@ -101,7 +101,8 @@ func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respRi
 
 	if respRingBuf != nil {
 		for _, buf := range bufs {
-			if !respRingBuf.Put(buf.Bytes()) {
+			e := ring.Elem{Data: buf.Bytes()}
+			if !respRingBuf.Put(e) {
 				log.WithError(err).Errorln("could not send response")
 				return nil, err
 			}

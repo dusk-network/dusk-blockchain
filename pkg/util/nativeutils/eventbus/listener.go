@@ -9,7 +9,6 @@ package eventbus
 import (
 	"crypto/rand"
 	"errors"
-	"io"
 	"math/big"
 	"sync"
 
@@ -71,18 +70,29 @@ var ringBufferLength = 2000
 // StreamListener uses a ring buffer to dispatch messages. It is inherently
 // thread-safe.
 type StreamListener struct {
-	ringbuffer *ring.Buffer
+	ringbuffer     *ring.Buffer
+	priorityMapper func(topic topics.Topic) byte
 }
 
 // NewStreamListener creates a new StreamListener.
-func NewStreamListener(w io.WriteCloser) Listener {
+func NewStreamListener(w ring.Writer) Listener {
+	return NewStreamListenerWithParams(w, ringBufferLength, nil)
+}
+
+// NewStreamListenerWithParams instantiate and configure a Stream Listener.
+func NewStreamListenerWithParams(w ring.Writer, bufLen int, mapper func(topic topics.Topic) byte) Listener {
 	// Each StreamListener uses its own ringBuffer to collect topic events
 	// Multiple-producers single-consumer approach utilizing a ringBuffer.
-	ringBuf := ring.NewBuffer(ringBufferLength)
-	sh := &StreamListener{ringBuf}
+	ringBuf := ring.NewBuffer(bufLen)
+	sh := &StreamListener{ringbuffer: ringBuf, priorityMapper: mapper}
+
+	sortByPriority := false
+	if mapper != nil {
+		sortByPriority = true
+	}
 
 	// single-consumer
-	_ = ring.NewConsumer(ringBuf, Consume, w)
+	_ = ring.NewConsumer(ringBuf, Consume, w, sortByPriority)
 	return sh
 }
 
@@ -92,7 +102,18 @@ func (s *StreamListener) Notify(m message.Message) error {
 	// writing on the ringbuffer happens asynchronously
 	go func() {
 		buf := m.Payload().(message.SafeBuffer)
-		if !s.ringbuffer.Put(buf.Bytes()) {
+
+		e := ring.Elem{
+			Data:     buf.Bytes(),
+			Header:   m.Header(),
+			Priority: 0,
+		}
+
+		if s.priorityMapper != nil {
+			e.Priority = s.priorityMapper(m.Category())
+		}
+
+		if !s.ringbuffer.Put(e) {
 			err := errors.New("ringbuffer is closed")
 			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("ringbuffer closed")
 		}
@@ -109,9 +130,9 @@ func (s *StreamListener) Close() {
 }
 
 // Consume an item by writing it to the specified WriteCloser. This is used in the StreamListener creation.
-func Consume(items [][]byte, w io.WriteCloser) bool {
-	for _, data := range items {
-		if _, err := w.Write(data); err != nil {
+func Consume(elems []ring.Elem, w ring.Writer) bool {
+	for _, e := range elems {
+		if _, err := w.Write(e.Data, e.Header, e.Priority); err != nil {
 			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("error in writing to WriteCloser")
 			return false
 		}

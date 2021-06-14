@@ -17,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
 
 // Collector is a very stupid implementation of the wire.EventCollector interface
@@ -54,7 +55,7 @@ func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 
 // CreateFrameStreamer sets up and event bus, subscribes a SimpleStreamer to the
 // gossip topic, and sets the right preprocessors up for the gossip topic.
-func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
+func CreateFrameStreamer(topic topics.Topic) (*EventBus, ring.Writer) {
 	eb := New()
 	streamer := NewSimpleStreamer(protocol.TestNet)
 	streamListener := NewStreamListener(streamer)
@@ -62,9 +63,9 @@ func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
 	return eb, streamer
 }
 
-// SimpleStreamer is a WriteCloser.
+// SimpleStreamer is a ring.Writer.
 var (
-	_ io.WriteCloser = (*SimpleStreamer)(nil)
+	_ ring.Writer    = (*SimpleStreamer)(nil)
 	_ io.WriteCloser = (*StupidStreamer)(nil)
 )
 
@@ -148,8 +149,8 @@ func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
 
 // Write receives the packets from the ringbuffer and writes it on the internal
 // pipe immediately.
-func (ms *SimpleStreamer) Write(p []byte) (n int, err error) {
-	b := bytes.NewBuffer(p)
+func (ms *SimpleStreamer) Write(data, header []byte, priority byte) (n int, err error) {
+	b := bytes.NewBuffer(data)
 	if e := ms.gossip.Process(b); e != nil {
 		return 0, e
 	}

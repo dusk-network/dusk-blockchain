@@ -12,14 +12,23 @@ import (
 	"sync/atomic"
 )
 
+// Elem single data unit of a ring buffer.
+type Elem struct {
+	Data     []byte
+	Header   []byte
+	Priority byte
+}
+
 // Buffer represents a circular array of data items.
 // It is suitable for (single/multiple) consumers (single/multiple) producers data transfer.
 type Buffer struct {
-	items      [][]byte
-	mu         *sync.Mutex
-	notEmpty   *sync.Cond
-	writeIndex int32
-	closed     syncBool
+	items    []Elem
+	mu       *sync.Mutex
+	notEmpty *sync.Cond
+
+	// writeIndex
+	wri    int32
+	closed syncBool
 }
 
 // NewBuffer returns an initialized ring buffer.
@@ -28,31 +37,31 @@ func NewBuffer(length int) *Buffer {
 	cv := sync.NewCond(m)
 
 	return &Buffer{
-		items:      make([][]byte, length),
-		notEmpty:   cv,
-		mu:         m,
-		writeIndex: -1,
+		items:    make([]Elem, length),
+		notEmpty: cv,
+		mu:       m,
+		wri:      -1,
 	}
 }
 
 // Put an item on the ring buffer.
-func (r *Buffer) Put(item []byte) bool {
-	if item == nil || r.closed.Load() {
+func (r *Buffer) Put(e Elem) bool {
+	if e.Data == nil || r.closed.Load() {
 		return false
 	}
 
 	// Protect the slice and the writeIndex
 	r.mu.Lock()
 
-	if !r.Has(item) {
+	if !r.Has(e) {
 		// Store the new item
-		r.writeIndex++
+		r.wri++
 		// Reset the writeIndex as this is ringBuffer
-		if int(r.writeIndex) == len(r.items) {
-			r.writeIndex = 0
+		if int(r.wri) == len(r.items) {
+			r.wri = 0
 		}
 
-		r.items[r.writeIndex] = item
+		r.items[r.wri] = e
 	}
 
 	r.mu.Unlock()
@@ -71,37 +80,38 @@ func (r *Buffer) Close() {
 }
 
 // GetAll gets all items in a buffer.
-func (r *Buffer) GetAll() ([][]byte, bool) {
+func (r *Buffer) GetAll() (ElemArray, bool) {
 	r.mu.Lock()
 
-	for int(r.writeIndex) < 0 && !r.closed.Load() {
+	for int(r.wri) < 0 && !r.closed.Load() {
 		r.notEmpty.Wait()
 	}
 
-	items := make([][]byte, 0)
-	for i, itemPtr := range r.items {
-		if itemPtr == nil {
+	elements := make(ElemArray, 0, len(r.items))
+
+	for i, elem := range r.items {
+		if elem.Data == nil {
 			break
 		}
 
-		items = append(items, itemPtr)
-		r.items[i] = nil
+		elements = append(elements, elem)
+		r.items[i].Data = nil
 	}
 
-	r.writeIndex = -1
+	r.wri = -1
 	r.mu.Unlock()
 
-	return items, r.closed.Load()
+	return elements, r.closed.Load()
 }
 
 // Has checks if item exists.
-func (r *Buffer) Has(item []byte) bool {
-	if item == nil {
+func (r *Buffer) Has(e Elem) bool {
+	if e.Data == nil {
 		return false
 	}
 
-	for _, existing := range r.items {
-		if bytes.Equal(existing, item) {
+	for _, bufElem := range r.items {
+		if bytes.Equal(bufElem.Data, e.Data) {
 			return true
 		}
 	}
@@ -113,6 +123,18 @@ func (r *Buffer) Has(item []byte) bool {
 func (r *Buffer) Closed() bool {
 	return r.closed.Load()
 }
+
+// ElemArray a sortable array of Elem in descending order.
+type ElemArray []Elem
+
+// Len complies with the Sort interface.
+func (e ElemArray) Len() int { return len(e) }
+
+// Swap complies with the Sort interface.
+func (e ElemArray) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
+
+// Less complies with the Sort interface.
+func (e ElemArray) Less(i, j int) bool { return e[i].Priority > e[j].Priority }
 
 // syncBool provides atomic Load/Store for bool type.
 type syncBool struct {
