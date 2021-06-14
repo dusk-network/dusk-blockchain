@@ -55,7 +55,7 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 		sv.Cluster = sortedset.NewCluster()
 	}
 
-	if err := sv.StepVotes.Add(ev.SignedHash, hdr.PubKeyBLS, hdr.Step); err != nil {
+	if err := sv.StepVotes.Add(ev.SignedHash); err != nil {
 		// adding the vote to the cluster failed. This is a programming error
 		panic(err)
 	}

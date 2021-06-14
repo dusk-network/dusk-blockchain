@@ -41,7 +41,6 @@ func TestStepVotes(t *testing.T) {
 	assert.NoError(t, bls.Verify(apk, hash, s))
 
 	expectedStepVotes := NewStepVotes()
-	expectedStepVotes.Apk = apk
 	expectedStepVotes.BitSet = bitset
 	expectedStepVotes.Signature = s
 
@@ -53,7 +52,7 @@ func TestStepVotes(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, expectedStepVotes, result)
-	assert.NoError(t, bls.Verify(result.Apk, hash, result.Signature))
+	assert.NoError(t, bls.Verify(apk, hash, result.Signature))
 }
 
 // Test that adding Reduction events to a StepVotes struct results in a properly
@@ -62,11 +61,22 @@ func TestStepVotesAdd(t *testing.T) {
 	sv := NewStepVotes()
 	set := sortedset.New()
 	hash := []byte("this is a mock message")
-	assert.NoError(t, sv.Add(genReduction(hash, &set)))
-	assert.NoError(t, sv.Add(genReduction(hash, &set)))
-	assert.NoError(t, sv.Add(genReduction(hash, &set)))
+	signedHash, pk := genReduction(hash, &set)
+	apk := bls.NewApk(pk)
 
-	assert.NoError(t, bls.Verify(sv.Apk, hash, sv.Signature))
+	assert.NoError(t, sv.Add(signedHash))
+
+	signedHash, pk = genReduction(hash, &set)
+
+	assert.NoError(t, apk.Aggregate(pk))
+	assert.NoError(t, sv.Add(signedHash))
+
+	signedHash, pk = genReduction(hash, &set)
+
+	assert.NoError(t, apk.Aggregate(pk))
+	assert.NoError(t, sv.Add(signedHash))
+
+	assert.NoError(t, bls.Verify(apk, hash, sv.Signature))
 }
 
 func genKeys(set *sortedset.Set) key.Keys {
@@ -75,7 +85,7 @@ func genKeys(set *sortedset.Set) key.Keys {
 	return k
 }
 
-func genReduction(hash []byte, set *sortedset.Set) ([]byte, []byte, uint8) {
+func genReduction(hash []byte, set *sortedset.Set) ([]byte, *bls.PublicKey) {
 	k := genKeys(set)
 
 	s, err := bls.Sign(k.BLSSecretKey, k.BLSPubKey, hash)
@@ -83,5 +93,5 @@ func genReduction(hash []byte, set *sortedset.Set) ([]byte, []byte, uint8) {
 		panic(err)
 	}
 
-	return s.Compress(), k.BLSPubKeyBytes, uint8(1)
+	return s.Compress(), k.BLSPubKey
 }

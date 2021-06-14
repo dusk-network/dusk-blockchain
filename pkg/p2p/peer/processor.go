@@ -49,10 +49,11 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 // to the processing function.
 func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf *ring.Buffer, services protocol.ServiceFlag, header []byte) ([]bytes.Buffer, error) {
 	b := bytes.NewBuffer(packet)
+	topic := topics.Topic(b.Bytes()[0])
 
 	msg, err := message.Unmarshal(b)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s - topic: %s", err, topic)
 	}
 
 	if header != nil {

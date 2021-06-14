@@ -185,6 +185,8 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 		}, nil
 	}
 
+	log.Infoln("converting txs")
+
 	txs, err := legacy.ContractCallsToTxs(req.Txs)
 	if err != nil {
 		log.WithError(err).Errorln("could not convert contract calls to legacy txs")
@@ -194,6 +196,8 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 	blk := block.NewBlock()
 	blk.Txs = txs
 	blk.Header.Height = req.Height
+
+	log.Infoln("checking wire block")
 
 	_, _, err = s.w.CheckWireBlock(*blk)
 	if err != nil {

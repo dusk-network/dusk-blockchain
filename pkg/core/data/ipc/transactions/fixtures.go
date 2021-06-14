@@ -21,6 +21,8 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
+const stateTransitionDelay = 1 * time.Second
+
 // PermissiveExecutor implements the transactions.Executor interface. It
 // simulates successful Validation and Execution of State transitions
 // all Validation and simulates.
@@ -40,12 +42,14 @@ func MockExecutor(height uint64) *PermissiveExecutor {
 // VerifyStateTransition returns all ContractCalls passed
 // height. It returns those ContractCalls deemed valid.
 func (p *PermissiveExecutor) VerifyStateTransition(ctx context.Context, cc []ContractCall, height uint64) ([]ContractCall, error) {
+	time.Sleep(stateTransitionDelay)
 	return cc, nil
 }
 
 // ExecuteStateTransition performs a global state mutation and steps the
 // block-height up.
 func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, height uint64) (user.Provisioners, error) {
+	time.Sleep(stateTransitionDelay)
 	return *p.P, nil
 }
 
