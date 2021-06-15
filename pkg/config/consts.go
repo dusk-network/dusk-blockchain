@@ -36,6 +36,10 @@ const (
 	KadcastInitialHeight byte = 128
 )
 
+var (
+	KadcastInitHeader = []byte{KadcastInitialHeight}
+)
+
 // DecodeGenesis marshals a genesis block into a buffer.
 func DecodeGenesis() *block.Block {
 	cfg, err := genesis.GetPresetConfig(Get().General.Network)

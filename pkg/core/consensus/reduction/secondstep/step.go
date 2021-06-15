@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
@@ -92,6 +93,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.Reduction {
 			rMsg := ev.Payload().(message.Reduction)
+
 			if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
 				continue
 			}
@@ -169,7 +171,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 	}
 
 	// Once the event is verified, we can republish it.
-	if err := p.Emitter.Gossip(message.New(topics.Reduction, r)); err != nil {
+	if err := p.Emitter.Republish(message.New(topics.Reduction, r.Copy().(message.Reduction)), config.KadcastInitHeader); err != nil {
 		lg.WithError(err).Error("could not republish reduction event")
 	}
 
@@ -249,7 +251,7 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 		"step":  step,
 	}).Traceln("gossiping_agreement")
 
-	if err := p.Gossip(message.New(topics.Agreement, *ev)); err != nil {
+	if err := p.Republish(message.New(topics.Agreement, *ev), config.KadcastInitHeader); err != nil {
 		lg.
 			WithError(err).
 			Error("gossip the agreement reported error, consensus is continuing but this needs to be investigated!")
