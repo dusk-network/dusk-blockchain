@@ -102,6 +102,10 @@ func (w *Writer) Serve() {
 			return 2
 		case topics.Score:
 			return 3
+		case topics.Reduction:
+			return 4
+		case topics.Agreement:
+			return 5
 		}
 
 		return 1
