@@ -11,6 +11,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -159,7 +160,7 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 	}
 
 	// Once the event is verified, we can republish it.
-	if err := p.Emitter.Gossip(message.New(topics.Reduction, r)); err != nil {
+	if err := p.Emitter.Republish(message.New(topics.Reduction, r), config.KadcastInitHeader); err != nil {
 		lg.WithError(err).Error("could not republish reduction event")
 	}
 
