@@ -10,6 +10,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -61,8 +62,9 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 	}()
 
 	evs := roundQueue.Flush(r.Round)
+
 	for _, ev := range evs {
-		go collectEvent(h, acc, ev.Payload().(message.Agreement), s.Emitter)
+		go collectEvent(h, acc, ev.Payload().(message.Agreement), config.KadcastInitHeader, s.Emitter)
 	}
 
 	for {
@@ -70,7 +72,7 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 		case m := <-agreementChan:
 			if s.shouldCollectNow(m, r.Round, roundQueue) {
 				msg := m.Payload().(message.Agreement)
-				go collectEvent(h, acc, msg, s.Emitter)
+				go collectEvent(h, acc, msg, m.Header(), s.Emitter)
 			}
 		case evs := <-acc.CollectedVotesChan:
 			lg.
@@ -145,14 +147,14 @@ func (s *Loop) requestCandidate(ctx context.Context, hash []byte) (block.Block, 
 	return s.requestor.RequestCandidate(ctx, hash)
 }
 
-func collectEvent(h *handler, accumulator *Accumulator, a message.Agreement, e *consensus.Emitter) {
+func collectEvent(h *handler, accumulator *Accumulator, a message.Agreement, msgHeader []byte, e *consensus.Emitter) {
 	hdr := a.State()
 	if !h.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step) {
 		return
 	}
 
 	// Once the event is verified, we can republish it.
-	if err := e.Gossip(message.New(topics.Agreement, a.Copy().(message.Agreement))); err != nil {
+	if err := e.Republish(message.New(topics.Agreement, a.Copy().(message.Agreement)), msgHeader); err != nil {
 		lg.WithError(err).Error("could not republish agreement event")
 	}
 
