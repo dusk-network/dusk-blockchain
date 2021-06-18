@@ -106,6 +106,8 @@ func (w *Writer) Serve() {
 			return 4
 		case topics.Agreement:
 			return 5
+		case topics.Candidate, topics.GetCandidate:
+			return 6
 		}
 
 		return 1
@@ -116,6 +118,7 @@ func (w *Writer) Serve() {
 
 	l2 := eventbus.NewStreamListenerWithParams(w, MaxWriterQueueSize, priorityMapper)
 	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l2)
+
 }
 
 func (w *Writer) Write(data, header []byte, priority byte) (int, error) {

@@ -13,6 +13,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -85,7 +86,14 @@ func (r *Requestor) publishGetCandidate(hash []byte) error {
 		return err
 	}
 
-	r.publisher.Publish(topics.Gossip, message.New(topics.GetCandidate, *buf))
+	if config.Get().Kadcast.Enabled {
+		m := message.NewWithHeader(topics.GetCandidate, *buf, config.KadcastInitHeader)
+		r.publisher.Publish(topics.Kadcast, m)
+	} else {
+		m := message.New(topics.GetCandidate, *buf)
+		r.publisher.Publish(topics.Gossip, m)
+	}
+
 	return nil
 }
 
