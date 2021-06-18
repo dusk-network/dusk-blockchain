@@ -109,7 +109,7 @@ func TestRequestor(t *testing.T) {
 		m := <-c
 		b := m.Payload().(message.SafeBuffer).Buffer
 
-		request, err := message.Unmarshal(&b)
+		request, err := message.Unmarshal(&b, nil)
 		assert.NoError(t, err)
 
 		if request.Category() == topics.GetCandidate {

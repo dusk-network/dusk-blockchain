@@ -264,7 +264,7 @@ func (r *RouterStreamer) Write(p []byte) (n int, err error) {
 	for i := 0; i < len(r.peers); i++ {
 		b := bytes.NewBuffer(p)
 
-		msg, err := message.Unmarshal(b)
+		msg, err := message.Unmarshal(b, nil)
 		if err != nil {
 			return 0, err
 		}

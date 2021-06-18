@@ -118,7 +118,6 @@ func (w *Writer) Serve() {
 
 	l2 := eventbus.NewStreamListenerWithParams(w, MaxWriterQueueSize, priorityMapper)
 	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l2)
-
 }
 
 func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
