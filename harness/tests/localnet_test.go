@@ -288,17 +288,6 @@ func TestMeasureNetworkTPS(t *testing.T) {
 
 	defaultLocktime := uint64(100000)
 
-	// Send a bunch of Bid transactions
-	// All nodes are Block Generators
-	for i := uint(0); i < uint(localNet.Size()); i++ {
-		time.Sleep(100 * time.Millisecond)
-		logrus.Infof("Node %d sending a Bid transaction", i)
-
-		if _, err := localNet.SendBidCmd(i, 100, defaultLocktime); err != nil {
-			logrus.Error(err.Error())
-		}
-	}
-
 	// Send a bunch of Stake transactions
 	// All nodes are Provisioners
 	for i := uint(0); i < uint(localNet.Size()); i++ {

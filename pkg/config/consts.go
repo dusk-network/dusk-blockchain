@@ -36,9 +36,8 @@ const (
 	KadcastInitialHeight byte = 128
 )
 
-var (
-	KadcastInitHeader = []byte{KadcastInitialHeight}
-)
+// KadcastInitHeader is used as default initial kadcast message header.
+var KadcastInitHeader = []byte{KadcastInitialHeight}
 
 // DecodeGenesis marshals a genesis block into a buffer.
 func DecodeGenesis() *block.Block {

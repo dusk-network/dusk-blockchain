@@ -239,7 +239,7 @@ func Setup() *Server {
 
 	// Create the listener and contact the voucher seeder
 	var gossip *protocol.Gossip
-	if cfg.Get().Kadcast.Enabled {
+	if !cfg.Get().Kadcast.Enabled {
 		gossip = protocol.NewGossip(protocol.TestNet)
 		connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag), peer.Create)
 
