@@ -92,12 +92,21 @@ func (s *sessionlessClient) GracefulClose(options ...grpc.DialOption) {
 	}
 }
 
+const (
+	// GossipNetwork Gossip network type.
+	GossipNetwork = byte(0)
+	// KadcastNetwork  Kadcast network type.
+	KadcastNetwork = byte(1)
+)
+
 // Network describes the current network configuration in terms of nodes and
 // processes.
 type Network struct {
 	grpcClients map[string]GrpcClient
 	nodes       []*DuskNode
 	processes   []*os.Process
+
+	NetworkType byte
 }
 
 // AddNode to the network.
@@ -146,14 +155,16 @@ func (n *Network) Bootstrap(workspace string) error {
 		return err
 	}
 
-	// Start voucher seeder.
-	if len(seederExec) > 0 {
-		if err := n.start(workspace, seederExec); err != nil {
-			return err
+	// Start voucher seeder if gossip network is selected.
+	if n.NetworkType == GossipNetwork {
+		if len(seederExec) > 0 {
+			if err := n.start(workspace, seederExec); err != nil {
+				return err
+			}
+		} else {
+			// If path not provided, then it's assumed that the seeder is already running.
+			log.Warnf("Seeder path not provided. Please, ensure dusk-seeder is already running")
 		}
-	} else {
-		// If path not provided, then it's assumed that the seeder is already running.
-		log.Warnf("Seeder path not provided. Please, ensure dusk-seeder is already running")
 	}
 
 	if MOCK_ADDRESS != "" {

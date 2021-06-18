@@ -64,8 +64,17 @@ func TestMain(m *testing.M) {
 		localNetSize = currentLocalNetSize
 	}
 
-	if tomlProfile == "" {
-		tomlProfile = "default"
+	// Select network type based on nodes profile name
+	switch tomlProfile {
+	case "":
+		{
+			tomlProfile = "default"
+			localNet.NetworkType = engine.GossipNetwork
+		}
+	case "kadcast":
+		{
+			localNet.NetworkType = engine.KadcastNetwork
+		}
 	}
 
 	fmt.Println("GRPC Session enabled?", localNet.IsSessionRequired())
