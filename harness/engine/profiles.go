@@ -94,7 +94,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 
 	viper.Set("rpc.rusk.network", node.Cfg.RPC.Rusk.Network)
 	viper.Set("rpc.rusk.address", addr)
-	viper.Set("rpc.rusk.contractTimeout", 6000)
+	viper.Set("rpc.rusk.contractTimeout", 20000)
 	viper.Set("rpc.rusk.defaultTimeout", 1000)
 	viper.Set("rpc.rusk.connectiontimeout", 10000)
 	viper.Set("database.driver", heavy.DriverName)

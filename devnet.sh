@@ -198,7 +198,7 @@ enabled = false
 
   [rpc.rusk]
     address = "127.0.0.1:$((10000+$i))"
-    contractTimeout = 6000
+    contractTimeout = 20000
     defaultTimeout = 1000
     connectionTimeout = 10000
 

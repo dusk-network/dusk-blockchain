@@ -153,7 +153,7 @@ keyFile=""
 [rpc.rusk]
 
 # timeout for internal GRPC calls expressed in milliseconds
-contractTimeout=6000
+contractTimeout=20000
 defaultTimeout=200
 connectionTimeout = 10000
 
