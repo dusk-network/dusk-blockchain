@@ -170,8 +170,10 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		return nil
 	}
 
+	m := message.NewWithHeader(topics.Reduction, r.Copy().(message.Reduction), config.KadcastInitHeader)
+
 	// Once the event is verified, we can republish it.
-	if err := p.Emitter.Republish(message.New(topics.Reduction, r.Copy().(message.Reduction)), config.KadcastInitHeader); err != nil {
+	if err := p.Emitter.Republish(m); err != nil {
 		lg.WithError(err).Error("could not republish reduction event")
 	}
 
@@ -251,7 +253,8 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 		"step":  step,
 	}).Traceln("gossiping_agreement")
 
-	if err := p.Republish(message.New(topics.Agreement, *ev), config.KadcastInitHeader); err != nil {
+	m := message.NewWithHeader(topics.Agreement, *ev, config.KadcastInitHeader)
+	if err := p.Republish(m); err != nil {
 		lg.
 			WithError(err).
 			Error("gossip the agreement reported error, consensus is continuing but this needs to be investigated!")

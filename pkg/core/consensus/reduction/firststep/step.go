@@ -159,8 +159,10 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 		return nil
 	}
 
+	m := message.NewWithHeader(topics.Reduction, r, config.KadcastInitHeader)
+
 	// Once the event is verified, we can republish it.
-	if err := p.Emitter.Republish(message.New(topics.Reduction, r), config.KadcastInitHeader); err != nil {
+	if err := p.Emitter.Republish(m); err != nil {
 		lg.WithError(err).Error("could not republish reduction event")
 	}
 

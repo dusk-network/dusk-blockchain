@@ -82,7 +82,8 @@ func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
 
-	if err := r.Republish(message.New(topics.Reduction, *red), config.KadcastInitHeader); err != nil {
+	m := message.NewWithHeader(topics.Reduction, *red, config.KadcastInitHeader)
+	if err := r.Republish(m); err != nil {
 		panic(err)
 	}
 }

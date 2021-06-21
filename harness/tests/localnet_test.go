@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 
 	// Select network type based on nodes profile name
 	switch tomlProfile {
-	case "":
+	case "", "default":
 		{
 			tomlProfile = "default"
 			localNet.NetworkType = engine.GossipNetwork

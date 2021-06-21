@@ -64,15 +64,14 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 	evs := roundQueue.Flush(r.Round)
 
 	for _, ev := range evs {
-		go collectEvent(h, acc, ev.Payload().(message.Agreement), config.KadcastInitHeader, s.Emitter)
+		go collectEvent(h, acc, ev, s.Emitter)
 	}
 
 	for {
 		select {
 		case m := <-agreementChan:
 			if s.shouldCollectNow(m, r.Round, roundQueue) {
-				msg := m.Payload().(message.Agreement)
-				go collectEvent(h, acc, msg, m.Header(), s.Emitter)
+				go collectEvent(h, acc, m, s.Emitter)
 			}
 		case evs := <-acc.CollectedVotesChan:
 			lg.
@@ -147,14 +146,19 @@ func (s *Loop) requestCandidate(ctx context.Context, hash []byte) (block.Block, 
 	return s.requestor.RequestCandidate(ctx, hash)
 }
 
-func collectEvent(h *handler, accumulator *Accumulator, a message.Agreement, msgHeader []byte, e *consensus.Emitter) {
+func collectEvent(h *handler, accumulator *Accumulator, ev message.Message, e *consensus.Emitter) {
+	a := ev.Payload().(message.Agreement)
+
 	hdr := a.State()
 	if !h.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step) {
 		return
 	}
 
+	// TODO: As an optimization, ev.Header() should be used instead of always starting from KadcastInitHeader.
+	m := message.NewWithHeader(topics.Agreement, a.Copy().(message.Agreement), config.KadcastInitHeader)
+
 	// Once the event is verified, we can republish it.
-	if err := e.Republish(message.New(topics.Agreement, a.Copy().(message.Agreement)), msgHeader); err != nil {
+	if err := e.Republish(m); err != nil {
 		lg.WithError(err).Error("could not republish agreement event")
 	}
 
