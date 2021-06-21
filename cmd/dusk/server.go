@@ -239,17 +239,20 @@ func Setup() *Server {
 
 	// Create the listener and contact the voucher seeder
 	gossip := protocol.NewGossip(protocol.TestNet)
-	connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag), peer.Create)
 
-	seeders := cfg.Get().Network.Seeder.Addresses
-	for _, seeder := range seeders {
-		if err = connector.Connect(seeder); err != nil {
-			log.WithError(err).Error("could not contact voucher seeder")
+	if !cfg.Get().Kadcast.Enabled {
+		connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag), peer.Create)
+
+		seeders := cfg.Get().Network.Seeder.Addresses
+		for _, seeder := range seeders {
+			if err = connector.Connect(seeder); err != nil {
+				log.WithError(err).Error("could not contact voucher seeder")
+			}
 		}
-	}
 
-	if connector.GetConnectionsCount() == 0 {
-		panic("could not contact any voucher seeders")
+		if connector.GetConnectionsCount() == 0 {
+			panic("could not contact any voucher seeders")
+		}
 	}
 
 	// creating the Server

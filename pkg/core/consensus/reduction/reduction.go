@@ -9,6 +9,7 @@ package reduction
 import (
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -81,7 +82,8 @@ func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
 
-	if err := r.Gossip(message.New(topics.Reduction, *red)); err != nil {
+	m := message.NewWithHeader(topics.Reduction, *red, config.KadcastInitHeader)
+	if err := r.Republish(m); err != nil {
 		panic(err)
 	}
 }

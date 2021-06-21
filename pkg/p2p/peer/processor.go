@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -53,19 +54,34 @@ func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf 
 		return nil, errors.New("empty packet provided")
 	}
 
+	defer m.trace(time.Now().UnixNano(), packet)
+
 	b := bytes.NewBuffer(packet)
 	topic := topics.Topic(b.Bytes()[0])
 
-	msg, err := message.Unmarshal(b)
+	msg, err := message.Unmarshal(b, header)
 	if err != nil {
 		return nil, fmt.Errorf("error while unmarshaling: %s - topic: %s", err, topic)
 	}
 
-	if header != nil {
-		msg = message.NewWithHeader(msg.Category(), msg.Payload(), header)
-	}
-
 	return m.process(srcPeerID, msg, respRingBuf, services)
+}
+
+func (m *MessageProcessor) trace(st int64, msg []byte) {
+	if l.Logger.GetLevel() == log.TraceLevel {
+		duration := float64(time.Now().UnixNano()-st) / 1000000
+
+		var topicName string
+		if len(msg) > 0 {
+			topicName = topics.Topic(msg[0]).String()
+		}
+
+		l.WithField("process", "msg_processor").
+			WithField("len", len(msg)).
+			WithField("ms", duration).
+			WithField("topic", topicName).
+			Trace("wire message")
+	}
 }
 
 func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {

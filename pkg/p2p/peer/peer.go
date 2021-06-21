@@ -326,14 +326,10 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 		go func() {
 			// TODO: error here should be checked in order to decrease reputation
 			// or blacklist spammers
-			startTime := time.Now().UnixNano()
-
 			if _, err = p.processor.Collect(p.Addr(), message, ringBuf, p.services, nil); err != nil {
 				l.WithField("process", "readloop").WithField("cs", hex.EncodeToString(cs)).
 					WithError(err).Error("failed to process message")
 			}
-
-			p.logWireMsg(startTime, cs, message)
 		}()
 
 		// Reset the keepalive timer
@@ -352,23 +348,6 @@ func (p *Reader) keepAliveLoop(ctx context.Context, timer *time.Timer) {
 			timer.Stop()
 			return
 		}
-	}
-}
-
-func (p *Reader) logWireMsg(startTime int64, cs, msg []byte) {
-	if l.Logger.GetLevel() == log.TraceLevel {
-		duration := float64(time.Now().UnixNano()-startTime) / 1000000
-
-		var topicName string
-		if len(msg) > 0 {
-			topicName = topics.Topic(msg[0]).String()
-		}
-
-		l.WithField("process", "readloop").WithField("cs", hex.EncodeToString(cs)).
-			WithField("len", len(msg)).
-			WithField("ms", duration).
-			WithField("topic", topicName).
-			Trace("gossip message")
 	}
 }
 

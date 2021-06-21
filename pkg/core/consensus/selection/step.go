@@ -169,7 +169,8 @@ func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
 
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
-	if err := p.Republish(message.New(topics.Score, sc), msgHeader); err != nil {
+	m := message.NewWithHeader(topics.Score, sc, msgHeader)
+	if err := p.Republish(m); err != nil {
 		lg.WithError(err).WithField("kadcast_enabled", config.Get().Kadcast.Enabled).
 			Error("could not republish score event")
 	}

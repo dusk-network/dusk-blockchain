@@ -97,6 +97,7 @@ func Clone(m Message) (Message, error) {
 		category:  m.Category(),
 		marshaled: &b,
 		payload:   m.Payload().Copy(),
+		header:    m.Header(),
 	}, nil
 }
 
@@ -229,10 +230,10 @@ func (m *simple) initPayloadBuffer(b bytes.Buffer) {
 // Unmarshal mutates the buffer by extracting the topic. It create the Message
 // by setting the topic and unmarshaling the payload into the proper structure
 // It also caches the serialized form within the message.
-func Unmarshal(b *bytes.Buffer) (Message, error) {
+func Unmarshal(b *bytes.Buffer, h []byte) (Message, error) {
 	var err error
 
-	msg := &simple{}
+	msg := &simple{header: h}
 	msg.initPayloadBuffer(*b)
 
 	topic, err := topics.Extract(b)

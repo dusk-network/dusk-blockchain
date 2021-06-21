@@ -72,7 +72,7 @@ func (g *gossipRouter) route(m message.Message) {
 	if g.d.HasAnywhere(&b) {
 		// The incoming message will be a message.SafeBuffer, as it's coming from
 		// the consensus.Emitter.
-		m, err := message.Unmarshal(&b)
+		m, err := message.Unmarshal(&b, nil)
 		if err != nil {
 			panic(err)
 		}
