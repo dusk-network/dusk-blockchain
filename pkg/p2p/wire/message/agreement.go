@@ -33,10 +33,8 @@ type (
 	// admit duplicates, whereas the same provisioner may very well be included in
 	// the committee for both Reduction steps.
 	StepVotes struct {
-		Apk       *bls.Apk
 		BitSet    uint64
 		Signature *bls.Signature
-		Step      uint8
 	}
 
 	// StepVotesMsg is the internal message exchanged by the consensus
@@ -62,8 +60,6 @@ type (
 func (s *StepVotes) Copy() *StepVotes {
 	return &StepVotes{
 		BitSet:    s.BitSet,
-		Step:      s.Step,
-		Apk:       s.Apk.Copy(),
 		Signature: s.Signature.Copy(),
 	}
 }
@@ -112,10 +108,10 @@ func (a Agreement) Copy() payload.Safe {
 
 // NewStepVotesMsg creates a StepVotesMsg.
 // Deprecated.
-func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) StepVotesMsg {
+func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes, step uint8) StepVotesMsg {
 	return StepVotesMsg{
 		Header: header.Header{
-			Step:      sv.Step,
+			Step:      step,
 			Round:     round,
 			BlockHash: hash,
 			PubKeyBLS: sender,
@@ -132,21 +128,21 @@ func (s StepVotesMsg) Copy() payload.Safe {
 	if err != nil {
 		log.WithError(err).Error("StepVotesMsg.Copy, could not MarshalStepVotes")
 		// FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
-		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes())
+		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes(), 0)
 	}
 
 	sv, err := UnmarshalStepVotes(b)
 	if err != nil {
 		// FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
 		log.WithError(err).Error("StepVotesMsg.Copy, could not UnmarshalStepVotes")
-		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes())
+		return NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes(), 0)
 	}
 
 	hdrCopy := s.Header.Copy()
 	if hdrCopy == nil {
 		return StepVotesMsg{
 			// FIXME: creating a empty stepvotes with round 0 does not seem optimal, how can this be improved ?
-			Header:    NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes()).Header,
+			Header:    NewStepVotesMsg(0, []byte{}, []byte{}, *NewStepVotes(), 0).Header,
 			StepVotes: *sv,
 		}
 	}
@@ -168,13 +164,13 @@ func (s StepVotesMsg) State() header.Header {
 // IsEmpty returns whether the StepVotesMsg represents a failed convergence
 // attempt at consensus over a Reduction message.
 func (s StepVotes) IsEmpty() bool {
-	return s.Apk == nil
+	return s.Signature == nil
 }
 
 // String representation.
 func (s StepVotes) String() string {
 	var sb strings.Builder
-	_, _ = sb.WriteString(fmt.Sprintf("BitSet: %d Step: %d\n Sig: %v\n Apk: %v\n", s.BitSet, s.Step, s.Signature, s.Apk))
+	_, _ = sb.WriteString(fmt.Sprintf("BitSet: %d\n Sig: %v\n", s.BitSet, s.Signature))
 	return sb.String()
 }
 
@@ -239,43 +235,22 @@ func UnmarshalAgreementMessage(r *bytes.Buffer, m SerializableMessage) error {
 // NewStepVotes returns a new StepVotes structure for a given round, step and block hash.
 func NewStepVotes() *StepVotes {
 	return &StepVotes{
-		Apk:       nil,
 		BitSet:    uint64(0),
 		Signature: nil,
-		Step:      uint8(0),
 	}
 }
 
 // Equal checks if two StepVotes structs are the same.
 func (s *StepVotes) Equal(other *StepVotes) bool {
-	return bytes.Equal(s.Apk.Marshal(), other.Apk.Marshal()) &&
-		bytes.Equal(s.Signature.Marshal(), other.Signature.Marshal())
+	return bytes.Equal(s.Signature.Marshal(), other.Signature.Marshal())
 }
 
 // Add a vote to the StepVotes struct.
-func (s *StepVotes) Add(signature, sender []byte, step uint8) error {
-	if s.Apk == nil {
-		pk, err := bls.UnmarshalPk(sender)
-		if err != nil {
-			return err
-		}
-
-		s.Step = step
-		s.Apk = bls.NewApk(pk)
+func (s *StepVotes) Add(signature []byte) error {
+	if s.Signature == nil {
+		var err error
 
 		s.Signature, err = bls.UnmarshalSignature(signature)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	if step != s.Step {
-		return fmt.Errorf("mismatched step in aggregating vote set. Expected %d, got %d", s.Step, step)
-	}
-
-	if err := s.Apk.AggregateBytes(sender); err != nil {
 		return err
 	}
 
@@ -392,32 +367,23 @@ func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 	sv := NewStepVotes()
 
-	// APK
-	var apk []byte
-
-	err := encoding.ReadVarBytes(r, &apk)
-	if err != nil {
-		return nil, err
-	}
-
-	sv.Apk, err = bls.UnmarshalApk(apk)
-	if err != nil {
-		return nil, err
-	}
-
 	// BitSet
-	if e := encoding.ReadUint64LE(r, &sv.BitSet); e != nil {
-		return nil, e
+	var err error
+	if err = encoding.ReadUint64LE(r, &sv.BitSet); err != nil {
+		log.WithError(err).Errorln("failed to unmarshal bitset")
+		return nil, err
 	}
 
 	// Signature
 	signature := make([]byte, 33)
-	if e := encoding.ReadBLS(r, signature); e != nil {
-		return nil, e
+	if err = encoding.ReadBLS(r, signature); err != nil {
+		log.WithError(err).Errorln("failed to unmarshal signature")
+		return nil, err
 	}
 
 	sv.Signature, err = bls.UnmarshalSignature(signature)
 	if err != nil {
+		log.WithError(err).Errorln("failed to decode signature")
 		return nil, err
 	}
 
@@ -443,17 +409,12 @@ func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 // for an ordered set of votes.
 func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	// #611
-	if vote == nil || vote.Apk == nil || vote.Signature == nil {
+	if vote == nil || vote.Signature == nil {
 		log.
 			WithField("vote", vote).
 			Error("could not MarshalStepVotes")
 
 		return errors.New("invalid stepVotes")
-	}
-
-	// APK
-	if err := encoding.WriteVarBytes(r, vote.Apk.Marshal()); err != nil {
-		return err
 	}
 
 	// BitSet
@@ -581,7 +542,7 @@ func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Key
 			}
 
 			sigma, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, r.Bytes())
-			if err := stepVotes.Add(sigma.Compress(), k.BLSPubKeyBytes, step); err != nil {
+			if err := stepVotes.Add(sigma.Compress()); err != nil {
 				// FIXME: shall this panic ?
 				panic(err)
 			}

@@ -37,7 +37,7 @@ func TestSendReduction(t *testing.T) {
 
 	// Generate second StepVotes
 	svs := message.GenVotes(hash, 1, 2, hlp.ProvisionersKeys, hlp.P)
-	msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0])
+	msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0], 0)
 
 	// injecting the stepVotes into secondStep
 	stepFn := secondStep.Initialize(msg)
@@ -175,7 +175,7 @@ func TestSecondStepReduction(t *testing.T) {
 
 			// Generate second StepVotes
 			svs := message.GenVotes(hash, 1, 2, hlp.ProvisionersKeys, hlp.P)
-			msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0])
+			msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0], 0)
 
 			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, streamer)
 			secondStepReduction.SetNext(testPhase)

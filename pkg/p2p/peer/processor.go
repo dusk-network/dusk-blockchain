@@ -8,6 +8,7 @@ package peer
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -48,11 +49,16 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
 func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf *ring.Buffer, services protocol.ServiceFlag, header []byte) ([]bytes.Buffer, error) {
+	if len(packet) == 0 {
+		return nil, errors.New("empty packet provided")
+	}
+
 	b := bytes.NewBuffer(packet)
+	topic := topics.Topic(b.Bytes()[0])
 
 	msg, err := message.Unmarshal(b)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while unmarshaling: %s - topic: %s", err, topic)
 	}
 
 	if header != nil {
@@ -96,7 +102,7 @@ func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respRi
 
 	bufs, err := processFn(srcPeerID, msg)
 	if err != nil {
-		return nil, fmt.Errorf("%s - topic %s", err, msg.Category())
+		return nil, fmt.Errorf("error while processing: %s - topic %s", err, msg.Category())
 	}
 
 	if respRingBuf != nil {

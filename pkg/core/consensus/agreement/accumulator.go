@@ -60,8 +60,6 @@ func (a *Accumulator) Process(ev message.Agreement) {
 // Accumulate agreements per block hash until a quorum is reached or a stop is detected (by closing the internal event channel). Supposed to run in a goroutine.
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
-		// FIXME: republish here to avoid race conditions for slower but safer
-		// re-propagation
 		hdr := ev.State()
 		collected := a.store.Get(hdr.Step)
 		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
