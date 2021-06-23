@@ -92,7 +92,7 @@ func (t *Transactor) handleSendStakeTx(req *node.StakeRequest) (*node.Transactio
 	// FIXME: 476 - we should calculate the expirationHeight somehow (by asking
 	// the chain for the last block through the RPC bus and calculating the
 	// height)
-	tx, err := t.proxy.Provider().NewStake(ctx, blsKey.Marshal(), req.Amount)
+	tx, err := t.proxy.Provider().NewStake(ctx, blsKey, req.Amount)
 	if err != nil {
 		log.
 			WithField("amount", req.Amount).

@@ -71,7 +71,7 @@ func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
 		Round:     round,
 		Step:      step,
 		BlockHash: hash,
-		PubKeyBLS: r.Keys.BLSPubKeyBytes,
+		PubKeyBLS: r.Keys.BLSPubKey,
 	}
 
 	sig, err := r.Sign(hdr)

@@ -61,7 +61,7 @@ func (b *Handler) VerifySignature(scr message.Score) error {
 	// see https://github.com/dusk-network/dusk-crypto/issues/16
 	sig := make([]byte, len(scr.SignedHash))
 	copy(sig, scr.SignedHash)
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, packet.Bytes())
 }
 
 // Committee returns a VotingCommittee for a given round and step.

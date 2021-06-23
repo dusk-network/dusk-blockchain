@@ -14,7 +14,7 @@ import (
 )
 
 func TestAccumulatorProcessing(t *testing.T) {
-	nr := 50
+	nr := 10
 	hlp := NewHelper(nr)
 	hash, _ := crypto.RandEntropy(32)
 	handler := NewHandler(hlp.Keys, *hlp.P)
@@ -26,5 +26,5 @@ func TestAccumulatorProcessing(t *testing.T) {
 	}
 
 	accumulatedAggros := <-accumulator.CollectedVotesChan
-	assert.Equal(t, 38, len(accumulatedAggros))
+	assert.Equal(t, 8, len(accumulatedAggros))
 }

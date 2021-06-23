@@ -35,7 +35,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	emitter.Keys = provisionersKeys[0]
 
 	hlp := &Helper{
-		ThisSender:       emitter.Keys.BLSPubKeyBytes,
+		ThisSender:       emitter.Keys.BLSPubKey,
 		ProvisionersKeys: provisionersKeys,
 		P:                p,
 		Nr:               provisioners,

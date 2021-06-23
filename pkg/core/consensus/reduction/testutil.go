@@ -74,7 +74,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 	hlp := &Helper{
 		failOnVerification: false,
 
-		ThisSender:       emitter.Keys.BLSPubKeyBytes,
+		ThisSender:       emitter.Keys.BLSPubKey,
 		ProvisionersKeys: provisionersKeys,
 		P:                p,
 		Nr:               provisioners,
@@ -108,7 +108,7 @@ func (hlp *Helper) Spawn(hash []byte, round uint64, step uint8) []message.Reduct
 		evs = append(evs, ev)
 
 		i++
-		count += hlp.Handler.VotesFor(hlp.ProvisionersKeys[i].BLSPubKeyBytes, round, step)
+		count += hlp.Handler.VotesFor(hlp.ProvisionersKeys[i].BLSPubKey, round, step)
 	}
 
 	return evs

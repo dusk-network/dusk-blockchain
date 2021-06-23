@@ -237,7 +237,7 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 		E: transactions.MockExecutor(startAtHeight),
 	}
 
-	BLSKeys, _ := key.NewRandKeys()
+	BLSKeys := key.NewRandKeys()
 	pk := keys.PublicKey{
 		AG: make([]byte, 32),
 		BG: make([]byte, 32),

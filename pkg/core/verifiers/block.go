@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 // CheckBlockCertificate ensures that the block certificate is valid.
@@ -31,16 +30,8 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 	stepOne := blk.Header.Certificate.Step - 1
 	stepTwo := blk.Header.Certificate.Step
 
-	// Reconstruct signatures
-	stepOneBatchedSig, err := bls.UnmarshalSignature(blk.Header.Certificate.StepOneBatchedSig)
-	if err != nil {
-		return err
-	}
-
-	stepTwoBatchedSig, err := bls.UnmarshalSignature(blk.Header.Certificate.StepTwoBatchedSig)
-	if err != nil {
-		return err
-	}
+	stepOneBatchedSig := blk.Header.Certificate.StepOneBatchedSig
+	stepTwoBatchedSig := blk.Header.Certificate.StepTwoBatchedSig
 
 	// Now, check the certificate's correctness for both reduction steps
 	if err := checkBlockCertificateForStep(stepOneBatchedSig, blk.Header.Certificate.StepOneCommittee, blk.Header.Height, stepOne, provisioners, blk.Header.Hash); err != nil {
@@ -50,7 +41,7 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 	return checkBlockCertificateForStep(stepTwoBatchedSig, blk.Header.Certificate.StepTwoCommittee, blk.Header.Height, stepTwo, provisioners, blk.Header.Hash)
 }
 
-func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, round uint64, step uint8, provisioners user.Provisioners, blockHash []byte) error {
+func checkBlockCertificateForStep(batchedSig []byte, bitSet uint64, round uint64, step uint8, provisioners user.Provisioners, blockHash []byte) error {
 	size := committeeSize(provisioners.SubsetSizeAt(round))
 	committee := provisioners.CreateVotingCommittee(round, step, size)
 	subcommittee := committee.IntersectCluster(bitSet)

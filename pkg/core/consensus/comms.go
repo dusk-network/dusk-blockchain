@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -21,7 +22,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 type (
@@ -113,7 +113,7 @@ func (e *Emitter) Sign(h header.Header) ([]byte, error) {
 		return nil, err
 	}
 
-	return signedHash.Compress(), nil
+	return signedHash, nil
 }
 
 // Gossip concatenates the topic, the header and the payload,

@@ -178,10 +178,10 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 	}
 
 	lg.WithFields(log.Fields{
-		"round": hdr.Round,
-		"step":  hdr.Step,
-		//"sender": hex.EncodeToString(hdr.Sender()),
-		//"hash":   hex.EncodeToString(hdr.BlockHash),
+		"round":  hdr.Round,
+		"step":   hdr.Step,
+		"sender": hex.EncodeToString(hdr.Sender()),
+		"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received_2nd_step_reduction")
 
 	result := p.aggregator.CollectVote(r)
@@ -206,7 +206,7 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 			Step:      step,
 			Round:     round,
 			BlockHash: r.Hash,
-			PubKeyBLS: p.Keys.BLSPubKeyBytes,
+			PubKeyBLS: p.Keys.BLSPubKey,
 		},
 		StepVotes: r.SV,
 	}
@@ -222,7 +222,7 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 	hdr := header.Header{
 		Round:     round,
 		Step:      step,
-		PubKeyBLS: p.Keys.BLSPubKeyBytes,
+		PubKeyBLS: p.Keys.BLSPubKey,
 		BlockHash: svm.BlockHash,
 	}
 

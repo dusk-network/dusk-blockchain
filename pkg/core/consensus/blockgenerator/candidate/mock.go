@@ -39,7 +39,7 @@ type mock struct {
 
 func (m *mock) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
 	hdr := header.Header{
-		PubKeyBLS: make([]byte, 129),
+		PubKeyBLS: make([]byte, 96),
 		Round:     r.Round,
 		Step:      step,
 		BlockHash: make([]byte, 32),
