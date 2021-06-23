@@ -199,7 +199,11 @@ func copyMembers(members map[string]*Member) map[string]*Member {
 
 	for k, v := range members {
 		member := &Member{
-			PublicKeyBLS: v.PublicKeyBLS,
+			PublicKeyBLS: make([]byte, len(v.PublicKeyBLS)),
+		}
+
+		if len(v.PublicKeyBLS) > 0 {
+			copy(member.PublicKeyBLS, v.PublicKeyBLS)
 		}
 
 		member.Stakes = append(member.Stakes, v.Stakes...)
