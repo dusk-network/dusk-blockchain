@@ -7,6 +7,7 @@
 package sortedset
 
 import (
+	"bytes"
 	"math"
 	"math/big"
 	"sort"
@@ -150,19 +151,12 @@ func (v *Set) Bits(subset Set) uint64 {
 		return ret
 	}
 
-	var head *big.Int
-
-	head, subset = subset[0], subset[1:]
-
-	for i, elem := range *v {
-		if elem.Cmp(head) == 0 {
-			ret |= 1 << uint(i) // flip the i-th bit to 1
-
-			if len(subset) == 0 {
+	for _, cmpElem := range subset {
+		for i, elem := range *v {
+			if bytes.Equal(elem.Bytes(), cmpElem.Bytes()) {
+				ret |= 1 << uint(i) // flip the i-th bit to 1
 				break
 			}
-
-			head, subset = subset[0], subset[1:]
 		}
 	}
 
