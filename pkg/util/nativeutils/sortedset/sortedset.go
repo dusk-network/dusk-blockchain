@@ -187,6 +187,13 @@ func (v Set) Whole() uint64 {
 	return ret
 }
 
+// Contains returns true if Set contains b.
+func (v *Set) Contains(b []byte) bool {
+	iRepr := new(big.Int).SetBytes(b)
+	_, found := v.indexOf(iRepr)
+	return found
+}
+
 func shortStr(i *big.Int) string {
 	var str strings.Builder
 
