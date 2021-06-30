@@ -62,11 +62,8 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 	// vote is taken into account (if more votes for the same slot are
 	// propagated, those are discarded).
 
-	// In addition, if a step execution lasts longer than default consensus
-	// time of 5 sec, dupemap will be reset and duplicated reduction messages
-	// can occur.
 	if sv.Cluster.Contains(hdr.PubKeyBLS) {
-		log.Warn("Disacrding duplicated votes from a single committee")
+		log.Warn("Disacrding duplicated votes from a Provisioner")
 		return nil
 	}
 

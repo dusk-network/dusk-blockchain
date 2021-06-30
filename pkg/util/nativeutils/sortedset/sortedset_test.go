@@ -113,3 +113,27 @@ func BenchmarkInsert(b *testing.B) {
 		v.Insert(bytes)
 	}
 }
+
+func TestBitsMissingValue(t *testing.T) {
+	set := New()
+	subset := New()
+
+	set = append(set, big.NewInt(0))
+	set = append(set, big.NewInt(10))
+	set = append(set, big.NewInt(20))
+	set = append(set, big.NewInt(30))
+
+	// First item in subset is not presented in the set
+	subset = append(subset, big.NewInt(1))
+
+	subset = append(subset, big.NewInt(20))
+	subset = append(subset, big.NewInt(30))
+
+	sort.Sort(set)
+	sort.Sort(subset)
+
+	repr := set.Bits(subset)
+	expected := uint64(12) // 0011
+
+	assert.Equal(t, expected, repr)
+}
