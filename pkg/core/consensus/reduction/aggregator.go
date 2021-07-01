@@ -55,6 +55,19 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 		sv.Cluster = sortedset.NewCluster()
 	}
 
+	// Each committee has 64 slots. If a Provisioner is extracted into
+	// multiple slots, then he/she only needs to send one vote which can be
+	// taken account as a vote for all his/her slots. Otherwise, if a
+	// Provisioner is only extracted to one slot per committee, then a single
+	// vote is taken into account (if more votes for the same slot are
+	// propagated, those are discarded).
+
+	if sv.Cluster.Contains(hdr.PubKeyBLS) {
+		log.Warn("Disacrding duplicated votes from a Provisioner")
+		return nil
+	}
+
+	// Aggregated Signatures
 	if err := sv.StepVotes.Add(ev.SignedHash); err != nil {
 		// adding the vote to the cluster failed. This is a programming error
 		panic(err)
