@@ -15,7 +15,7 @@ import (
 )
 
 // PregenerationAmount is the size of a pregenerated committee.
-var PregenerationAmount uint8 = 8
+var PregenerationAmount uint8 = 1
 
 // Handler is injected in the consensus components that work with the various
 // committee. It generates and maintains a list of active and valid committee members and

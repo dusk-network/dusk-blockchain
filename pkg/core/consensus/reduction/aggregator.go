@@ -7,6 +7,8 @@
 package reduction
 
 import (
+	"encoding/hex"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	log "github.com/sirupsen/logrus"
@@ -79,9 +81,23 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 	}
 
 	a.voteSets[hash] = sv
-	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum(hdr.Round) {
+	total := sv.Cluster.TotalOccurrences()
+
+	if total >= a.handler.Quorum(hdr.Round) {
 		// quorum reached
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
+
+		log.WithField("process", "consensus").
+			WithField("q_total", total).
+			WithField("round", hdr.Round).
+			WithField("hash", hex.EncodeToString(hdr.BlockHash)[:6]).
+			WithField("step", hdr.Step).
+			WithField("step_voting_committee", a.handler.Committee(hdr.Round, hdr.Step)).
+			WithField("subcommittee", sv.Cluster.Set).
+			WithField("bitset", sv.BitSet).
+			WithField("provisioners", a.handler.Provisioners).
+			Info("event: quorum_reached")
+
 		return &Result{hdr.BlockHash, *sv.StepVotes}
 	}
 

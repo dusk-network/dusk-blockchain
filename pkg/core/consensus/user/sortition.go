@@ -8,6 +8,8 @@ package user
 
 import (
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"math"
 	"math/big"
 
@@ -53,6 +55,12 @@ func (v VotingCommittee) Equal(other *VotingCommittee) bool {
 func (v VotingCommittee) IsMember(pubKeyBLS []byte) bool {
 	_, found := v.IndexOf(pubKeyBLS)
 	return found
+}
+
+// Format implements fmt.Formatter interface.
+func (v VotingCommittee) Format(f fmt.State, c rune) {
+	r := fmt.Sprintf("cluster: %v", v.Cluster)
+	_, _ = f.Write([]byte(r))
 }
 
 // createSortitionMessage will return the hash of the passed sortition information.
@@ -143,7 +151,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 			// handling the eventuality of an out of bound error
 			m, e = p.MemberAt(0)
 			if e != nil {
-				// FIXME: shall this panic ?
+				// FIXME: shall this panic?
 				log.Panic(e)
 			}
 
@@ -180,6 +188,16 @@ func (p Provisioners) GenerateCommittees(round uint64, amount, step uint8, size 
 	}
 
 	return committees
+}
+
+// Format implements fmt.Formatter interface.
+// Prints all members and its stakes.
+func (p Provisioners) Format(f fmt.State, c rune) {
+	for _, m := range p.Members {
+		pk := hex.EncodeToString(m.PublicKeyBLS)
+		r := fmt.Sprintf("(blsPk: %s -> stakes: %v )", pk[:6], m.Stakes)
+		_, _ = f.Write([]byte(r))
+	}
 }
 
 func subtractFromTotalWeight(W *big.Int, amount uint64) {

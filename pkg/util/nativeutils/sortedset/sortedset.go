@@ -8,10 +8,11 @@ package sortedset
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -166,15 +167,24 @@ func (v *Set) Bits(subset Set) uint64 {
 func (v Set) String() string {
 	var str strings.Builder
 
-	for i, bi := range v {
-		_, _ = str.WriteString("idx: ")
-		_, _ = str.WriteString(strconv.Itoa(i))
-		_, _ = str.WriteString(" nr: ")
-		_, _ = str.WriteString(shortStr(bi))
+	for _, bi := range v {
+
+		pk := hex.EncodeToString(bi.Bytes())
+		_, _ = str.WriteString(" blsPK: ")
+		_, _ = str.WriteString(pk[:6])
 		_, _ = str.WriteString("\n")
 	}
 
 	return str.String()
+}
+
+// Format implements fmt.Formatter interface.
+func (v Set) Format(f fmt.State, c rune) {
+	for _, bi := range v {
+		pk := hex.EncodeToString(bi.Bytes())
+		r := fmt.Sprintf("(blsPK:%s )", pk[:6])
+		_, _ = f.Write([]byte(r))
+	}
 }
 
 // Whole returns the bitmap of all the elements within the set.

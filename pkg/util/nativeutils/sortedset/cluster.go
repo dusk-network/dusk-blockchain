@@ -6,6 +6,11 @@
 
 package sortedset
 
+import (
+	"encoding/hex"
+	"fmt"
+)
+
 // Cluster is a sortedset that keeps track of duplicates.
 type Cluster struct {
 	Set
@@ -133,5 +138,15 @@ func (c *Cluster) IntersectCluster(committeeSet uint64) Cluster {
 	return Cluster{
 		Set:      set,
 		elements: elems,
+	}
+}
+
+// Format implements fmt.Formatter interface.
+func (c Cluster) Format(f fmt.State, r rune) {
+	for _, elem := range c.Set {
+		pk := hex.EncodeToString(elem.Bytes())
+		count := c.OccurrencesOf(elem.Bytes())
+		r := fmt.Sprintf("(blsPk: %s,count: %d)", pk[:6], count)
+		_, _ = f.Write([]byte(r))
 	}
 }
