@@ -11,13 +11,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-crypto/bls"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -85,7 +85,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 	}
 
 	hdr := header.Header{
-		PubKeyBLS: bg.Keys.BLSPubKeyBytes,
+		PubKeyBLS: bg.Keys.BLSPubKey,
 		Round:     r.Round,
 		Step:      step,
 		BlockHash: blk.Header.Hash,
@@ -187,11 +187,5 @@ func (bg *generator) ConstructBlockTxs(keys [][]byte) ([]transactions.ContractCa
 }
 
 func (bg *generator) sign(seed []byte) ([]byte, error) {
-	signedSeed, err := bls.Sign(bg.Keys.BLSSecretKey, bg.Keys.BLSPubKey, seed)
-	if err != nil {
-		return nil, err
-	}
-
-	compSeed := signedSeed.Compress()
-	return compSeed, nil
+	return bls.Sign(bg.Keys.BLSSecretKey, bg.Keys.BLSPubKey, seed)
 }

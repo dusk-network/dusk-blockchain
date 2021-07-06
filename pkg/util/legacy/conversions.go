@@ -325,7 +325,7 @@ func StakeToRuskStake(tx *transactions.Stake) (*rusk.Transaction, error) {
 		return nil, err
 	}
 
-	if err := encoding.WriteVarBytes(buf, tx.PubKeyBLS); err != nil {
+	if err := encoding.WriteVarBytes(buf, tx.PubKeyBLS[0:96]); err != nil {
 		return nil, err
 	}
 
@@ -375,7 +375,7 @@ func RuskStakeToStake(tx *rusk.Transaction) (*transactions.Stake, error) {
 			Standard: stx,
 			Lock:     expirationHeight,
 		},
-		PubKeyBLS: blsKey,
+		PubKeyBLS: blsKey[0:96],
 	}, nil
 }
 

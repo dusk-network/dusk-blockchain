@@ -7,6 +7,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/drewolson/testflight v1.0.0
+	github.com/dusk-network/bls12_381-sign-go v0.1.1
 	github.com/dusk-network/dusk-crypto v0.1.3
 	github.com/dusk-network/dusk-protobuf v0.2.16
 	github.com/dusk-network/dusk-wallet/v2 v2.0.5
@@ -20,6 +21,7 @@ require (
 	github.com/facebookgo/stats v0.0.0-20151006221625-1b76add642e4 // indirect
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
 	github.com/go-chi/render v1.0.1
+	github.com/golangci/golangci-lint v1.31.0 // indirect
 	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/google/gofountain v0.0.0-20160820054803-4928733085e9
 	github.com/gorilla/context v1.1.1 // indirect

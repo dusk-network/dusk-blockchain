@@ -29,6 +29,8 @@ import (
 func TestConsensus(t *testing.T) {
 	assert := assert.New(t)
 
+	// logrus.SetLevel(logrus.DebugLevel)
+
 	// Retrieve the amount of nodes to use for this test case.
 	numNodes := getNumNodes(assert)
 

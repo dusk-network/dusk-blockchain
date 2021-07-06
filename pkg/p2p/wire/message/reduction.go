@@ -10,12 +10,12 @@ import (
 	"bytes"
 	"strings"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
-	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 type (
@@ -32,7 +32,7 @@ type (
 func NewReduction(hdr header.Header) *Reduction {
 	return &Reduction{
 		hdr:        hdr,
-		SignedHash: make([]byte, 33),
+		SignedHash: make([]byte, 0),
 	}
 }
 
@@ -42,7 +42,7 @@ func (r Reduction) Copy() payload.Safe {
 
 	cpy.hdr = r.hdr.Copy().(header.Header)
 	if r.SignedHash != nil {
-		cpy.SignedHash = make([]byte, 33)
+		cpy.SignedHash = make([]byte, len(r.SignedHash))
 		copy(cpy.SignedHash, r.SignedHash)
 	}
 
@@ -93,8 +93,8 @@ func UnmarshalReduction(r *bytes.Buffer, bev *Reduction) error {
 		return err
 	}
 
-	bev.SignedHash = make([]byte, 33)
-	return encoding.ReadBLS(r, bev.SignedHash)
+	bev.SignedHash = make([]byte, 0)
+	return encoding.ReadVarBytes(r, &bev.SignedHash)
 }
 
 // MarshalReduction a Reduction event into a buffer.
@@ -103,7 +103,7 @@ func MarshalReduction(r *bytes.Buffer, bev Reduction) error {
 		return err
 	}
 
-	if err := encoding.WriteBLS(r, bev.SignedHash); err != nil {
+	if err := encoding.WriteVarBytes(r, bev.SignedHash); err != nil {
 		return err
 	}
 
@@ -162,14 +162,18 @@ func MockReduction(hash []byte, round uint64, step uint8, keys []key.Keys, itera
 		panic("wrong iterative index: cannot iterate more than there are keys")
 	}
 
-	hdr := header.Header{Round: round, Step: step, BlockHash: hash, PubKeyBLS: keys[idx].BLSPubKeyBytes}
+	hdr := header.Header{Round: round, Step: step, BlockHash: hash, PubKeyBLS: keys[idx].BLSPubKey}
 	r := new(bytes.Buffer)
 	_ = header.MarshalSignableVote(r, hdr)
-	sigma, _ := bls.Sign(keys[idx].BLSSecretKey, keys[idx].BLSPubKey, r.Bytes())
+
+	sigma, err := bls.Sign(keys[idx].BLSSecretKey, keys[idx].BLSPubKey, r.Bytes())
+	if err != nil {
+		panic(err)
+	}
 
 	return Reduction{
 		hdr:        hdr,
-		SignedHash: sigma.Compress(),
+		SignedHash: sigma,
 	}
 }
 
@@ -203,10 +207,10 @@ func createVoteSet(k1, k2 []key.Keys, hash []byte, size int, round uint64, step 
 	duplicates := make(map[string]struct{})
 	// We need 75% of the committee size worth of events to reach quorum.
 	for j := 0; j < int(float64(size)*0.75); j++ {
-		if _, ok := duplicates[string(k1[j].BLSPubKeyBytes)]; !ok {
+		if _, ok := duplicates[string(k1[j].BLSPubKey)]; !ok {
 			ev := MockReduction(hash, round, step-2, k1, j)
 			events = append(events, ev)
-			duplicates[string(k1[j].BLSPubKeyBytes)] = struct{}{}
+			duplicates[string(k1[j].BLSPubKey)] = struct{}{}
 		}
 	}
 
@@ -216,10 +220,10 @@ func createVoteSet(k1, k2 []key.Keys, hash []byte, size int, round uint64, step 
 	}
 
 	for j := 0; j < int(float64(size)*0.75); j++ {
-		if _, ok := duplicates[string(k2[j].BLSPubKeyBytes)]; !ok {
+		if _, ok := duplicates[string(k2[j].BLSPubKey)]; !ok {
 			ev := MockReduction(hash, round, step-1, k2, j)
 			events = append(events, ev)
-			duplicates[string(k2[j].BLSPubKeyBytes)] = struct{}{}
+			duplicates[string(k2[j].BLSPubKey)] = struct{}{}
 		}
 	}
 

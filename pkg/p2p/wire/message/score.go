@@ -34,7 +34,7 @@ func NewScore(hdr header.Header, prevHash []byte, candidate block.Block) *Score 
 		hdr:        hdr,
 		PrevHash:   prevHash,
 		Candidate:  candidate,
-		SignedHash: make([]byte, 33),
+		SignedHash: make([]byte, 0),
 	}
 }
 
@@ -133,8 +133,8 @@ func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
 		return err
 	}
 
-	sev.SignedHash = make([]byte, 33)
-	if err := encoding.ReadBLS(r, sev.SignedHash); err != nil {
+	sev.SignedHash = make([]byte, 0)
+	if err := encoding.ReadVarBytes(r, &sev.SignedHash); err != nil {
 		return err
 	}
 
@@ -159,7 +159,7 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 		return err
 	}
 
-	if err := encoding.WriteBLS(r, sev.SignedHash); err != nil {
+	if err := encoding.WriteVarBytes(r, sev.SignedHash); err != nil {
 		return err
 	}
 
@@ -174,6 +174,6 @@ func MockScore(hdr header.Header, c block.Block) Score {
 		hdr:        hdr,
 		PrevHash:   prevHash,
 		Candidate:  c,
-		SignedHash: make([]byte, 33),
+		SignedHash: make([]byte, 50),
 	}
 }

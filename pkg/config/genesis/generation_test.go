@@ -34,6 +34,7 @@ import (
 	"testing"
 	"time"
 
+	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
@@ -52,7 +53,7 @@ func TestWallets(t *testing.T) {
 		w := generateWallet(t, i, keyMaster)
 		wallets[i] = w
 		pubKeys[i] = w.PublicKey
-		blsKeys[i] = w.Keys().BLSPubKeyBytes
+		blsKeys[i] = w.Keys().BLSPubKey
 	}
 
 	fmt.Println(pubKeys)
@@ -96,6 +97,11 @@ func generateWallet(t *testing.T, i int, keyMaster rusk.KeysClient) *wallet.Wall
 		PublicKey: *pk,
 		ViewKey:   *vk,
 	}
+
+	consensusKeys := consensuskey.NewRandKeys()
+
+	keysJSON.SecretKeyBLS = consensusKeys.BLSSecretKey
+	keysJSON.PublicKeyBLS = consensusKeys.BLSPubKey
 
 	w, err := wallet.LoadFromSeed(byte(2), db, "password", "wallet"+strconv.Itoa(i)+".dat", keysJSON)
 	if err != nil {

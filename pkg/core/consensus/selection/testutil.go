@@ -49,7 +49,7 @@ func NewHelper(scoreToSpawn int) *Helper {
 	}
 
 	genHlp := &candidate.Helper{
-		ThisSender:       emitter.Keys.BLSPubKeyBytes,
+		ThisSender:       emitter.Keys.BLSPubKey,
 		ProvisionersKeys: provisionersKeys,
 		P:                p,
 		Nr:               ProvisionerNr,
@@ -79,11 +79,11 @@ func (h *Helper) Spawn() []message.Score {
 
 	for i := 0; i < h.scoreToSpawn; i++ {
 		hash, _ := crypto.RandEntropy(32)
-		keys, _ := key.NewRandKeys()
+		keys := key.NewRandKeys()
 		hdr := header.Header{
 			Round:     h.Round,
 			Step:      h.Step,
-			PubKeyBLS: keys.BLSPubKeyBytes,
+			PubKeyBLS: keys.BLSPubKey,
 			BlockHash: hash,
 		}
 		genesis := config.DecodeGenesis()

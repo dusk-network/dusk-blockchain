@@ -120,7 +120,7 @@ func TestExecuteStateTransition(t *testing.T) {
 
 	tx, err := sc.NewStake(ctx, &rusk.StakeTransactionRequest{
 		Value:        value,
-		PublicKeyBls: s.w.ConsensusKeys().BLSPubKeyBytes,
+		PublicKeyBls: s.w.ConsensusKeys().BLSPubKeyBytes[0:96],
 	})
 	assert.NoError(t, err)
 
@@ -134,7 +134,7 @@ func TestExecuteStateTransition(t *testing.T) {
 
 	// Check that the provisioner set has a stake for our public key, with the
 	// chosen value
-	m := s.p.Members[string(s.w.ConsensusKeys().BLSPubKeyBytes)]
+	m := s.p.Members[string(s.w.ConsensusKeys().BLSPubKeyBytes[0:96])]
 	assert.Equal(t, value, m.Stakes[0].Amount)
 }
 
@@ -254,7 +254,7 @@ func TestNewStake(t *testing.T) {
 
 	resp, err := c.NewStake(ctx, &rusk.StakeTransactionRequest{
 		Value:        100,
-		PublicKeyBls: s.w.ConsensusKeys().BLSPubKeyBytes,
+		PublicKeyBls: s.w.ConsensusKeys().BLSPubKeyBytes[0:96],
 	})
 	assert.NoError(t, err)
 
@@ -278,7 +278,7 @@ func TestNewStake(t *testing.T) {
 	err = encoding.ReadVarBytes(buf, &pkBLS)
 	assert.NoError(t, err)
 
-	assert.Equal(t, s.w.ConsensusKeys().BLSPubKeyBytes, pkBLS)
+	assert.Equal(t, s.w.ConsensusKeys().BLSPubKeyBytes[0:96], pkBLS[0:96])
 	assert.Equal(t, uint32(4), resp.Type)
 }
 

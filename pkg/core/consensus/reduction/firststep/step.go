@@ -9,6 +9,7 @@ package firststep
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -169,10 +170,10 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 	hdr := r.State()
 
 	lg.WithFields(log.Fields{
-		"round": hdr.Round,
-		"step":  hdr.Step,
-		//"sender": hex.EncodeToString(hdr.Sender()),
-		//"hash":   hex.EncodeToString(hdr.BlockHash),
+		"round":  hdr.Round,
+		"step":   hdr.Step,
+		"sender": hex.EncodeToString(hdr.Sender()),
+		"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received_event")
 
 	result := p.aggregator.CollectVote(r)
@@ -256,7 +257,7 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 			Step:      step,
 			Round:     round,
 			BlockHash: r.Hash,
-			PubKeyBLS: p.Keys.BLSPubKeyBytes,
+			PubKeyBLS: p.Keys.BLSPubKey,
 		},
 		StepVotes: r.SV,
 	}

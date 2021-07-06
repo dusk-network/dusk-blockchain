@@ -88,7 +88,7 @@ func TestNewWallet(t *testing.T) {
 	assert.NotNil(sk.A)
 	assert.NotNil(sk.B)
 
-	w, err := New(nil, seed, netPrefix, db, "pass", seedFile, sk)
+	w, err := New(seed, netPrefix, db, "pass", seedFile, sk)
 	assert.NoError(err)
 
 	// wrong wallet password
@@ -104,41 +104,7 @@ func TestNewWallet(t *testing.T) {
 	assert.Equal(w.SecretKey.B, loadedWallet.SecretKey.B)
 
 	assert.Equal(w.consensusKeys.BLSSecretKey, loadedWallet.consensusKeys.BLSSecretKey)
-	assert.True(bytes.Equal(w.consensusKeys.BLSPubKeyBytes, loadedWallet.consensusKeys.BLSPubKeyBytes))
-}
-
-func TestCatchEOF(t *testing.T) {
-	netPrefix := byte(1)
-
-	client, conn := createRPCConn(t)
-	defer conn.Close()
-
-	db, err := database.New(dbPath)
-	assert.Nil(t, err)
-
-	defer os.RemoveAll(dbPath)
-	defer os.Remove(seedFile)
-	defer os.Remove(secretFile)
-
-	// Generate 1000 new wallets
-	for i := 0; i < 1000; i++ {
-		seed, err := GenerateNewSeed(nil)
-		require.Nil(t, err)
-
-		ctx := context.Background()
-		secretKey, err := client.GenerateKeys(ctx, &rusk.GenerateKeysRequest{})
-		require.Nil(t, err)
-
-		require.Nil(t, fillSecretKey(secretKey.Sk))
-
-		sk := keys.NewSecretKey()
-		keys.USecretKey(secretKey.Sk, sk)
-
-		_, err = New(nil, seed, netPrefix, db, "pass", seedFile, sk)
-		assert.Nil(t, err)
-		os.Remove(seedFile)
-		os.Remove(secretFile)
-	}
+	assert.True(bytes.Equal(w.consensusKeys.BLSPubKey, loadedWallet.consensusKeys.BLSPubKey))
 }
 
 func fillSecretKey(sk *rusk.SecretKey) error {

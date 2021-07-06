@@ -19,6 +19,7 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
@@ -396,6 +397,11 @@ func createWallet(seed []byte, password string, keyMaster transactions.KeyMaster
 		PublicKey: pk,
 		ViewKey:   vk,
 	}
+
+	consensusKeys := consensuskey.NewRandKeys()
+
+	keysJSON.SecretKeyBLS = consensusKeys.BLSSecretKey
+	keysJSON.PublicKeyBLS = consensusKeys.BLSPubKey
 
 	// Then create the wallet with seed and password
 	w, err := wallet.LoadFromSeed(testnet, db, password, cfg.Get().Wallet.File, keysJSON)

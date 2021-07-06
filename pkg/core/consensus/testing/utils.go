@@ -43,12 +43,10 @@ func setupProvisioners(assert *assert.Assertions, amount int) (user.Provisioners
 	keys := make([]key.Keys, amount)
 
 	for i := 0; i < amount; i++ {
-		var err error
-		keys[i], err = key.NewRandKeys()
-		assert.NoError(err)
+		keys[i] = key.NewRandKeys()
 
 		// All nodes are given an equal stake and locktime
-		assert.NoError(p.Add(keys[i].BLSPubKeyBytes, 100000, 0, 250000))
+		assert.NoError(p.Add(keys[i].BLSPubKey, 100000, 0, 250000))
 	}
 
 	return *p, keys

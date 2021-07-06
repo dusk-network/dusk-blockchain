@@ -7,35 +7,15 @@
 package msg
 
 import (
-	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 )
 
 // VerifyBLSSignature returns err if signature is invalid.
-func VerifyBLSSignature(pubKeyBytes, message, signature []byte) error {
-	pubKeyBLS := &bls.PublicKey{}
-	if err := pubKeyBLS.Unmarshal(pubKeyBytes); err != nil {
+func VerifyBLSSignature(pk, signature, message []byte) error {
+	apk, err := bls.CreateApk(pk)
+	if err != nil {
 		return err
 	}
 
-	sig := &bls.Signature{}
-	if err := sig.Decompress(signature); err != nil {
-		return err
-	}
-
-	apk := bls.NewApk(pubKeyBLS)
-	return bls.Verify(apk, message, sig)
+	return bls.Verify(apk, signature, message)
 }
-
-//func VerifyBLSMultisig(apk, message, signature []byte) error {
-//	batchPK, err := bls.UnmarshalApk(apk)
-//	if err != nil {
-//		return err
-//	}
-//
-//	sig := &bls.Signature{}
-//	if err := sig.Decompress(signature); err != nil {
-//		return err
-//	}
-//
-//	return bls.Verify(batchPK, message, sig)
-//}

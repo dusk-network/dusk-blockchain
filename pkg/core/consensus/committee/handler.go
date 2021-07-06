@@ -39,7 +39,7 @@ func NewHandler(keys key.Keys, p user.Provisioners) *Handler {
 
 // AmMember checks if we are part of the committee for a given round and step.
 func (b *Handler) AmMember(round uint64, step uint8, maxSize int) bool {
-	return b.IsMember(b.Keys.BLSPubKeyBytes, round, step, maxSize)
+	return b.IsMember(b.Keys.BLSPubKey, round, step, maxSize)
 }
 
 // IsMember checks if a provisioner with a given BLS public key is

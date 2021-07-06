@@ -38,7 +38,7 @@ func (s sortedKeys) Less(i, j int) bool {
 }
 
 func btoi(k key.Keys) *big.Int {
-	b := k.BLSPubKeyBytes
+	b := k.BLSPubKey
 	return (&big.Int{}).SetBytes(b)
 }
 
@@ -59,7 +59,7 @@ func TestMemberAt(t *testing.T) {
 			t.FailNow()
 		}
 
-		assert.True(t, bytes.Equal(m.PublicKeyBLS, ks[i].BLSPubKeyBytes))
+		assert.True(t, bytes.Equal(m.PublicKeyBLS, ks[i].BLSPubKey))
 	}
 }
 
@@ -70,7 +70,7 @@ func TestGetMember(t *testing.T) {
 
 	p, k := consensus.MockProvisioners(50)
 	for _, keys := range k {
-		tKeys = append(tKeys, keys.BLSPubKeyBytes)
+		tKeys = append(tKeys, keys.BLSPubKey)
 	}
 
 	_, err := p.GetStake([]byte("Fake Public Key"))

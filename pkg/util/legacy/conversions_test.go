@@ -68,7 +68,7 @@ func TestStakeTxIntegrity(t *testing.T) {
 
 	resp, err := c.NewStake(ctx, &rusk.StakeTransactionRequest{
 		Value:        100,
-		PublicKeyBls: make([]byte, 129),
+		PublicKeyBls: make([]byte, 96),
 	})
 	assert.NoError(t, err)
 
@@ -116,7 +116,7 @@ func TestBlockIntegrity(t *testing.T) {
 	// Create a valid stake to put in the block.
 	resp, err := c.NewStake(ctx, &rusk.StakeTransactionRequest{
 		Value:        100,
-		PublicKeyBls: make([]byte, 129),
+		PublicKeyBls: make([]byte, 96),
 	})
 	assert.NoError(t, err)
 
