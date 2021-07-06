@@ -379,7 +379,7 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 // NewStake creates a staking transaction and returns it to the caller.
 func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.Transaction, error) {
 	log.Infoln("call received to NewStake")
-	defer log.Infoln("cinished call to NewStake")
+	defer log.Infoln("finished call to NewStake")
 
 	var value ristretto.Scalar
 
@@ -390,6 +390,9 @@ func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest
 		log.WithError(err).Errorln("error creating new stake")
 		return nil, err
 	}
+
+	stake.PubKeyBLS = make([]byte, len(req.PublicKeyBls))
+	copy(stake.PubKeyBLS, req.PublicKeyBls)
 
 	if err := s.w.Sign(stake); err != nil {
 		log.WithError(err).Errorln("error signing stake")
