@@ -93,8 +93,8 @@ func getNumNodes(assert *assert.Assertions) int {
 		return numNodes
 	}
 
-	// Standard test case runs with 20 nodes.
-	return 20
+	// Standard test case runs with 10 nodes.
+	return 10
 }
 
 func getNumRounds(assert *assert.Assertions) int {
