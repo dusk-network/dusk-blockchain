@@ -160,6 +160,14 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 		return nil
 	}
 
+	// TODO: message.Reduction MarshalJSON, ...
+	log.WithField("process", "consensus").
+		WithField("round", round).
+		WithField("msg", r).
+		WithField("this_provisioner", util.StringifyBytes(p.handler.BLSPubKey)).
+		WithField("step", step).
+		WithField("event", "firstreduction_collected").Debug("")
+
 	m := message.NewWithHeader(topics.Reduction, r, config.KadcastInitHeader)
 
 	// Once the event is verified, we can republish it.

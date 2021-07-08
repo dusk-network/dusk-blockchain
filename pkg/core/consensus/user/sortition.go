@@ -8,11 +8,12 @@ package user
 
 import (
 	"encoding/binary"
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
 	log "github.com/sirupsen/logrus"
@@ -194,10 +195,21 @@ func (p Provisioners) GenerateCommittees(round uint64, amount, step uint8, size 
 // Prints all members and its stakes.
 func (p Provisioners) Format(f fmt.State, c rune) {
 	for _, m := range p.Members {
-		pk := hex.EncodeToString(m.PublicKeyBLS)
-		r := fmt.Sprintf("(blsPk: %s -> stakes: %v )", pk[:6], m.Stakes)
+		r := fmt.Sprintf("BLS key: %s, Stakes: %q", util.StringifyBytes(m.PublicKeyBLS), m.Stakes)
 		_, _ = f.Write([]byte(r))
 	}
+}
+
+// MarshalJSON allows to print Provisioners list in JSONFormatter.
+func (p Provisioners) MarshalJSON() ([]byte, error) {
+	data := make([]string, 0)
+
+	for _, m := range p.Members {
+		r := fmt.Sprintf("BLS key: %s, Stakes: %q", util.StringifyBytes(m.PublicKeyBLS), m.Stakes)
+		data = append(data, r)
+	}
+
+	return json.Marshal(data)
 }
 
 func subtractFromTotalWeight(W *big.Int, amount uint64) {

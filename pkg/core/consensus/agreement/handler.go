@@ -13,13 +13,16 @@ import (
 	"math"
 
 	"github.com/dusk-network/bls12_381-sign-go/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+	log "github.com/sirupsen/logrus"
 )
 
 // MaxCommitteeSize represents the maximum size of the committee for an
@@ -103,6 +106,19 @@ func (a *handler) Verify(ev message.Agreement) error {
 		subcommittee := committee.IntersectCluster(votes.BitSet)
 
 		allVoters += subcommittee.TotalOccurrences()
+
+		log.WithField("process", "consensus").
+			WithField("round", hdr.Round).
+			WithField("total_votes", allVoters).
+			WithField("hash", util.StringifyBytes(hdr.BlockHash)).
+			WithField("step", hdr.Step).
+			WithField("step_voting_committee", committee).
+			WithField("voted_committee", subcommittee).
+			WithField("bitset", votes.BitSet).
+			WithField("provisioners", a.Provisioners).
+			WithField("this_provisioner", util.StringifyBytes(a.Keys.BLSPubKey)).
+			WithField("this_node", config.Get().Network.Port).
+			WithField("event", "agreement_received").Debug("")
 
 		apk, err := ReconstructApk(subcommittee.Set)
 		if err != nil {
