@@ -31,6 +31,7 @@ import (
 var log = logrus.WithField("process", "mock rusk server")
 
 const stateTransitionDelay = 1 * time.Second
+const stakeGracePeriod = 2
 
 // Server is a stand-in Rusk server, which can be used during any kind of
 // testing. Its behavior can be modified depending on the settings of the
@@ -233,7 +234,7 @@ func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight u
 			stake := tx.(*transactions.Stake)
 
 			// Add grace period for stakes.
-			stakeStartHeight := startHeight + 1000
+			stakeStartHeight := startHeight + stakeGracePeriod
 			if err := s.p.Add(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), stakeStartHeight, startHeight+stake.Lock-2); err != nil {
 				return err
 			}
