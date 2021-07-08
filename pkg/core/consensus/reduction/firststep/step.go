@@ -160,10 +160,9 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 		return nil
 	}
 
-	// TODO: message.Reduction MarshalJSON, ...
 	log.WithField("process", "consensus").
 		WithField("round", round).
-		WithField("msg", r).
+		WithField("reduction_msg", r).
 		WithField("this_provisioner", util.StringifyBytes(p.handler.BLSPubKey)).
 		WithField("step", step).
 		WithField("event", "firstreduction_collected").Debug("")

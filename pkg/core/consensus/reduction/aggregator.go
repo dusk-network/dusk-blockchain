@@ -94,7 +94,6 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 		WithField("step_voted_committee", sv.Cluster).
 		WithField("quorum_target", roundQuorumTarget).
 		WithField("provisioners", a.handler.Provisioners).
-		//TODO: WithField("voteSets", a.voteSets).
 		WithField("event", "vote_received").Debug("")
 
 	if total >= roundQuorumTarget {

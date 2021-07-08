@@ -13,6 +13,7 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
@@ -169,11 +170,24 @@ func (v *Set) Bits(subset Set) uint64 {
 func (v Set) String() string {
 	var str strings.Builder
 
-	for _, bi := range v {
-		_, _ = str.WriteString(" Key: ")
-		_, _ = str.WriteString(util.StringifyBytes(bi.Bytes()))
+	for i, bi := range v {
+		_, _ = str.WriteString("idx: ")
+		_, _ = str.WriteString(strconv.Itoa(i))
+		_, _ = str.WriteString(" nr: ")
+		_, _ = str.WriteString(shortStr(bi))
 		_, _ = str.WriteString("\n")
 	}
+
+	return str.String()
+}
+
+func shortStr(i *big.Int) string {
+	var str strings.Builder
+
+	iStr := i.String()
+	_, _ = str.WriteString(iStr[:3])
+	_, _ = str.WriteString("...")
+	_, _ = str.WriteString(iStr[len(iStr)-3:])
 
 	return str.String()
 }
@@ -213,15 +227,4 @@ func (v *Set) Contains(b []byte) bool {
 	iRepr := new(big.Int).SetBytes(b)
 	_, found := v.indexOf(iRepr)
 	return found
-}
-
-func shortStr(i *big.Int) string {
-	var str strings.Builder
-
-	iStr := i.String()
-	_, _ = str.WriteString(iStr[:3])
-	_, _ = str.WriteString("...")
-	_, _ = str.WriteString(iStr[len(iStr)-3:])
-
-	return str.String()
 }

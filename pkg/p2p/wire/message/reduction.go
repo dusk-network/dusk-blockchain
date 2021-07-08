@@ -8,6 +8,8 @@ package message
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/dusk-network/bls12_381-sign-go/bls"
@@ -74,6 +76,14 @@ func (r Reduction) Sender() []byte {
 func (r Reduction) Equal(msg Message) bool {
 	m, ok := msg.Payload().(Reduction)
 	return ok && r.hdr.Equal(m.hdr) && bytes.Equal(r.SignedHash, m.SignedHash)
+}
+
+// MarshalJSON ...
+func (r Reduction) MarshalJSON() ([]byte, error) {
+	v := fmt.Sprintf("Signature: %s, Hash: %s, Round: %d, Step: %d, Sender BLS key %s)", util.StringifyBytes(r.SignedHash),
+		util.StringifyBytes(r.hdr.BlockHash), r.hdr.Round, r.hdr.Step, util.StringifyBytes(r.hdr.PubKeyBLS))
+
+	return json.Marshal(v)
 }
 
 // UnmarshalReductionMessage unmarshals a serialization from a buffer.

@@ -30,8 +30,10 @@ import (
 
 var log = logrus.WithField("process", "mock rusk server")
 
-const stateTransitionDelay = 1 * time.Second
-const stakeGracePeriod = 2
+const (
+	stateTransitionDelay = 1 * time.Second
+	stakeGracePeriod     = 2
+)
 
 // Server is a stand-in Rusk server, which can be used during any kind of
 // testing. Its behavior can be modified depending on the settings of the
