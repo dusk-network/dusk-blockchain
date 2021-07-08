@@ -16,9 +16,17 @@ func StringifyBytes(b []byte) string {
 	var sb strings.Builder
 
 	if len(b) > 0 {
-		_, _ = sb.WriteString(hex.EncodeToString(b[0:5]))
-		_, _ = sb.WriteString("...")
-		_, _ = sb.WriteString(hex.EncodeToString(b[len(b)-5:]))
+		offset := 5
+		if len(b) < offset {
+			offset = len(b)
+		}
+
+		_, _ = sb.WriteString(hex.EncodeToString(b[0:offset]))
+
+		if len(b)-offset > 0 {
+			_, _ = sb.WriteString("...")
+			_, _ = sb.WriteString(hex.EncodeToString(b[len(b)-offset:]))
+		}
 	} else {
 		_, _ = sb.WriteString("<empty>")
 	}
