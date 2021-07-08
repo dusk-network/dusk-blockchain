@@ -8,12 +8,14 @@ package sortedset
 
 import (
 	"bytes"
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
 	"sort"
 	"strings"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 )
 
 // All represents the bitmap of the whole set.
@@ -168,10 +170,8 @@ func (v Set) String() string {
 	var str strings.Builder
 
 	for _, bi := range v {
-
-		pk := hex.EncodeToString(bi.Bytes())
-		_, _ = str.WriteString(" blsPK: ")
-		_, _ = str.WriteString(pk[:6])
+		_, _ = str.WriteString(" Key: ")
+		_, _ = str.WriteString(util.StringifyBytes(bi.Bytes()))
 		_, _ = str.WriteString("\n")
 	}
 
@@ -181,10 +181,21 @@ func (v Set) String() string {
 // Format implements fmt.Formatter interface.
 func (v Set) Format(f fmt.State, c rune) {
 	for _, bi := range v {
-		pk := hex.EncodeToString(bi.Bytes())
-		r := fmt.Sprintf("(blsPK:%s )", pk[:6])
+		r := fmt.Sprintf("Key: %s", util.StringifyBytes(bi.Bytes()))
 		_, _ = f.Write([]byte(r))
 	}
+}
+
+// MarshalJSON ...
+func (v Set) MarshalJSON() ([]byte, error) {
+	data := make([]string, 0)
+
+	for _, bi := range v {
+		r := fmt.Sprintf("Key: %s", util.StringifyBytes(bi.Bytes()))
+		data = append(data, r)
+	}
+
+	return json.Marshal(data)
 }
 
 // Whole returns the bitmap of all the elements within the set.
