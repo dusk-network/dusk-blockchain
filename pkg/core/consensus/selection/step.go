@@ -23,6 +23,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -102,15 +103,17 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 	isMember := p.handler.AmMember(r.Round, step)
 
-	log.WithField("process", "consensus").
-		WithField("round", r.Round).
-		WithField("provisioners", r.P).
-		WithField("step_voting_committee", p.handler.Committees[step]).
-		WithField("step", step).
-		WithField("is_member", isMember).
-		WithField("this_provisioner", util.StringifyBytes(p.Keys.BLSPubKey)).
-		WithField("node_id", config.Get().Network.Port).
-		WithField("event", "selection_initialized").Debug("")
+	if log.GetLevel() >= logrus.DebugLevel {
+		log.WithField("process", "consensus").
+			WithField("round", r.Round).
+			WithField("provisioners", r.P).
+			WithField("step_voting_committee", p.handler.Committees[step]).
+			WithField("step", step).
+			WithField("is_member", isMember).
+			WithField("this_provisioner", util.StringifyBytes(p.Keys.BLSPubKey)).
+			WithField("node_id", config.Get().Network.Port).
+			WithField("event", "selection_initialized").Debug("")
+	}
 
 	if isMember {
 		scr, err := p.g.GenerateCandidateMessage(ctx, r, step)
@@ -118,12 +121,14 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 			lg.WithError(err).Errorln("candidate block generation failed")
 		}
 
-		log.WithField("process", "consensus").
-			WithField("round", r.Round).
-			WithField("hash", util.StringifyBytes(scr.State().BlockHash)).
-			WithField("this_provisioner", util.StringifyBytes(p.keys.BLSPubKey)).
-			WithField("step", step).
-			WithField("event", "candidate_generated").Debug("")
+		if log.GetLevel() >= logrus.DebugLevel {
+			log.WithField("process", "consensus").
+				WithField("round", r.Round).
+				WithField("hash", util.StringifyBytes(scr.State().BlockHash)).
+				WithField("this_provisioner", util.StringifyBytes(p.keys.BLSPubKey)).
+				WithField("step", step).
+				WithField("event", "candidate_generated").Debug("")
+		}
 
 		evChan <- message.NewWithHeader(topics.Score, *scr, []byte{config.KadcastInitialHeight})
 	}
@@ -185,6 +190,17 @@ func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
 		return t.StoreCandidateMessage(sc.Candidate)
 	}); err != nil {
 		lg.WithError(err).Errorln("could not store candidate")
+	}
+
+	if log.GetLevel() >= logrus.DebugLevel {
+		log.WithField("process", "consensus").
+			WithField("hash", util.StringifyBytes(sc.Candidate.Header.Hash)).
+			WithField("Sender BLS Key", util.StringifyBytes(sc.State().PubKeyBLS)).
+			WithField("round", sc.State().Round).
+			WithField("step", sc.State().Step).
+			WithField("this_provisioner", util.StringifyBytes(p.Keys.BLSPubKey)).
+			WithField("node_id", config.Get().Network.Port).
+			WithField("event", "score_collected").Debug("")
 	}
 
 	// Once the event is verified, and has passed all preliminary checks,

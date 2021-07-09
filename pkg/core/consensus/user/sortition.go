@@ -64,6 +64,18 @@ func (v VotingCommittee) Format(f fmt.State, c rune) {
 	_, _ = f.Write([]byte(r))
 }
 
+// MarshalJSON ...
+func (v VotingCommittee) MarshalJSON() ([]byte, error) {
+	data := make([]string, 0)
+
+	for _, bi := range v.Set {
+		r := fmt.Sprintf("Key: %s, Count: %d", util.StringifyBytes(bi.Bytes()), v.Cluster.OccurrencesOf(bi.Bytes()))
+		data = append(data, r)
+	}
+
+	return json.Marshal(data)
+}
+
 // createSortitionMessage will return the hash of the passed sortition information.
 func createSortitionHash(round uint64, step uint8, i int) ([]byte, error) {
 	msg := make([]byte, 12)

@@ -22,6 +22,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -160,12 +161,14 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 		return nil
 	}
 
-	log.WithField("process", "consensus").
-		WithField("round", round).
-		WithField("reduction_msg", r).
-		WithField("this_provisioner", util.StringifyBytes(p.handler.BLSPubKey)).
-		WithField("step", step).
-		WithField("event", "firstreduction_collected").Debug("")
+	if log.GetLevel() >= logrus.DebugLevel {
+		log.WithField("process", "consensus").
+			WithField("round", round).
+			WithField("reduction_msg", r).
+			WithField("this_provisioner", util.StringifyBytes(p.handler.BLSPubKey)).
+			WithField("step", step).
+			WithField("event", "first_reduction_collected").Debug("")
+	}
 
 	m := message.NewWithHeader(topics.Reduction, r, config.KadcastInitHeader)
 

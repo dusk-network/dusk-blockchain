@@ -8,7 +8,6 @@ package sortedset
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -198,18 +197,6 @@ func (v Set) Format(f fmt.State, c rune) {
 		r := fmt.Sprintf("Key: %s", util.StringifyBytes(bi.Bytes()))
 		_, _ = f.Write([]byte(r))
 	}
-}
-
-// MarshalJSON ...
-func (v Set) MarshalJSON() ([]byte, error) {
-	data := make([]string, 0)
-
-	for _, bi := range v {
-		r := fmt.Sprintf("Key: %s", util.StringifyBytes(bi.Bytes()))
-		data = append(data, r)
-	}
-
-	return json.Marshal(data)
 }
 
 // Whole returns the bitmap of all the elements within the set.
