@@ -101,8 +101,8 @@ func action(ctx *cli.Context) error {
 
 	logging.InitLog(logFile)
 
-	log.Info("Loaded config file", "UsedConfigFile", cfg.Get().UsedConfigFile)
-	log.Info("Selected network", "Network", cfg.Get().General.Network)
+	log.WithField("file", cfg.Get().UsedConfigFile).Info("Loaded config file")
+	log.WithField("network", cfg.Get().General.Network).Info("Selected network")
 
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup()

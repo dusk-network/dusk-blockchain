@@ -323,3 +323,9 @@ func unmarshalStake(r *bytes.Buffer) (Stake, error) {
 
 	return stake, nil
 }
+
+// Format implements fmt.Formatter interface.
+func (s Stake) Format(f fmt.State, c rune) {
+	r := fmt.Sprintf("Amount: %d, From: %d, To: %d", s.Amount, s.StartHeight, s.EndHeight)
+	_, _ = f.Write([]byte(r))
+}

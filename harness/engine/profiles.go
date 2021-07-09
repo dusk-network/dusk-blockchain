@@ -67,6 +67,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 
 	viper.Set("logger.output", node.Dir+"/dusk")
 	viper.Set("logger.level", "trace")
+	viper.Set("logger.format", "json")
 
 	viper.Set("gql.address", node.Cfg.Gql.Address)
 	viper.Set("gql.network", node.Cfg.Gql.Network)

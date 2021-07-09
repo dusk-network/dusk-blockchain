@@ -7,8 +7,12 @@
 package reduction
 
 import (
+	"fmt"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -79,9 +83,41 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 	}
 
 	a.voteSets[hash] = sv
-	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum(hdr.Round) {
+	total := sv.Cluster.TotalOccurrences()
+	roundQuorumTarget := a.handler.Quorum(hdr.Round)
+
+	if log.GetLevel() >= logrus.DebugLevel {
+		log.WithField("process", "consensus").
+			WithField("total", total).
+			WithField("round", hdr.Round).
+			WithField("hash", util.StringifyBytes(hdr.BlockHash)).
+			WithField("step", hdr.Step).
+			WithField("vote_from", util.StringifyBytes(hdr.PubKeyBLS)).
+			WithField("num", votes).
+			WithField("step_voting_committee", a.handler.Committee(hdr.Round, hdr.Step)).
+			WithField("step_voted_committee", sv.Cluster).
+			WithField("quorum_target", roundQuorumTarget).
+			WithField("provisioners", a.handler.Provisioners).
+			WithField("event", "vote_received").Debug("")
+	}
+
+	if total >= roundQuorumTarget {
 		// quorum reached
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
+
+		log.WithField("process", "consensus").
+			WithField("total_votes", total).
+			WithField("quorum_target", roundQuorumTarget).
+			WithField("round", hdr.Round).
+			WithField("hash", util.StringifyBytes(hdr.BlockHash)).
+			WithField("step", hdr.Step).
+			WithField("step_voting_committee", a.handler.Committee(hdr.Round, hdr.Step)).
+			WithField("step_voted_committee", sv.Cluster).
+			WithField("bitset", fmt.Sprintf("%b", sv.BitSet)).
+			WithField("provisioners", a.handler.Provisioners).
+			WithField("event", "quorum_reached").
+			Info("")
+
 		return &Result{hdr.BlockHash, *sv.StepVotes}
 	}
 

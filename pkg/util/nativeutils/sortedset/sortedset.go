@@ -8,11 +8,14 @@ package sortedset
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 )
 
 // All represents the bitmap of the whole set.
@@ -177,6 +180,25 @@ func (v Set) String() string {
 	return str.String()
 }
 
+func shortStr(i *big.Int) string {
+	var str strings.Builder
+
+	iStr := i.String()
+	_, _ = str.WriteString(iStr[:3])
+	_, _ = str.WriteString("...")
+	_, _ = str.WriteString(iStr[len(iStr)-3:])
+
+	return str.String()
+}
+
+// Format implements fmt.Formatter interface.
+func (v Set) Format(f fmt.State, c rune) {
+	for _, bi := range v {
+		r := fmt.Sprintf("Key: %s", util.StringifyBytes(bi.Bytes()))
+		_, _ = f.Write([]byte(r))
+	}
+}
+
 // Whole returns the bitmap of all the elements within the set.
 func (v Set) Whole() uint64 {
 	ret := uint64(0)
@@ -192,15 +214,4 @@ func (v *Set) Contains(b []byte) bool {
 	iRepr := new(big.Int).SetBytes(b)
 	_, found := v.indexOf(iRepr)
 	return found
-}
-
-func shortStr(i *big.Int) string {
-	var str strings.Builder
-
-	iStr := i.String()
-	_, _ = str.WriteString(iStr[:3])
-	_, _ = str.WriteString("...")
-	_, _ = str.WriteString(iStr[len(iStr)-3:])
-
-	return str.String()
 }
