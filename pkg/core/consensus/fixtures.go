@@ -187,7 +187,7 @@ func MockNewBlockMsg(t *testing.T, hdr *header.Header) message.Message {
 	// Mock candidate
 	genesis := config.DecodeGenesis()
 	genesis.Header.Hash = h.BlockHash
-	se := message.MockScore(h, *genesis)
+	se := message.MockNewBlock(h, *genesis)
 
 	return message.New(topics.NewBlock, se)
 }

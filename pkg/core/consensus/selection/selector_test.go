@@ -24,7 +24,7 @@ import (
 
 type tparm struct {
 	bg   blockgenerator.BlockGenerator
-	msgs []message.Score
+	msgs []message.NewBlock
 }
 
 func TestSelection(t *testing.T) {
@@ -38,7 +38,7 @@ func TestSelection(t *testing.T) {
 
 		"InternalWinningScore": {
 			bg:   blockgenerator.Mock(hlp.Emitter, false),
-			msgs: []message.Score{},
+			msgs: []message.NewBlock{},
 		},
 	}
 	_, db := lite.CreateDBConnection()
@@ -47,8 +47,8 @@ func TestSelection(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) {
 				require.NotNil(p)
-				messageScore := p.(message.Score)
-				require.NotEmpty(messageScore)
+				messageNewBlock := p.(message.NewBlock)
+				require.NotEmpty(messageNewBlock)
 			}
 
 			testPhase := consensus.NewTestPhase(t, ttestCB, nil)
@@ -57,7 +57,7 @@ func TestSelection(t *testing.T) {
 
 			msgChan := make(chan message.Message, 1)
 			msgs := ttest.msgs
-			go func(msgs []message.Score) {
+			go func(msgs []message.NewBlock) {
 				for _, msg := range msgs {
 					msgChan <- message.New(topics.NewBlock, msg)
 				}

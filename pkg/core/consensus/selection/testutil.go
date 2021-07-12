@@ -74,8 +74,8 @@ func (h *Helper) RoundUpdate() consensus.RoundUpdate {
 }
 
 // Spawn a number of score events.
-func (h *Helper) Spawn() []message.Score {
-	evs := make([]message.Score, 0, h.scoreToSpawn)
+func (h *Helper) Spawn() []message.NewBlock {
+	evs := make([]message.NewBlock, 0, h.scoreToSpawn)
 
 	for i := 0; i < h.scoreToSpawn; i++ {
 		hash, _ := crypto.RandEntropy(32)
@@ -87,7 +87,7 @@ func (h *Helper) Spawn() []message.Score {
 			BlockHash: hash,
 		}
 		genesis := config.DecodeGenesis()
-		evs = append(evs, message.MockScore(hdr, *genesis))
+		evs = append(evs, message.MockNewBlock(hdr, *genesis))
 	}
 
 	return evs

@@ -46,8 +46,7 @@ type Phase struct {
 }
 
 // New creates and launches the component which responsibility is to validate
-// and select the best score among the blind bidders. The component publishes under
-// the topic BestScoreTopic.
+// and select a Provisioner to propagate NewBlock message.
 func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emitter, timeout time.Duration, db database.DB) *Phase {
 	selector := &Phase{
 		Emitter: e,
@@ -91,7 +90,7 @@ func (p *Phase) String() string {
 }
 
 // Run executes the logic for this phase.
-// In this case the selection listens to new Score/Candidate messages.
+// In this case the selection listens to NewBlock messages.
 func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	ctx, cancel := context.WithCancel(parentCtx)
 
@@ -146,7 +145,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		select {
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
-				if err := p.collectScore(ev.Payload().(message.Score), ev.Header()); err != nil {
+				if err := p.collectNewBlock(ev.Payload().(message.NewBlock), ev.Header()); err != nil {
 					continue
 				}
 
@@ -154,10 +153,10 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 				go func() {
 					<-timeoutChan
 				}()
-				return p.endSelection(ev.Payload().(message.Score))
+				return p.endSelection(ev.Payload().(message.NewBlock))
 			}
 		case <-timeoutChan:
-			return p.endSelection(message.EmptyScore())
+			return p.endSelection(message.EmptyNewBlock())
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
@@ -168,16 +167,15 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 	}
 }
 
-func (p *Phase) endSelection(result message.Score) consensus.PhaseFn {
+func (p *Phase) endSelection(result message.NewBlock) consensus.PhaseFn {
 	log.WithField("empty", result.IsEmpty()).
 		Debug("endSelection")
 	return p.next.Initialize(result)
 }
 
-func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
-	// Ensure NewBlock message comes from a member
+func (p *Phase) collectNewBlock(sc message.NewBlock, msgHeader []byte) error {
 	if !p.handler.IsMember(sc.State().PubKeyBLS, sc.State().Round, sc.State().Step) {
-
+		// Ensure NewBlock message comes from a member
 		lg.WithField("Sender BLS key", util.StringifyBytes(sc.State().PubKeyBLS)).
 			WithField("round", sc.State().Round).WithField("step", sc.State().Step).
 			Warn("score message from non-committee provisioner")

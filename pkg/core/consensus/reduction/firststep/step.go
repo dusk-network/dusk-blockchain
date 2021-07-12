@@ -44,7 +44,7 @@ type Phase struct {
 	handler    *reduction.Handler
 	aggregator *reduction.Aggregator
 
-	selectionResult message.Score
+	selectionResult message.NewBlock
 
 	verifyFn  consensus.CandidateVerificationFunc
 	requestor *candidate.Requestor
@@ -72,7 +72,7 @@ func (p *Phase) String() string {
 
 // Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
-	p.selectionResult = re.(message.Score)
+	p.selectionResult = re.(message.NewBlock)
 	return p
 }
 
