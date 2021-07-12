@@ -8,6 +8,7 @@ package selection
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strconv"
 	"time"
@@ -130,13 +131,13 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 				WithField("event", "candidate_generated").Debug("")
 		}
 
-		evChan <- message.NewWithHeader(topics.Score, *scr, []byte{config.KadcastInitialHeight})
+		evChan <- message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
 	}
 
 	timeoutChan := time.After(p.timeout)
 
 	for _, ev := range queue.GetEvents(r.Round, step) {
-		if ev.Category() == topics.Score {
+		if ev.Category() == topics.NewBlock {
 			evChan <- ev
 		}
 	}
@@ -174,6 +175,16 @@ func (p *Phase) endSelection(result message.Score) consensus.PhaseFn {
 }
 
 func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
+	// Ensure NewBlock message comes from a member
+	if !p.handler.IsMember(sc.State().PubKeyBLS, sc.State().Round, sc.State().Step) {
+
+		lg.WithField("Sender BLS key", util.StringifyBytes(sc.State().PubKeyBLS)).
+			WithField("round", sc.State().Round).WithField("step", sc.State().Step).
+			Warn("score message from non-committee provisioner")
+
+		return errors.New("not a member")
+	}
+
 	// Sanity-check the candidate message
 	if err := candidate.ValidateCandidate(sc.Candidate); err != nil {
 		lg.Warn("Invalid candidate message")
@@ -205,7 +216,7 @@ func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
 
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
-	m := message.NewWithHeader(topics.Score, sc, msgHeader)
+	m := message.NewWithHeader(topics.NewBlock, sc, msgHeader)
 	if err := p.Republish(m); err != nil {
 		lg.WithError(err).WithField("kadcast_enabled", config.Get().Kadcast.Enabled).
 			Error("could not republish score event")
@@ -261,14 +272,14 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 		return false
 	}
 
-	if m.Category() != topics.Score {
+	if m.Category() != topics.NewBlock {
 		lg.
 			WithFields(log.Fields{
 				"topic": m.Category(),
 				"round": hdr.Round,
 				"step":  hdr.Step,
 			}).
-			Warnln("message not topics.Score")
+			Warnln("message not topics.NewBlock")
 		return false
 	}
 
