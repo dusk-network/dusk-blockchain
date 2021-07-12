@@ -59,7 +59,7 @@ func TestSelection(t *testing.T) {
 			msgs := ttest.msgs
 			go func(msgs []message.Score) {
 				for _, msg := range msgs {
-					msgChan <- message.New(topics.Score, msg)
+					msgChan <- message.New(topics.NewBlock, msg)
 				}
 			}(msgs)
 			testCallbackPhase := selFn.Run(context.Background(), consensus.NewQueue(), msgChan, hlp.RoundUpdate(), hlp.Step)

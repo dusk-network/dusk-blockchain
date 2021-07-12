@@ -88,7 +88,7 @@ func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
 	switch t {
 	case topics.Tx,
 		topics.Candidate,
-		topics.Score,
+		topics.NewBlock,
 		topics.Reduction,
 		topics.Agreement,
 		topics.GetCandidate:

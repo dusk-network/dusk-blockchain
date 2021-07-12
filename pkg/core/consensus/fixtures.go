@@ -172,8 +172,8 @@ func (t *TestPhase) Run(_ context.Context, queue *Queue, _ chan message.Message,
 	return nil
 }
 
-// MockScoreMsg ...
-func MockScoreMsg(t *testing.T, hdr *header.Header) message.Message {
+// MockNewBlockMsg ...
+func MockNewBlockMsg(t *testing.T, hdr *header.Header) message.Message {
 	var h header.Header
 	if hdr == nil {
 		h = header.Mock()
@@ -189,5 +189,5 @@ func MockScoreMsg(t *testing.T, hdr *header.Header) message.Message {
 	genesis.Header.Hash = h.BlockHash
 	se := message.MockScore(h, *genesis)
 
-	return message.New(topics.Score, se)
+	return message.New(topics.NewBlock, se)
 }
