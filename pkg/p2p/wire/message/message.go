@@ -256,8 +256,8 @@ func Unmarshal(b *bytes.Buffer, h []byte) (Message, error) {
 		err = UnmarshalTxMessage(b, msg)
 	case topics.Candidate:
 		err = UnmarshalBlockMessage(b, msg)
-	case topics.Score:
-		err = UnmarshalScoreMessage(b, msg)
+	case topics.NewBlock:
+		err = UnmarshalNewBlockMessage(b, msg)
 	case topics.Reduction:
 		err = UnmarshalReductionMessage(b, msg)
 	case topics.Agreement:
@@ -347,9 +347,9 @@ func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) 
 	case topics.Candidate:
 		candidate := payload.(block.Block)
 		err = MarshalBlock(buf, &candidate)
-	case topics.Score:
-		score := payload.(Score)
-		err = MarshalScore(buf, score)
+	case topics.NewBlock:
+		score := payload.(NewBlock)
+		err = MarshalNewBlock(buf, score)
 	case topics.Reduction:
 		reduction := payload.(Reduction)
 		err = MarshalReduction(buf, reduction)

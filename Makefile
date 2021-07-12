@@ -26,7 +26,7 @@ test-harness-alive: stop build
 	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestMultipleProvisioners -args -enable -keepalive
 test-harness-tps: stop build
-	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+	MOCK_ADDRESS=127.0.0.1:9191 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestMeasureNetworkTPS -args -enable -keepalive
 test-harness-session:
 	REQUIRE_SESSION=true make test-harness-alive

@@ -8,6 +8,7 @@ package selection
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strconv"
 	"time"
@@ -45,8 +46,7 @@ type Phase struct {
 }
 
 // New creates and launches the component which responsibility is to validate
-// and select the best score among the blind bidders. The component publishes under
-// the topic BestScoreTopic.
+// and select a Provisioner to propagate NewBlock message.
 func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emitter, timeout time.Duration, db database.DB) *Phase {
 	selector := &Phase{
 		Emitter: e,
@@ -90,7 +90,7 @@ func (p *Phase) String() string {
 }
 
 // Run executes the logic for this phase.
-// In this case the selection listens to new Score/Candidate messages.
+// In this case the selection listens to NewBlock messages.
 func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	ctx, cancel := context.WithCancel(parentCtx)
 
@@ -130,13 +130,13 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 				WithField("event", "candidate_generated").Debug("")
 		}
 
-		evChan <- message.NewWithHeader(topics.Score, *scr, []byte{config.KadcastInitialHeight})
+		evChan <- message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
 	}
 
 	timeoutChan := time.After(p.timeout)
 
 	for _, ev := range queue.GetEvents(r.Round, step) {
-		if ev.Category() == topics.Score {
+		if ev.Category() == topics.NewBlock {
 			evChan <- ev
 		}
 	}
@@ -145,7 +145,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		select {
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
-				if err := p.collectScore(ev.Payload().(message.Score), ev.Header()); err != nil {
+				if err := p.collectNewBlock(ev.Payload().(message.NewBlock), ev.Header()); err != nil {
 					continue
 				}
 
@@ -153,10 +153,10 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 				go func() {
 					<-timeoutChan
 				}()
-				return p.endSelection(ev.Payload().(message.Score))
+				return p.endSelection(ev.Payload().(message.NewBlock))
 			}
 		case <-timeoutChan:
-			return p.endSelection(message.EmptyScore())
+			return p.endSelection(message.EmptyNewBlock())
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
@@ -167,13 +167,22 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 	}
 }
 
-func (p *Phase) endSelection(result message.Score) consensus.PhaseFn {
+func (p *Phase) endSelection(result message.NewBlock) consensus.PhaseFn {
 	log.WithField("empty", result.IsEmpty()).
 		Debug("endSelection")
 	return p.next.Initialize(result)
 }
 
-func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
+func (p *Phase) collectNewBlock(sc message.NewBlock, msgHeader []byte) error {
+	if !p.handler.IsMember(sc.State().PubKeyBLS, sc.State().Round, sc.State().Step) {
+		// Ensure NewBlock message comes from a member
+		lg.WithField("Sender BLS key", util.StringifyBytes(sc.State().PubKeyBLS)).
+			WithField("round", sc.State().Round).WithField("step", sc.State().Step).
+			Warn("NewBlock message from non-committee provisioner")
+
+		return errors.New("not a member")
+	}
+
 	// Sanity-check the candidate message
 	if err := candidate.ValidateCandidate(sc.Candidate); err != nil {
 		lg.Warn("Invalid candidate message")
@@ -205,7 +214,7 @@ func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
 
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
-	m := message.NewWithHeader(topics.Score, sc, msgHeader)
+	m := message.NewWithHeader(topics.NewBlock, sc, msgHeader)
 	if err := p.Republish(m); err != nil {
 		lg.WithError(err).WithField("kadcast_enabled", config.Get().Kadcast.Enabled).
 			Error("could not republish score event")
@@ -261,14 +270,14 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 		return false
 	}
 
-	if m.Category() != topics.Score {
+	if m.Category() != topics.NewBlock {
 		lg.
 			WithFields(log.Fields{
 				"topic": m.Category(),
 				"round": hdr.Round,
 				"step":  hdr.Step,
 			}).
-			Warnln("message not topics.Score")
+			Warnln("message not topics.NewBlock")
 		return false
 	}
 

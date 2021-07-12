@@ -88,7 +88,7 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 	// subscribe topics to eventChan
 	evSub := eventbus.NewChanListener(eventChan)
 
-	e.EventBus.AddDefaultTopic(topics.Reduction, topics.Score)
+	e.EventBus.AddDefaultTopic(topics.Reduction, topics.NewBlock)
 	e.EventBus.SubscribeDefault(evSub)
 
 	c := &Consensus{

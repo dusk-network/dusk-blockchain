@@ -100,7 +100,7 @@ func (w *Writer) Serve() {
 			return 0
 		case topics.Block:
 			return 2
-		case topics.Score:
+		case topics.NewBlock:
 			return 3
 		case topics.Reduction:
 			return 4

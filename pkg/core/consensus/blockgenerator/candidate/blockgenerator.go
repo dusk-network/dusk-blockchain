@@ -36,7 +36,7 @@ const MaxTxSetSize = 825000
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator interface {
-	GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.Score, error)
+	GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.NewBlock, error)
 }
 
 type generator struct {
@@ -64,7 +64,7 @@ func (bg *generator) regenerateCommittee(r consensus.RoundUpdate) [][]byte {
 // PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`.
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
-func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
+func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.NewBlock, error) {
 	log := lg.
 		WithField("round", r.Round).
 		WithField("step", step)
@@ -94,7 +94,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 	// Since the Candidate message goes straight to the Chain, there is
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
-	scr := message.NewScore(hdr, r.Hash, *blk)
+	scr := message.NewNewBlock(hdr, r.Hash, *blk)
 
 	sig, err := bg.Sign(hdr)
 	if err != nil {

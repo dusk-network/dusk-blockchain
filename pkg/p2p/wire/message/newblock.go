@@ -18,19 +18,19 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
-// Score extends the ScoreProposal with additional fields related to the
-// candidate it pairs up with. The Score is supposed to be immutable once
+// NewBlock extends the ScoreProposal with additional fields related to the
+// candidate it pairs up with. The NewBlock is supposed to be immutable once
 // created and it gets forwarded to the other nodes.
-type Score struct {
+type NewBlock struct {
 	hdr        header.Header
 	PrevHash   []byte
 	Candidate  block.Block
 	SignedHash []byte
 }
 
-// NewScore creates a new Score from a proposal.
-func NewScore(hdr header.Header, prevHash []byte, candidate block.Block) *Score {
-	return &Score{
+// NewNewBlock creates a new Score from a proposal.
+func NewNewBlock(hdr header.Header, prevHash []byte, candidate block.Block) *NewBlock {
+	return &NewBlock{
 		hdr:        hdr,
 		PrevHash:   prevHash,
 		Candidate:  candidate,
@@ -39,14 +39,14 @@ func NewScore(hdr header.Header, prevHash []byte, candidate block.Block) *Score 
 }
 
 // State is used to comply to the consensus.Message interface.
-func (e Score) State() header.Header {
+func (e NewBlock) State() header.Header {
 	return e.hdr
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
-func (e Score) Copy() payload.Safe {
-	cpy := Score{
+func (e NewBlock) Copy() payload.Safe {
+	cpy := NewBlock{
 		hdr:        e.hdr.Copy().(header.Header),
 		PrevHash:   make([]byte, len(e.PrevHash)),
 		Candidate:  e.Candidate.Copy().(block.Block),
@@ -58,32 +58,32 @@ func (e Score) Copy() payload.Safe {
 	return cpy
 }
 
-// IsEmpty checks if a Score message is empty.
-func (e Score) IsEmpty() bool {
+// IsEmpty checks if a NewBlock message is empty.
+func (e NewBlock) IsEmpty() bool {
 	return e.SignedHash == nil && e.PrevHash == nil
 }
 
-// EmptyScore is used primarily to initialize the Score,
-// since empty scores should not be propagated externally.
-func EmptyScore() Score {
-	return Score{
+// EmptyNewBlock is used primarily to initialize the NewBlock,
+// since empty newblocks should not be propagated externally.
+func EmptyNewBlock() NewBlock {
+	return NewBlock{
 		hdr:       header.New(),
 		Candidate: *block.NewBlock(),
 	}
 }
 
-// Equal tests if two Scores are equal.
-func (e Score) Equal(s Score) bool {
+// Equal tests if two NewBlock messages are equal.
+func (e NewBlock) Equal(s NewBlock) bool {
 	return e.hdr.Equal(s.hdr) && bytes.Equal(e.VoteHash(), s.VoteHash()) && e.VoteHash() != nil
 }
 
 // VoteHash returns hash of the Candidate block.
-func (e Score) VoteHash() []byte {
+func (e NewBlock) VoteHash() []byte {
 	return e.Candidate.Header.Hash
 }
 
-// String representation of a Score.
-func (e Score) String() string {
+// String representation of a NewBlock.
+func (e NewBlock) String() string {
 	var sb strings.Builder
 
 	_, _ = sb.WriteString(e.hdr.String())
@@ -97,17 +97,17 @@ func (e Score) String() string {
 	return sb.String()
 }
 
-func makeScore() *Score {
-	return &Score{
+func makeNewBlock() *NewBlock {
+	return &NewBlock{
 		hdr: header.Header{},
 	}
 }
 
-// UnmarshalScoreMessage unmarshal a ScoreMessage from a buffer.
-func UnmarshalScoreMessage(r *bytes.Buffer, m SerializableMessage) error {
-	sc := makeScore()
+// UnmarshalNewBlockMessage unmarshal a NewBlockMessage from a buffer.
+func UnmarshalNewBlockMessage(r *bytes.Buffer, m SerializableMessage) error {
+	sc := makeNewBlock()
 
-	if err := UnmarshalScore(r, sc); err != nil {
+	if err := UnmarshalNewBlock(r, sc); err != nil {
 		return err
 	}
 
@@ -115,10 +115,10 @@ func UnmarshalScoreMessage(r *bytes.Buffer, m SerializableMessage) error {
 	return nil
 }
 
-// UnmarshalScore unmarshals the buffer into a Score Event.
+// UnmarshalNewBlock unmarshals the buffer into a NewBlock Event.
 // Field order is the following:
 // * Score Payload [score, proof, Z, BidList, Seed, Block Candidate Hash].
-func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
+func UnmarshalNewBlock(r *bytes.Buffer, sev *NewBlock) error {
 	if err := header.Unmarshal(r, &sev.hdr); err != nil {
 		return err
 	}
@@ -141,10 +141,10 @@ func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
 	return nil
 }
 
-// MarshalScore the buffer into a committee Event.
+// MarshalNewBlock the buffer into a committee Event.
 // Field order is the following:
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash].
-func MarshalScore(r *bytes.Buffer, sev Score) error {
+func MarshalNewBlock(r *bytes.Buffer, sev NewBlock) error {
 	// Marshaling header first
 	if err := header.Marshal(r, sev.hdr); err != nil {
 		return err
@@ -166,11 +166,11 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 	return nil
 }
 
-// MockScore mocks a Score and returns it.
-func MockScore(hdr header.Header, c block.Block) Score {
+// MockNewBlock mocks a NewBlock and returns it.
+func MockNewBlock(hdr header.Header, c block.Block) NewBlock {
 	prevHash, _ := crypto.RandEntropy(32)
 
-	return Score{
+	return NewBlock{
 		hdr:        hdr,
 		PrevHash:   prevHash,
 		Candidate:  c,
