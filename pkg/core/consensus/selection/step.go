@@ -178,7 +178,7 @@ func (p *Phase) collectNewBlock(sc message.NewBlock, msgHeader []byte) error {
 		// Ensure NewBlock message comes from a member
 		lg.WithField("Sender BLS key", util.StringifyBytes(sc.State().PubKeyBLS)).
 			WithField("round", sc.State().Round).WithField("step", sc.State().Step).
-			Warn("score message from non-committee provisioner")
+			Warn("NewBlock message from non-committee provisioner")
 
 		return errors.New("not a member")
 	}
