@@ -105,7 +105,10 @@ func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensu
 		return false
 	}
 
-	if hdr.Round > round {
+	// Only store events up to 10 rounds into the future
+	// XXX: According to protocol specs, we should abandon consensus
+	// if we notice valid messages from far into the future.
+	if hdr.Round > round && hdr.Round-round < 10 {
 		lg.
 			WithFields(log.Fields{
 				"topic":             "Agreement",
