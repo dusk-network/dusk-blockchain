@@ -58,6 +58,15 @@ func (m *HashMap) Put(t TxDesc) error {
 	var k txHash
 	copy(k[:], txID)
 
+	// Let's check if we're not inserting a double key. This is, is essence,
+	// fine for the map, but having a duplicate entry in `sorted` can cause
+	// a panic in CalculateRoot, in the block generator.
+
+	_, ok := m.data[k]
+	if ok {
+		return ErrAlreadyExists
+	}
+
 	m.data[k] = t
 	m.txsSize += uint32(t.size)
 
