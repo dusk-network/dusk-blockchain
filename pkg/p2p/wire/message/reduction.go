@@ -216,7 +216,7 @@ func createVoteSet(k1, k2 []key.Keys, hash []byte, size int, round uint64, step 
 	// We can not have duplicates in the vote set.
 	duplicates := make(map[string]struct{})
 	// We need 75% of the committee size worth of events to reach quorum.
-	for j := 0; j < int(float64(size)*0.75); j++ {
+	for j := 0; j < int(float64(size)*0.67); j++ {
 		if _, ok := duplicates[string(k1[j].BLSPubKey)]; !ok {
 			ev := MockReduction(hash, round, step-2, k1, j)
 			events = append(events, ev)
@@ -229,7 +229,7 @@ func createVoteSet(k1, k2 []key.Keys, hash []byte, size int, round uint64, step 
 		delete(duplicates, k)
 	}
 
-	for j := 0; j < int(float64(size)*0.75); j++ {
+	for j := 0; j < int(float64(size)*0.67); j++ {
 		if _, ok := duplicates[string(k2[j].BLSPubKey)]; !ok {
 			ev := MockReduction(hash, round, step-1, k2, j)
 			events = append(events, ev)

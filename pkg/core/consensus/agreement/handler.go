@@ -76,7 +76,7 @@ func (a *handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
 
 // Quorum returns the amount of committee members necessary to reach a quorum.
 func (a *handler) Quorum(round uint64) int {
-	return int(math.Ceil(float64(a.CommitteeSize(round, MaxCommitteeSize)) * 0.75))
+	return int(math.Ceil(float64(a.CommitteeSize(round, MaxCommitteeSize)) * 0.67))
 }
 
 // Verify checks the signature of the set.
