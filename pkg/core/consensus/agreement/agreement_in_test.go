@@ -26,5 +26,5 @@ func TestAccumulatorProcessing(t *testing.T) {
 	}
 
 	accumulatedAggros := <-accumulator.CollectedVotesChan
-	assert.Equal(t, 8, len(accumulatedAggros))
+	assert.Equal(t, 7, len(accumulatedAggros))
 }
