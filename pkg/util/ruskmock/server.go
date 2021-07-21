@@ -11,6 +11,8 @@ import (
 	"context"
 	"encoding/binary"
 	"net"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -40,7 +42,8 @@ type Server struct {
 	cfg *Config
 	s   *grpc.Server
 
-	p *user.Provisioners
+	p  *user.Provisioners
+	db *BuntStore
 }
 
 // New returns a new Rusk mock server with the given config. If no config is
@@ -50,9 +53,17 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 		cfg = DefaultConfig()
 	}
 
+	dbPath := filepath.Dir(filepath.Dir(c.Wallet.Store)) + "/" + "ruskmock.db"
+
+	db, err := NewBuntStore(dbPath, High)
+	if err != nil {
+		panic(err)
+	}
+
 	srv := &Server{
 		cfg: cfg,
 		p:   user.NewProvisioners(),
+		db:  db,
 	}
 
 	grpcServer := grpc.NewServer()
@@ -65,9 +76,22 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 func (s *Server) bootstrapBlockchain() error {
 	log.Infoln("bootstrapping blockchain")
 
+	// Reconstruct Genesis Provisioners
 	g := config.DecodeGenesis()
+	if err := chain.ReconstructCommittee(s.p, g); err != nil {
+		return err
+	}
 
-	return chain.ReconstructCommittee(s.p, g)
+	provisioners, err := s.db.FetchProvisioners()
+	if err == nil {
+		s.p = provisioners
+	} else {
+		// Could not fetch any provisioners from DB.
+		// Then we should update.
+		_ = s.db.StoreProvisioners(s.p)
+	}
+
+	return nil
 }
 
 func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
@@ -86,6 +110,11 @@ func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
 // incoming gRPC requests.
 func (s *Server) Serve(network, url string) error {
 	log.WithField("addr", url).WithField("net", network).Infoln("starting GRPC server")
+
+	if network == "unix" {
+		// Remove obsolete unix socket file
+		_ = os.Remove(url)
+	}
 
 	l, err := net.Listen(network, url)
 	if err != nil {
@@ -155,6 +184,11 @@ func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersR
 	log.Infoln("call received to GetProvisioners")
 	defer log.Infoln("finished call to GetProvisioners")
 
+	provisioners, err := s.db.FetchProvisioners()
+	if err == nil {
+		s.p = provisioners
+	}
+
 	return &rusk.GetProvisionersResponse{
 		Provisioners: legacy.ProvisionersToRuskCommittee(s.p),
 	}, nil
@@ -162,6 +196,8 @@ func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersR
 
 func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) error {
 	log.Debugln("adding consensus nodes")
+
+	var added bool
 
 	for _, tx := range txs {
 		if tx.Type == uint32(transactions.Stake) {
@@ -185,6 +221,8 @@ func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) 
 				return err
 			}
 
+			added = true
+
 			log.WithFields(logrus.Fields{
 				"BLS key":      pk,
 				"amount":       value,
@@ -192,6 +230,12 @@ func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) 
 				"end height":   startHeight + lock - 2,
 			}).Debugln("added provisioner")
 		}
+	}
+
+	if added {
+		// New provisioners added on last block.
+		// Update ondisk copy of provisioners.
+		return s.db.StoreProvisioners(s.p)
 	}
 
 	return nil
