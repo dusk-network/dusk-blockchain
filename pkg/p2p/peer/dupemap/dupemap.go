@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultCapacity = uint32(300000)
-	defaultExpire   = int64(5)
+	defaultExpire   = int64(60)
 )
 
 // TODO: DupeMap should deal with value bytes.Buffer rather than pointers as it is not supposed to mutate the struct.
