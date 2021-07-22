@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -45,6 +46,8 @@ import (
 )
 
 var testnet = byte(2)
+
+const voucherRetryTime = 15 * time.Second
 
 // Server is the main process of the node.
 type Server struct {
@@ -245,13 +248,7 @@ func Setup() *Server {
 		connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag), peer.Create)
 
 		seeders := cfg.Get().Network.Seeder.Addresses
-		for _, seeder := range seeders {
-			if err = connector.Connect(seeder); err != nil {
-				log.WithError(err).Error("could not contact voucher seeder")
-			}
-		}
-
-		if connector.GetConnectionsCount() == 0 {
+		if err = connectToSeeders(connector, seeders); err != nil {
 			panic("could not contact any voucher seeders")
 		}
 	}
@@ -315,6 +312,27 @@ func (s *Server) Close() {
 	if s.kadPeer != nil {
 		s.kadPeer.Close()
 	}
+}
+
+func connectToSeeders(connector *peer.Connector, seeders []string) error {
+	i := 0
+
+	for connector.GetConnectionsCount() == 0 {
+		for _, seeder := range seeders {
+			if err := connector.Connect(seeder); err != nil {
+				log.WithError(err).Error("could not contact voucher seeder")
+			}
+		}
+
+		i++
+		if i >= 3 {
+			return errors.New("could not connect to any voucher seeders")
+		}
+
+		time.Sleep(voucherRetryTime * time.Duration(i))
+	}
+
+	return nil
 }
 
 func registerPeerServices(processor *peer.MessageProcessor, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) {
