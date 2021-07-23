@@ -316,12 +316,19 @@ func (s *Server) Close() {
 
 func connectToSeeders(connector *peer.Connector, seeders []string) error {
 	i := 0
+	var connected bool
 
-	for connector.GetConnectionsCount() == 0 {
+	for {
 		for _, seeder := range seeders {
 			if err := connector.Connect(seeder); err != nil {
 				log.WithError(err).Error("could not contact voucher seeder")
+			} else {
+				connected = true
 			}
+		}
+
+		if connected {
+			break
 		}
 
 		i++
