@@ -9,6 +9,7 @@
 package server
 
 import (
+	"os"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -53,6 +54,11 @@ func SetupGRPC(conf Setup) (*grpc.Server, error) {
 	jwtMan, err := NewJWTManager(time.Duration(conf.SessionDurationMins) * time.Minute)
 	if err != nil {
 		return nil, err
+	}
+
+	if conf.Network == "unix" {
+		// Remove obsolete unix socket file
+		_ = os.Remove(conf.Address)
 	}
 
 	// Add default interceptors to provide jwt-based session authentication and error logging

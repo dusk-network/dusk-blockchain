@@ -2,7 +2,6 @@ module github.com/dusk-network/dusk-blockchain
 
 require (
 	github.com/asdine/storm/v3 v3.2.1
-	github.com/bwesterb/go-ristretto v1.1.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/didip/tollbooth v4.0.2+incompatible
@@ -10,7 +9,6 @@ require (
 	github.com/dusk-network/bls12_381-sign-go v0.1.1
 	github.com/dusk-network/dusk-crypto v0.1.3
 	github.com/dusk-network/dusk-protobuf v0.2.16
-	github.com/dusk-network/dusk-wallet/v2 v2.0.5
 	github.com/etherlabsio/healthcheck v0.0.0-20191224061800-dd3d2fd8c3f6
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
@@ -21,7 +19,6 @@ require (
 	github.com/facebookgo/stats v0.0.0-20151006221625-1b76add642e4 // indirect
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
 	github.com/go-chi/render v1.0.1
-	github.com/golangci/golangci-lint v1.31.0 // indirect
 	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/google/gofountain v0.0.0-20160820054803-4928733085e9
 	github.com/gorilla/context v1.1.1 // indirect
@@ -49,6 +46,7 @@ require (
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/goleveldb v1.0.0
+	github.com/tidwall/buntdb v1.2.4
 	github.com/urfave/cli v1.22.3
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
