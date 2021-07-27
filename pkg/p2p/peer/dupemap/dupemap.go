@@ -40,6 +40,7 @@ func NewDupeMapDefault() *DupeMap {
 }
 
 // NewDupeMap creates new dupemap instance.
+// Expire is number of seconds.
 func NewDupeMap(expire int64, capacity uint32) *DupeMap {
 	log.WithField("cap", capacity).Info("create dupemap instance")
 

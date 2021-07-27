@@ -47,13 +47,14 @@ func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus) *DataRequestor {
 	return &DataRequestor{
 		db:      db,
 		rpcBus:  rpcBus,
-		dupemap: dupemap.NewDupeMapDefault(),
+		dupemap: dupemap.NewDupeMap(5, 100000),
 	}
 }
 
 // RequestMissingItems takes an inventory message, checks it for any items that the node
 // is missing, puts these items in a GetData wire message, and sends it off to the peer's
 // outgoing message queue, requesting the items in full.
+// Handles topics.Inv wire messages.
 func (d *DataRequestor) RequestMissingItems(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
@@ -70,6 +71,14 @@ func (d *DataRequestor) RequestMissingItems(srcPeerID string, m message.Message)
 				_, err := t.FetchBlockExists(obj.Hash)
 				return err
 			})
+
+			// In Gossip network, topics.Inv msg could be received from
+			// all (up to 9) peers when a new transaction or a block hash
+			// is propagated. To ensure we request full tx/block data from
+			// not more than a single peer and reduce bandwidth needs, we
+			// introduce a dupemap here with short expiry time.
+
+			// In Kadcast network, topics.Inv is never used.
 
 			if err == database.ErrBlockNotFound {
 				if d.dupemap.HasAnywhere(bytes.NewBuffer(obj.Hash)) {

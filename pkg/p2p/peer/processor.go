@@ -84,6 +84,8 @@ func (m *MessageProcessor) trace(st int64, msg []byte) {
 	}
 }
 
+// shouldBeCached determines types of topics that are filtered with a dupemap.
+// topics.Inv is filtered with another instance of dupemap managed by responding.DataRequestor.
 func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
 	switch t {
 	case topics.Tx,
