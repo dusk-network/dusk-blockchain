@@ -20,8 +20,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type (
@@ -152,4 +156,49 @@ func (e *Emitter) Republish(msg message.Message) error {
 	}
 
 	return e.Gossip(msg)
+}
+
+// WithFields builds a list of common Consensus logging fields.
+// It also adds extra fields for TraceLevel only.
+func WithFields(round uint64, step uint8, eventName string, hash,
+	blsPubKey []byte, sVotingCommittee *user.VotingCommittee,
+	sVotedCommittee *sortedset.Cluster, p *user.Provisioners) *log.Entry {
+	l := log.WithField("process", "consensus").
+		WithField("round", round).
+		WithField("step", step).
+		WithField("event", eventName)
+
+	if len(hash) > 0 {
+		// Hash of a candidate block, members are voting for at this step
+		l = l.WithField("hash", util.StringifyBytes(hash))
+	}
+
+	// Printing provisioners and committee members could be useful for short-lived tests.
+	// For long-lived tests, logfile size may become a concern.
+	if log.GetLevel() == log.TraceLevel {
+		// This node network identification
+		l = l.WithField("node_id", config.Get().Network.Port)
+
+		if len(blsPubKey) > 0 {
+			// This node (loaded wallet) provisioner BLS Public Key
+			l = l.WithField("this_prov", util.StringifyBytes(blsPubKey))
+		}
+
+		if sVotingCommittee != nil {
+			// Step Voting Committee are Committee members that are extracted
+			// by Sortition at this step and round
+			l = l.WithField("s_voting_c", sVotingCommittee)
+		}
+
+		if sVotedCommittee != nil {
+			// Step Voted Committee are Committee members that voted at this step
+			l = l.WithField("s_voted_c", sVotedCommittee)
+		}
+
+		if p != nil {
+			// List of all legit provisioners for this round
+			l = l.WithField("provs", p)
+		}
+	}
+	return l
 }
