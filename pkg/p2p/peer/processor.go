@@ -53,8 +53,7 @@ func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf 
 	if len(packet) == 0 {
 		return nil, errors.New("empty packet provided")
 	}
-
-	defer m.trace(time.Now().UnixNano(), packet)
+	defer m.trace(srcPeerID, time.Now().UnixNano(), packet)
 
 	b := bytes.NewBuffer(packet)
 	topic := topics.Topic(b.Bytes()[0])
@@ -67,7 +66,7 @@ func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf 
 	return m.process(srcPeerID, msg, respRingBuf, services)
 }
 
-func (m *MessageProcessor) trace(st int64, msg []byte) {
+func (m *MessageProcessor) trace(srcAddr string, st int64, msg []byte) {
 	if l.Logger.GetLevel() == log.TraceLevel {
 		duration := float64(time.Now().UnixNano()-st) / 1000000
 
@@ -80,7 +79,8 @@ func (m *MessageProcessor) trace(st int64, msg []byte) {
 			WithField("len", len(msg)).
 			WithField("ms", duration).
 			WithField("topic", topicName).
-			Trace("wire message")
+			WithField("r_addr", srcAddr).
+			Trace("wire msg")
 	}
 }
 

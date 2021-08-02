@@ -13,6 +13,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
+	"github.com/sirupsen/logrus"
 )
 
 // InvType is a byte describing the Inventory type.
@@ -71,6 +72,10 @@ func (inv *Inv) Encode(w *bytes.Buffer) error {
 		return errors.New("inv message is too large")
 	}
 
+	if uint32(len(inv.InvList)) > 10 {
+		logrus.WithField("list_size", len(inv.InvList)).Trace("encode inv message")
+	}
+
 	if err := encoding.WriteVarInt(w, uint64(len(inv.InvList))); err != nil {
 		return err
 	}
@@ -119,6 +124,10 @@ func (inv *Inv) Decode(r *bytes.Buffer) error {
 	}
 
 	inv.InvList = make([]InvVect, lenVect)
+
+	if lenVect > 10 {
+		logrus.WithField("list_size", lenVect).Trace("decode inv message")
+	}
 
 	for i := uint64(0); i < lenVect; i++ {
 		var invType uint8

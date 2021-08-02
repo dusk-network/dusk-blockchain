@@ -21,8 +21,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 // MaxCommitteeSize represents the maximum size of the committee for an
@@ -107,13 +105,11 @@ func (a *handler) Verify(ev message.Agreement) error {
 
 		allVoters += subcommittee.TotalOccurrences()
 
-		if log.GetLevel() >= logrus.DebugLevel {
-			log := consensus.WithFields(hdr.Round, step, "agreement_received",
-				hdr.BlockHash, a.Keys.BLSPubKey, &committee, &subcommittee, &a.Provisioners)
+		log := consensus.WithFields(hdr.Round, step, "agreement_received",
+			hdr.BlockHash, a.Keys.BLSPubKey, &committee, &subcommittee, &a.Provisioners)
 
-			log.WithField("bitset", votes.BitSet).
-				WithField("total_votes", allVoters).Debug()
-		}
+		log.WithField("bitset", votes.BitSet).WithField("voted_len", subcommittee.Len()).
+			WithField("total_votes", allVoters).Info()
 
 		apk, err := ReconstructApk(subcommittee.Set)
 		if err != nil {
