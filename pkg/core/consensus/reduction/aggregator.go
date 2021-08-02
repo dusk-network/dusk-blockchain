@@ -9,6 +9,7 @@ package reduction
 import (
 	"fmt"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
@@ -87,36 +88,30 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 	roundQuorumTarget := a.handler.Quorum(hdr.Round)
 
 	if log.GetLevel() >= logrus.DebugLevel {
-		log.WithField("process", "consensus").
-			WithField("total", total).
-			WithField("round", hdr.Round).
-			WithField("hash", util.StringifyBytes(hdr.BlockHash)).
-			WithField("step", hdr.Step).
+		c := a.handler.Committee(hdr.Round, hdr.Step)
+
+		log := consensus.WithFields(hdr.Round, hdr.Step, "vote_received",
+			hdr.BlockHash, nil, &c, &sv.Cluster, &a.handler.Provisioners)
+
+		log.WithField("total", total).
 			WithField("vote_from", util.StringifyBytes(hdr.PubKeyBLS)).
 			WithField("num", votes).
-			WithField("step_voting_committee", a.handler.Committee(hdr.Round, hdr.Step)).
-			WithField("step_voted_committee", sv.Cluster).
-			WithField("quorum_target", roundQuorumTarget).
-			WithField("provisioners", a.handler.Provisioners).
-			WithField("event", "vote_received").Debug("")
+			WithField("quorum_target", roundQuorumTarget).Debug()
 	}
 
 	if total >= roundQuorumTarget {
 		// quorum reached
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
 
-		log.WithField("process", "consensus").
+		c := a.handler.Committee(hdr.Round, hdr.Step)
+
+		log := consensus.WithFields(hdr.Round, hdr.Step, "quorum_reached",
+			hdr.BlockHash, nil, &c, &sv.Cluster, &a.handler.Provisioners)
+
+		log.
 			WithField("total_votes", total).
 			WithField("quorum_target", roundQuorumTarget).
-			WithField("round", hdr.Round).
-			WithField("hash", util.StringifyBytes(hdr.BlockHash)).
-			WithField("step", hdr.Step).
-			WithField("step_voting_committee", a.handler.Committee(hdr.Round, hdr.Step)).
-			WithField("step_voted_committee", sv.Cluster).
-			WithField("bitset", fmt.Sprintf("%b", sv.BitSet)).
-			WithField("provisioners", a.handler.Provisioners).
-			WithField("event", "quorum_reached").
-			Info("")
+			WithField("bitset", fmt.Sprintf("%b", sv.BitSet)).Info("")
 
 		return &Result{hdr.BlockHash, *sv.StepVotes}
 	}

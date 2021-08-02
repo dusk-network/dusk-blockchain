@@ -9,7 +9,6 @@ package firststep
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -163,12 +162,12 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 	}
 
 	if log.GetLevel() >= logrus.DebugLevel {
-		log.WithField("process", "consensus").
-			WithField("round", round).
-			WithField("reduction_msg", r).
-			WithField("this_provisioner", util.StringifyBytes(p.handler.BLSPubKey)).
-			WithField("step", step).
-			WithField("event", "first_reduction_collected").Debug("")
+		log := consensus.WithFields(r.State().Round, r.State().Step, "1th_reduction_collected",
+			r.State().BlockHash, p.handler.BLSPubKey, nil, nil, nil)
+
+		log.WithField("signature", util.StringifyBytes(r.SignedHash)).
+			WithField("sender", util.StringifyBytes(r.Sender())).
+			Debug("")
 	}
 
 	m := message.NewWithHeader(topics.Reduction, r, config.KadcastInitHeader)
@@ -179,13 +178,6 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 	}
 
 	hdr := r.State()
-
-	lg.WithFields(log.Fields{
-		"round":  hdr.Round,
-		"step":   hdr.Step,
-		"sender": hex.EncodeToString(hdr.Sender()),
-		"hash":   hex.EncodeToString(hdr.BlockHash),
-	}).Debugln("received_event")
 
 	result := p.aggregator.CollectVote(r)
 	if result == nil {

@@ -104,15 +104,9 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 	isMember := p.handler.AmMember(r.Round, step)
 
 	if log.GetLevel() >= logrus.DebugLevel {
-		log.WithField("process", "consensus").
-			WithField("round", r.Round).
-			WithField("provisioners", r.P).
-			WithField("step_voting_committee", p.handler.Committees[step]).
-			WithField("step", step).
-			WithField("is_member", isMember).
-			WithField("this_provisioner", util.StringifyBytes(p.Keys.BLSPubKey)).
-			WithField("node_id", config.Get().Network.Port).
-			WithField("event", "selection_initialized").Debug("")
+		log := consensus.WithFields(r.Round, step, "selection_init",
+			nil, p.Keys.BLSPubKey, &p.handler.Committees[step], nil, &r.P)
+		log.WithField("is_member", isMember).Debug()
 	}
 
 	if isMember {
@@ -122,12 +116,8 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		}
 
 		if log.GetLevel() >= logrus.DebugLevel {
-			log.WithField("process", "consensus").
-				WithField("round", r.Round).
-				WithField("hash", util.StringifyBytes(scr.State().BlockHash)).
-				WithField("this_provisioner", util.StringifyBytes(p.keys.BLSPubKey)).
-				WithField("step", step).
-				WithField("event", "candidate_generated").Debug("")
+			consensus.WithFields(r.Round, step, "candidate_generated",
+				scr.State().BlockHash, p.Keys.BLSPubKey, nil, nil, nil).Debug()
 		}
 
 		evChan <- message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
@@ -176,7 +166,7 @@ func (p *Phase) endSelection(result message.NewBlock) consensus.PhaseFn {
 func (p *Phase) collectNewBlock(sc message.NewBlock, msgHeader []byte) error {
 	if !p.handler.IsMember(sc.State().PubKeyBLS, sc.State().Round, sc.State().Step) {
 		// Ensure NewBlock message comes from a member
-		lg.WithField("Sender BLS key", util.StringifyBytes(sc.State().PubKeyBLS)).
+		lg.WithField("sender", util.StringifyBytes(sc.State().PubKeyBLS)).
 			WithField("round", sc.State().Round).WithField("step", sc.State().Step).
 			Warn("NewBlock message from non-committee provisioner")
 
@@ -202,14 +192,10 @@ func (p *Phase) collectNewBlock(sc message.NewBlock, msgHeader []byte) error {
 	}
 
 	if log.GetLevel() >= logrus.DebugLevel {
-		log.WithField("process", "consensus").
-			WithField("hash", util.StringifyBytes(sc.Candidate.Header.Hash)).
-			WithField("Sender BLS Key", util.StringifyBytes(sc.State().PubKeyBLS)).
-			WithField("round", sc.State().Round).
-			WithField("step", sc.State().Step).
-			WithField("this_provisioner", util.StringifyBytes(p.Keys.BLSPubKey)).
-			WithField("node_id", config.Get().Network.Port).
-			WithField("event", "score_collected").Debug("")
+		log := consensus.WithFields(sc.State().Round, sc.State().Step, "score_collected",
+			sc.Candidate.Header.Hash, p.Keys.BLSPubKey, nil, nil, nil)
+
+		log.WithField("sender", util.StringifyBytes(sc.State().PubKeyBLS)).Debug()
 	}
 
 	// Once the event is verified, and has passed all preliminary checks,
