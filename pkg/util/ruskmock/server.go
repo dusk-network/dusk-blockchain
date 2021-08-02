@@ -20,6 +20,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -224,7 +225,7 @@ func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) 
 			added = true
 
 			log.WithFields(logrus.Fields{
-				"BLS key":      pk,
+				"BLS key":      util.StringifyBytes(pk),
 				"amount":       value,
 				"start height": stakeStartHeight,
 				"end height":   startHeight + lock - 2,
@@ -233,6 +234,7 @@ func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) 
 	}
 
 	if added {
+		log.WithField("size", s.p.Set.Len()).Debugln("update provisioners db")
 		// New provisioners added on last block.
 		// Update ondisk copy of provisioners.
 		return s.db.StoreProvisioners(s.p)
