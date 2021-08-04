@@ -80,7 +80,7 @@ func (r Reduction) Equal(msg Message) bool {
 
 // MarshalJSON ...
 func (r Reduction) MarshalJSON() ([]byte, error) {
-	v := fmt.Sprintf("Signature: %s, Hash: %s, Round: %d, Step: %d, Sender BLS key %s)", util.StringifyBytes(r.SignedHash),
+	v := fmt.Sprintf("Signature: %s, Hash: %s, Round: %d, Step: %d, Sender key %s)", util.StringifyBytes(r.SignedHash),
 		util.StringifyBytes(r.hdr.BlockHash), r.hdr.Round, r.hdr.Step, util.StringifyBytes(r.hdr.PubKeyBLS))
 
 	return json.Marshal(v)

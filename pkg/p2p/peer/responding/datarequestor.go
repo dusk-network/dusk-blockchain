@@ -20,6 +20,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -61,6 +62,10 @@ func (d *DataRequestor) RequestMissingItems(srcPeerID string, m message.Message)
 
 	msg := m.Payload().(message.Inv)
 	getData := &message.Inv{}
+
+	if len(msg.InvList) > 10 {
+		logrus.WithField("list_size", len(msg.InvList)).Trace("request missing items")
+	}
 
 	for _, obj := range msg.InvList {
 		switch obj.Type {
@@ -128,7 +133,11 @@ func (d *DataRequestor) RequestMissingItems(srcPeerID string, m message.Message)
 	// If we found any items to be missing, we request them from the peer who
 	// advertised them.
 	if getData.InvList != nil {
-		// we've got objects that are missing, then packet and request them
+		if len(msg.InvList) > 10 {
+			// we've got objects that are missing, then packet and request them
+			logrus.WithField("list_size", len(getData.InvList)).Trace("getdata items")
+		}
+
 		buf, err := marshalGetData(getData)
 		return []bytes.Buffer{*buf}, err
 	}

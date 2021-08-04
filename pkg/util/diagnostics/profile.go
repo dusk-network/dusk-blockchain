@@ -231,7 +231,8 @@ func profFile(prefix string) string {
 	name += "_"
 	name += strconv.Itoa(int(time.Now().Unix()))
 
-	return name + ".prof"
+	dir, _ := os.Getwd()
+	return dir + "/" + name + ".prof"
 }
 
 // Custom profile samples
