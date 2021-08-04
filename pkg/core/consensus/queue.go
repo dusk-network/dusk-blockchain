@@ -57,7 +57,7 @@ func (eq *Queue) PutEvent(round uint64, step uint8, m message.Message) {
 	defer eq.lock.Unlock()
 
 	if eq.items >= maxMessages {
-		logrus.WithField("process", "consensus queue").
+		logrus.WithField("process", "consensus").
 			WithField("round", round).
 			WithField("step", step).
 			WithField("topic", m.Category()).
