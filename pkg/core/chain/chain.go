@@ -9,6 +9,7 @@ package chain
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"sync"
 
@@ -317,7 +318,8 @@ func (c *Chain) AcceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved.
 func (c *Chain) AcceptBlock(blk block.Block) error {
-	field := logger.Fields{"process": "accept block", "height": blk.Header.Height}
+	field := logger.Fields{"event": "accept_block", "height": blk.Header.Height, "hash": hex.EncodeToString(blk.Header.Hash)}
+
 	l := log.WithFields(field)
 
 	l.Trace("verifying block")
@@ -341,7 +343,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// 3. Call ExecuteStateTransitionFunction
 	prov_num := c.p.Set.Len()
 
-	l.WithField("provisioners", prov_num).Info("calling ExecuteStateTransitionFunction")
+	l.WithField("provisioners", prov_num).Info("run state transition")
 
 	// TODO: the context here should maybe used to set a timeout
 	provisioners, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
@@ -356,14 +358,14 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	l.WithField("provisioners", c.p.Set.Len()).
 		WithField("added", c.p.Set.Len()-prov_num).
-		Info("after ExecuteStateTransitionFunction")
+		Info("state transition completed")
 
 	if config.Get().API.Enabled {
 		go c.storeStakesInStormDB(blk.Header.Height)
 	}
 
 	// 4. Store the approved block
-	l.Trace("storing block in db")
+	l.Debug("storing block")
 
 	if err := c.loader.Append(&blk); err != nil {
 		l.WithError(err).Error("block storing failed")

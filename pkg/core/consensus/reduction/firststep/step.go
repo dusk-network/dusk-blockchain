@@ -26,7 +26,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "first step reduction")
+var lg = log.WithField("process", "consensus").
+	WithField("phase", "1th_reduction")
 
 func getLog(r uint64, s uint8) *log.Entry {
 	return lg.WithFields(log.Fields{

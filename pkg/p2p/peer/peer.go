@@ -19,7 +19,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
@@ -29,6 +28,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
+// Filtering logs by "peer" or "peer_conn" words should be enough to fetch all
+// details of gossip connections and messages for all peers.
 var l = log.WithField("process", "peer")
 
 const (
@@ -63,9 +64,13 @@ type GossipConnector struct {
 
 func (g *GossipConnector) Write(b, header []byte, priority byte) (int, error) {
 	if !canRoute(g.services, topics.Topic(b[0])) {
-		l.WithField("topic", topics.Topic(b[0]).String()).
-			WithField("service flag", g.services).
-			Trace("dropping message")
+		if g.services != protocol.VoucherNode {
+			l.WithField("topic", topics.Topic(b[0]).String()).
+				WithField("service flag", g.services).
+				WithField("r_addr", g.RemoteAddr().String()).
+				Trace("dropping message")
+		}
+
 		return 0, nil
 	}
 
@@ -74,7 +79,13 @@ func (g *GossipConnector) Write(b, header []byte, priority byte) (int, error) {
 		return 0, err
 	}
 
-	return g.Connection.Write(buf.Bytes())
+	n, err := g.Connection.Write(buf.Bytes())
+	if err != nil {
+		l.WithField("r_addr", g.RemoteAddr().String()).
+			WithError(err).Warn("failed to write")
+	}
+
+	return n, err
 }
 
 // Writer abstracts all of the logic and fields needed to write messages to
@@ -149,7 +160,7 @@ func (w *Writer) Connect(services protocol.ServiceFlag) error {
 
 			err := store.Save(&peerJSON)
 			if err != nil {
-				log.Error("failed to save peerJSON into StormDB")
+				l.Error("failed to save peerJSON into StormDB")
 			}
 
 			// save count
@@ -160,7 +171,7 @@ func (w *Writer) Connect(services protocol.ServiceFlag) error {
 
 			err = store.Save(&peerCount)
 			if err != nil {
-				log.Error("failed to save peerCount into StormDB")
+				l.Error("failed to save peerCount into StormDB")
 			}
 		}()
 	}
@@ -188,7 +199,7 @@ func (p *Reader) Accept(services protocol.ServiceFlag) error {
 
 			err := store.Save(&peerJSON)
 			if err != nil {
-				log.Error("failed to save peer into StormDB")
+				l.Error("failed to save peer into StormDB")
 			}
 
 			// save count
@@ -199,7 +210,7 @@ func (p *Reader) Accept(services protocol.ServiceFlag) error {
 
 			err = store.Save(&peerCount)
 			if err != nil {
-				log.Error("failed to save peerCount into StormDB")
+				l.Error("failed to save peerCount into StormDB")
 			}
 		}()
 	}
@@ -215,8 +226,8 @@ func Create(ctx context.Context, reader *Reader, writer *Writer) {
 	defer cancel()
 
 	g := &GossipConnector{writer.Connection}
-	l := eventbus.NewStreamListener(g)
-	writer.gossipID = writer.subscriber.Subscribe(topics.Gossip, l)
+	listener := eventbus.NewStreamListener(g)
+	writer.gossipID = writer.subscriber.Subscribe(topics.Gossip, listener)
 	ringBuf := ring.NewBuffer(1000)
 
 	// On each new connection the node sends topics.Mempool to retrieve mempool
@@ -228,8 +239,7 @@ func Create(ctx context.Context, reader *Reader, writer *Writer) {
 	}
 
 	if !ringBuf.Put(e) {
-		logrus.WithField("process", "peer").
-			Errorln("could not send mempool message to peer")
+		l.Errorln("could not send mempool message to peer")
 	}
 
 	_ = ring.NewConsumer(ringBuf, eventbus.Consume, g, false)
@@ -239,7 +249,7 @@ func Create(ctx context.Context, reader *Reader, writer *Writer) {
 }
 
 func (w *Writer) onDisconnect() {
-	log.WithField("address", w.Connection.RemoteAddr().String()).Infof("Connection terminated")
+	l.WithField("r_addr", w.Connection.RemoteAddr().String()).Info("peer_connection terminated")
 
 	_ = w.Conn.Close()
 
@@ -258,7 +268,7 @@ func (w *Writer) onDisconnect() {
 
 			err := store.Save(&peerJSON)
 			if err != nil {
-				log.Error("failed to save peer into StormDB")
+				l.Error("failed to save peer into StormDB")
 			}
 		}()
 	}
@@ -291,6 +301,8 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 	timer := time.NewTimer(keepAliveTime)
 	go p.keepAliveLoop(ctx, timer)
 
+	plog := l.WithField("r_addr", p.Conn.RemoteAddr().String())
+
 	for {
 		// Check if context was canceled
 		select {
@@ -302,24 +314,26 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 		// Refresh the read deadline
 		err := p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
 		if err != nil {
-			l.WithError(err).Warnf("error setting read timeout")
+			plog.WithError(err).
+				Warn("error setting read timeout")
 			return
 		}
 
 		b, err := p.gossip.ReadMessage(p.Conn)
 		if err != nil {
-			l.WithError(err).Warnln("error reading message")
+			plog.WithError(err).Warnln("error reading message")
 			return
 		}
 
 		message, cs, err := checksum.Extract(b)
 		if err != nil {
-			l.WithError(err).Warnln("error reading Extract message")
+			plog.WithError(err).Warnln("error extracting message and cs")
 			return
 		}
 
 		if !checksum.Verify(message, cs) {
-			l.WithError(errors.New("invalid checksum")).Warnln("error reading message")
+			plog.WithError(errors.New("invalid checksum")).
+				Warnln("error verifying message cs")
 			return
 		}
 
@@ -327,7 +341,13 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 			// TODO: error here should be checked in order to decrease reputation
 			// or blacklist spammers
 			if _, err = p.processor.Collect(p.Addr(), message, ringBuf, p.services, nil); err != nil {
-				l.WithField("process", "readloop").WithField("cs", hex.EncodeToString(cs)).
+				var topic string
+				if len(message) > 0 {
+					topic = topics.Topic(message[0]).String()
+				}
+
+				plog.WithField("cs", hex.EncodeToString(cs)).
+					WithField("topic", topic).
 					WithError(err).Error("failed to process message")
 			}
 		}()
@@ -342,7 +362,8 @@ func (p *Reader) keepAliveLoop(ctx context.Context, timer *time.Timer) {
 		select {
 		case <-timer.C:
 			if err := p.Connection.keepAlive(); err != nil {
-				log.WithError(err).WithField("process", "keepaliveloop").Error("got error back from keepAlive")
+				l.WithError(err).WithField("r_addr", p.RemoteAddr().String()).
+					Error("failed to ping a peer")
 			}
 		case <-ctx.Done():
 			timer.Stop()

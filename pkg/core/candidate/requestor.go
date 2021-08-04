@@ -21,7 +21,7 @@ import (
 	lg "github.com/sirupsen/logrus"
 )
 
-var log = lg.WithField("process", "candidate-requestor")
+var log = lg.WithField("process", "consensus")
 
 // Requestor serves to retrieve certain Candidate messages from peers in the
 // network.

@@ -20,7 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "agreement")
+var lg = log.WithField("process", "consensus").WithField("phase", "agreement")
 
 // WorkerAmount sets the number of concurrent workers to concurrently verify
 // Agreement messages.

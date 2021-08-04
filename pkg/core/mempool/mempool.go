@@ -32,7 +32,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-var log = logger.WithFields(logger.Fields{"prefix": "mempool"})
+var log = logger.WithFields(logger.Fields{"process": "mempool"})
 
 const idleTime = 20 * time.Second
 

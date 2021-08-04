@@ -16,11 +16,15 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/sirupsen/logrus"
 )
 
 const (
-	syncTimeout = time.Duration(5) * time.Second
+	syncTimeout      = time.Duration(5) * time.Second
+	changeStatelabel = "change state"
 )
+
+var slog = logrus.WithField("process", "sync")
 
 type syncState func(srcPeerAddr string, currentHeight uint64, blk block.Block, kadcastHeight byte) ([]bytes.Buffer, error)
 
@@ -38,7 +42,7 @@ func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk bloc
 		// consecutive block before the timer expires
 		s.timer.Start(srcPeerAddr)
 
-		log.WithField("state", "outSync").Traceln("change sync state")
+		slog.WithField("state", "outsync").Debug(changeStatelabel)
 
 		s.state = s.outSync
 		b, err := s.startSync(srcPeerAddr, blk.Header.Height, currentHeight, kadcastHeight)
@@ -47,11 +51,11 @@ func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk bloc
 
 	// Otherwise notify the chain (and the consensus loop).
 	if err := s.chain.TryNextConsecutiveBlockInSync(blk, kadcastHeight); err != nil {
-		log.WithField("blk_height", blk.Header.Height).
+		slog.WithField("blk_height", blk.Header.Height).
 			WithField("blk_hash", hex.EncodeToString(blk.Header.Hash)).
 			WithField("state", "insync").
 			WithError(err).
-			Debug("could not AcceptBlock")
+			Warn("could not AcceptBlock")
 		return nil, err
 	}
 
@@ -77,14 +81,16 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 	for _, blk := range blks {
 		// append them all to the ledger
 		if err = s.chain.TryNextConsecutiveBlockOutSync(blk, kadcastHeight); err != nil {
-			log.WithError(err).WithField("state", "outSync").Debug("could not AcceptBlock")
+			slog.WithError(err).WithField("state", "outsync").
+				Warn("could not accept block")
 			return nil, err
 		}
 
 		// Peer does provide a valid consecutive block
 		// outSyncTimer should restart its counter
 		if err = s.timer.Reset(srcPeerAddr); err != nil {
-			log.WithError(err).WithField("state", "outSync").Warn("timer error")
+			slog.WithError(err).WithField("state", "outsync").
+				Warn("timer error")
 		}
 
 		if blk.Header.Height == s.syncTarget {
@@ -97,7 +103,7 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 				return nil, err
 			}
 
-			log.WithField("state", "inSync").Traceln("change sync state")
+			slog.WithField("state", "insync").Debug(changeStatelabel)
 
 			s.state = s.inSync
 		}
@@ -130,7 +136,7 @@ func newSynchronizer(db database.DB, chain Ledger) *synchronizer {
 
 	s.timer = newSyncTimer(syncTimeout, chain.ProcessSyncTimerExpired)
 
-	log.WithField("state", "inSync").Traceln("change sync state")
+	slog.WithField("state", "insync").Debug(changeStatelabel)
 
 	s.state = s.inSync
 	return s
@@ -150,11 +156,11 @@ func (s *synchronizer) processBlock(srcPeerID string, currentHeight uint64, blk 
 func (s *synchronizer) startSync(strPeerAddr string, tipHeight, currentHeight uint64, _ byte) ([]bytes.Buffer, error) {
 	s.setSyncTarget(tipHeight, currentHeight+config.MaxInvBlocks)
 
-	log.WithField("curr", currentHeight).
+	slog.WithField("curr_h", currentHeight).
 		WithField("tip", tipHeight).
 		WithField("target", s.syncTarget).
-		WithField("src_addr", strPeerAddr).
-		Info("Start syncing")
+		WithField("r_addr", strPeerAddr).
+		Info("start syncing")
 
 	var hash []byte
 

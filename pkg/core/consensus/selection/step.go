@@ -28,7 +28,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "selector")
+var lg = log.WithField("process", "consensus").WithField("phase", "selector")
 
 // Phase is the implementation of the Selection step component.
 type Phase struct {
