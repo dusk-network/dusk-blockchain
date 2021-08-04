@@ -3,7 +3,7 @@ Below are a few snippets how to fetch log details per a specified context. The s
 
 # Logging grep snippets
 
-## General 
+## General (cross-subsystem)
 ```bash
 # Monitor for block accepting events
 tail -F /var/log/dusk.log | grep -e 'agreement_received\|accept_block' 
@@ -13,6 +13,10 @@ grep -e "error\|warn" /var/log/dusk.log
 
 # Fetch all traces per a block hash (candidate or accepted)
 grep  '"hash":"bdc02411' /var/log/dusk.log
+
+# Fetch all traces per a block height
+grep  '"height":"99999' /var/log/dusk.log
+
 ```
 ## P2P subsystem
 ```bash
