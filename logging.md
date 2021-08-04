@@ -1,5 +1,5 @@
 # Description
-Below are a few snippets how to fetch log details per a specified context. The snippets are based on `logger.formtat=json`.
+Below are a few snippets how to fetch log details per a specified context. The snippets are based on `logger.format=json`.
 
 # Logging grep snippets
 
