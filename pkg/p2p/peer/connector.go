@@ -20,6 +20,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -28,6 +29,8 @@ const (
 	defaultMaxConnections = 50
 	peerCountTime         = 30 * time.Second
 )
+
+var plog = logrus.WithField("process", "peer_conn")
 
 type connectFunc func(context.Context, *Reader, *Writer)
 
@@ -57,8 +60,7 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 
 	listener, err := net.Listen("tcp", addrPort)
 	if err != nil {
-		log.WithField("process", "peer connector").
-			WithError(err).
+		plog.WithError(err).
 			Panic("could not establish a listener")
 	}
 
@@ -78,9 +80,9 @@ func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 		for {
 			conn, err := c.l.Accept()
 			if err != nil {
-				log.WithField("process", "peer connector").
+				plog.WithField("r_addr", conn.RemoteAddr().String()).
 					WithError(err).
-					Warnln("error accepting connection request")
+					Warnln("error accepting conn request")
 				return
 			}
 
@@ -170,16 +172,18 @@ func (c *Connector) Dial(addr string) (net.Conn, error) {
 func (c *Connector) acceptConnection(conn net.Conn) {
 	pConn := NewConnection(conn, c.gossip)
 	peerReader := c.readerFactory.SpawnReader(pConn)
+	raddr := conn.RemoteAddr().String()
 
 	if err := peerReader.Accept(c.services); err != nil {
-		log.WithField("process", "peer connector").
-			WithError(err).Warnln("problem performing incoming handshake")
+		plog.WithField("r_addr", raddr).
+			WithError(err).
+			WithField("type", "inbound").
+			Warnln("error performing handshake")
 		return
 	}
 
-	log.WithField("process", "peer connector").
-		WithField("address", peerReader.Addr()).
-		Debugln("incoming connection established")
+	plog.WithField("r_addr", raddr).WithField("type", "inbound").
+		Infoln("peer_connection established")
 
 	c.addPeer(peerReader.Addr())
 
@@ -196,16 +200,16 @@ func (c *Connector) proposeConnection(conn net.Conn) {
 	peerWriter := NewWriter(pConn, c.eventBus)
 
 	if err := peerWriter.Connect(c.services); err != nil {
-		log.WithField("process", "peer connector").
-			WithError(err).Warnln("problem performing outgoing handshake")
+		plog.WithField("r_addr", conn.RemoteAddr().String()).
+			WithField("type", "outbound").
+			WithError(err).Warnln("error performing handshake")
 		return
 	}
 
 	address := peerWriter.Addr()
 
-	log.WithField("process", "peer connector").
-		WithField("address", address).
-		Debugln("outgoing connection established")
+	plog.WithField("r_addr", address).WithField("type", "outbound").
+		Infoln("peer_connection established")
 
 	peerReader := c.readerFactory.SpawnReader(pConn)
 
@@ -240,7 +244,7 @@ func (c *Connector) removePeer(address string) {
 
 			// delete count
 			if err := store.Delete(&peerCount); err != nil {
-				log.WithField("process", "peer connector").Error("failed to Delete peerCount into StormDB")
+				plog.Error("failed to Delete peerCount into StormDB")
 			}
 		}()
 	}
@@ -249,8 +253,7 @@ func (c *Connector) removePeer(address string) {
 	if len(c.registry) < config.Get().Network.MinimumConnections {
 		buf := new(bytes.Buffer)
 		if err := topics.Prepend(buf, topics.GetAddrs); err != nil {
-			log.WithField("process", "peer connector").
-				WithError(err).
+			plog.WithError(err).
 				Panic("could not create topic buffer")
 		}
 

@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-var log = logger.WithFields(logger.Fields{"prefix": "grpc"})
+var log = logger.WithFields(logger.Fields{"process": "grpc_c"})
 
 // CreateStateClient opens the connection with the Rusk gRPC server, and
 // initializes the different clients which can speak to the Rusk server.

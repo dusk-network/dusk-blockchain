@@ -27,7 +27,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "candidate generator")
+var lg = log.WithField("process", "consensus").WithField("actor", "candidate_generator")
 
 // MaxTxSetSize defines the maximum amount of transactions.
 // It is TBD along with block size and processing.MaxFrameSize.

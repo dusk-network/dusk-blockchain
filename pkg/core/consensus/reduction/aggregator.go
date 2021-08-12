@@ -17,7 +17,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "reduction")
+var lg = log.WithField("process", "consensus").WithField("actor", "aggr")
 
 // The Aggregator acts as a de facto storage unit for Reduction messages. Any message
 // it receives will be Aggregated into a StepVotes struct, organized by block hash.
@@ -103,15 +103,16 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 		// quorum reached
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
 
-		c := a.handler.Committee(hdr.Round, hdr.Step)
+		if logrus.GetLevel() >= logrus.DebugLevel {
+			c := a.handler.Committee(hdr.Round, hdr.Step)
+			log := consensus.WithFields(hdr.Round, hdr.Step, "quorum_reached",
+				hdr.BlockHash, nil, &c, &sv.Cluster, &a.handler.Provisioners)
 
-		log := consensus.WithFields(hdr.Round, hdr.Step, "quorum_reached",
-			hdr.BlockHash, nil, &c, &sv.Cluster, &a.handler.Provisioners)
-
-		log.
-			WithField("total_votes", total).
-			WithField("quorum_target", roundQuorumTarget).
-			WithField("bitset", fmt.Sprintf("%b", sv.BitSet)).Info("")
+			log.
+				WithField("total_votes", total).
+				WithField("quorum_target", roundQuorumTarget).
+				WithField("bitset", fmt.Sprintf("%b", sv.BitSet)).Debug("")
+		}
 
 		return &Result{hdr.BlockHash, *sv.StepVotes}
 	}

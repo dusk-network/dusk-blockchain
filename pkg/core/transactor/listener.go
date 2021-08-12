@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	log = logger.WithField("prefix", "transactor") //nolint
+	log = logger.WithField("process", "transactor") //nolint
 
 	errWalletNotLoaded     = errors.New("wallet is not loaded yet") //nolint
 	errWalletAlreadyLoaded = errors.New("wallet is already loaded") //nolint
