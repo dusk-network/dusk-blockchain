@@ -20,7 +20,7 @@ type Accumulator struct {
 	verificationChan   chan message.Agreement
 	eventChan          chan message.Agreement
 	CollectedVotesChan chan []message.Agreement
-	storeMap           storeMap
+	storeMap           *storeMap
 
 	workersQuitChan chan struct{}
 }

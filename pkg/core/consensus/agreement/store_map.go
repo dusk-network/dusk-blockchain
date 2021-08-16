@@ -6,15 +6,23 @@
 
 package agreement
 
+import "sync"
+
 type hash [32]byte
 
-type storeMap map[hash]*store
-
-func newStoreMap() storeMap {
-	return make(map[hash]*store)
+type storeMap struct {
+	sync.RWMutex
+	stores map[hash]*store
 }
 
-func (s storeMap) getStoreByHash(blkHash []byte) *store {
+func newStoreMap() *storeMap {
+	return &storeMap{stores: make(map[hash]*store)}
+}
+
+func (m *storeMap) getStoreByHash(blkHash []byte) *store {
+	m.RLock()
+	defer m.RUnlock()
+
 	var (
 		h  hash
 		ok bool
@@ -23,23 +31,29 @@ func (s storeMap) getStoreByHash(blkHash []byte) *store {
 
 	copy(h[:], blkHash)
 
-	if r, ok = s[h]; !ok {
+	if r, ok = m.stores[h]; !ok {
 		return nil
 	}
 
 	return r
 }
 
-func (s storeMap) makeStoreByHash(blkHash []byte) *store {
+func (m *storeMap) makeStoreByHash(blkHash []byte) *store {
+	m.Lock()
+	defer m.Unlock()
+
 	var h hash
 	copy(h[:], blkHash)
 
 	st := newStore()
-	s[h] = st
+	m.stores[h] = st
 
 	return st
 }
 
-func (s storeMap) len() int {
-	return len(s)
+func (m *storeMap) len() int {
+	m.RLock()
+	defer m.RUnlock()
+
+	return len(m.stores)
 }
