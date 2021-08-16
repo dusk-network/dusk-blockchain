@@ -17,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -77,7 +78,8 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 			lg.
 				WithField("round", r.Round).
 				WithField("step", evs[0].State().Step).
-				Debugln("quorum reached")
+				WithField("hash", util.StringifyBytes(evs[0].State().BlockHash)).
+				Info("consensus_achieved")
 
 			cert := evs[0].GenerateCertificate()
 			blk, err := s.createWinningBlock(ctx, evs[0].State().BlockHash, cert)
