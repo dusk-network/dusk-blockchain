@@ -17,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -77,7 +78,8 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 			lg.
 				WithField("round", r.Round).
 				WithField("step", evs[0].State().Step).
-				Debugln("quorum reached")
+				WithField("hash", util.StringifyBytes(evs[0].State().BlockHash)).
+				Info("consensus_achieved")
 
 			cert := evs[0].GenerateCertificate()
 			blk, err := s.createWinningBlock(ctx, evs[0].State().BlockHash, cert)
@@ -97,26 +99,37 @@ func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensu
 	if hdr.Round < round {
 		lg.
 			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
+				"topic":  "Agreement",
+				"round":  hdr.Round,
+				"curr_h": round,
 			}).
 			Debugln("discarding obsolete agreement")
 		return false
 	}
 
-	// Only store events up to 10 rounds into the future
 	// XXX: According to protocol specs, we should abandon consensus
 	// if we notice valid messages from far into the future.
-	if hdr.Round > round && hdr.Round-round < 10 {
-		lg.
-			WithFields(log.Fields{
-				"topic":             "Agreement",
-				"round":             hdr.Round,
-				"coordinator_round": round,
-			}).
-			Debugln("storing future round for later")
-		queue.PutEvent(hdr.Round, hdr.Step, a)
+	if hdr.Round > round {
+		if hdr.Round-round < 10 {
+			// Only store events up to 10 rounds into the future
+			lg.
+				WithFields(log.Fields{
+					"topic":  "Agreement",
+					"round":  hdr.Round,
+					"curr_h": round,
+				}).
+				Debugln("storing future round for later")
+			queue.PutEvent(hdr.Round, hdr.Step, a)
+		} else {
+			lg.
+				WithFields(log.Fields{
+					"topic":  "Agreement",
+					"round":  hdr.Round,
+					"curr_h": round,
+				}).
+				Info("discarding too-far agreement")
+		}
+
 		return false
 	}
 

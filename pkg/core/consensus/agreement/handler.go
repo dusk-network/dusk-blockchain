@@ -117,7 +117,9 @@ func (a *handler) Verify(ev message.Agreement) error {
 		}
 
 		if err := header.VerifySignatures(hdr.Round, step, hdr.BlockHash, apk, votes.Signature); err != nil {
-			return fmt.Errorf("failed to verify BLS multisig: %w", err)
+			err = fmt.Errorf("failed to verify BLS multisig: %w", err)
+			log.Error(err)
+			return err
 		}
 	}
 

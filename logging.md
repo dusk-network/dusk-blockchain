@@ -35,7 +35,6 @@ grep "peer_connection" /var/log/dusk.log
 
 ## Consensus subsystem
 ```bash
-
 #  Fetch all traces from Consensus
 grep ':"consensus"'  /var/log/dusk.log
 
@@ -47,6 +46,9 @@ grep 'round":10'   /var/log/dusk.log | grep -e "error\|warn"
 
 # Fetch consensus state at agreement_received event for round 10
 grep 'round":10'   /var/log/dusk.log | grep 'agreement_received'
+
+# Fetch consensus_achieved events
+grep 'consensus_achieved'  /var/log/dusk.log
 
 ```
 

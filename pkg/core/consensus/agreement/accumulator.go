@@ -20,7 +20,7 @@ type Accumulator struct {
 	verificationChan   chan message.Agreement
 	eventChan          chan message.Agreement
 	CollectedVotesChan chan []message.Agreement
-	store              *store
+	storeMap           *storeMap
 
 	workersQuitChan chan struct{}
 }
@@ -33,7 +33,7 @@ func newAccumulator(handler Handler, workerAmount int) *Accumulator {
 		verificationChan:   make(chan message.Agreement, 100),
 		eventChan:          make(chan message.Agreement, 100),
 		CollectedVotesChan: make(chan []message.Agreement, 1),
-		store:              newStore(),
+		storeMap:           newStoreMap(),
 		workersQuitChan:    make(chan struct{}),
 	}
 
@@ -61,10 +61,16 @@ func (a *Accumulator) Process(ev message.Agreement) {
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
 		hdr := ev.State()
-		collected := a.store.Get(hdr.Step)
+
+		var s *store
+		if s = a.storeMap.getStoreByHash(hdr.BlockHash); s == nil {
+			s = a.storeMap.makeStoreByHash(hdr.BlockHash)
+		}
+
+		collected := s.Get(hdr.Step)
 		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 
-		count := a.store.Insert(ev, weight)
+		count := s.Insert(ev, weight)
 		if count == len(collected) {
 			lg.Warnln("Agreement was not accumulated since it is a duplicate")
 			continue
@@ -75,10 +81,11 @@ func (a *Accumulator) Accumulate() {
 			"round":  ev.State().Round,
 			"count":  count,
 			"quorum": a.handler.Quorum(hdr.Round),
-		}).Debugln("collected agreement")
+			"len":    a.storeMap.len(),
+		}).Info("collected agreement")
 
 		if count >= a.handler.Quorum(hdr.Round) {
-			votes := a.store.Get(hdr.Step)
+			votes := s.Get(hdr.Step)
 			a.CollectedVotesChan <- votes
 			return
 		}

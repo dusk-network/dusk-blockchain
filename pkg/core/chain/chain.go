@@ -9,7 +9,6 @@ package chain
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"sync"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
@@ -179,7 +179,8 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 
 	// Is it worth looking at this?
 	if blk.Header.Height <= c.tip.Header.Height {
-		log.Debug("discarded block from the past")
+		log.WithField("curr_h", c.tip.Header.Height).WithField("blk_height", blk.Header.Height).
+			Debug("discarded block from the past")
 		return nil, nil
 	}
 
@@ -318,9 +319,14 @@ func (c *Chain) AcceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved.
 func (c *Chain) AcceptBlock(blk block.Block) error {
-	field := logger.Fields{"event": "accept_block", "height": blk.Header.Height, "hash": hex.EncodeToString(blk.Header.Hash)}
+	fields := logger.Fields{
+		"event":  "accept_block",
+		"height": blk.Header.Height,
+		"hash":   util.StringifyBytes(blk.Header.Hash),
+		"curr_h": c.tip.Header.Height,
+	}
 
-	l := log.WithFields(field)
+	l := log.WithFields(fields)
 
 	l.Trace("verifying block")
 	// 1. Check that stateless and stateful checks pass
@@ -335,13 +341,15 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// for the same round is negligible.
 	l.Trace("verifying block certificate")
 
+	prov_num := c.p.Set.Len()
+
 	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
-		l.WithError(err).Error("certificate verification failed")
+		l.WithError(err).WithField("provisioners", prov_num).
+			Error("certificate verification failed")
 		return err
 	}
 
 	// 3. Call ExecuteStateTransitionFunction
-	prov_num := c.p.Set.Len()
 
 	l.WithField("provisioners", prov_num).Info("run state transition")
 
