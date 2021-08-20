@@ -31,7 +31,6 @@ type syncState func(srcPeerAddr string, currentHeight uint64, blk block.Block, k
 func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk block.Block, kadcastHeight byte) ([]bytes.Buffer, error) {
 	if blk.Header.Height > currentHeight+1 {
 		// If this block is from far in the future, we should start syncing mode.
-		s.chain.StopBlockProduction()
 		s.sequencer.add(blk)
 
 		// Trigger timeout outSync timer. If the peer initiating the Sync
@@ -80,7 +79,7 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 
 	for _, blk := range blks {
 		// append them all to the ledger
-		if err = s.chain.TryNextConsecutiveBlockOutSync(blk, kadcastHeight); err != nil {
+		if err = s.chain.TryNextConsecutiveBlockOutSync(blk, s.syncTarget, kadcastHeight); err != nil {
 			slog.WithError(err).WithField("state", "outsync").
 				Warn("could not accept block")
 			return nil, err
@@ -96,12 +95,6 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 		if blk.Header.Height == s.syncTarget {
 			// Sync Target reached. outSyncTimer is not anymore needed
 			s.timer.Cancel()
-
-			// if we reach the target we get into sync mode
-			// and trigger the consensus again
-			if err = s.chain.ProduceBlock(); err != nil {
-				return nil, err
-			}
 
 			slog.WithField("state", "insync").Debug(changeStatelabel)
 

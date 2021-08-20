@@ -51,6 +51,9 @@ type Consensus struct {
 
 	agreementChan chan message.Message
 	eventChan     chan message.Message
+
+	// Indicates if Spin is running or is suspended.
+	active uint8
 }
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
@@ -87,6 +90,8 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 
 	// subscribe topics to eventChan
 	evSub := eventbus.NewChanListener(eventChan)
+
+	// TODO: Unsubscribe ID
 
 	e.EventBus.AddDefaultTopic(topics.Reduction, topics.NewBlock)
 	e.EventBus.SubscribeDefault(evSub)
@@ -162,7 +167,7 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 					"round": round.Round,
 					"step":  step,
 				}).
-				Debug("consensus achieved")
+				Debug("consensus spin terminated")
 
 				// Take round results from the agreement goroutine
 			select {

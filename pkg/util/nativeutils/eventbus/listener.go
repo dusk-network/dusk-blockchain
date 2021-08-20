@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -177,6 +178,11 @@ func (c *ChanListener) Notify(m message.Message) error {
 
 // forward avoids code duplication in the ChanListener method.
 func forward(msgChan chan<- message.Message, msg message.Message) error {
+	if log.GetLevel() >= logrus.DebugLevel {
+		log.WithField("t", msg.Category().String()).WithField("s", len(msgChan)).
+			Debug("ChanListener forward msg")
+	}
+
 	select {
 	case msgChan <- msg:
 	default:
@@ -223,7 +229,9 @@ func (m *multiListener) Forward(topic topics.Topic, msg message.Message) (errorL
 
 	for _, dispatcher := range m.dispatchers {
 		if err := dispatcher.Notify(msg); err != nil {
-			logEB.WithError(err).WithField("type", "multilistener").Warnln("notifying subscriber failed")
+			logEB.WithError(err).WithField("topic", topic.String()).
+				WithField("type", "multilistener").Warnln("notifying subscriber failed")
+
 			errorList = append(errorList, err)
 		}
 	}

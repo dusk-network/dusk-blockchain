@@ -292,11 +292,7 @@ func Setup() *Server {
 		}
 	}()
 
-	if err := c.ProduceBlock(); err != nil {
-		log.WithError(err).Warn("ProduceBlock returned err")
-		// If we can not start consensus, we shouldn't be able to start at all.
-		panic(err)
-	}
+	go c.StartConsensus()
 
 	return srv
 }
@@ -305,6 +301,7 @@ func Setup() *Server {
 func (s *Server) Close() {
 	// TODO: disconnect peers
 	// _ = s.c.Close(cfg.Get().Database.Driver)
+	s.c.StopConsensus()
 	s.rpcBus.Close()
 	s.grpcServer.GracefulStop()
 	_ = s.ruskConn.Close()
