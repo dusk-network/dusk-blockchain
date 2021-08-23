@@ -67,8 +67,15 @@ type Loader interface {
 type Ledger interface {
 	TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error
 	TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error
-	ProduceBlock() error
-	StopBlockProduction()
+
+	// StartConsensus starts the consensus loop that deals with start-and-stop
+	// and result-fetch of the Consensus Spin.
+	// The Consensus Spin is the loop that performs the Segregated Byzantine
+	// Agreement over a single round.
+	StartConsensus() error
+	// StopConsensus terminates the consensus loop.
+	StopConsensus()
+
 	ProcessSyncTimerExpired(strPeerAddr string) error
 }
 
@@ -143,9 +150,9 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, loade
 	return chain, nil
 }
 
-// StopBlockProduction will send a non-blocking signal to `stopConsensusChan` to
+// StopConsensus will send a non-blocking signal to `stopConsensusChan` to
 // kill the consensus goroutine.
-func (c *Chain) StopBlockProduction() {
+func (c *Chain) StopConsensus() {
 	select {
 	case c.stopConsensusChan <- struct{}{}:
 	// If there is nobody listening on the other end, it could very well be that
@@ -191,16 +198,16 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kadcastHeight)
 }
 
-// ProduceBlock will start the consensus loop. It can be halted at any point by
+// StartConsensus will start the consensus loop. It can be halted at any point by
 // sending a signal through the `stopConsensus` channel (`StopBlockProduction`
 // as exposed by the `Ledger` interface).
-func (c *Chain) ProduceBlock() error {
+func (c *Chain) StartConsensus() error {
 	ctx, cancel := context.WithCancel(c.ctx)
 
 	// Start consensus outside of the goroutine first, so that we can ensure
 	// it is fully started up while the mutex is still held.
 	winnerChan := make(chan consensus.Results, 1)
-	if err := c.produceBlock(ctx, winnerChan); err != nil {
+	if err := c.asyncSpin(ctx, winnerChan); err != nil {
 		cancel()
 		return err
 	}
@@ -239,7 +246,7 @@ func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan cons
 				return
 			}
 
-			if err := c.produceBlock(ctx, winnerChan); err != nil {
+			if err := c.asyncSpin(ctx, winnerChan); err != nil {
 				log.WithError(err).Error("starting consensus failed")
 				c.lock.Unlock()
 				return
@@ -254,7 +261,7 @@ func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan cons
 	}
 }
 
-func (c *Chain) produceBlock(ctx context.Context, winnerChan chan consensus.Results) error {
+func (c *Chain) asyncSpin(ctx context.Context, winnerChan chan consensus.Results) error {
 	ru := c.getRoundUpdate()
 
 	if c.loop != nil {
@@ -284,13 +291,13 @@ func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight by
 // TryNextConsecutiveBlockInSync is the processing path for accepting a block
 // from the network during in-sync state.
 func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error {
-	c.StopBlockProduction()
+	c.StopConsensus()
 
 	if err := c.AcceptSuccessiveBlock(blk, kadcastHeight); err != nil {
 		return err
 	}
 
-	return c.ProduceBlock()
+	return c.StartConsensus()
 }
 
 // AcceptSuccessiveBlock will accept a block which directly follows the chain
@@ -552,7 +559,7 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if err := c.ProduceBlock(); err != nil {
+	if err := c.StartConsensus(); err != nil {
 		log.WithError(err).Warn("sync timer could not restart consensus loop")
 	}
 

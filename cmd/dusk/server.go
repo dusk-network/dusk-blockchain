@@ -292,8 +292,8 @@ func Setup() *Server {
 		}
 	}()
 
-	if err := c.ProduceBlock(); err != nil {
-		log.WithError(err).Warn("ProduceBlock returned err")
+	if err := c.StartConsensus(); err != nil {
+		log.WithError(err).Warn("StartConsensus returned err")
 		// If we can not start consensus, we shouldn't be able to start at all.
 		panic(err)
 	}
