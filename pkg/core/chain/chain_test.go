@@ -153,7 +153,7 @@ func TestAcceptBlock(t *testing.T) {
 	cert.Step = 5
 	blk.Header.Certificate = cert
 
-	assert.NoError(c.AcceptBlock(*blk))
+	assert.NoError(c.acceptBlock(*blk))
 
 	// Should have `blk` as blockchain head now
 	assert.True(bytes.Equal(blk.Header.Hash, c.tip.Header.Hash))

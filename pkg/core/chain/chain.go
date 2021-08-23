@@ -171,7 +171,7 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 // from the network during out-of-sync state.
 func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting sync block")
-	return c.AcceptBlock(blk)
+	return c.acceptBlock(blk)
 }
 
 // TryNextConsecutiveBlockInSync is the processing path for accepting a block
@@ -179,19 +179,39 @@ func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight by
 func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error {
 	c.StopConsensus()
 
-	if err := c.AcceptSuccessiveBlock(blk, kadcastHeight); err != nil {
+	if err := c.acceptSuccessiveBlock(blk, kadcastHeight); err != nil {
 		return err
 	}
 
 	return c.StartConsensus()
 }
 
-// AcceptSuccessiveBlock will accept a block which directly follows the chain
+// ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
+// It implements transition back to inSync state.
+// strPeerAddr is the address of the peer initiated the syncing but failed to deliver.
+func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
+	log.WithField("curr", c.tip.Header.Height).
+		WithField("src_addr", strPeerAddr).Warn("sync timer expired")
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if err := c.StartConsensus(); err != nil {
+		log.WithError(err).Warn("sync timer could not restart consensus loop")
+	}
+
+	log.WithField("state", "inSync").Traceln("change sync state")
+
+	c.state = c.inSync
+	return nil
+}
+
+// acceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
-func (c *Chain) AcceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
+func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
 
-	if err := c.AcceptBlock(blk); err != nil {
+	if err := c.acceptBlock(blk); err != nil {
 		return err
 	}
 
@@ -207,11 +227,11 @@ func (c *Chain) AcceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 	return nil
 }
 
-// AcceptBlock will accept a block if
+// acceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved.
-func (c *Chain) AcceptBlock(blk block.Block) error {
+func (c *Chain) acceptBlock(blk block.Block) error {
 	fields := logger.Fields{
 		"event":  "accept_block",
 		"height": blk.Header.Height,
@@ -433,24 +453,4 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 	if err != nil {
 		log.Warn("Could not store provisioners on memoryDB")
 	}
-}
-
-// ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
-// It implements transition back to inSync state.
-// strPeerAddr is the address of the peer initiated the syncing but failed to deliver.
-func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
-	log.WithField("curr", c.tip.Header.Height).
-		WithField("src_addr", strPeerAddr).Warn("sync timer expired")
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if err := c.StartConsensus(); err != nil {
-		log.WithError(err).Warn("sync timer could not restart consensus loop")
-	}
-
-	log.WithField("state", "inSync").Traceln("change sync state")
-
-	c.state = c.inSync
-	return nil
 }
