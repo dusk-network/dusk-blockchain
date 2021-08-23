@@ -31,7 +31,7 @@ type syncState func(srcPeerAddr string, currentHeight uint64, blk block.Block, k
 func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk block.Block, kadcastHeight byte) ([]bytes.Buffer, error) {
 	if blk.Header.Height > currentHeight+1 {
 		// If this block is from far in the future, we should start syncing mode.
-		s.chain.StopBlockProduction()
+		s.chain.StopConsensus()
 		s.sequencer.add(blk)
 
 		// Trigger timeout outSync timer. If the peer initiating the Sync
@@ -99,7 +99,7 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 
 			// if we reach the target we get into sync mode
 			// and trigger the consensus again
-			if err = s.chain.ProduceBlock(); err != nil {
+			if err = s.chain.StartConsensus(); err != nil {
 				return nil, err
 			}
 

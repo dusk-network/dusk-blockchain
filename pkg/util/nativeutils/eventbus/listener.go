@@ -223,7 +223,9 @@ func (m *multiListener) Forward(topic topics.Topic, msg message.Message) (errorL
 
 	for _, dispatcher := range m.dispatchers {
 		if err := dispatcher.Notify(msg); err != nil {
-			logEB.WithError(err).WithField("type", "multilistener").Warnln("notifying subscriber failed")
+			logEB.WithError(err).WithField("type", "multilistener").WithField("topic", topic.String()).
+				Warnln("notifying subscriber failed")
+
 			errorList = append(errorList, err)
 		}
 	}
