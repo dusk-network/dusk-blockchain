@@ -9,6 +9,7 @@ package chain
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -20,16 +21,21 @@ import (
 func (c *Chain) StartConsensus() error {
 	ctx, cancel := context.WithCancel(c.ctx)
 
+	id := c.beginTrace()
+
 	// Start consensus outside of the goroutine first, so that we can ensure
 	// it is fully started up while the mutex is still held.
 	winnerChan := make(chan consensus.Results, 1)
 	if err := c.asyncSpin(ctx, winnerChan); err != nil {
 		cancel()
+		log.WithField("id", id).WithError(err).Info("consensus_loop terminated")
 		return err
 	}
 
 	go func(ctx context.Context, cancel context.CancelFunc, winnerChan chan consensus.Results) {
 		defer cancel()
+		defer log.WithField("id", id).Info("consensus_loop terminated")
+
 		c.acceptConsensusResults(ctx, winnerChan)
 	}(ctx, cancel, winnerChan)
 
@@ -112,4 +118,13 @@ func (c *Chain) StopConsensus() {
 	// results obsolete, and ending the lifetime of that goroutine.
 	default:
 	}
+}
+
+// beginTrace increments loop counter and assings ID to loop.
+// This will help on detecting dead-locked, too-long-run or multiple loops errors.
+func (c *Chain) beginTrace() uint64 {
+	correlateID := atomic.AddUint64(&c.loopID, 1)
+	log.WithField("id", correlateID).Info("start consensus_loop")
+
+	return correlateID
 }

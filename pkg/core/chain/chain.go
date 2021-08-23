@@ -84,6 +84,7 @@ type Chain struct {
 	// Consensus loop.
 	loop              *loop.Consensus
 	stopConsensusChan chan struct{}
+	loopID            uint64
 
 	// Syncing related things.
 	*synchronizer
