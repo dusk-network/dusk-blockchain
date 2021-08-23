@@ -175,15 +175,23 @@ func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight by
 }
 
 // TryNextConsecutiveBlockInSync is the processing path for accepting a block
-// from the network during in-sync state.
+// from the network during in-sync state. Returns err if the block is not valid.
 func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error {
-	c.StopConsensus()
-
+	// Make an attempt to accept a new block. If succeeds, we could safely restart the Consensus Loop.
+	// If not, peer reputation score should be decreased.
 	if err := c.acceptSuccessiveBlock(blk, kadcastHeight); err != nil {
 		return err
 	}
 
-	return c.StartConsensus()
+	c.StopConsensus()
+
+	// Consensus needs a fresh restart so that it is initialized with most
+	// recent round update which is Chain tip and the list of active Provisioners.
+	if err := c.StartConsensus(); err != nil {
+		log.WithError(err).Error("failed to start consensus loop")
+	}
+
+	return nil
 }
 
 // ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.

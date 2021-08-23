@@ -80,6 +80,9 @@ func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan cons
 func (c *Chain) asyncSpin(ctx context.Context, winnerChan chan consensus.Results) error {
 	ru := c.getRoundUpdate()
 
+	log.WithField("round", ru.Round).
+		WithField("prov_size", ru.P.Set.Len()).Debug("start consensus_spin")
+
 	if c.loop != nil {
 		scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock)
 		if err != nil {
