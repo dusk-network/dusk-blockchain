@@ -8,11 +8,13 @@ package agreement
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/sirupsen/logrus"
 	assert "github.com/stretchr/testify/require"
 )
 
@@ -54,5 +56,58 @@ func TestGetVoterKeys(t *testing.T) {
 		}
 
 		assert.True(t, found)
+	}
+}
+
+func BenchmarkAgreementVerification(b *testing.B) {
+	logrus.SetLevel(logrus.ErrorLevel)
+
+	const (
+		workersCount      = 4  // default is 4
+		provisionersCount = 64 // 64 is the highest number of provisioners
+		msgMax            = 40 // Agreement messages count to be verified
+	)
+
+	// mocking voters
+	p, keys := consensus.MockProvisioners(provisionersCount)
+	hash, _ := crypto.RandEntropy(32)
+	ev := message.MockAgreement(hash, 1, 3, keys, p)
+	handler := NewHandler(keys[0], *p)
+
+	a := &Accumulator{
+		handler:            handler,
+		verificationChan:   make(chan message.Agreement, 100),
+		eventChan:          make(chan message.Agreement, 100),
+		CollectedVotesChan: make(chan []message.Agreement, 1),
+		storeMap:           newStoreMap(),
+		workersQuitChan:    make(chan struct{}),
+	}
+
+	a.CreateWorkers(workersCount)
+
+	b.ResetTimer()
+
+	for tN := 0; tN < b.N; tN++ {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		// Drain eventChan and count until we reach number of all sent agreement
+		// messages.
+		go func(target int) {
+			for range a.eventChan {
+				target--
+				if target == 0 {
+					wg.Done()
+					return
+				}
+			}
+		}(msgMax)
+		// Send N Agreement messages for complete verification
+		go func() {
+			for i := 0; i < msgMax; i++ {
+				a.Process(ev)
+			}
+		}()
+
+		wg.Wait()
 	}
 }
