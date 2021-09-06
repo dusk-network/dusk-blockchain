@@ -56,6 +56,8 @@ type (
 	}
 )
 
+var mockSeed = []byte{0, 0, 0, 0}
+
 // Copy deeply the StepVotes.
 func (s *StepVotes) Copy() *StepVotes {
 	sig := make([]byte, len(s.Signature))
@@ -429,7 +431,7 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 // It includes a vararg iterativeIdx to help avoiding duplicates when testing.
 func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners, iterativeIdx ...int) Agreement {
 	// Make sure we create an event made by an actual voting committee member
-	c := p.CreateVotingCommittee(round, step, len(keys))
+	c := p.CreateVotingCommittee(mockSeed, round, step, len(keys))
 	cKeys := createCommitteeKeySet(c, keys)
 
 	idx := 0
@@ -446,7 +448,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *us
 	a := NewAgreement(hdr)
 
 	// generating reduction events (votes) and signing them
-	steps := GenVotes(hash, round, step, keys, p)
+	steps := GenVotes(hash, mockSeed, round, step, keys, p)
 
 	whole := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(whole, a.State()); err != nil {
@@ -466,8 +468,8 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *us
 
 // MockCommitteeVoteSet mocks a VoteSet.
 func MockCommitteeVoteSet(p *user.Provisioners, k []key.Keys, hash []byte, committeeSize int, round uint64, step uint8) []Reduction {
-	c1 := p.CreateVotingCommittee(round, step-2, len(k))
-	c2 := p.CreateVotingCommittee(round, step-1, len(k))
+	c1 := p.CreateVotingCommittee(mockSeed, round, step-2, len(k))
+	c2 := p.CreateVotingCommittee(mockSeed, round, step-1, len(k))
 	cKeys1 := createCommitteeKeySet(c1, k)
 	cKeys2 := createCommitteeKeySet(c2, k)
 	events := createVoteSet(cKeys1, cKeys2, hash, len(cKeys1), round, step)
@@ -477,29 +479,29 @@ func MockCommitteeVoteSet(p *user.Provisioners, k []key.Keys, hash []byte, commi
 
 // GenVotes randomly generates a slice of StepVotes with the indicated length.
 // Albeit random, the generation is consistent with the rules of Votes.
-func GenVotes(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners) []*StepVotes {
+func GenVotes(hash, seed []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners) []*StepVotes {
 	if len(keys) < 2 {
 		// FIXME: shall this panic ?
 		panic("At least two votes are required to mock an Agreement")
 	}
 
 	// Create committee key sets
-	keySet1 := createCommitteeKeySet(p.CreateVotingCommittee(round, step-1, len(keys)), keys)
-	keySet2 := createCommitteeKeySet(p.CreateVotingCommittee(round, step, len(keys)), keys)
+	keySet1 := createCommitteeKeySet(p.CreateVotingCommittee(seed, round, step-1, len(keys)), keys)
+	keySet2 := createCommitteeKeySet(p.CreateVotingCommittee(seed, round, step, len(keys)), keys)
 
 	stepVotes1, set1 := createStepVotesAndSet(hash, round, step-1, keySet1)
 	stepVotes2, set2 := createStepVotesAndSet(hash, round, step, keySet2)
 
-	bitSet1 := createBitSet(set1, round, step-1, len(keySet1), p)
+	bitSet1 := createBitSet(set1, seed, round, step-1, len(keySet1), p)
 	stepVotes1.BitSet = bitSet1
-	bitSet2 := createBitSet(set2, round, step, len(keySet2), p)
+	bitSet2 := createBitSet(set2, seed, round, step, len(keySet2), p)
 	stepVotes2.BitSet = bitSet2
 
 	return []*StepVotes{stepVotes1, stepVotes2}
 }
 
-func createBitSet(set sortedset.Set, round uint64, step uint8, size int, p *user.Provisioners) uint64 {
-	committee := p.CreateVotingCommittee(round, step, size)
+func createBitSet(set sortedset.Set, seed []byte, round uint64, step uint8, size int, p *user.Provisioners) uint64 {
+	committee := p.CreateVotingCommittee(seed, round, step, size)
 	return committee.Bits(set)
 }
 

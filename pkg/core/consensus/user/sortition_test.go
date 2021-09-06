@@ -114,5 +114,6 @@ func TestRemoveStake(t *testing.T) {
 
 	// Now, extract a committee for round 1 step 1
 	seed := []byte{0, 0, 0, 0}
+
 	assert.NotPanics(t, func() { p.CreateVotingCommittee(seed, 1, 1, 10) })
 }
