@@ -53,7 +53,7 @@ func (s *Loop) GetControlFn() consensus.ControlFn {
 // Run the agreement step loop.
 func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, r consensus.RoundUpdate) consensus.Results {
 	// creating accumulator and handler
-	h := NewHandler(s.Keys, r.P)
+	h := NewHandler(s.Keys, r.P, r.Seed)
 	acc := newAccumulator(h, WorkerAmount)
 
 	// deferring queue cleanup at the end of the execution of this round

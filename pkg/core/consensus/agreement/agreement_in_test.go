@@ -17,7 +17,7 @@ func TestAccumulatorProcessing(t *testing.T) {
 	nr := 10
 	hlp := NewHelper(nr)
 	hash, _ := crypto.RandEntropy(32)
-	handler := NewHandler(hlp.Keys, *hlp.P)
+	handler := NewHandler(hlp.Keys, *hlp.P, []byte{0, 0, 0, 0})
 	accumulator := newAccumulator(handler, 4)
 
 	evs := hlp.Spawn(hash)
