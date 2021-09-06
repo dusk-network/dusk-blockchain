@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
@@ -50,11 +51,13 @@ func (s storedAgreements) String() string {
 type store struct {
 	sync.RWMutex
 	collected map[uint8]storedAgreements
+	createdAt int64
 }
 
 func newStore() *store {
 	return &store{
 		collected: make(map[uint8]storedAgreements),
+		createdAt: time.Now().Unix(),
 	}
 }
 
@@ -175,4 +178,11 @@ func (s *store) Clear() {
 	for k := range s.collected {
 		delete(s.collected, k)
 	}
+}
+
+func (s *store) CreatedAt() int64 {
+	s.RLock()
+	defer s.RUnlock()
+
+	return s.createdAt
 }

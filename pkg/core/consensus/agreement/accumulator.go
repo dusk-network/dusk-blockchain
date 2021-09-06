@@ -8,6 +8,7 @@ package agreement
 
 import (
 	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	log "github.com/sirupsen/logrus"
@@ -82,11 +83,21 @@ func (a *Accumulator) Accumulate() {
 			"count":  count,
 			"quorum": a.handler.Quorum(hdr.Round),
 			"len":    a.storeMap.len(),
-		}).Info("collected agreement")
+		}).Debug("collected agreement")
 
 		if count >= a.handler.Quorum(hdr.Round) {
 			votes := s.Get(hdr.Step)
 			a.CollectedVotesChan <- votes
+
+			lg.WithFields(log.Fields{
+				"step":     ev.State().Step,
+				"round":    ev.State().Round,
+				"count":    count,
+				"quorum":   a.handler.Quorum(hdr.Round),
+				"len":      a.storeMap.len(),
+				"duration": time.Now().Unix() - s.CreatedAt(),
+			}).Info("quorum reached")
+
 			return
 		}
 	}
