@@ -23,7 +23,8 @@ func TestCreateVotingCommittee(t *testing.T) {
 	p, _ := consensus.MockProvisioners(50)
 
 	// Run sortition to get 50 members
-	committee := p.CreateVotingCommittee(100, 1, 50)
+	seed := []byte{0, 0, 0, 0}
+	committee := p.CreateVotingCommittee(seed, 100, 1, 50)
 
 	// total amount of members in the committee should be 50
 	assert.Equal(t, 50, committee.Size())

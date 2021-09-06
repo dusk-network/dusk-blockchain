@@ -77,13 +77,14 @@ func (v VotingCommittee) MarshalJSON() ([]byte, error) {
 }
 
 // createSortitionMessage will return the hash of the passed sortition information.
-func createSortitionHash(round uint64, step uint8, i int) ([]byte, error) {
+func createSortitionHash(seed []byte, round uint64, step uint8, i int) ([]byte, error) {
 	msg := make([]byte, 12)
 
 	binary.LittleEndian.PutUint64(msg[:8], round)
 	binary.LittleEndian.PutUint32(msg[8:12], uint32(i))
 
 	msg = append(msg, step)
+	msg = append(msg, seed...)
 
 	return hash.Sha3256(msg)
 }
@@ -97,7 +98,7 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 // CreateVotingCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step and round.
 // TODO: running this with weird setup causes infinite looping (to reproduce, hardcode `3` on MockProvisioners when calling agreement.NewHelper in the agreement tests).
-func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) VotingCommittee {
+func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint8, size int) VotingCommittee {
 	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(p.TotalWeight())
 
@@ -130,7 +131,7 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 			break
 		}
 
-		hashSort, err := createSortitionHash(round, step, i)
+		hashSort, err := createSortitionHash(seed, round, step, i)
 		if err != nil {
 			log.Panic(err)
 		}
@@ -188,7 +189,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 }
 
 // GenerateCommittees pre-generates an `amount` of VotingCommittee of a specified `size` from a given `step`.
-func (p Provisioners) GenerateCommittees(round uint64, amount, step uint8, size int) []VotingCommittee {
+func (p Provisioners) GenerateCommittees(seed []byte, round uint64, amount, step uint8, size int) []VotingCommittee {
 	if step >= math.MaxUint8-amount {
 		amount = math.MaxUint8 - step
 	}
@@ -196,7 +197,7 @@ func (p Provisioners) GenerateCommittees(round uint64, amount, step uint8, size 
 	committees := make([]VotingCommittee, amount)
 
 	for i := 0; i < int(amount); i++ {
-		votingCommittee := p.CreateVotingCommittee(round, step+uint8(i), size)
+		votingCommittee := p.CreateVotingCommittee(seed, round, step+uint8(i), size)
 		committees[i] = votingCommittee
 	}
 
