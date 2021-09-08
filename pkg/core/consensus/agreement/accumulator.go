@@ -78,11 +78,11 @@ func (a *Accumulator) Accumulate() {
 		}
 
 		lg.WithFields(log.Fields{
-			"step":   ev.State().Step,
-			"round":  ev.State().Round,
-			"count":  count,
-			"quorum": a.handler.Quorum(hdr.Round),
-			"len":    a.storeMap.len(),
+			"step":       ev.State().Step,
+			"round":      ev.State().Round,
+			"aggr_count": count,
+			"quorum":     a.handler.Quorum(hdr.Round),
+			"hash_count": a.storeMap.len(),
 		}).Debug("collected agreement")
 
 		if count >= a.handler.Quorum(hdr.Round) {
@@ -90,12 +90,13 @@ func (a *Accumulator) Accumulate() {
 			a.CollectedVotesChan <- votes
 
 			lg.WithFields(log.Fields{
-				"step":     ev.State().Step,
-				"round":    ev.State().Round,
-				"count":    count,
-				"quorum":   a.handler.Quorum(hdr.Round),
-				"len":      a.storeMap.len(),
-				"duration": time.Now().Unix() - s.CreatedAt(),
+				"step":        ev.State().Step,
+				"round":       ev.State().Round,
+				"aggr_count":  count,
+				"quorum":      a.handler.Quorum(hdr.Round),
+				"hash_count":  a.storeMap.len(),
+				"steps_count": s.Len(),
+				"duration":    time.Now().Unix() - s.CreatedAt(),
 			}).Info("quorum reached")
 
 			return

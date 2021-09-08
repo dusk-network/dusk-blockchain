@@ -186,3 +186,10 @@ func (s *store) CreatedAt() int64 {
 
 	return s.createdAt
 }
+
+func (s *store) Len() int {
+	s.RLock()
+	defer s.RUnlock()
+
+	return len(s.collected)
+}
