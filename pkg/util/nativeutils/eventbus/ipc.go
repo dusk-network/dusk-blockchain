@@ -34,11 +34,9 @@ func NewIPCListener(
 }
 
 func (il *IPCListener) attach() {
-
 }
 
 func (il *IPCListener) detach() {
-
 }
 
 // Notify passes a message to be relayed by the attached eventbus.
