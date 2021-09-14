@@ -1,0 +1,18 @@
+syntax = "proto3";
+package eventbus;
+
+option go_package = "../../eventbus";
+
+service IPC {
+  rpc Notify(stream Request) returns (stream Responses) {}
+
+}
+
+message Request {
+  uint32 topic = 1;
+  bytes query = 2;
+}
+
+message Responses {
+  bytes data = 1;
+}
