@@ -4,15 +4,14 @@ package eventbus;
 option go_package = "../../eventbus";
 
 service IPC {
-  rpc Notify(stream Request) returns (stream Responses) {}
-
+  rpc Notify(stream Request) returns (stream Response) {}
+  rpc Close(Request) returns (Response) {}
 }
 
 message Request {
-  uint32 topic = 1;
-  bytes query = 2;
+  bytes query = 1;
 }
 
-message Responses {
+message Response {
   bytes data = 1;
 }
