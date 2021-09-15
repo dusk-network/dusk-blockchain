@@ -19,10 +19,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "secondstep reduction")
+var lg = log.WithField("process", "consensus").
+	WithField("phase", "2nd_reduction")
 
 func getLog(r uint64, s uint8) *log.Entry {
 	return lg.WithFields(log.Fields{
@@ -170,19 +172,20 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 		return nil
 	}
 
+	if log.GetLevel() >= logrus.DebugLevel {
+		log := consensus.WithFields(hdr.Round, hdr.Step, "2nd_reduction_collected",
+			hdr.BlockHash, p.handler.BLSPubKey, nil, nil, nil)
+
+		log.WithField("sender", util.StringifyBytes(hdr.Sender())).
+			Debug("")
+	}
+
 	m := message.NewWithHeader(topics.Reduction, r.Copy().(message.Reduction), config.KadcastInitHeader)
 
 	// Once the event is verified, we can republish it.
 	if err := p.Emitter.Republish(m); err != nil {
 		lg.WithError(err).Error("could not republish reduction event")
 	}
-
-	lg.WithFields(log.Fields{
-		"round": hdr.Round,
-		"step":  hdr.Step,
-		//"sender": hex.EncodeToString(hdr.Sender()),
-		//"hash":   hex.EncodeToString(hdr.BlockHash),
-	}).Debugln("received_2nd_step_reduction")
 
 	result := p.aggregator.CollectVote(r)
 
@@ -206,7 +209,7 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 			Step:      step,
 			Round:     round,
 			BlockHash: r.Hash,
-			PubKeyBLS: p.Keys.BLSPubKeyBytes,
+			PubKeyBLS: p.Keys.BLSPubKey,
 		},
 		StepVotes: r.SV,
 	}
@@ -222,7 +225,7 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 	hdr := header.Header{
 		Round:     round,
 		Step:      step,
-		PubKeyBLS: p.Keys.BLSPubKeyBytes,
+		PubKeyBLS: p.Keys.BLSPubKey,
 		BlockHash: svm.BlockHash,
 	}
 

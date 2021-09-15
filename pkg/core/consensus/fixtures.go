@@ -28,7 +28,7 @@ import (
 func MockEmitter(consTimeout time.Duration) *Emitter {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	keys, _ := key.NewRandKeys()
+	keys := key.NewRandKeys()
 
 	return &Emitter{
 		EventBus:    eb,
@@ -74,11 +74,11 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.Keys) {
 	k := make([]key.Keys, amount)
 
 	for i := 0; i < amount; i++ {
-		keys, _ := key.NewRandKeys()
+		keys := key.NewRandKeys()
 		member := MockMember(keys)
 
-		p.Members[string(keys.BLSPubKeyBytes)] = member
-		p.Set.Insert(keys.BLSPubKeyBytes)
+		p.Members[string(keys.BLSPubKey)] = member
+		p.Set.Insert(keys.BLSPubKey)
 		k[i] = keys
 	}
 
@@ -88,7 +88,7 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.Keys) {
 // MockMember mocks a Provisioner.
 func MockMember(keys key.Keys) *user.Member {
 	member := &user.Member{}
-	member.PublicKeyBLS = keys.BLSPubKeyBytes
+	member.PublicKeyBLS = keys.BLSPubKey
 	member.Stakes = make([]user.Stake, 1)
 	member.Stakes[0].Amount = 500
 	member.Stakes[0].EndHeight = 10000
@@ -172,8 +172,8 @@ func (t *TestPhase) Run(_ context.Context, queue *Queue, _ chan message.Message,
 	return nil
 }
 
-// MockScoreMsg ...
-func MockScoreMsg(t *testing.T, hdr *header.Header) message.Message {
+// MockNewBlockMsg ...
+func MockNewBlockMsg(t *testing.T, hdr *header.Header) message.Message {
 	var h header.Header
 	if hdr == nil {
 		h = header.Mock()
@@ -187,7 +187,7 @@ func MockScoreMsg(t *testing.T, hdr *header.Header) message.Message {
 	// Mock candidate
 	genesis := config.DecodeGenesis()
 	genesis.Header.Hash = h.BlockHash
-	se := message.MockScore(h, *genesis)
+	se := message.MockNewBlock(h, *genesis)
 
-	return message.New(topics.Score, se)
+	return message.New(topics.NewBlock, se)
 }

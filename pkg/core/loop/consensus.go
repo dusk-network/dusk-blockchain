@@ -28,7 +28,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "consensus loop")
+var lg = log.WithField("process", "consensus")
 
 // ErrMaxStepsReached is triggered when the consensus loop reaches the maximum
 // amount of steps without reaching an Agreement. This means that the network
@@ -88,7 +88,7 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 	// subscribe topics to eventChan
 	evSub := eventbus.NewChanListener(eventChan)
 
-	e.EventBus.AddDefaultTopic(topics.Reduction, topics.Score)
+	e.EventBus.AddDefaultTopic(topics.Reduction, topics.NewBlock)
 	e.EventBus.SubscribeDefault(evSub)
 
 	c := &Consensus{
@@ -162,7 +162,7 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 					"round": round.Round,
 					"step":  step,
 				}).
-				Trace("consensus achieved")
+				Debug("consensus achieved")
 
 				// Take round results from the agreement goroutine
 			select {

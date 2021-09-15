@@ -27,7 +27,7 @@ import (
 // TestMockValidity ensures that we don't go into a wild goose chase if our
 // mock system gets screwed up.
 func TestMockValidity(t *testing.T) {
-	nr := 50
+	nr := 10
 	hlp := agreement.NewHelper(nr)
 	hash, _ := crypto.RandEntropy(32)
 	handler := agreement.NewHandler(hlp.Keys, *hlp.P)
@@ -43,7 +43,7 @@ func TestMockValidity(t *testing.T) {
 // Test the accumulation of agreement events. It should result in the agreement
 // component sending a valid certificate.
 func TestAgreement(t *testing.T) {
-	nr := 50
+	nr := 10
 	hlp := agreement.NewHelper(nr)
 	blk := helper.RandomBlock(1, 1)
 	_, db := lite.CreateDBConnection()
@@ -69,7 +69,7 @@ func TestAgreement(t *testing.T) {
 
 // Test the usage of the candidate requestor in case of a missing candidate block.
 func TestRequestor(t *testing.T) {
-	nr := 50
+	nr := 10
 	hlp := agreement.NewHelper(nr)
 	blk := helper.RandomBlock(1, 1)
 	_, db := lite.CreateDBConnection()

@@ -21,10 +21,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "first step reduction")
+var lg = log.WithField("process", "consensus").
+	WithField("phase", "1th_reduction")
 
 func getLog(r uint64, s uint8) *log.Entry {
 	return lg.WithFields(log.Fields{
@@ -42,7 +44,7 @@ type Phase struct {
 	handler    *reduction.Handler
 	aggregator *reduction.Aggregator
 
-	selectionResult message.Score
+	selectionResult message.NewBlock
 
 	verifyFn  consensus.CandidateVerificationFunc
 	requestor *candidate.Requestor
@@ -70,7 +72,7 @@ func (p *Phase) String() string {
 
 // Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
-	p.selectionResult = re.(message.Score)
+	p.selectionResult = re.(message.NewBlock)
 	return p
 }
 
@@ -159,6 +161,15 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 		return nil
 	}
 
+	if log.GetLevel() >= logrus.DebugLevel {
+		log := consensus.WithFields(r.State().Round, r.State().Step, "1th_reduction_collected",
+			r.State().BlockHash, p.handler.BLSPubKey, nil, nil, nil)
+
+		log.WithField("signature", util.StringifyBytes(r.SignedHash)).
+			WithField("sender", util.StringifyBytes(r.Sender())).
+			Debug("")
+	}
+
 	m := message.NewWithHeader(topics.Reduction, r, config.KadcastInitHeader)
 
 	// Once the event is verified, we can republish it.
@@ -167,13 +178,6 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 	}
 
 	hdr := r.State()
-
-	lg.WithFields(log.Fields{
-		"round": hdr.Round,
-		"step":  hdr.Step,
-		//"sender": hex.EncodeToString(hdr.Sender()),
-		//"hash":   hex.EncodeToString(hdr.BlockHash),
-	}).Debugln("received_event")
 
 	result := p.aggregator.CollectVote(r)
 	if result == nil {
@@ -256,7 +260,7 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 			Step:      step,
 			Round:     round,
 			BlockHash: r.Hash,
-			PubKeyBLS: p.Keys.BLSPubKeyBytes,
+			PubKeyBLS: p.Keys.BLSPubKey,
 		},
 		StepVotes: r.SV,
 	}

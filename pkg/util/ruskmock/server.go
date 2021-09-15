@@ -7,30 +7,33 @@
 package ruskmock
 
 import (
+	"bytes"
 	"context"
-	"math/big"
+	"encoding/binary"
 	"net"
+	"os"
+	"path/filepath"
 	"time"
 
-	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/legacy"
-	"github.com/dusk-network/dusk-crypto/mlsag"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	"github.com/dusk-network/dusk-wallet/v2/block"
-	"github.com/dusk-network/dusk-wallet/v2/database"
-	"github.com/dusk-network/dusk-wallet/v2/key"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
-	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 var log = logrus.WithField("process", "mock rusk server")
 
-const stateTransitionDelay = 1 * time.Second
+const (
+	stateTransitionDelay = 1 * time.Second
+	stakeGracePeriod     = 2
+)
 
 // Server is a stand-in Rusk server, which can be used during any kind of
 // testing. Its behavior can be modified depending on the settings of the
@@ -40,9 +43,8 @@ type Server struct {
 	cfg *Config
 	s   *grpc.Server
 
-	w  *wallet.Wallet
-	db *database.DB
 	p  *user.Provisioners
+	db *BuntStore
 }
 
 // New returns a new Rusk mock server with the given config. If no config is
@@ -52,67 +54,45 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 		cfg = DefaultConfig()
 	}
 
+	dbPath := filepath.Dir(filepath.Dir(c.Wallet.Store)) + "/" + "ruskmock.db"
+
+	db, err := NewBuntStore(dbPath, High)
+	if err != nil {
+		panic(err)
+	}
+
 	srv := &Server{
 		cfg: cfg,
 		p:   user.NewProvisioners(),
+		db:  db,
 	}
 
 	grpcServer := grpc.NewServer()
 	registerGRPCServers(grpcServer, srv)
 	srv.s = grpcServer
 
-	if err := srv.setupWallet(c); err != nil {
-		log.WithError(err).Errorln("error setting up wallet")
-		return nil, err
-	}
-
 	return srv, srv.bootstrapBlockchain()
-}
-
-func (s *Server) setupWallet(c config.Registry) error {
-	log.Infoln("setting up wallet")
-
-	// First load the database
-	db, err := database.New(c.Wallet.Store + "_2")
-	if err != nil {
-		return err
-	}
-
-	// Then load the wallet
-	w, err := wallet.LoadFromFile(byte(2), db, fetchDecoys, fetchInputs, "password", c.Wallet.File)
-	if err != nil {
-		_ = db.Close()
-		return err
-	}
-
-	if err := w.UpdateWalletHeight(0); err != nil {
-		return err
-	}
-
-	s.w = w
-	s.db = db
-	return nil
 }
 
 func (s *Server) bootstrapBlockchain() error {
 	log.Infoln("bootstrapping blockchain")
 
-	var genesis *block.Block
-
+	// Reconstruct Genesis Provisioners
 	g := config.DecodeGenesis()
-
-	var err error
-	if err = chain.ReconstructCommittee(s.p, g); err != nil {
+	if err := chain.ReconstructCommittee(s.p, g); err != nil {
 		return err
 	}
 
-	genesis, err = legacy.NewBlockToOldBlock(g)
-	if err != nil {
-		return err
+	provisioners, err := s.db.FetchProvisioners()
+	if err == nil {
+		s.p = provisioners
+	} else {
+		// Could not fetch any provisioners from DB.
+		// Then we should update.
+		_ = s.db.StoreProvisioners(s.p)
 	}
 
-	_, _, err = s.w.CheckWireBlock(*genesis)
-	return err
+	return nil
 }
 
 func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
@@ -131,6 +111,11 @@ func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
 // incoming gRPC requests.
 func (s *Server) Serve(network, url string) error {
 	log.WithField("addr", url).WithField("net", network).Infoln("starting GRPC server")
+
+	if network == "unix" {
+		// Remove obsolete unix socket file
+		_ = os.Remove(url)
+	}
 
 	l, err := net.Listen(network, url)
 	if err != nil {
@@ -185,27 +170,7 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 		}, nil
 	}
 
-	log.Infoln("converting txs")
-
-	txs, err := legacy.ContractCallsToTxs(req.Txs)
-	if err != nil {
-		log.WithError(err).Errorln("could not convert contract calls to legacy txs")
-		return nil, err
-	}
-
-	blk := block.NewBlock()
-	blk.Txs = txs
-	blk.Header.Height = req.Height
-
-	log.Infoln("checking wire block")
-
-	_, _, err = s.w.CheckWireBlock(*blk)
-	if err != nil {
-		log.WithError(err).Errorln("could not check wire block")
-		return nil, err
-	}
-
-	if err := s.addConsensusNodes(blk.Txs, req.Height); err != nil {
+	if err := s.addConsensusNodes(req.Txs, req.Height); err != nil {
 		log.WithError(err).Errorln("could not add consensus nodes")
 		return nil, err
 	}
@@ -220,31 +185,59 @@ func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersR
 	log.Infoln("call received to GetProvisioners")
 	defer log.Infoln("finished call to GetProvisioners")
 
+	provisioners, err := s.db.FetchProvisioners()
+	if err == nil {
+		s.p = provisioners
+	}
+
 	return &rusk.GetProvisionersResponse{
 		Provisioners: legacy.ProvisionersToRuskCommittee(s.p),
 	}, nil
 }
 
-func (s *Server) addConsensusNodes(txs []transactions.Transaction, startHeight uint64) error {
+func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) error {
 	log.Debugln("adding consensus nodes")
 
-	for _, tx := range txs {
-		if tx.Type() == transactions.StakeType {
-			stake := tx.(*transactions.Stake)
+	var added bool
 
-			// Add grace period for stakes.
-			stakeStartHeight := startHeight + 1000
-			if err := s.p.Add(stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), stakeStartHeight, startHeight+stake.Lock-2); err != nil {
+	for _, tx := range txs {
+		if tx.Type == uint32(transactions.Stake) {
+			payload := transactions.NewTransactionPayload()
+			if err := transactions.UnmarshalTransactionPayload(bytes.NewBuffer(tx.Payload), payload); err != nil {
 				return err
 			}
 
+			lock := binary.LittleEndian.Uint64(payload.CallData[0:8])
+
+			var pk []byte
+			if err := encoding.ReadVarBytes(bytes.NewBuffer(payload.CallData[8:]), &pk); err != nil {
+				return err
+			}
+
+			value := binary.LittleEndian.Uint64(payload.SpendingProof[0:8])
+
+			// Add grace period for stakes.
+			stakeStartHeight := startHeight + stakeGracePeriod
+			if err := s.p.Add(pk, value, stakeStartHeight, startHeight+lock-2); err != nil {
+				return err
+			}
+
+			added = true
+
 			log.WithFields(logrus.Fields{
-				"BLS key":      stake.PubKeyBLS,
-				"amount":       stake.Outputs[0].EncryptedAmount.BigInt().Uint64(),
+				"BLS key":      util.StringifyBytes(pk),
+				"amount":       value,
 				"start height": stakeStartHeight,
-				"end height":   startHeight + stake.Lock - 2,
+				"end height":   startHeight + lock - 2,
 			}).Debugln("added provisioner")
 		}
+	}
+
+	if added {
+		log.WithField("size", s.p.Set.Len()).Debugln("update provisioners db")
+		// New provisioners added on last block.
+		// Update ondisk copy of provisioners.
+		return s.db.StoreProvisioners(s.p)
 	}
 
 	return nil
@@ -275,16 +268,13 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 	log.Infoln("call received to GenerateKeys")
 	defer log.Infoln("finished call to GenerateKeys")
 
-	var r ristretto.Scalar
-
-	r.Rand()
-
-	pk := s.w.PublicKey()
-	addr := pk.StealthAddress(r, 0)
-
-	pSpend, err := s.w.PrivateSpend()
+	pSpend, err := crypto.RandEntropy(32)
 	if err != nil {
-		log.WithError(err).Errorln("could not get private spend key")
+		return nil, err
+	}
+
+	pk, err := crypto.RandEntropy(32)
+	if err != nil {
 		return nil, err
 	}
 
@@ -298,7 +288,7 @@ func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest
 			BG: make([]byte, 32),
 		},
 		Pk: &rusk.PublicKey{
-			AG: addr.P.Bytes(),
+			AG: pk,
 			BG: make([]byte, 32),
 		},
 	}, nil
@@ -310,15 +300,11 @@ func (s *Server) GenerateStealthAddress(ctx context.Context, req *rusk.PublicKey
 	log.Infoln("call received to GenerateStealthAddress")
 	defer log.Infoln("finished call to GenerateStealthAddress")
 
-	var r ristretto.Scalar
-
-	r.Rand()
-
-	pk := s.w.PublicKey()
-	addr := pk.StealthAddress(r, 0)
+	cpy := make([]byte, len(req.AG))
+	copy(cpy, req.AG)
 
 	return &rusk.StealthAddress{
-		RG:  addr.P.Bytes(),
+		RG:  cpy,
 		PkR: make([]byte, 0),
 	}, nil
 }
@@ -328,75 +314,79 @@ func (s *Server) NewTransfer(ctx context.Context, req *rusk.TransferTransactionR
 	log.Infoln("call received to NewTransfer")
 	defer log.Infoln("finished call to NewTransfer")
 
-	tx, err := transactions.NewStandard(0, byte(2), int64(100))
+	anchor, err := crypto.RandEntropy(32)
 	if err != nil {
-		log.WithError(err).Errorln("error creating new transfer")
 		return nil, err
 	}
 
-	var spend ristretto.Point
-	var view ristretto.Point
-
-	_ = spend.UnmarshalBinary(req.Recipient[:32])
-	_ = view.UnmarshalBinary(req.Recipient[32:])
-	sp := key.PublicSpend(spend)
-	v := key.PublicView(view)
-
-	pk := &key.PublicKey{
-		PubSpend: &sp,
-		PubView:  &v,
+	payload := &transactions.TransactionPayload{
+		Anchor:        anchor,
+		Nullifiers:    make([][]byte, 0),
+		Notes:         make([]*transactions.Note, 0),
+		Crossover:     transactions.MockCrossover(false),
+		Fee:           transactions.MockFee(false),
+		SpendingProof: make([]byte, 0),
+		CallData:      make([]byte, 0),
 	}
 
-	addr, err := pk.PublicAddress(byte(2))
-	if err != nil {
-		log.WithError(err).Errorln("error getting public address")
+	buf := new(bytes.Buffer)
+	if err := transactions.MarshalTransactionPayload(buf, payload); err != nil {
 		return nil, err
 	}
 
-	var value ristretto.Scalar
-	value.SetBigInt(big.NewInt(int64(req.Value)))
-
-	err = tx.AddOutput(*addr, value)
-	if err != nil {
-		log.WithError(err).Errorln("error adding output")
-		return nil, err
-	}
-
-	err = s.w.Sign(tx)
-	if err != nil {
-		log.WithError(err).Errorln("error signing tx")
-		return nil, err
-	}
-
-	ruskTx, err := legacy.TxToRuskTx(tx)
-	if ruskTx != nil {
-		ruskTx.Type = 0
-	}
-
-	return ruskTx, err
+	// NOTE: None of this is gonna be checked so it doesn't matter what's in here.
+	return &rusk.Transaction{
+		Version: 0,
+		Type:    0,
+		Payload: buf.Bytes(),
+	}, nil
 }
 
 // NewStake creates a staking transaction and returns it to the caller.
 func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest) (*rusk.Transaction, error) {
 	log.Infoln("call received to NewStake")
-	defer log.Infoln("cinished call to NewStake")
+	defer log.Infoln("finished call to NewStake")
 
-	var value ristretto.Scalar
+	PubKeyBLS := make([]byte, len(req.PublicKeyBls))
+	copy(PubKeyBLS, req.PublicKeyBls)
 
-	value.SetBigInt(big.NewInt(0).SetUint64(req.Value))
+	calldata := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(calldata, 250000); err != nil {
+		return nil, err
+	}
 
-	stake, err := s.w.NewStakeTx(int64(0), 250000, value)
+	if err := encoding.WriteVarBytes(calldata, PubKeyBLS[0:96]); err != nil {
+		return nil, err
+	}
+
+	value := make([]byte, 8)
+	binary.LittleEndian.PutUint64(value, req.Value)
+
+	anchor, err := crypto.RandEntropy(32)
 	if err != nil {
-		log.WithError(err).Errorln("error creating new stake")
 		return nil, err
 	}
 
-	if err := s.w.Sign(stake); err != nil {
-		log.WithError(err).Errorln("error signing stake")
+	payload := &transactions.TransactionPayload{
+		Anchor:        anchor,
+		Nullifiers:    make([][]byte, 0),
+		Notes:         make([]*transactions.Note, 0),
+		Crossover:     transactions.MockCrossover(false),
+		Fee:           transactions.MockFee(false),
+		SpendingProof: value,
+		CallData:      calldata.Bytes(),
+	}
+
+	buf := new(bytes.Buffer)
+	if err := transactions.MarshalTransactionPayload(buf, payload); err != nil {
 		return nil, err
 	}
 
-	return legacy.StakeToRuskStake(stake)
+	return &rusk.Transaction{
+		Version: 0,
+		Type:    4,
+		Payload: buf.Bytes(),
+	}, nil
 }
 
 // NewBid creates a bidding transaction and returns it to the caller.
@@ -425,46 +415,6 @@ func (s *Server) FindStake(ctx context.Context, req *rusk.FindStakeRequest) (*ru
 	return nil, nil
 }
 
-func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
-	// Fetch all inputs from database that are >= totalAmount
-	// returns error if inputs do not add up to total amount
-	privSpend, err := key.PrivateSpend()
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return db.FetchInputs(privSpend.Bytes(), totalAmount)
-}
-
-// This will just mock some decoys. Note that, if we change to actual tx verification,
-// this should be updated accordingly.
-func fetchDecoys(numMixins int) []mlsag.PubKeys {
-	var decoys []ristretto.Point
-
-	for i := 0; i < numMixins; i++ {
-		decoy := ristretto.Point{}
-
-		decoy.Rand()
-
-		decoys = append(decoys, decoy)
-	}
-
-	var pubKeys []mlsag.PubKeys
-
-	for i := 0; i < numMixins; i++ {
-		var keyVector mlsag.PubKeys
-		var secondaryKey ristretto.Point
-
-		keyVector.AddPubKey(decoys[i])
-		secondaryKey.Rand()
-		keyVector.AddPubKey(secondaryKey)
-
-		pubKeys = append(pubKeys, keyVector)
-	}
-
-	return pubKeys
-}
-
 // GetBalance locked and unlocked balance values per a ViewKey.
 func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*rusk.GetWalletBalanceResponse, error) {
 	log.Infoln("call received to GetBalance")
@@ -472,13 +422,8 @@ func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*
 
 	resp := new(rusk.GetWalletBalanceResponse)
 
-	unlockedBalance, lockedBalance, err := s.w.Balance()
-	if err != nil {
-		return resp, err
-	}
-
-	resp.LockedBalance = lockedBalance
-	resp.UnlockedBalance = unlockedBalance
+	resp.LockedBalance = 0
+	resp.UnlockedBalance = 0
 	return resp, nil
 }
 
@@ -487,5 +432,5 @@ func (s *Server) Stop() error {
 	log.Infoln("stopping RUSK mock server")
 
 	s.s.Stop()
-	return s.db.Close()
+	return nil
 }

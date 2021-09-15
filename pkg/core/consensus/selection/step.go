@@ -8,6 +8,7 @@ package selection
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strconv"
 	"time"
@@ -17,15 +18,17 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "selector")
+var lg = log.WithField("process", "consensus").WithField("phase", "selector")
 
 // Phase is the implementation of the Selection step component.
 type Phase struct {
@@ -43,8 +46,7 @@ type Phase struct {
 }
 
 // New creates and launches the component which responsibility is to validate
-// and select the best score among the blind bidders. The component publishes under
-// the topic BestScoreTopic.
+// and select a Provisioner to propagate NewBlock message.
 func New(next consensus.Phase, g blockgenerator.BlockGenerator, e *consensus.Emitter, timeout time.Duration, db database.DB) *Phase {
 	selector := &Phase{
 		Emitter: e,
@@ -88,7 +90,7 @@ func (p *Phase) String() string {
 }
 
 // Run executes the logic for this phase.
-// In this case the selection listens to new Score/Candidate messages.
+// In this case the selection listens to NewBlock messages.
 func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	ctx, cancel := context.WithCancel(parentCtx)
 
@@ -99,19 +101,32 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 	p.handler = NewHandler(p.Keys, r.P)
 
-	if p.handler.AmMember(r.Round, step) {
+	isMember := p.handler.AmMember(r.Round, step)
+
+	if log.GetLevel() >= logrus.DebugLevel {
+		log := consensus.WithFields(r.Round, step, "selection_init",
+			nil, p.Keys.BLSPubKey, &p.handler.Committees[step], nil, &r.P)
+		log.WithField("is_member", isMember).Debug()
+	}
+
+	if isMember {
 		scr, err := p.g.GenerateCandidateMessage(ctx, r, step)
 		if err != nil {
 			lg.WithError(err).Errorln("candidate block generation failed")
 		}
 
-		evChan <- message.NewWithHeader(topics.Score, *scr, []byte{config.KadcastInitialHeight})
+		if log.GetLevel() >= logrus.DebugLevel {
+			consensus.WithFields(r.Round, step, "candidate_generated",
+				scr.State().BlockHash, p.Keys.BLSPubKey, nil, nil, nil).Debug()
+		}
+
+		evChan <- message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
 	}
 
 	timeoutChan := time.After(p.timeout)
 
 	for _, ev := range queue.GetEvents(r.Round, step) {
-		if ev.Category() == topics.Score {
+		if ev.Category() == topics.NewBlock {
 			evChan <- ev
 		}
 	}
@@ -120,7 +135,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		select {
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
-				if err := p.collectScore(ev.Payload().(message.Score), ev.Header()); err != nil {
+				if err := p.collectNewBlock(ev.Payload().(message.NewBlock), ev.Header()); err != nil {
 					continue
 				}
 
@@ -128,10 +143,10 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 				go func() {
 					<-timeoutChan
 				}()
-				return p.endSelection(ev.Payload().(message.Score))
+				return p.endSelection(ev.Payload().(message.NewBlock))
 			}
 		case <-timeoutChan:
-			return p.endSelection(message.EmptyScore())
+			return p.endSelection(message.EmptyNewBlock())
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
@@ -142,13 +157,22 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 	}
 }
 
-func (p *Phase) endSelection(result message.Score) consensus.PhaseFn {
+func (p *Phase) endSelection(result message.NewBlock) consensus.PhaseFn {
 	log.WithField("empty", result.IsEmpty()).
 		Debug("endSelection")
 	return p.next.Initialize(result)
 }
 
-func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
+func (p *Phase) collectNewBlock(sc message.NewBlock, msgHeader []byte) error {
+	if !p.handler.IsMember(sc.State().PubKeyBLS, sc.State().Round, sc.State().Step) {
+		// Ensure NewBlock message comes from a member
+		lg.WithField("sender", util.StringifyBytes(sc.State().PubKeyBLS)).
+			WithField("round", sc.State().Round).WithField("step", sc.State().Step).
+			Warn("NewBlock message from non-committee provisioner")
+
+		return errors.New("not a member")
+	}
+
 	// Sanity-check the candidate message
 	if err := candidate.ValidateCandidate(sc.Candidate); err != nil {
 		lg.Warn("Invalid candidate message")
@@ -167,9 +191,16 @@ func (p *Phase) collectScore(sc message.Score, msgHeader []byte) error {
 		lg.WithError(err).Errorln("could not store candidate")
 	}
 
+	if log.GetLevel() >= logrus.DebugLevel {
+		log := consensus.WithFields(sc.State().Round, sc.State().Step, "score_collected",
+			sc.Candidate.Header.Hash, p.Keys.BLSPubKey, nil, nil, nil)
+
+		log.WithField("sender", util.StringifyBytes(sc.State().PubKeyBLS)).Debug()
+	}
+
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
-	m := message.NewWithHeader(topics.Score, sc, msgHeader)
+	m := message.NewWithHeader(topics.NewBlock, sc, msgHeader)
 	if err := p.Republish(m); err != nil {
 		lg.WithError(err).WithField("kadcast_enabled", config.Get().Kadcast.Enabled).
 			Error("could not republish score event")
@@ -211,7 +242,10 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 		return false
 	}
 
-	if cmp == header.After {
+	// Only store events up to 10 rounds into the future
+	// XXX: According to protocol specs, we should abandon consensus
+	// if we notice valid messages from far into the future.
+	if cmp == header.After && hdr.Round-round < 10 {
 		lg.
 			WithFields(log.Fields{
 				"topic":          m.Category(),
@@ -225,14 +259,14 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 		return false
 	}
 
-	if m.Category() != topics.Score {
+	if m.Category() != topics.NewBlock {
 		lg.
 			WithFields(log.Fields{
 				"topic": m.Category(),
 				"round": hdr.Round,
 				"step":  hdr.Step,
 			}).
-			Warnln("message not topics.Score")
+			Warnln("message not topics.NewBlock")
 		return false
 	}
 

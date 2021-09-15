@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -104,12 +104,12 @@ func RandomHeader(height uint64) *block.Header {
 // RandomBLSSignature returns a valid BLS Signature of a bogus message.
 func RandomBLSSignature() []byte {
 	msg := "this is a test"
-	keys, _ := key.NewRandKeys()
+	keys := key.NewRandKeys()
 
 	sig, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, []byte(msg))
 	if err != nil {
 		panic(err)
 	}
 
-	return sig.Compress()
+	return sig
 }

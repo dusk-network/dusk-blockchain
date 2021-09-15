@@ -6,6 +6,13 @@
 
 package sortedset
 
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
+)
+
 // Cluster is a sortedset that keeps track of duplicates.
 type Cluster struct {
 	Set
@@ -134,4 +141,26 @@ func (c *Cluster) IntersectCluster(committeeSet uint64) Cluster {
 		Set:      set,
 		elements: elems,
 	}
+}
+
+// Format implements fmt.Formatter interface.
+func (c Cluster) Format(f fmt.State, r rune) {
+	for _, elem := range c.Set {
+		count := c.OccurrencesOf(elem.Bytes())
+		r := fmt.Sprintf("(blsPk: %s,count: %d)", util.StringifyBytes(elem.Bytes()), count)
+		_, _ = f.Write([]byte(r))
+	}
+}
+
+// MarshalJSON ...
+func (c Cluster) MarshalJSON() ([]byte, error) {
+	data := make([]string, 0)
+
+	for _, elem := range c.Set {
+		count := c.OccurrencesOf(elem.Bytes())
+		r := fmt.Sprintf("Key: %s, Count: %d", util.StringifyBytes(elem.Bytes()), count)
+		data = append(data, r)
+	}
+
+	return json.Marshal(data)
 }

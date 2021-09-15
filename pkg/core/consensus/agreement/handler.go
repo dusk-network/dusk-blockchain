@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -19,7 +21,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
-	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 // MaxCommitteeSize represents the maximum size of the committee for an
@@ -72,7 +73,7 @@ func (a *handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
 
 // Quorum returns the amount of committee members necessary to reach a quorum.
 func (a *handler) Quorum(round uint64) int {
-	return int(math.Ceil(float64(a.CommitteeSize(round, MaxCommitteeSize)) * 0.75))
+	return int(math.Ceil(float64(a.CommitteeSize(round, MaxCommitteeSize)) * 0.67))
 }
 
 // Verify checks the signature of the set.
@@ -104,13 +105,21 @@ func (a *handler) Verify(ev message.Agreement) error {
 
 		allVoters += subcommittee.TotalOccurrences()
 
+		log := consensus.WithFields(hdr.Round, step, "agreement_received",
+			hdr.BlockHash, a.Keys.BLSPubKey, &committee, &subcommittee, &a.Provisioners)
+
+		log.WithField("bitset", votes.BitSet).WithField("voted_len", subcommittee.Len()).
+			WithField("total_votes", allVoters).Info()
+
 		apk, err := ReconstructApk(subcommittee.Set)
 		if err != nil {
 			return fmt.Errorf("failed to reconstruct APK in the Agreement verification: %w", err)
 		}
 
 		if err := header.VerifySignatures(hdr.Round, step, hdr.BlockHash, apk, votes.Signature); err != nil {
-			return fmt.Errorf("failed to verify BLS multisig: %w", err)
+			err = fmt.Errorf("failed to verify BLS multisig: %w", err)
+			log.Error(err)
+			return err
 		}
 	}
 
@@ -159,29 +168,32 @@ func verifyWhole(a message.Agreement) error {
 	sig := make([]byte, len(a.SignedVotes()))
 	copy(sig, a.SignedVotes())
 
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, r.Bytes(), sig)
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, r.Bytes())
 }
 
 // ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.
-func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
-	var apk *bls.Apk
+func ReconstructApk(subcommittee sortedset.Set) ([]byte, error) {
+	var apk []byte
+	var err error
 
 	if len(subcommittee) == 0 {
 		return nil, errors.New("Subcommittee is empty")
 	}
 
 	for i, ipk := range subcommittee {
-		pk, err := bls.UnmarshalPk(ipk.Bytes())
-		if err != nil {
-			return nil, err
-		}
+		pk := ipk.Bytes()
 
 		if i == 0 {
-			apk = bls.NewApk(pk)
+			apk, err = bls.CreateApk(pk)
+			if err != nil {
+				return nil, err
+			}
+
 			continue
 		}
 
-		if err := apk.Aggregate(pk); err != nil {
+		apk, err = bls.AggregatePk(apk, pk)
+		if err != nil {
 			return nil, err
 		}
 	}

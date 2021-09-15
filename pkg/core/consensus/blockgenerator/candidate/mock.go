@@ -37,17 +37,17 @@ type mock struct {
 	*generator
 }
 
-func (m *mock) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
+func (m *mock) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.NewBlock, error) {
 	hdr := header.Header{
-		PubKeyBLS: make([]byte, 129),
+		PubKeyBLS: make([]byte, 96),
 		Round:     r.Round,
 		Step:      step,
 		BlockHash: make([]byte, 32),
 	}
 
 	cand := m.MockCandidate(hdr, nil)
-	mockScore := message.MockScore(hdr, cand)
-	return &mockScore, nil
+	mockNewBlock := message.MockNewBlock(hdr, cand)
+	return &mockNewBlock, nil
 }
 
 // Mock the candidate generator.

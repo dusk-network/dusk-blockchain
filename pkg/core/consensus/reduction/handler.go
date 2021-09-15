@@ -68,12 +68,12 @@ func (b *Handler) VerifySignature(red message.Reduction) error {
 	// see https://github.com/dusk-network/dusk-crypto/issues/16
 	sig := make([]byte, len(red.SignedHash))
 	copy(sig, red.SignedHash)
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, packet.Bytes())
 }
 
 // Quorum returns the amount of committee votes to reach a quorum.
 func (b *Handler) Quorum(round uint64) int {
-	return int(math.Ceil(float64(b.CommitteeSize(round, maxCommitteeSize)) * 0.75))
+	return int(math.Ceil(float64(b.CommitteeSize(round, maxCommitteeSize)) * 0.67))
 }
 
 // Committee returns a VotingCommittee for a given round and step.

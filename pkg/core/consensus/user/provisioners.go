@@ -111,8 +111,8 @@ func NewProvisioners() *Provisioners {
 
 // Add a Member to the Provisioners by using the bytes of a BLS public key.
 func (p *Provisioners) Add(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
-	if len(pubKeyBLS) != 129 {
-		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
+	if len(pubKeyBLS) != 96 {
+		return fmt.Errorf("public key is %v bytes long instead of 96", len(pubKeyBLS))
 	}
 
 	i := string(pubKeyBLS)
@@ -178,7 +178,7 @@ func (p Provisioners) GetMember(pubKeyBLS []byte) *Member {
 // GetStake will find a certain provisioner in the committee by BLS public key,
 // and return their stake.
 func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
-	if len(pubKeyBLS) != 129 {
+	if len(pubKeyBLS) != 96 {
 		return 0, fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
 
@@ -322,4 +322,10 @@ func unmarshalStake(r *bytes.Buffer) (Stake, error) {
 	}
 
 	return stake, nil
+}
+
+// Format implements fmt.Formatter interface.
+func (s Stake) Format(f fmt.State, c rune) {
+	r := fmt.Sprintf("Amount: %d, From: %d, To: %d", s.Amount, s.StartHeight, s.EndHeight)
+	_, _ = f.Write([]byte(r))
 }

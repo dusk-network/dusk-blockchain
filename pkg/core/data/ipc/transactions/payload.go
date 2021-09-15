@@ -81,10 +81,7 @@ func MarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 	}
 
 	for _, input := range f.Nullifiers {
-		// XXX: We are using variable size bytes here, because we abuse the
-		// input when mocking RUSK, to fill it with lots of data.
-		// This should be fixed when we integrate the actual RUSK server.
-		if err := encoding.WriteVarBytes(r, input); err != nil {
+		if err := encoding.Write256(r, input); err != nil {
 			return err
 		}
 	}
@@ -127,9 +124,8 @@ func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 
 	f.Nullifiers = make([][]byte, lenInputs)
 	for i := range f.Nullifiers {
-		// XXX: Change back to normal once RUSK is integrated.
-		f.Nullifiers[i] = make([]byte, 0)
-		if err = encoding.ReadVarBytes(r, &f.Nullifiers[i]); err != nil {
+		f.Nullifiers[i] = make([]byte, 32)
+		if err = encoding.Read256(r, f.Nullifiers[i]); err != nil {
 			return err
 		}
 	}

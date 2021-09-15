@@ -259,7 +259,7 @@ func RandStakeTx(expiration uint64) *Transaction {
 		expiration = RandUint64()
 	}
 
-	blsKey := make([]byte, 129)
+	blsKey := make([]byte, 96)
 	if _, err := rand.Read(blsKey); err != nil {
 		panic(err)
 	}

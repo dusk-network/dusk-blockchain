@@ -25,8 +25,8 @@ func TestRemove(t *testing.T) {
 
 	nr := 5
 	for i := 0; i < nr; i++ {
-		k, _ := key.NewRandKeys()
-		bk := (&big.Int{}).SetBytes(k.BLSPubKeyBytes)
+		k := key.NewRandKeys()
+		bk := (&big.Int{}).SetBytes(k.BLSPubKey)
 		committee.Set = append(committee.Set, bk)
 	}
 
@@ -81,7 +81,7 @@ func TestSubtractStake(t *testing.T) {
 
 	// Check that `CreateVotingCommittee` did not modify our original provisioner set
 	for _, k := range ks {
-		stake, err := p.GetStake(k.BLSPubKeyBytes)
+		stake, err := p.GetStake(k.BLSPubKey)
 		if err != nil {
 			t.Fatal(err)
 		}

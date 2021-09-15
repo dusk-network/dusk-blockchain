@@ -40,7 +40,7 @@ const (
 
 	// Gossiped topics.
 	Candidate
-	Score
+	NewBlock
 	Reduction
 	Agreement
 
@@ -119,7 +119,7 @@ var Topics = [...]topicBuf{
 	{MemPool, *(bytes.NewBuffer([]byte{byte(MemPool)})), "mempool"},
 	{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
 	{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
-	{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
+	{NewBlock, *(bytes.NewBuffer([]byte{byte(NewBlock)})), "newblock"},
 	{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
 	{Agreement, *(bytes.NewBuffer([]byte{byte(Agreement)})), "agreement"},
 	{Gossip, *(bytes.NewBuffer([]byte{byte(Gossip)})), "gossip"},

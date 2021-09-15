@@ -14,7 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	logger "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -25,7 +25,8 @@ const (
 	maxTxsPerMsg = 15
 )
 
-var log = logger.WithField("process", "broker")
+var log = logrus.WithField("process", "consensus").
+	WithField("actor", "broker")
 
 // Broker is a pub/sub broker that keeps updated all subscribers (websocket
 // connections) with latest block accepted published by node layer.

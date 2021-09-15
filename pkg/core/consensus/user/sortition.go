@@ -8,9 +8,12 @@ package user
 
 import (
 	"encoding/binary"
+	"encoding/json"
+	"fmt"
 	"math"
 	"math/big"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
 	log "github.com/sirupsen/logrus"
@@ -53,6 +56,24 @@ func (v VotingCommittee) Equal(other *VotingCommittee) bool {
 func (v VotingCommittee) IsMember(pubKeyBLS []byte) bool {
 	_, found := v.IndexOf(pubKeyBLS)
 	return found
+}
+
+// Format implements fmt.Formatter interface.
+func (v VotingCommittee) Format(f fmt.State, c rune) {
+	r := fmt.Sprintf("cluster: %v", v.Cluster)
+	_, _ = f.Write([]byte(r))
+}
+
+// MarshalJSON ...
+func (v VotingCommittee) MarshalJSON() ([]byte, error) {
+	data := make([]string, 0)
+
+	for _, bi := range v.Set {
+		r := fmt.Sprintf("Key: %s, Count: %d", util.StringifyBytes(bi.Bytes()), v.Cluster.OccurrencesOf(bi.Bytes()))
+		data = append(data, r)
+	}
+
+	return json.Marshal(data)
 }
 
 // createSortitionMessage will return the hash of the passed sortition information.
@@ -143,7 +164,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 			// handling the eventuality of an out of bound error
 			m, e = p.MemberAt(0)
 			if e != nil {
-				// FIXME: shall this panic ?
+				// FIXME: shall this panic?
 				log.Panic(e)
 			}
 
@@ -180,6 +201,27 @@ func (p Provisioners) GenerateCommittees(round uint64, amount, step uint8, size 
 	}
 
 	return committees
+}
+
+// Format implements fmt.Formatter interface.
+// Prints all members and its stakes.
+func (p Provisioners) Format(f fmt.State, c rune) {
+	for _, m := range p.Members {
+		r := fmt.Sprintf("BLS key: %s, Stakes: %q", util.StringifyBytes(m.PublicKeyBLS), m.Stakes)
+		_, _ = f.Write([]byte(r))
+	}
+}
+
+// MarshalJSON allows to print Provisioners list in JSONFormatter.
+func (p Provisioners) MarshalJSON() ([]byte, error) {
+	data := make([]string, 0)
+
+	for _, m := range p.Members {
+		r := fmt.Sprintf("BLS key: %s, Stakes: %q", util.StringifyBytes(m.PublicKeyBLS), m.Stakes)
+		data = append(data, r)
+	}
+
+	return json.Marshal(data)
 }
 
 func subtractFromTotalWeight(W *big.Int, amount uint64) {

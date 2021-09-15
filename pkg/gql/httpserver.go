@@ -30,7 +30,7 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
-var log = logger.WithFields(logger.Fields{"prefix": "gql"})
+var log = logger.WithFields(logger.Fields{"process": "gql"})
 
 const (
 	endpointWS  = "/ws"
@@ -108,7 +108,7 @@ func (s *Server) listenOnHTTPServer(l net.Listener) {
 
 	log.WithField("net", conf.Network).
 		WithField("addr", conf.Address).
-		WithField("tls", conf.EnableTLS).Infof("GraphQL HTTP server listening")
+		WithField("tls", conf.EnableTLS).Info("GraphQL HTTP server listening")
 
 	var err error
 	if conf.EnableTLS {

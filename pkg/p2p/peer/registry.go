@@ -17,7 +17,7 @@ var routingRegistry = map[protocol.ServiceFlag]map[topics.Topic]struct{}{
 	protocol.FullNode: {
 		topics.Tx:           {},
 		topics.Candidate:    {},
-		topics.Score:        {},
+		topics.NewBlock:     {},
 		topics.Reduction:    {},
 		topics.Agreement:    {},
 		topics.Ping:         {},

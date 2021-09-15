@@ -97,7 +97,7 @@ func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
-	if err := encoding.WriteBLS(r, h.Seed); err != nil {
+	if err := encoding.WriteVarBytes(r, h.Seed); err != nil {
 		return err
 	}
 
@@ -147,8 +147,8 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
-	h.Seed = make([]byte, 33)
-	if err := encoding.ReadBLS(r, h.Seed); err != nil {
+	h.Seed = make([]byte, 0)
+	if err := encoding.ReadVarBytes(r, &h.Seed); err != nil {
 		return err
 	}
 
@@ -171,11 +171,11 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 
 // MarshalCertificate marshals a certificate.
 func MarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
-	if err := encoding.WriteBLS(r, c.StepOneBatchedSig); err != nil {
+	if err := encoding.WriteVarBytes(r, c.StepOneBatchedSig); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteBLS(r, c.StepTwoBatchedSig); err != nil {
+	if err := encoding.WriteVarBytes(r, c.StepTwoBatchedSig); err != nil {
 		return err
 	}
 
@@ -196,13 +196,13 @@ func MarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 
 // UnmarshalCertificate unmarshals a certificate.
 func UnmarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
-	c.StepOneBatchedSig = make([]byte, 33)
-	if err := encoding.ReadBLS(r, c.StepOneBatchedSig); err != nil {
+	c.StepOneBatchedSig = make([]byte, 0)
+	if err := encoding.ReadVarBytes(r, &c.StepOneBatchedSig); err != nil {
 		return err
 	}
 
-	c.StepTwoBatchedSig = make([]byte, 33)
-	if err := encoding.ReadBLS(r, c.StepTwoBatchedSig); err != nil {
+	c.StepTwoBatchedSig = make([]byte, 0)
+	if err := encoding.ReadVarBytes(r, &c.StepTwoBatchedSig); err != nil {
 		return err
 	}
 

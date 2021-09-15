@@ -48,7 +48,7 @@ func TestGetVoterKeys(t *testing.T) {
 		found := false
 
 		for _, k := range keys {
-			if bytes.Equal(k.BLSPubKeyBytes, key) {
+			if bytes.Equal(k.BLSPubKey, key) {
 				found = true
 			}
 		}

@@ -23,7 +23,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-var l = log.WithField("process", "StakeAutomaton")
+var l = log.WithField("process", "consensus").
+	WithField("actor", "StakeAutomaton")
 
 // StakeAutomaton is a process that keeps note of when certain consensus transactions
 // expire, and makes sure the node remains within the bidlist/committee, when those

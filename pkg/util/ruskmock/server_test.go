@@ -12,12 +12,12 @@ import (
 	"os"
 	"testing"
 
-	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/stretchr/testify/assert"
 )
@@ -118,9 +118,11 @@ func TestExecuteStateTransition(t *testing.T) {
 	sc, _ := client.CreateStakeClient(ctx, "localhost:10000")
 	value := uint64(712389)
 
+	pk, _ := crypto.RandEntropy(96)
+
 	tx, err := sc.NewStake(ctx, &rusk.StakeTransactionRequest{
 		Value:        value,
-		PublicKeyBls: s.w.ConsensusKeys().BLSPubKeyBytes,
+		PublicKeyBls: pk,
 	})
 	assert.NoError(t, err)
 
@@ -134,7 +136,7 @@ func TestExecuteStateTransition(t *testing.T) {
 
 	// Check that the provisioner set has a stake for our public key, with the
 	// chosen value
-	m := s.p.Members[string(s.w.ConsensusKeys().BLSPubKeyBytes)]
+	m := s.p.Members[string(pk)]
 	assert.Equal(t, value, m.Stakes[0].Amount)
 }
 
@@ -156,93 +158,6 @@ func TestFailedExecuteStateTransition(t *testing.T) {
 	assert.False(t, resp.Success)
 }
 
-func TestGenerateStealthAddress(t *testing.T) {
-	s := setupRuskMockTest(t, DefaultConfig())
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateKeysClient(ctx, "localhost:10000")
-
-	// The server will just generate a stealth address for it's own public
-	// key, so we don't need to send a proper one.
-	resp, err := c.GenerateStealthAddress(ctx, &rusk.PublicKey{})
-	assert.NoError(t, err)
-
-	// Since we don't know the randomness with which the stealth address was
-	// created, we can't really do an equality check. Let's at least make sure
-	// that it is a valid ristretto point.
-	var pBytes [32]byte
-	var p ristretto.Point
-
-	copy(pBytes[:], resp.RG[:])
-	assert.True(t, p.SetBytes(&pBytes))
-}
-
-func TestGenerateKeys(t *testing.T) {
-	s := setupRuskMockTest(t, DefaultConfig())
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateKeysClient(ctx, "localhost:10000")
-
-	resp, err := c.GenerateKeys(ctx, &rusk.GenerateKeysRequest{})
-	assert.NoError(t, err)
-
-	var spendBytes [32]byte
-	var pSpend ristretto.Scalar
-
-	copy(spendBytes[:], resp.Sk.A[:])
-	pSpend.SetBytes(&spendBytes)
-
-	sPSpendBytes, err := s.w.PrivateSpend()
-	assert.NoError(t, err)
-
-	var sPSpend ristretto.Scalar
-
-	assert.NoError(t, sPSpend.UnmarshalBinary(sPSpendBytes))
-	assert.True(t, sPSpend.Equals(&pSpend))
-
-	// Since we don't know the randomness with which the stealth address was
-	// created, we can't really do an equality check. Let's at least make sure
-	// that it is a valid ristretto point.
-	var pBytes [32]byte
-	var p ristretto.Point
-
-	copy(pBytes[:], resp.Pk.AG[:])
-	assert.True(t, p.SetBytes(&pBytes))
-}
-
-// TODO: check values for correctness
-// This is currently quite hard to do, so I will defer it for now.
-// In any case, if the call succeeds, we know we've successfully
-// created a transaction and marshaled it, so checking values
-// would be icing on top of the cake.
-func TestNewTransfer(t *testing.T) {
-	s := setupRuskMockTest(t, DefaultConfig())
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateTransferClient(ctx, "localhost:10000")
-
-	// Send a transfer to ourselves
-	var r ristretto.Scalar
-	r.Rand()
-
-	pk := s.w.PublicKey()
-
-	_, err := c.NewTransfer(ctx, &rusk.TransferTransactionRequest{
-		Value:     100,
-		Recipient: append(pk.PubSpend.Bytes(), pk.PubView.Bytes()...),
-	})
-	assert.NoError(t, err)
-}
-
 func TestNewStake(t *testing.T) {
 	s := setupRuskMockTest(t, DefaultConfig())
 	defer cleanup(s)
@@ -252,9 +167,11 @@ func TestNewStake(t *testing.T) {
 
 	c, _ := client.CreateStakeClient(ctx, "localhost:10000")
 
+	pk, _ := crypto.RandEntropy(96)
+
 	resp, err := c.NewStake(ctx, &rusk.StakeTransactionRequest{
 		Value:        100,
-		PublicKeyBls: s.w.ConsensusKeys().BLSPubKeyBytes,
+		PublicKeyBls: pk,
 	})
 	assert.NoError(t, err)
 
@@ -278,7 +195,7 @@ func TestNewStake(t *testing.T) {
 	err = encoding.ReadVarBytes(buf, &pkBLS)
 	assert.NoError(t, err)
 
-	assert.Equal(t, s.w.ConsensusKeys().BLSPubKeyBytes, pkBLS)
+	assert.Equal(t, pk, pkBLS[0:96])
 	assert.Equal(t, uint32(4), resp.Type)
 }
 

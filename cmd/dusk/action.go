@@ -47,30 +47,11 @@ func action(ctx *cli.Context) error {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	log.Info("initializing node...")
-
 	// Loading all node configurations. Fail-fast if critical error occurs
 	err := cfg.Load(config, nil, nil)
 	if err != nil {
 		log.WithError(err).Fatal("Could not load config ")
 	}
-
-	log.WithFields(logrus.Fields{
-		"config.timeout.timeoutgetlastcommittee":     cfg.Get().Timeout.TimeoutGetLastCommittee,
-		"config.timeout.timeoutgetlastcertificate":   cfg.Get().Timeout.TimeoutGetLastCertificate,
-		"config.timeout.timeoutgetmempooltxsbysize":  cfg.Get().Timeout.TimeoutGetMempoolTXsBySize,
-		"config.timeout.timeoutgetlastblock":         cfg.Get().Timeout.TimeoutGetLastBlock,
-		"config.timeout.timeoutgetcandidate":         cfg.Get().Timeout.TimeoutGetCandidate,
-		"config.timeout.timeoutclearwalletdatabase":  cfg.Get().Timeout.TimeoutClearWalletDatabase,
-		"config.timeout.timeoutverifycandidateblock": cfg.Get().Timeout.TimeoutVerifyCandidateBlock,
-		"config.timeout.timeoutsendstaketx":          cfg.Get().Timeout.TimeoutSendStakeTX,
-		"config.timeout.timeoutgetmempooltxs":        cfg.Get().Timeout.TimeoutGetMempoolTXs,
-		"config.timeout.timeoutgetroundresults":      cfg.Get().Timeout.TimeoutGetRoundResults,
-		"config.timeout.timeoutbrokergetcandidate":   cfg.Get().Timeout.TimeoutBrokerGetCandidate,
-		"config.timeout.timeoutreadwrite":            cfg.Get().Timeout.TimeoutReadWrite,
-		"config.timeout.timeoutkeepalivetime":        cfg.Get().Timeout.TimeoutKeepAliveTime,
-	}).
-		Info("Timeout config...")
 
 	port := cfg.Get().Network.Port
 
@@ -101,16 +82,14 @@ func action(ctx *cli.Context) error {
 
 	logging.InitLog(logFile)
 
-	log.Info("Loaded config file", "UsedConfigFile", cfg.Get().UsedConfigFile)
-	log.Info("Selected network", "Network", cfg.Get().General.Network)
+	log.WithField("file", cfg.Get().UsedConfigFile).Info("Loaded config file")
+	log.WithField("network", cfg.Get().General.Network).Info("Selected network")
 
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup()
-	defer srv.Close()
 
 	// Setting up profiling tools, if enabled
 	s := setupProfiles(srv.rpcBus)
-	defer s.Close()
 
 	log.Info("initialization complete")
 
@@ -119,10 +98,15 @@ func action(ctx *cli.Context) error {
 	// server.
 	<-interrupt
 
+	s.Close()
+	srv.Close()
+
 	// Graceful shutdown of listening components
 	msg := message.New(topics.Quit, bytes.Buffer{})
 	errList := srv.eventBus.Publish(topics.Quit, msg)
 	diagnostics.LogPublishErrors("dusk/action.go, topics.Quit", errList)
+
+	time.Sleep(3 * time.Second)
 
 	log.WithField("prefix", "main").Info("Terminated")
 

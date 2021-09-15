@@ -10,6 +10,11 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/sirupsen/logrus"
+)
+
+const (
+	maxMessages = 4096
 )
 
 // Queue is a Queue of Events grouped by rounds and steps. It is thread-safe
@@ -18,6 +23,7 @@ import (
 type Queue struct {
 	lock    sync.RWMutex
 	entries map[uint64]map[uint8][]message.Message
+	items   int
 }
 
 // NewQueue creates a new Queue. It is primarily used by Collectors to
@@ -36,7 +42,9 @@ func (eq *Queue) GetEvents(round uint64, step uint8) []message.Message {
 
 	if eq.entries[round][step] != nil {
 		messages := eq.entries[round][step]
+
 		eq.entries[round][step] = nil
+		eq.items -= len(messages)
 		return messages
 	}
 
@@ -47,6 +55,15 @@ func (eq *Queue) GetEvents(round uint64, step uint8) []message.Message {
 func (eq *Queue) PutEvent(round uint64, step uint8, m message.Message) {
 	eq.lock.Lock()
 	defer eq.lock.Unlock()
+
+	if eq.items >= maxMessages {
+		logrus.WithField("process", "consensus").
+			WithField("round", round).
+			WithField("step", step).
+			WithField("topic", m.Category()).
+			Warnln("dropping message, queue has reached max capacity")
+		return
+	}
 
 	// Initialize the map on this round if it was not yet created
 	if eq.entries[round] == nil {
@@ -59,6 +76,7 @@ func (eq *Queue) PutEvent(round uint64, step uint8, m message.Message) {
 	}
 
 	eq.entries[round][step] = append(eq.entries[round][step], m)
+	eq.items++
 }
 
 // Clear the queue. This method swaps the internal `entries` map, to avoid
@@ -68,6 +86,7 @@ func (eq *Queue) Clear(round uint64) {
 	defer eq.lock.Unlock()
 
 	newEntries := make(map[uint64]map[uint8][]message.Message)
+	eq.items = 0
 
 	for r := range eq.entries {
 		if r > round {
@@ -75,6 +94,7 @@ func (eq *Queue) Clear(round uint64) {
 
 			for s, m := range eq.entries[r] {
 				newEntries[r][s] = m
+				eq.items += len(m)
 
 				delete(eq.entries[r], s)
 			}
@@ -98,6 +118,7 @@ func (eq *Queue) Flush(round uint64) []message.Message {
 			eq.entries[round][step] = nil
 		}
 
+		eq.items -= len(events)
 		return events
 	}
 

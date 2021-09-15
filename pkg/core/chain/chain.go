@@ -9,7 +9,6 @@ package chain
 import (
 	"bytes"
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -23,6 +22,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
@@ -62,15 +62,6 @@ type Loader interface {
 	Append(*block.Block) error
 }
 
-// Ledger is the Chain interface used in tests.
-type Ledger interface {
-	TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error
-	TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error
-	ProduceBlock() error
-	StopBlockProduction()
-	ProcessSyncTimerExpired(strPeerAddr string) error
-}
-
 // Chain represents the nodes blockchain.
 // This struct will be aware of the current state of the node.
 type Chain struct {
@@ -93,6 +84,7 @@ type Chain struct {
 	// Consensus loop.
 	loop              *loop.Consensus
 	stopConsensusChan chan struct{}
+	loopID            uint64
 
 	// Syncing related things.
 	*synchronizer
@@ -142,20 +134,6 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, loade
 	return chain, nil
 }
 
-// StopBlockProduction will send a non-blocking signal to `stopConsensusChan` to
-// kill the consensus goroutine.
-func (c *Chain) StopBlockProduction() {
-	select {
-	case c.stopConsensusChan <- struct{}{}:
-	// If there is nobody listening on the other end, it could very well be that
-	// `acceptConsensusResults` is attempting to take control of the mutex.
-	// In this instance, we can forego the channel send here, as the release of
-	// the mutex will result in a bump to the tip height, making the consensus
-	// results obsolete, and ending the lifetime of that goroutine.
-	default:
-	}
-}
-
 // ProcessBlockFromNetwork will handle blocks incoming from the network.
 // It will allow the chain to enter sync mode if it detects that we are behind,
 // which will cancel the running consensus loop and attempt to reach the new
@@ -178,7 +156,8 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 
 	// Is it worth looking at this?
 	if blk.Header.Height <= c.tip.Header.Height {
-		log.Debug("discarded block from the past")
+		log.WithField("curr_h", c.tip.Header.Height).WithField("blk_height", blk.Header.Height).
+			Debug("discarded block from the past")
 		return nil, nil
 	}
 
@@ -189,114 +168,59 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kadcastHeight)
 }
 
-// ProduceBlock will start the consensus loop. It can be halted at any point by
-// sending a signal through the `stopConsensus` channel (`StopBlockProduction`
-// as exposed by the `Ledger` interface).
-func (c *Chain) ProduceBlock() error {
-	ctx, cancel := context.WithCancel(c.ctx)
-
-	// Start consensus outside of the goroutine first, so that we can ensure
-	// it is fully started up while the mutex is still held.
-	winnerChan := make(chan consensus.Results, 1)
-	if err := c.produceBlock(ctx, winnerChan); err != nil {
-		cancel()
-		return err
-	}
-
-	go func(ctx context.Context, cancel context.CancelFunc, winnerChan chan consensus.Results) {
-		defer cancel()
-		c.acceptConsensusResults(ctx, winnerChan)
-	}(ctx, cancel, winnerChan)
-
-	return nil
-}
-
-func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan consensus.Results) {
-	for {
-		select {
-		case candidate := <-winnerChan:
-			block, err := candidate.Blk, candidate.Err
-			if err != nil {
-				// Most likely a context cancellation, but could also be a reaching
-				// of maximum steps.
-				log.WithError(err).Error("consensus exited with error")
-				return
-			}
-
-			c.lock.Lock()
-
-			if block.IsEmpty() || block.Header.Height != c.tip.Header.Height+1 {
-				log.WithField("height", block.Header.Height).Debugln("discarding consensus result")
-				c.lock.Unlock()
-				return
-			}
-
-			if err = c.AcceptSuccessiveBlock(block, config.KadcastInitialHeight); err != nil {
-				log.WithError(err).Error("block acceptance failed")
-				c.lock.Unlock()
-				return
-			}
-
-			if err := c.produceBlock(ctx, winnerChan); err != nil {
-				log.WithError(err).Error("starting consensus failed")
-				c.lock.Unlock()
-				return
-			}
-
-			c.lock.Unlock()
-		case <-c.stopConsensusChan:
-			return
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (c *Chain) produceBlock(ctx context.Context, winnerChan chan consensus.Results) error {
-	ru := c.getRoundUpdate()
-
-	if c.loop != nil {
-		scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock)
-		if err != nil {
-			log.WithError(err).Error("could not create consensus state machine")
-			return err
-		}
-
-		go func() {
-			winnerChan <- c.loop.Spin(ctx, scr, agr, ru)
-		}()
-
-		return nil
-	}
-
-	return errors.New("no consensus loop present")
-}
-
 // TryNextConsecutiveBlockOutSync is the processing path for accepting a block
 // from the network during out-of-sync state.
 func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting sync block")
-	return c.AcceptBlock(blk)
+	return c.acceptBlock(blk)
 }
 
 // TryNextConsecutiveBlockInSync is the processing path for accepting a block
-// from the network during in-sync state.
+// from the network during in-sync state. Returns err if the block is not valid.
 func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error {
-	c.StopBlockProduction()
-
-	if err := c.AcceptSuccessiveBlock(blk, kadcastHeight); err != nil {
+	// Make an attempt to accept a new block. If succeeds, we could safely restart the Consensus Loop.
+	// If not, peer reputation score should be decreased.
+	if err := c.acceptSuccessiveBlock(blk, kadcastHeight); err != nil {
 		return err
 	}
 
-	return c.ProduceBlock()
+	c.StopConsensus()
+
+	// Consensus needs a fresh restart so that it is initialized with most
+	// recent round update which is Chain tip and the list of active Provisioners.
+	if err := c.StartConsensus(); err != nil {
+		log.WithError(err).Error("failed to start consensus loop")
+	}
+
+	return nil
 }
 
-// AcceptSuccessiveBlock will accept a block which directly follows the chain
+// ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
+// It implements transition back to inSync state.
+// strPeerAddr is the address of the peer initiated the syncing but failed to deliver.
+func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
+	log.WithField("curr", c.tip.Header.Height).
+		WithField("src_addr", strPeerAddr).Warn("sync timer expired")
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if err := c.StartConsensus(); err != nil {
+		log.WithError(err).Warn("sync timer could not restart consensus loop")
+	}
+
+	log.WithField("state", "inSync").Traceln("change sync state")
+
+	c.state = c.inSync
+	return nil
+}
+
+// acceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
-func (c *Chain) AcceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
+func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
 
-	if err := c.AcceptBlock(blk); err != nil {
+	if err := c.acceptBlock(blk); err != nil {
 		return err
 	}
 
@@ -312,13 +236,19 @@ func (c *Chain) AcceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 	return nil
 }
 
-// AcceptBlock will accept a block if
+// acceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved.
-func (c *Chain) AcceptBlock(blk block.Block) error {
-	field := logger.Fields{"process": "accept block", "height": blk.Header.Height}
-	l := log.WithFields(field)
+func (c *Chain) acceptBlock(blk block.Block) error {
+	fields := logger.Fields{
+		"event":  "accept_block",
+		"height": blk.Header.Height,
+		"hash":   util.StringifyBytes(blk.Header.Hash),
+		"curr_h": c.tip.Header.Height,
+	}
+
+	l := log.WithFields(fields)
 
 	l.Trace("verifying block")
 	// 1. Check that stateless and stateful checks pass
@@ -333,15 +263,17 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// for the same round is negligible.
 	l.Trace("verifying block certificate")
 
+	prov_num := c.p.Set.Len()
+
 	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
-		l.WithError(err).Error("certificate verification failed")
+		l.WithError(err).WithField("provisioners", prov_num).
+			Error("certificate verification failed")
 		return err
 	}
 
 	// 3. Call ExecuteStateTransitionFunction
-	prov_num := c.p.Set.Len()
 
-	l.WithField("provisioners", prov_num).Info("calling ExecuteStateTransitionFunction")
+	l.WithField("provisioners", prov_num).Info("run state transition")
 
 	// TODO: the context here should maybe used to set a timeout
 	provisioners, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
@@ -356,14 +288,14 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	l.WithField("provisioners", c.p.Set.Len()).
 		WithField("added", c.p.Set.Len()-prov_num).
-		Info("after ExecuteStateTransitionFunction")
+		Info("state transition completed")
 
 	if config.Get().API.Enabled {
 		go c.storeStakesInStormDB(blk.Header.Height)
 	}
 
 	// 4. Store the approved block
-	l.Trace("storing block in db")
+	l.Debug("storing block")
 
 	if err := c.loader.Append(&blk); err != nil {
 		l.WithError(err).Error("block storing failed")
@@ -530,24 +462,4 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 	if err != nil {
 		log.Warn("Could not store provisioners on memoryDB")
 	}
-}
-
-// ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
-// It implements transition back to inSync state.
-// strPeerAddr is the address of the peer initiated the syncing but failed to deliver.
-func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
-	log.WithField("curr", c.tip.Header.Height).
-		WithField("src_addr", strPeerAddr).Warn("sync timer expired")
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if err := c.ProduceBlock(); err != nil {
-		log.WithError(err).Warn("sync timer could not restart consensus loop")
-	}
-
-	log.WithField("state", "inSync").Traceln("change sync state")
-
-	c.state = c.inSync
-	return nil
 }

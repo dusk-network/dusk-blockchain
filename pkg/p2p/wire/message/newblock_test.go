@@ -26,13 +26,13 @@ func TestUnMarshal(t *testing.T) {
 
 	// mock candidate
 	genesis := config.DecodeGenesis()
-	se := message.MockScore(hdr, *genesis)
+	se := message.MockNewBlock(hdr, *genesis)
 
 	buf := new(bytes.Buffer)
-	assert.NoError(t, message.MarshalScore(buf, se))
+	assert.NoError(t, message.MarshalNewBlock(buf, se))
 
-	other := &message.Score{}
-	assert.NoError(t, message.UnmarshalScore(buf, other))
+	other := &message.NewBlock{}
+	assert.NoError(t, message.UnmarshalNewBlock(buf, other))
 	assert.True(t, se.Equal(*other))
 }
 
@@ -43,14 +43,14 @@ func TestDeepCopy(t *testing.T) {
 
 	// mock candidate
 	genesis := config.DecodeGenesis()
-	se := message.MockScore(hdr, *genesis)
+	se := message.MockNewBlock(hdr, *genesis)
 
 	buf := new(bytes.Buffer)
-	assert.NoError(t, message.MarshalScore(buf, se))
+	assert.NoError(t, message.MarshalNewBlock(buf, se))
 
-	deepCopy := se.Copy().(message.Score)
+	deepCopy := se.Copy().(message.NewBlock)
 	buf2 := new(bytes.Buffer)
-	assert.NoError(t, message.MarshalScore(buf2, deepCopy))
+	assert.NoError(t, message.MarshalNewBlock(buf2, deepCopy))
 
 	assert.Equal(t, buf.Bytes(), buf2.Bytes())
 }

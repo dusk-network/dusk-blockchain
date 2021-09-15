@@ -11,13 +11,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-crypto/bls"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -27,7 +27,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "candidate generator")
+var lg = log.WithField("process", "consensus").WithField("actor", "candidate_generator")
 
 // MaxTxSetSize defines the maximum amount of transactions.
 // It is TBD along with block size and processing.MaxFrameSize.
@@ -36,7 +36,7 @@ const MaxTxSetSize = 825000
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator interface {
-	GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.Score, error)
+	GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.NewBlock, error)
 }
 
 type generator struct {
@@ -64,7 +64,7 @@ func (bg *generator) regenerateCommittee(r consensus.RoundUpdate) [][]byte {
 // PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`.
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
-func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.Score, error) {
+func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.NewBlock, error) {
 	log := lg.
 		WithField("round", r.Round).
 		WithField("step", step)
@@ -85,7 +85,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 	}
 
 	hdr := header.Header{
-		PubKeyBLS: bg.Keys.BLSPubKeyBytes,
+		PubKeyBLS: bg.Keys.BLSPubKey,
 		Round:     r.Round,
 		Step:      step,
 		BlockHash: blk.Header.Hash,
@@ -94,7 +94,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 	// Since the Candidate message goes straight to the Chain, there is
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
-	scr := message.NewScore(hdr, r.Hash, *blk)
+	scr := message.NewNewBlock(hdr, r.Hash, *blk)
 
 	sig, err := bg.Sign(hdr)
 	if err != nil {
@@ -187,11 +187,5 @@ func (bg *generator) ConstructBlockTxs(keys [][]byte) ([]transactions.ContractCa
 }
 
 func (bg *generator) sign(seed []byte) ([]byte, error) {
-	signedSeed, err := bls.Sign(bg.Keys.BLSSecretKey, bg.Keys.BLSPubKey, seed)
-	if err != nil {
-		return nil, err
-	}
-
-	compSeed := signedSeed.Compress()
-	return compSeed, nil
+	return bls.Sign(bg.Keys.BLSSecretKey, bg.Keys.BLSPubKey, seed)
 }

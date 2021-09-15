@@ -15,6 +15,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -23,7 +24,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
-	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 type (
@@ -34,7 +34,7 @@ type (
 	// the committee for both Reduction steps.
 	StepVotes struct {
 		BitSet    uint64
-		Signature *bls.Signature
+		Signature []byte
 	}
 
 	// StepVotesMsg is the internal message exchanged by the consensus
@@ -58,9 +58,13 @@ type (
 
 // Copy deeply the StepVotes.
 func (s *StepVotes) Copy() *StepVotes {
+	sig := make([]byte, len(s.Signature))
+
+	copy(sig, s.Signature)
+
 	return &StepVotes{
 		BitSet:    s.BitSet,
-		Signature: s.Signature.Copy(),
+		Signature: sig,
 	}
 }
 
@@ -209,8 +213,8 @@ func (a Agreement) Equal(aev Agreement) bool {
 // GenerateCertificate is used by the Chain component.
 func (a Agreement) GenerateCertificate() *block.Certificate {
 	return &block.Certificate{
-		StepOneBatchedSig: a.VotesPerStep[0].Signature.Compress(),
-		StepTwoBatchedSig: a.VotesPerStep[1].Signature.Compress(),
+		StepOneBatchedSig: a.VotesPerStep[0].Signature,
+		StepTwoBatchedSig: a.VotesPerStep[1].Signature,
 		Step:              a.State().Step,
 		StepOneCommittee:  a.VotesPerStep[0].BitSet,
 		StepTwoCommittee:  a.VotesPerStep[1].BitSet,
@@ -242,23 +246,19 @@ func NewStepVotes() *StepVotes {
 
 // Equal checks if two StepVotes structs are the same.
 func (s *StepVotes) Equal(other *StepVotes) bool {
-	return bytes.Equal(s.Signature.Marshal(), other.Signature.Marshal())
+	return bytes.Equal(s.Signature, other.Signature)
 }
 
 // Add a vote to the StepVotes struct.
 func (s *StepVotes) Add(signature []byte) error {
 	if s.Signature == nil {
-		var err error
-
-		s.Signature, err = bls.UnmarshalSignature(signature)
-		return err
+		s.Signature = signature
+		return nil
 	}
 
-	if err := s.Signature.AggregateBytes(signature); err != nil {
-		return err
-	}
-
-	return nil
+	var err error
+	s.Signature, err = bls.AggregateSig(s.Signature, signature)
+	return err
 }
 
 // MarshalAgreement marshals an Agreement event into a buffer.
@@ -268,7 +268,7 @@ func MarshalAgreement(r *bytes.Buffer, a Agreement) error {
 	}
 
 	// Marshal BLS Signature of VoteSet
-	if err := encoding.WriteBLS(r, a.SignedVotes()); err != nil {
+	if err := encoding.WriteVarBytes(r, a.SignedVotes()); err != nil {
 		return err
 	}
 
@@ -285,8 +285,8 @@ func MarshalAgreement(r *bytes.Buffer, a Agreement) error {
 // * Header [BLS Public Key; Round; Step]
 // * Agreement [Signed Vote Set; Vote Set; BlockHash].
 func UnmarshalAgreement(r *bytes.Buffer, a *Agreement) error {
-	signedVotes := make([]byte, 33)
-	if err := encoding.ReadBLS(r, signedVotes); err != nil {
+	signedVotes := make([]byte, 0)
+	if err := encoding.ReadVarBytes(r, &signedVotes); err != nil {
 		return err
 	}
 
@@ -334,7 +334,7 @@ func SignAgreement(a *Agreement, keys key.Keys) error {
 		return err
 	}
 
-	a.SetSignature(signedVoteSet.Compress())
+	a.SetSignature(signedVoteSet)
 	return nil
 }
 
@@ -375,18 +375,13 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 	}
 
 	// Signature
-	signature := make([]byte, 33)
-	if err = encoding.ReadBLS(r, signature); err != nil {
+	signature := make([]byte, 0)
+	if err = encoding.ReadVarBytes(r, &signature); err != nil {
 		log.WithError(err).Errorln("failed to unmarshal signature")
 		return nil, err
 	}
 
-	sv.Signature, err = bls.UnmarshalSignature(signature)
-	if err != nil {
-		log.WithError(err).Errorln("failed to decode signature")
-		return nil, err
-	}
-
+	sv.Signature = signature
 	return sv, nil
 }
 
@@ -423,7 +418,7 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	}
 
 	// Signature
-	if err := encoding.WriteBLS(r, vote.Signature.Compress()); err != nil {
+	if err := encoding.WriteVarBytes(r, vote.Signature); err != nil {
 		return err
 	}
 
@@ -447,7 +442,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *us
 		panic("wrong iterative index: cannot iterate more than there are keys")
 	}
 
-	hdr := header.Header{Round: round, Step: step, BlockHash: hash, PubKeyBLS: cKeys[idx].BLSPubKeyBytes}
+	hdr := header.Header{Round: round, Step: step, BlockHash: hash, PubKeyBLS: cKeys[idx].BLSPubKey}
 	a := NewAgreement(hdr)
 
 	// generating reduction events (votes) and signing them
@@ -459,10 +454,13 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *us
 		panic(err)
 	}
 
-	sig, _ := bls.Sign(cKeys[idx].BLSSecretKey, cKeys[idx].BLSPubKey, whole.Bytes())
+	sig, err := bls.Sign(cKeys[idx].BLSSecretKey, cKeys[idx].BLSPubKey, whole.Bytes())
+	if err != nil {
+		panic(err)
+	}
 
 	a.VotesPerStep = steps
-	a.SetSignature(sig.Compress())
+	a.SetSignature(sig)
 	return *a
 }
 
@@ -510,7 +508,7 @@ func createCommitteeKeySet(c user.VotingCommittee, k []key.Keys) (keys []key.Key
 
 	for _, cKey := range committeeKeys {
 		for _, key := range k {
-			if bytes.Equal(cKey, key.BLSPubKeyBytes) {
+			if bytes.Equal(cKey, key.BLSPubKey) {
 				keys = append(keys, key)
 				break
 			}
@@ -526,13 +524,13 @@ func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Key
 
 	for _, k := range keys {
 		// We should not aggregate any given key more than once.
-		_, inserted := set.IndexOf(k.BLSPubKeyBytes)
+		_, inserted := set.IndexOf(k.BLSPubKey)
 		if !inserted {
 			h := header.Header{
 				BlockHash: hash,
 				Round:     round,
 				Step:      step,
-				PubKeyBLS: k.BLSPubKeyBytes,
+				PubKeyBLS: k.BLSPubKey,
 			}
 
 			r := new(bytes.Buffer)
@@ -542,13 +540,13 @@ func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Key
 			}
 
 			sigma, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, r.Bytes())
-			if err := stepVotes.Add(sigma.Compress()); err != nil {
+			if err := stepVotes.Add(sigma); err != nil {
 				// FIXME: shall this panic ?
 				panic(err)
 			}
 		}
 
-		set.Insert(k.BLSPubKeyBytes)
+		set.Insert(k.BLSPubKey)
 	}
 
 	return stepVotes, set

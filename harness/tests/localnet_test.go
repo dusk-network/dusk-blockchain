@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/harness/engine"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -223,30 +224,21 @@ func TestCatchup(t *testing.T) {
 	localNet.WaitUntil(t, uint(ind), 5, 2*time.Minute, 5*time.Second)
 }
 
-// TestMultipleBiddersProvisioners should be helpful on long-run testing. It
-// should ensure that in a network of multiple Bidders and Provisioners
-// consensus is stable and consistent.
-func TestMultipleBiddersProvisioners(t *testing.T) {
+// TestMultipleProvisioners should be helpful on long-run testing. It should
+// ensure that in a network of multiple Provisioners with equal stake, consensus
+// is stable and consistent.
+func TestMultipleProvisioners(t *testing.T) {
 	if !*engine.KeepAlive {
 		// Runnable in keepalive mode only
 		t.SkipNow()
 	}
 
 	localNet.PrintWalletsInfo(t)
-	logrus.Infof("TestMultipleBiddersProvisioners with staking")
+	logrus.Infof("TestMultipleProvisioners with staking")
 
 	defaultLocktime := uint64(100000)
 
-	// Send a bunch of Bid transactions
-	// All nodes are Block Generators
-	for i := uint(0); i < uint(localNet.Size()); i++ {
-		time.Sleep(100 * time.Millisecond)
-		t.Logf("Node %d sending a Bid transaction", i)
-
-		if _, err := localNet.SendBidCmd(i, 100, defaultLocktime); err != nil {
-			t.Log(err.Error())
-		}
-	}
+	amount := wallet.DUSK * 10000
 
 	// Send a bunch of Stake transactions
 	// All nodes are Provisioners
@@ -254,7 +246,7 @@ func TestMultipleBiddersProvisioners(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		t.Logf("Node %d sending a Stake transaction", i)
 
-		if _, err := localNet.SendStakeCmd(i, 100, defaultLocktime); err != nil {
+		if _, err := localNet.SendStakeCmd(i, amount, defaultLocktime); err != nil {
 			t.Log(err.Error())
 		}
 	}
@@ -296,6 +288,7 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	*/
 
 	defaultLocktime := uint64(100000)
+	amount := wallet.DUSK * 10000
 
 	// Send a bunch of Stake transactions
 	// All nodes are Provisioners
@@ -303,7 +296,7 @@ func TestMeasureNetworkTPS(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		logrus.Infof("Node %d sending a Stake transaction", i)
 
-		if _, err := localNet.SendStakeCmd(i, 100, defaultLocktime); err != nil {
+		if _, err := localNet.SendStakeCmd(i, amount, defaultLocktime); err != nil {
 			logrus.Error(err.Error())
 		}
 	}

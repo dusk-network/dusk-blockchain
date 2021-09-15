@@ -29,6 +29,8 @@ import (
 func TestConsensus(t *testing.T) {
 	assert := assert.New(t)
 
+	// logrus.SetLevel(logrus.DebugLevel)
+
 	// Retrieve the amount of nodes to use for this test case.
 	numNodes := getNumNodes(assert)
 
@@ -71,7 +73,7 @@ func TestConsensus(t *testing.T) {
 	// Start the consensus loop on all nodes
 	for _, n := range nodes {
 		go func(n *node) {
-			if err := n.chain.ProduceBlock(); err != nil && err != context.Canceled {
+			if err := n.chain.StartConsensus(); err != nil && err != context.Canceled {
 				panic(err)
 			}
 		}(n)

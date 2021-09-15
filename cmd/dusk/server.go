@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -19,6 +20,7 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
@@ -44,6 +46,8 @@ import (
 )
 
 var testnet = byte(2)
+
+const voucherRetryTime = 15 * time.Second
 
 // Server is the main process of the node.
 type Server struct {
@@ -244,13 +248,7 @@ func Setup() *Server {
 		connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag), peer.Create)
 
 		seeders := cfg.Get().Network.Seeder.Addresses
-		for _, seeder := range seeders {
-			if err = connector.Connect(seeder); err != nil {
-				log.WithError(err).Error("could not contact voucher seeder")
-			}
-		}
-
-		if connector.GetConnectionsCount() == 0 {
+		if err = connectToSeeders(connector, seeders); err != nil {
 			panic("could not contact any voucher seeders")
 		}
 	}
@@ -294,8 +292,8 @@ func Setup() *Server {
 		}
 	}()
 
-	if err := c.ProduceBlock(); err != nil {
-		log.WithError(err).Warn("ProduceBlock returned err")
+	if err := c.StartConsensus(); err != nil {
+		log.WithError(err).Warn("StartConsensus returned err")
 		// If we can not start consensus, we shouldn't be able to start at all.
 		panic(err)
 	}
@@ -316,6 +314,34 @@ func (s *Server) Close() {
 	}
 }
 
+func connectToSeeders(connector *peer.Connector, seeders []string) error {
+	i := 0
+	var connected bool
+
+	for {
+		for _, seeder := range seeders {
+			if err := connector.Connect(seeder); err != nil {
+				log.WithError(err).Error("could not contact voucher seeder")
+			} else {
+				connected = true
+			}
+		}
+
+		if connected {
+			break
+		}
+
+		i++
+		if i >= 3 {
+			return errors.New("could not connect to any voucher seeders")
+		}
+
+		time.Sleep(voucherRetryTime * time.Duration(i))
+	}
+
+	return nil
+}
+
 func registerPeerServices(processor *peer.MessageProcessor, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) {
 	processor.Register(topics.Ping, responding.ProcessPing)
 	dataBroker := responding.NewDataBroker(db, rpcBus)
@@ -331,7 +357,7 @@ func registerPeerServices(processor *peer.MessageProcessor, db database.DB, even
 	processor.Register(topics.Inv, dataRequestor.RequestMissingItems)
 	processor.Register(topics.GetBlocks, bhb.AdvertiseMissingBlocks)
 	processor.Register(topics.GetCandidate, cb.ProvideCandidate)
-	processor.Register(topics.Score, cp.Process)
+	processor.Register(topics.NewBlock, cp.Process)
 	processor.Register(topics.Reduction, cp.Process)
 	processor.Register(topics.Agreement, cp.Process)
 	processor.Register(topics.Challenge, responding.CompleteChallenge)
@@ -396,6 +422,11 @@ func createWallet(seed []byte, password string, keyMaster transactions.KeyMaster
 		PublicKey: pk,
 		ViewKey:   vk,
 	}
+
+	consensusKeys := consensuskey.NewRandKeys()
+
+	keysJSON.SecretKeyBLS = consensusKeys.BLSSecretKey
+	keysJSON.PublicKeyBLS = consensusKeys.BLSPubKey
 
 	// Then create the wallet with seed and password
 	w, err := wallet.LoadFromSeed(testnet, db, password, cfg.Get().Wallet.File, keysJSON)

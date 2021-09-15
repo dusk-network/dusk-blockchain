@@ -9,6 +9,7 @@
 package server
 
 import (
+	"os"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -18,7 +19,7 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-var log = logrus.WithField("process", "grpc-server")
+var log = logrus.WithField("process", "grpc_s")
 
 // Setup is a configuration struct to setup the GRPC with.
 type Setup struct {
@@ -55,6 +56,11 @@ func SetupGRPC(conf Setup) (*grpc.Server, error) {
 		return nil, err
 	}
 
+	if conf.Network == "unix" {
+		// Remove obsolete unix socket file
+		_ = os.Remove(conf.Address)
+	}
+
 	// Add default interceptors to provide jwt-based session authentication and error logging
 	// for both unary and stream RPC calls
 	serverOpt := make([]grpc.ServerOption, 0)
@@ -65,7 +71,7 @@ func SetupGRPC(conf Setup) (*grpc.Server, error) {
 		serverOpt = append(serverOpt, opt)
 	}
 
-	log.WithField("tls", tlsVer).Infof("gRPC HTTP server TLS configured")
+	log.WithField("tls", tlsVer).Info("HTTP server TLS configured")
 
 	grpc.EnableTracing = false
 
@@ -91,7 +97,7 @@ func loadTLSFiles(enable bool, certFile, keyFile, network string) (grpc.ServerOp
 	if !enable {
 		if network != "unix" {
 			// Running gRPC over tcp would require TLS
-			log.Warn("Running over insecure HTTP")
+			log.Warn("running over insecure HTTP")
 		}
 
 		return nil, tlsVersion

@@ -15,12 +15,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
-	"github.com/dusk-network/dusk-crypto/bls"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -215,7 +215,7 @@ func MarshalSignableVote(r *bytes.Buffer, h Header) error {
 
 // VerifySignatures verifies the BLS aggregated signature carried by consensus related messages.
 // The signed message needs to carry information about the round, the step and the blockhash.
-func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, sig *bls.Signature) error {
+func VerifySignatures(round uint64, step uint8, blockHash, apk, sig []byte) error {
 	signed := new(bytes.Buffer)
 	vote := Header{
 		Round:     round,
@@ -227,14 +227,14 @@ func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, 
 		return err
 	}
 
-	return bls.Verify(apk, signed.Bytes(), sig)
+	return bls.Verify(apk, sig, signed.Bytes())
 }
 
 // Mock a Header.
 func Mock() Header {
 	hash, _ := crypto.RandEntropy(32)
-	k, _ := key.NewRandKeys()
-	pubkey := k.BLSPubKeyBytes
+	k := key.NewRandKeys()
+	pubkey := k.BLSPubKey
 	buf := make([]byte, 8)
 	_, _ = rand.Read(buf)
 	round := binary.LittleEndian.Uint64(buf)

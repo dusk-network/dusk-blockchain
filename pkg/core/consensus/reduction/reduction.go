@@ -71,7 +71,7 @@ func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
 		Round:     round,
 		Step:      step,
 		BlockHash: hash,
-		PubKeyBLS: r.Keys.BLSPubKeyBytes,
+		PubKeyBLS: r.Keys.BLSPubKey,
 	}
 
 	sig, err := r.Sign(hdr)
@@ -108,7 +108,10 @@ func ShouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 		return false
 	}
 
-	if cmp == header.After {
+	// Only store events up to 10 rounds into the future
+	// XXX: According to protocol specs, we should abandon consensus
+	// if we notice valid messages from far into the future.
+	if cmp == header.After && hdr.Round-round < 10 {
 		lg.
 			WithFields(log.Fields{
 				"topic":          m.Category(),
