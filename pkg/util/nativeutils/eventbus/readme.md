@@ -23,67 +23,65 @@ then you can approach porting of the individual units, much smaller and more
 defined, much more easily into Rust, or for that matter, in the future, any
 compliant implementation of `eventbus` socket/pipes for any language whatsoever.
 
-## Interfaces
-
-### Listener
-
-- `Notify(message.Message) error`
-- `Close()`
+## Specification
 
 ### Broker
 
-#### Subscriber
+A broker processes subscriptions and relays messages to `Listener`s
 
-- `Subscribe(topic topics.Topic, listener Listener) uint32`
-  
-  Adds the listener to the list of brokers to be sent messages with a given
-  topic
+- #### Interface
 
-  When messages arrive, the `Notify` method of the
-  `Listener` is called with the message.
+    - #### Subscriber
 
-- `Unsubscribe(topic topics.Topic, id uint32)`
+        - `Subscribe(topic topics.Topic, listener Listener) uint32`
 
-  Removes listener with given id from being delivered messages with topic.
+          Adds the listener to the list of brokers to be sent messages with a
+          given topic
 
-#### Publisher
+          When messages arrive, the `Notify` method of the
+          `Listener` is called with the message.
 
-- `Publish(topics.Topic, message.Message) []error`
+        - `Unsubscribe(topic topics.Topic, id uint32)`
 
-   Publishes a message on a given topic.
+          Removes listener with given id from being delivered messages with
+          topic.
 
-## Implementations
+    - #### Publisher
+
+        - `Publish(topics.Topic, message.Message) []error`
+
+          Publishes a message on a given topic.
 
 ### Listener
 
 - #### Interface
 
-  - #### Listener
-
     - `Notify(message.Message) error`
+
+      When a message is published the `Notify` method of a listener is called,
+      relaying the message.
+
     - `Close()`
 
-#### CallbackListener
+      Disconnects the `Listener` to stop receiving messages.
 
-Invokes a processing function upon receiving a message
+#### Implementations
 
-#### StreamListener
+- #### CallbackListener
 
-Loads an atomic (FIFO?) queue with messages to be picked up by worker threads 
+  Invokes a processing function upon receiving a message
 
-#### ChanListener
+- #### StreamListener
 
-Relays the messages to a channel
+  Loads an atomic (FIFO?) queue with messages to be picked up by worker threads
 
-#### multiListener 
+- #### ChanListener
 
-(not exported)
+  Relays the messages to a channel
 
-Combines multiple listeners
+- #### multiListener
 
-todo: maybe this will need to be exported or otherwise forces placing the 
-listener implementation that connects two (such as needed for pipe/socket 
-connections) listeners inside this package.
+  Combines multiple listeners
 
-### Broker
-
+  > todo: maybe this will need to be exported or otherwise forces placing
+  > the listener implementation that connects two (such as needed for pipe/socket connections) listeners inside this package.
