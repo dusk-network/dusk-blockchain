@@ -112,5 +112,4 @@ A broker processes subscriptions and relays messages to `Listener`s
 
 - #### multiListener
 
-  Combines multiple listeners. This is an implementation of the `Multicaster` 
-  interface
+  Combines multiple listeners. This is part of the `Multicaster` interface
