@@ -43,3 +43,4 @@ demo/**.*
 launch/testnet/testnet
 
 devnet
+/pkg/util/ruskmock/ruskmock.db
