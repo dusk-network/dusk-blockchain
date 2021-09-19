@@ -83,6 +83,10 @@ A broker processes subscriptions and relays messages to `Listener`s
   the controller terminates regardless of whether it formally signals this 
   (shutdown signal allows cleanup of network and pipe buffers).
 
+  Because this is entirely connected via interfaces this implementation will 
+  live in [dusk-ipc](https://github.com/dusk-network/dusk-ipc), where future 
+  work will go on this.
+
 ### Listener
 
 #### Interface
