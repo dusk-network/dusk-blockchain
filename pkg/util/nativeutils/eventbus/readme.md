@@ -29,41 +29,47 @@ compliant implementation of `eventbus` socket/pipes for any language whatsoever.
 
 A broker processes subscriptions and relays messages to `Listener`s
 
-- #### Interface
+#### Interfaces
 
-    - #### Subscriber
+- #### Subscriber
 
-        - `Subscribe(topic topics.Topic, listener Listener) uint32`
+    - `Subscribe(topic topics.Topic, listener Listener) uint32`
 
-          Adds the listener to the list of brokers to be sent messages with a
-          given topic
+      Adds the listener to the list of brokers to be sent messages with a
+      given topic
 
-          When messages arrive, the `Notify` method of the
-          `Listener` is called with the message.
+      When messages arrive, the `Notify` method of the
+      `Listener` is called with the message.
 
-        - `Unsubscribe(topic topics.Topic, id uint32)`
+    - `Unsubscribe(topic topics.Topic, id uint32)`
 
-          Removes listener with given id from being delivered messages with
-          topic.
+      Removes listener with given id from being delivered messages with
+      topic.
 
-    - #### Publisher
+- #### Publisher
 
-        - `Publish(topics.Topic, message.Message) []error`
+    - `Publish(topics.Topic, message.Message) []error`
 
-          Publishes a message on a given topic.
+      Publishes a message on a given topic.
+
+#### Implementations
+
+- #### todo:
+
+  add content here
 
 ### Listener
 
-- #### Interface
+#### Interface
 
-    - `Notify(message.Message) error`
+- `Notify(message.Message) error`
 
-      When a message is published the `Notify` method of a listener is called,
-      relaying the message.
+  When a message is published the `Notify` method of a listener is called,
+  relaying the message.
 
-    - `Close()`
+- `Close()`
 
-      Disconnects the `Listener` to stop receiving messages.
+  Disconnects the `Listener` to stop receiving messages.
 
 #### Implementations
 
