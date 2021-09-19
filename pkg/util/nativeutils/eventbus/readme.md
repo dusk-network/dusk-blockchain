@@ -35,16 +35,15 @@ A broker processes subscriptions and relays messages to `Listener`s
 
     - `Subscribe(topic topics.Topic, listener Listener) uint32`
 
-      Adds the listener to the list of brokers to be sent messages with a
-      given topic
+      Adds the listener to the list of brokers to be sent messages with a given
+      topic
 
       When messages arrive, the `Notify` method of the
       `Listener` is called with the message.
 
     - `Unsubscribe(topic topics.Topic, id uint32)`
 
-      Removes listener with given id from being delivered messages with
-      topic.
+      Removes listener with given id from being delivered messages with topic.
 
 - #### Publisher
 
@@ -52,11 +51,37 @@ A broker processes subscriptions and relays messages to `Listener`s
 
       Publishes a message on a given topic.
 
+- #### Multicaster
+
+    - `AddDefaultTopic(topic topics.Topic)`
+
+      Add a topic to the multilistener (note there is no remove, so a new
+      `Multicaster` is required to implement a remove)
+
+    - `SubscribeDefault(listener Listener) (topic uint32)`
+
+      Subscriber adds a Listener to the default multilistener
+
 #### Implementations
 
-- #### todo:
+- #### EventBus
 
-  add content here
+  This implementation of the `Broker` and `Multicaster` interfaces serves to
+  implement the basic in-process message dispatch bus in the `eventbus` package.
+
+- #### IPCBus
+
+  **TODO:**
+
+  This will composit the EventBus type and extend its methods with shadowing to
+  implement a local broker for client processes that mirrors requests to the
+  IPCBus by proxying protocol messages of interest back and forth over the 
+  connection (ReaderWriterCloser interface implementation) which is created 
+  by running a command that attaches via stdin/out and exposes interrupt and 
+  kill methods for use in interrupt processing of the application, including 
+  shutting down if the connection is closed, so the process terminates when 
+  the controller terminates regardless of whether it formally signals this 
+  (shutdown signal allows cleanup of network and pipe buffers).
 
 ### Listener
 
@@ -87,7 +112,5 @@ A broker processes subscriptions and relays messages to `Listener`s
 
 - #### multiListener
 
-  Combines multiple listeners
-
-  > todo: maybe this will need to be exported or otherwise forces placing
-  > the listener implementation that connects two (such as needed for pipe/socket connections) listeners inside this package.
+  Combines multiple listeners. This is an implementation of the `Multicaster` 
+  interface
