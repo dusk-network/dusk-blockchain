@@ -58,7 +58,7 @@ func (bg *generator) regenerateCommittee(r consensus.RoundUpdate) [][]byte {
 		size = agreement.MaxCommitteeSize
 	}
 
-	return r.P.CreateVotingCommittee(r.Round-1, r.LastCertificate.Step, size).MemberKeys()
+	return r.P.CreateVotingCommittee(r.Seed, r.Round-1, r.LastCertificate.Step, size).MemberKeys()
 }
 
 // PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`.

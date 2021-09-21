@@ -32,7 +32,7 @@ func TestVoteVerification(t *testing.T) {
 	p, keys := consensus.MockProvisioners(3)
 	hash, _ := crypto.RandEntropy(32)
 	ev := message.MockAgreement(hash, 1, 3, keys, p)
-	handler := NewHandler(keys[0], *p)
+	handler := NewHandler(keys[0], *p, []byte{0, 0, 0, 0})
 	assert.NoError(t, handler.Verify(ev), "problems in verification logic")
 }
 
@@ -40,7 +40,7 @@ func TestGetVoterKeys(t *testing.T) {
 	p, keys := consensus.MockProvisioners(3)
 	hash, _ := crypto.RandEntropy(32)
 	ev := message.MockAgreement(hash, 1, 3, keys, p)
-	handler := NewHandler(keys[0], *p)
+	handler := NewHandler(keys[0], *p, []byte{0, 0, 0, 0})
 
 	voterKeys, err := handler.getVoterKeys(ev)
 	assert.Nil(t, err)

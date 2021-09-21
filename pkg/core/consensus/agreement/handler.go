@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -43,9 +44,9 @@ type handler struct {
 
 // NewHandler returns an initialized handler.
 //nolint:golint
-func NewHandler(keys key.Keys, p user.Provisioners) *handler {
+func NewHandler(keys key.Keys, p user.Provisioners, seed []byte) *handler {
 	return &handler{
-		Handler: committee.NewHandler(keys, p),
+		Handler: committee.NewHandler(keys, p, seed),
 	}
 }
 
@@ -79,6 +80,20 @@ func (a *handler) Quorum(round uint64) int {
 // Verify checks the signature of the set.
 func (a *handler) Verify(ev message.Agreement) error {
 	hdr := ev.State()
+
+	start := time.Now()
+
+	defer func() {
+		// Measure duration of a complete verification of an agreement message.
+		// Report any duration above 1s.
+		alarmThreshold := int64(1000)
+		elapsed := time.Since(start)
+		ms := elapsed.Milliseconds()
+
+		if ms > alarmThreshold {
+			lg.WithField("duration_ms", ms).Info("verify agreement done")
+		}
+	}()
 
 	if err := verifyWhole(ev); err != nil {
 		return fmt.Errorf("failed to verify Agreement Sender: %w", err)

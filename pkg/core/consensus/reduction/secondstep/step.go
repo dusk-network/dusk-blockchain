@@ -83,7 +83,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 		tlog.Traceln("ending second reduction step")
 	}()
 
-	p.handler = reduction.NewHandler(p.Keys, r.P)
+	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
 		p.SendReduction(r.Round, step, p.firstStepVotesMsg.BlockHash)

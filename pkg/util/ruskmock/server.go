@@ -32,7 +32,7 @@ var log = logrus.WithField("process", "mock rusk server")
 
 const (
 	stateTransitionDelay = 1 * time.Second
-	stakeGracePeriod     = 2
+	stakeGracePeriod     = 10
 )
 
 // Server is a stand-in Rusk server, which can be used during any kind of

@@ -70,6 +70,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 
 	emitter := consensus.MockEmitter(timeOut)
 	emitter.Keys = provisionersKeys[0]
+	seed := []byte{0, 0, 0, 0}
 
 	hlp := &Helper{
 		failOnVerification: false,
@@ -78,7 +79,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 		ProvisionersKeys: provisionersKeys,
 		P:                p,
 		Nr:               provisioners,
-		Handler:          NewHandler(emitter.Keys, *p),
+		Handler:          NewHandler(emitter.Keys, *p, seed),
 		Emitter:          emitter,
 	}
 
@@ -87,7 +88,9 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 
 // Verify StepVotes. The step must be specified otherwise verification would be dependent on the state of the Helper.
 func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, round uint64, step uint8) error {
-	vc := hlp.P.CreateVotingCommittee(round, step, hlp.Nr)
+	seed := []byte{0, 0, 0, 0}
+
+	vc := hlp.P.CreateVotingCommittee(seed, round, step, hlp.Nr)
 	sub := vc.IntersectCluster(sv.BitSet)
 
 	apk, err := agreement.ReconstructApk(sub.Set)

@@ -265,7 +265,7 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 
 	prov_num := c.p.Set.Len()
 
-	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
+	if err := verifiers.CheckBlockCertificate(*c.p, blk, c.tip.Header.Seed); err != nil {
 		l.WithError(err).WithField("provisioners", prov_num).
 			Error("certificate verification failed")
 		return err

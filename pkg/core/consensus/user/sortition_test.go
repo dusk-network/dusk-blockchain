@@ -50,7 +50,8 @@ func TestMemberKeys(t *testing.T) {
 
 	sort.Sort(sks)
 
-	v := p.CreateVotingCommittee(1, 1, 50)
+	seed := []byte{0, 0, 0, 0}
+	v := p.CreateVotingCommittee(seed, 1, 1, 50)
 
 	mk := v.MemberKeys()
 	assert.Equal(t, 50, len(mk))
@@ -68,7 +69,9 @@ func TestSubtractStake(t *testing.T) {
 	// to each provisioner, which means they can only be extracted once per step.
 	// Therefore, we will check that a call to `CreateVotingCommittee` will
 	// extract every single member in the set, with no duplicates.
-	v := p.CreateVotingCommittee(1, 1, 50)
+	seed := []byte{0, 0, 0, 0}
+
+	v := p.CreateVotingCommittee(seed, 1, 1, 50)
 	duplicates := make(map[string]struct{})
 
 	for _, k := range v.Set {
@@ -110,5 +113,7 @@ func TestRemoveStake(t *testing.T) {
 	m.AddStake(user.Stake{500, 1000, 10000})
 
 	// Now, extract a committee for round 1 step 1
-	assert.NotPanics(t, func() { p.CreateVotingCommittee(1, 1, 10) })
+	seed := []byte{0, 0, 0, 0}
+
+	assert.NotPanics(t, func() { p.CreateVotingCommittee(seed, 1, 1, 10) })
 }

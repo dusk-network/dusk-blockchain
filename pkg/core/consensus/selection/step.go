@@ -99,7 +99,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		cancel()
 	}()
 
-	p.handler = NewHandler(p.Keys, r.P)
+	p.handler = NewHandler(p.Keys, r.P, r.Seed)
 
 	isMember := p.handler.AmMember(r.Round, step)
 

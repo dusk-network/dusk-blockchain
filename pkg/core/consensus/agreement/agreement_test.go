@@ -30,7 +30,7 @@ func TestMockValidity(t *testing.T) {
 	nr := 10
 	hlp := agreement.NewHelper(nr)
 	hash, _ := crypto.RandEntropy(32)
-	handler := agreement.NewHandler(hlp.Keys, *hlp.P)
+	handler := agreement.NewHandler(hlp.Keys, *hlp.P, []byte{0, 0, 0, 0})
 
 	evs := hlp.Spawn(hash)
 	for _, ev := range evs {
