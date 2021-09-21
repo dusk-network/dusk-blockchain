@@ -123,30 +123,30 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		evChan <- message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
 	}
 
-	timeoutChan := time.After(p.timeout)
-
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.NewBlock {
 			evChan <- ev
 		}
 	}
 
+	// Тimer should expire before proceeding to the Reduction.
+	// As per spec, we proceed with an EmptyNewBlock if no valid NewBlock arrives on time.
+	timeoutChan := time.After(p.timeout)
+	selectionBlock := message.EmptyNewBlock()
+
 	for {
 		select {
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
-				if err := p.collectNewBlock(ev.Payload().(message.NewBlock), ev.Header()); err != nil {
+				b := ev.Payload().(message.NewBlock)
+				if err := p.collectNewBlock(b, ev.Header()); err != nil {
 					continue
 				}
 
-				// preventing timeout leakage
-				go func() {
-					<-timeoutChan
-				}()
-				return p.endSelection(ev.Payload().(message.NewBlock))
+				selectionBlock = b
 			}
 		case <-timeoutChan:
-			return p.endSelection(message.EmptyNewBlock())
+			return p.endSelection(selectionBlock)
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
