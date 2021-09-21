@@ -180,6 +180,8 @@ func ReconstructApk(subcommittee sortedset.Set) ([]byte, error) {
 		return nil, errors.New("Subcommittee is empty")
 	}
 
+	pks := make([][]byte, 0)
+
 	for i, ipk := range subcommittee {
 		pk := ipk.Bytes()
 
@@ -192,7 +194,18 @@ func ReconstructApk(subcommittee sortedset.Set) ([]byte, error) {
 			continue
 		}
 
-		apk, err = bls.AggregatePk(apk, pk)
+		if len(pk) != 96 {
+			panic("invalid pubkey size")
+		}
+
+		pks = append(pks, pk)
+	}
+
+	if len(pks) > 0 {
+		// Instead of calling AggregatePk per each PubKey, we mitigate Cgo
+		// overhead by aggregating a set of Pubkeys in a single call.
+		// Benchmarking indicates 30% faster execution.
+		apk, err = bls.AggregatePk(apk, pks...)
 		if err != nil {
 			return nil, err
 		}
