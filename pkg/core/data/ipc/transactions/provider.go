@@ -85,6 +85,9 @@ type Executor interface {
 
 	// GetProvisioners returns the current set of provisioners.
 	GetProvisioners(ctx context.Context) (user.Provisioners, error)
+
+	// GetHeight returns rusk state height
+	GetHeight(ctx context.Context) (uint64, error)
 }
 
 // Proxy toward the rusk client.
@@ -370,6 +373,18 @@ func (e *executor) GetProvisioners(ctx context.Context) (user.Provisioners, erro
 
 	provisioners.Members = memberMap
 	return *provisioners, nil
+}
+
+func (e *executor) GetHeight(ctx context.Context) (uint64, error) {
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
+	defer cancel()
+
+	res, err := e.stateClient.GetHeight(ctx, &rusk.GetHeightRequest{})
+	if err != nil {
+		return 0, err
+	}
+
+	return res.Height, nil
 }
 
 // UMember deep copies from the rusk.Provisioner.

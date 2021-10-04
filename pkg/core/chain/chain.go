@@ -361,8 +361,8 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 	if err := c.db.Update(func(t database.Transaction) error {
 		return t.ClearCandidateMessages()
 	}); err != nil {
-		l.WithError(err).Warn("candidate deletion failed")
 		// failure here should not be treated as critical
+		l.WithError(err).Warn("candidate deletion failed")
 	}
 
 	// 3. Update Storm DB
