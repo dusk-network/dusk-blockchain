@@ -26,7 +26,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	"github.com/sirupsen/logrus"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -237,76 +236,21 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 	return nil
 }
 
-func (c *Chain) executeStateTransition(blk block.Block, l *logrus.Entry) error {
-	// Ensure that both (co-deployed) services dusk and rusk are on the same
-	// height. If not, we should trigger a recovery procedure so both are
-	// always synced up. Rusk service is supposed to atomically update its
-	// height value only on a successful completion of execute state
-	// transition.
-	ruskHeight, err := c.proxy.Executor().GetHeight(c.ctx)
-	if err != nil {
-		return err
-	}
-
-	provLen := c.p.Set.Len()
-
-	switch {
-	case ruskHeight == c.tip.Header.Height: // both on the same height, both are synced up
-		{
-			l.WithField("provisioners", provLen).Info("run state transition")
-
-			provUpdated, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
-			if err != nil {
-				l.WithError(err).Error("Error in executing the state transition")
-				return err
-			}
-
-			l.WithField("provisioners", c.p.Set.Len()).
-				WithField("added", c.p.Set.Len()-provLen).
-				Info("state transition completed")
-
-			// Update the provisioners as blk.Txs may bring new provisioners to the current state
-			c.p = &provUpdated
-		}
-	case ruskHeight == c.tip.Header.Height+1:
-		{
-			// Contract storage has already accepted txs at this height then we should
-			// not duplicate the ExecuteStateTransition call.
-			l.Warn("skip state transition")
-		}
-	case ruskHeight > c.tip.Header.Height+1:
-		{
-			// Out-of-sync state
-			// Contract storage is multiple blocks ahead
-			// TODO: Rebuild contract from Genesis block
-		}
-	case ruskHeight < c.tip.Header.Height:
-		{
-			// Out-of-sync state
-			// Contract storage has missed block updates.
-			// TODO: ExecuteStateTransition for the missing blocks
-		}
-	}
-
-	return nil
-}
-
 // acceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved.
 func (c *Chain) acceptBlock(blk block.Block) error {
 	fields := logger.Fields{
-		"event":    "accept_block",
-		"height":   blk.Header.Height,
-		"hash":     util.StringifyBytes(blk.Header.Hash),
-		"curr_h":   c.tip.Header.Height,
-		"prov_num": c.p.Set.Len(),
+		"event":  "accept_block",
+		"height": blk.Header.Height,
+		"hash":   util.StringifyBytes(blk.Header.Hash),
+		"curr_h": c.tip.Header.Height,
 	}
 
 	l := log.WithFields(fields)
 
-	l.Debug("verifying block")
+	l.Trace("verifying block")
 	// 1. Check that stateless and stateful checks pass
 	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
 		l.WithError(err).Error("block verification failed")
@@ -317,21 +261,40 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 	// This check should avoid a possible race condition between accepting two blocks
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
-	l.Debug("verifying block certificate")
+	l.Trace("verifying block certificate")
 
-	var err error
-	if err = verifiers.CheckBlockCertificate(*c.p, blk, c.tip.Header.Seed); err != nil {
-		l.WithError(err).Error("certificate verification failed")
+	prov_num := c.p.Set.Len()
+
+	if err := verifiers.CheckBlockCertificate(*c.p, blk, c.tip.Header.Seed); err != nil {
+		l.WithError(err).WithField("provisioners", prov_num).
+			Error("certificate verification failed")
 		return err
 	}
 
-	// 3. Execute State Transition to update Contract Storage
-	if err = c.executeStateTransition(blk, l); err != nil {
-		l.WithError(err).Error("execute state transition failed")
+	// 3. Call ExecuteStateTransitionFunction
+
+	l.WithField("provisioners", prov_num).Info("run state transition")
+
+	// TODO: the context here should maybe used to set a timeout
+	provisioners, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
+	if err != nil {
+		l.WithError(err).Error("Error in executing the state transition")
 		return err
 	}
 
-	// 4. Store the approved block and update in-memory chain tip
+	// Update the provisioners as blk.Txs may bring new provisioners to the current state
+	c.p = &provisioners
+	c.tip = &blk
+
+	l.WithField("provisioners", c.p.Set.Len()).
+		WithField("added", c.p.Set.Len()-prov_num).
+		Info("state transition completed")
+
+	if config.Get().API.Enabled {
+		go c.storeStakesInStormDB(blk.Header.Height)
+	}
+
+	// 4. Store the approved block
 	l.Debug("storing block")
 
 	if err := c.loader.Append(&blk); err != nil {
@@ -339,39 +302,25 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 		return err
 	}
 
-	c.tip = &blk
+	if err := c.db.Update(func(t database.Transaction) error {
+		return t.ClearCandidateMessages()
+	}); err != nil {
+		l.WithError(err).Error("candidate deletion failed")
+		return err
+	}
 
-	// 5. Perform all post-events on accepting a block
-	c.postAcceptBlock(blk, l)
-
-	return nil
-}
-
-// postAcceptBlock performs all post-events on accepting a block.
-func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
-	// 1. Notify other subsystems for the accepted block
+	// 6. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
-	l.Debug("notifying internally")
+	l.Trace("notifying internally")
 
 	msg := message.New(topics.AcceptedBlock, blk)
 	errList := c.eventBus.Publish(topics.AcceptedBlock, msg)
 
-	// 2. Clear obsolete Candidate blocks
-	if err := c.db.Update(func(t database.Transaction) error {
-		return t.ClearCandidateMessages()
-	}); err != nil {
-		// failure here should not be treated as critical
-		l.WithError(err).Warn("candidate deletion failed")
-	}
-
-	// 3. Update Storm DB
-	if config.Get().API.Enabled {
-		go c.storeStakesInStormDB(blk.Header.Height)
-	}
-
 	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
-	l.Debug("procedure ended")
+	l.Trace("procedure ended")
+
+	return nil
 }
 
 // VerifyCandidateBlock can be used as a callback for the consensus in order to

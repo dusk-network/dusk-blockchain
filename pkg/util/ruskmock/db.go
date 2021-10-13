@@ -9,7 +9,6 @@ package ruskmock
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/tidwall/buntdb"
@@ -18,7 +17,6 @@ import (
 //nolint
 var (
 	ProvisionersPrefix = "provisioner"
-	ChainTipPrefix     = "chaintip"
 	RoundInfoPrefix    = "roundinfo"
 	EventQueuePrefix   = "eventqueue"
 	buntStoreInstance  *BuntStore
@@ -115,25 +113,8 @@ func (b *BuntStore) FetchProvisioners() (*user.Provisioners, error) {
 	return &provisioners, err
 }
 
-// FetchHeight get rusk height.
-func (b *BuntStore) FetchHeight() (uint64, error) {
-	var height int
-
-	err := b.db.View(func(t *buntdb.Tx) error {
-		key := GetKey(ChainTipPrefix, 0)
-		heightStr, err := t.Get(key)
-		if err != nil {
-			return err
-		}
-
-		height, err = strconv.Atoi(heightStr)
-		return err
-	})
-	return uint64(height), err
-}
-
-// PersistStakeContractAndHeight stores atomically Provisioners and chain tip.
-func (b *BuntStore) PersistStakeContractAndHeight(provisioners *user.Provisioners, height uint64) error {
+// StoreProvisioners will store the Provisioners into db.
+func (b *BuntStore) StoreProvisioners(provisioners *user.Provisioners) error {
 	// Always reset all keys
 	_ = b.Reset()
 
@@ -145,29 +126,8 @@ func (b *BuntStore) PersistStakeContractAndHeight(provisioners *user.Provisioner
 			return err
 		}
 
-		// Update provisioners
-		// This simulates Stake Contract persisting.
 		key := GetKey(ProvisionersPrefix, 0)
 		_, _, err = tx.Set(key, buf.String(), nil)
-		if err != nil {
-			return err
-		}
-
-		// update chain tip
-		key = GetKey(ChainTipPrefix, 0)
-		_, _, err = tx.Set(key, strconv.Itoa(int(height)), nil)
-
-		return err
-	})
-	return err
-}
-
-// PersistHeight stores chain tip.
-func (b *BuntStore) PersistHeight(height uint64) error {
-	err := b.db.Update(func(tx *buntdb.Tx) error {
-		// update chain tip
-		key := GetKey(ChainTipPrefix, 0)
-		_, _, err := tx.Set(key, strconv.Itoa(int(height)), nil)
 		return err
 	})
 	return err
