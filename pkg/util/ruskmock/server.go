@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -43,7 +44,9 @@ type Server struct {
 	cfg *Config
 	s   *grpc.Server
 
-	p  *user.Provisioners
+	p      *user.Provisioners
+	height uint64
+
 	db *BuntStore
 }
 
@@ -71,26 +74,43 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 	registerGRPCServers(grpcServer, srv)
 	srv.s = grpcServer
 
-	return srv, srv.bootstrapBlockchain()
+	if err := srv.bootstrapBlockchain(); err != nil {
+		panic(err)
+	}
+
+	return srv, nil
 }
 
 func (s *Server) bootstrapBlockchain() error {
 	log.Infoln("bootstrapping blockchain")
 
-	// Reconstruct Genesis Provisioners
-	g := config.DecodeGenesis()
-	if err := chain.ReconstructCommittee(s.p, g); err != nil {
-		return err
+	provisioners, errFetch := s.db.FetchProvisioners()
+	if errFetch != nil {
+		provisioners = user.NewProvisioners()
+
+		// Could not restore provisioners from DB.
+		// Then we should regenerate DB from Genesis block.
+
+		// Reconstruct Genesis Provisioners
+		g := config.DecodeGenesis()
+		if err := chain.ReconstructCommittee(provisioners, g); err != nil {
+			return fmt.Errorf("couldn't reconstruct genesis committee: %v", err)
+		}
+
+		if err := s.db.PersistStakeContractAndHeight(provisioners, 0); err != nil {
+			return fmt.Errorf("couldn't persist genesis committee: %v", err)
+		}
 	}
 
-	provisioners, err := s.db.FetchProvisioners()
-	if err == nil {
-		s.p = provisioners
-	} else {
-		// Could not fetch any provisioners from DB.
-		// Then we should update.
-		_ = s.db.StoreProvisioners(s.p)
+	h, err := s.db.FetchHeight()
+	if err != nil {
+		return fmt.Errorf("couldn't fetch height: %v", err)
 	}
+
+	log.WithField("height", h).Info("network state initialized")
+
+	s.height = h
+	s.p = provisioners
 
 	return nil
 }
@@ -159,16 +179,10 @@ func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStat
 // ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
 // configuration.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
-	log.Infoln("call received to ExecuteStateTransition")
+	log.WithField("height", s.height).Infoln("call received to ExecuteStateTransition")
 	defer log.Infoln("finished call to ExecuteStateTransition")
 
 	time.Sleep(stateTransitionDelay)
-
-	if !s.cfg.PassStateTransition {
-		return &rusk.ExecuteStateTransitionResponse{
-			Success: s.cfg.PassStateTransition,
-		}, nil
-	}
 
 	if err := s.addConsensusNodes(req.Txs, req.Height); err != nil {
 		log.WithError(err).Errorln("could not add consensus nodes")
@@ -195,10 +209,25 @@ func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersR
 	}, nil
 }
 
+// GetHeight returns height of the last call to ExecuteStateTransition.
+func (s *Server) GetHeight(ctx context.Context, req *rusk.GetHeightRequest) (*rusk.GetHeightResponse, error) {
+	log.Infoln("call received to GetHeight")
+	defer log.Infoln("finished call to GetHeight")
+
+	h, err := s.db.FetchHeight()
+	if err != nil {
+		return &rusk.GetHeightResponse{Height: 0}, err
+	}
+
+	return &rusk.GetHeightResponse{Height: h}, nil
+}
+
 func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) error {
 	log.Debugln("adding consensus nodes")
 
-	var added bool
+	p := s.p.Copy()
+
+	var updated bool
 
 	for _, tx := range txs {
 		if tx.Type == uint32(transactions.Stake) {
@@ -218,27 +247,38 @@ func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) 
 
 			// Add grace period for stakes.
 			stakeStartHeight := startHeight + stakeGracePeriod
-			if err := s.p.Add(pk, value, stakeStartHeight, startHeight+lock-2); err != nil {
+			if err := p.Add(pk, value, stakeStartHeight, startHeight+lock-2); err != nil {
 				return err
 			}
 
-			added = true
+			updated = true
 
 			log.WithFields(logrus.Fields{
 				"BLS key":      util.StringifyBytes(pk),
 				"amount":       value,
 				"start height": stakeStartHeight,
 				"end height":   startHeight + lock - 2,
-			}).Debugln("added provisioner")
+			}).Infoln("added provisioner")
 		}
 	}
 
-	if added {
-		log.WithField("size", s.p.Set.Len()).Debugln("update provisioners db")
+	if updated {
+		log.WithField("size", p.Set.Len()).Infoln("update provisioners db")
 		// New provisioners added on last block.
 		// Update ondisk copy of provisioners.
-		return s.db.StoreProvisioners(s.p)
+		if err := s.db.PersistStakeContractAndHeight(&p, startHeight); err != nil {
+			return err
+		}
+
+		s.p = &p
+	} else {
+		// No new provisioners added, update height field only
+		if err := s.db.PersistHeight(startHeight); err != nil {
+			return err
+		}
 	}
+
+	s.height = startHeight
 
 	return nil
 }
