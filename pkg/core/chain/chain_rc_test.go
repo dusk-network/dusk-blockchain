@@ -26,7 +26,7 @@ func TestConcurrentBlock(t *testing.T) {
 	// Set up a chain instance with mocking verifiers
 	startingHeight := uint64(1)
 	_, chain := setupChainTest(t, startingHeight)
-	chain.StartConsensus()
+	chain.RestartConsensus()
 
 	var wg sync.WaitGroup
 	for n := 0; n < 50; n++ {

@@ -88,7 +88,7 @@ func (m *mockChain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
 	return nil
 }
 
-func (m *mockChain) StartConsensus() error {
+func (m *mockChain) RestartConsensus() error {
 	return nil
 }
 
