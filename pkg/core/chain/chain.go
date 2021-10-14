@@ -197,7 +197,7 @@ func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byt
 }
 
 // TryNextConsecutiveBlockIsValid makes an attempt to validate a blk without
-// state update.
+// changing any state.
 // returns error if the block is invalid to current blockchain tip.
 func (c *Chain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
 	fields := logger.Fields{
