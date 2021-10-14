@@ -185,11 +185,9 @@ func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byt
 		return err
 	}
 
-	c.StopConsensus()
-
 	// Consensus needs a fresh restart so that it is initialized with most
 	// recent round update which is Chain tip and the list of active Provisioners.
-	if err := c.StartConsensus(); err != nil {
+	if err := c.RestartConsensus(); err != nil {
 		log.WithError(err).Error("failed to start consensus loop")
 	}
 
@@ -223,7 +221,7 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if err := c.StartConsensus(); err != nil {
+	if err := c.RestartConsensus(); err != nil {
 		log.WithError(err).Warn("sync timer could not restart consensus loop")
 	}
 

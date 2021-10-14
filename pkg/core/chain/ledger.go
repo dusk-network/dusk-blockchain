@@ -14,11 +14,14 @@ type Ledger interface {
 	TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error
 	TryNextConsecutiveBlockIsValid(blk block.Block) error
 
-	// StartConsensus starts the consensus loop that deals with start-and-stop
+	// RestartConsensus Stop and Start Consensus.
+	// This is a safer approach to ensure we do not duplicate Consensus loop ever.
+	// It starts the consensus loop that deals with start-and-stop
 	// and result-fetch of the Consensus Spin.
 	// The Consensus Spin is the loop that performs the Segregated Byzantine
 	// Agreement over a single round.
-	StartConsensus() error
+
+	RestartConsensus() error
 	// StopConsensus signals the consensus loop to terminate if exists.
 	StopConsensus()
 

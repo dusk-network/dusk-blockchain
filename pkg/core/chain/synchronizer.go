@@ -68,12 +68,12 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 	// purposes.
 	if currentHeight == s.hrange.from &&
 		blk.Header.Height == s.hrange.from+1 {
+		// This validation should happen only once to ensure we can trust
+		// this peer for syncing up
 		if err = s.chain.TryNextConsecutiveBlockIsValid(blk); err != nil {
 			if srcPeerAddr == s.timer.ownerID {
 				// Syncing Peer has provided invalid next block
-				// TODO: Decrease reputation score
-				log.WithField("r_addr", srcPeerAddr).Warn("syncing peer provided invalid next block")
-
+				slog.WithField("r_addr", srcPeerAddr).Warn("syncing peer provided invalid next block")
 				slog.WithField("state", "insync").Debug(changeStatelabel)
 
 				s.state = s.inSync
@@ -122,7 +122,7 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 
 			// if we reach the target we get into sync mode
 			// and trigger the consensus again
-			if err = s.chain.StartConsensus(); err != nil {
+			if err = s.chain.RestartConsensus(); err != nil {
 				return nil, err
 			}
 
