@@ -129,10 +129,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		}
 	}
 
-	// Тimer should expire before proceeding to the Reduction.
-	// As per spec, we proceed with an EmptyNewBlock if no valid NewBlock arrives on time.
 	timeoutChan := time.After(p.timeout)
-	selectionBlock := message.EmptyNewBlock()
 
 	for {
 		select {
@@ -143,10 +140,14 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 					continue
 				}
 
-				selectionBlock = b
+				go func() {
+					<-timeoutChan
+				}()
+
+				return p.endSelection(b)
 			}
 		case <-timeoutChan:
-			return p.endSelection(selectionBlock)
+			return p.endSelection(message.EmptyNewBlock())
 		case <-ctx.Done():
 			// preventing timeout leakage
 			go func() {
