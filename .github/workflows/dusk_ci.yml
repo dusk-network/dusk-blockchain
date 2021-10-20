@@ -7,7 +7,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.15.x
+        go-version: 1.17.x
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Run go-analyzer
@@ -18,7 +18,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.15.x
+        go-version: 1.17.x
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Lint
@@ -29,7 +29,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.15.x
+        go-version: 1.17.x
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Test
@@ -42,7 +42,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.15.x
+        go-version: 1.17.x
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Test Harness
@@ -53,13 +53,19 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.15.x
+        go-version: 1.17.x
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Test Harness with Kadcast
       run: make test-harness-ci-kadcast
   benchmark-agreement:
-    runs-on: benchmark
+    runs-on: ubuntu-latest
     steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17.x
+      - name: Checkout code
+        uses: actions/checkout@v2
       - name: Run benchmark of agreement verification
         run: cd pkg/core/consensus/agreement && go test -run=BenchmarkAgreementVerification -bench=.  -benchtime=10s -count 5
