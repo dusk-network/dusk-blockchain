@@ -59,7 +59,13 @@ jobs:
     - name: Test Harness with Kadcast
       run: make test-harness-ci-kadcast
   benchmark-agreement:
-     runs-on: benchmark
-     steps:
-     - name: Run benchmark of agreement verification
-       run: cd pkg/core/consensus/agreement && go test -run=BenchmarkAgreementVerification -bench=.  -benchtime=10s -count 5
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17.x
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Run benchmark of agreement verification
+      run: cd pkg/core/consensus/agreement && go test -run=BenchmarkAgreementVerification -bench=.  -benchtime=10s -count 5
