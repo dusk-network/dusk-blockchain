@@ -58,4 +58,8 @@ jobs:
       uses: actions/checkout@v2
     - name: Test Harness with Kadcast
       run: make test-harness-ci-kadcast
-  
+  benchmark-agreement:
+     runs-on: benchmark
+     steps:
+       - name: Run benchmark of agreement verification
+         run: cd dusk-blockchain/pkg/core/consensus/agreement && go test -run=BenchmarkAgreementVerification -bench=.  -benchtime=10s -count 5
