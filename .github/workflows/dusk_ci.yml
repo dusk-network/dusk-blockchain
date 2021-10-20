@@ -62,4 +62,4 @@ jobs:
      runs-on: benchmark
      steps:
        - name: Run benchmark of agreement verification
-         run: cd dusk-blockchain/pkg/core/consensus/agreement && go test -run=BenchmarkAgreementVerification -bench=.  -benchtime=10s -count 5
+         run: cd /home/runner/work/dusk-blockchain/pkg/core/consensus/agreement && go test -run=BenchmarkAgreementVerification -bench=.  -benchtime=10s -count 5
