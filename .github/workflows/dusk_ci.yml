@@ -60,6 +60,7 @@ jobs:
       run: make test-harness-ci-kadcast
   benchmark-agreement:
     runs-on: ubuntu-latest
+    needs: [go-analyzer, lint, test, test-harness, test-harness-kadcast]
     steps:
     - name: Install Go
       uses: actions/setup-go@v2
