@@ -46,7 +46,7 @@ func checkBlockCertificateForStep(batchedSig []byte, bitSet uint64, round uint64
 	committee := provisioners.CreateVotingCommittee(seed, round, step, size)
 	subcommittee := committee.IntersectCluster(bitSet)
 
-	apk, err := agreement.ReconstructApk(subcommittee.Set)
+	apk, err := agreement.AggregatePks(&provisioners, subcommittee.Set)
 	if err != nil {
 		return err
 	}
