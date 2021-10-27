@@ -255,6 +255,7 @@ func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) 
 
 			log.WithFields(logrus.Fields{
 				"BLS key":      util.StringifyBytes(pk),
+				"Raw BLS key":  util.StringifyBytes(p.GetRawPublicKeyBLS(pk)),
 				"amount":       value,
 				"start height": stakeStartHeight,
 				"end height":   startHeight + lock - 2,
