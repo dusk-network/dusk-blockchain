@@ -28,6 +28,8 @@ import (
 // Agreement quorum.
 const MaxCommitteeSize = 64
 
+const useUncompressedKeys = false
+
 // Handler interface is handy for tests.
 type Handler interface {
 	AmMember(uint64, uint8) bool
@@ -126,7 +128,7 @@ func (a *handler) Verify(ev message.Agreement) error {
 		log.WithField("bitset", votes.BitSet).WithField("voted_len", subcommittee.Len()).
 			WithField("total_votes", allVoters).Info()
 
-		apk, err := ReconstructApk(subcommittee.Set)
+		apk, err := AggregatePks(&a.Provisioners, subcommittee.Set)
 		if err != nil {
 			return fmt.Errorf("failed to reconstruct APK in the Agreement verification: %w", err)
 		}
@@ -186,8 +188,18 @@ func verifyWhole(a message.Agreement) error {
 	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, r.Bytes())
 }
 
-// ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.
-func ReconstructApk(subcommittee sortedset.Set) ([]byte, error) {
+// AggregatePks reconstructs an aggregated BLS public key from a subcommittee.
+// useUncompressedKeys determines if this works with compressed or uncompressed Apk
+func AggregatePks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
+	if useUncompressedKeys {
+		return aggregateUncompressedPks(p, subcommittee)
+	}
+
+	return aggregateCompressedPks(subcommittee)
+}
+
+// aggregateCompressedPks reconstructs compressed BLS public key.
+func aggregateCompressedPks(subcommittee sortedset.Set) ([]byte, error) {
 	var apk []byte
 	var err error
 
@@ -224,6 +236,32 @@ func ReconstructApk(subcommittee sortedset.Set) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	return apk, nil
+}
+
+// aggregateCompressedPks reconstructs uncompressed BLS public.
+func aggregateUncompressedPks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
+	var apk []byte
+
+	pks := make([][]byte, 0)
+
+	for _, ipk := range subcommittee {
+		rawPk := p.GetRawPublicKeyBLS(ipk.Bytes())
+		if len(rawPk) != 0 {
+			pks = append(pks, rawPk)
+		}
+	}
+
+	if len(pks) > 0 {
+		/*
+			apk, err := bls.AggregatePKsUnchecked(pks...)
+			if err != nil {
+				return nil, err
+			}
+
+		*/
 	}
 
 	return apk, nil
