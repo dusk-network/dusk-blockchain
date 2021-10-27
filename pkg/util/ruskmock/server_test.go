@@ -12,11 +12,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
+
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/stretchr/testify/assert"
@@ -118,7 +120,7 @@ func TestExecuteStateTransition(t *testing.T) {
 	sc, _ := client.CreateStakeClient(ctx, "localhost:10000")
 	value := uint64(712389)
 
-	pk, _ := crypto.RandEntropy(96)
+	_, pk, rpk := bls.GenerateKeysWithRaw()
 
 	tx, err := sc.NewStake(ctx, &rusk.StakeTransactionRequest{
 		Value:        value,
@@ -138,6 +140,11 @@ func TestExecuteStateTransition(t *testing.T) {
 	// chosen value
 	m := s.p.Members[string(pk)]
 	assert.Equal(t, value, m.Stakes[0].Amount)
+
+	// Ensure mapping Compressed Pk to Uncompressed Pk is correct
+	rpk2 := s.p.GetRawPublicKeyBLS(pk)
+
+	assert.True(t, bytes.Equal(rpk, rpk2))
 }
 
 func TestFailedExecuteStateTransition(t *testing.T) {

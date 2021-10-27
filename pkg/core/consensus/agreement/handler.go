@@ -28,7 +28,7 @@ import (
 // Agreement quorum.
 const MaxCommitteeSize = 64
 
-const useUncompressedKeys = false
+const useCompressedKeys = false
 
 // Handler interface is handy for tests.
 type Handler interface {
@@ -189,13 +189,13 @@ func verifyWhole(a message.Agreement) error {
 }
 
 // AggregatePks reconstructs an aggregated BLS public key from a subcommittee.
-// useUncompressedKeys determines if this works with compressed or uncompressed Apk
+// useUncompressedKeys determines if this works with compressed or uncompressed Apk.
 func AggregatePks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
-	if useUncompressedKeys {
-		return aggregateUncompressedPks(p, subcommittee)
+	if useCompressedKeys {
+		return aggregateCompressedPks(subcommittee)
 	}
 
-	return aggregateCompressedPks(subcommittee)
+	return aggregateUncompressedPks(p, subcommittee)
 }
 
 // aggregateCompressedPks reconstructs compressed BLS public key.
@@ -244,6 +244,7 @@ func aggregateCompressedPks(subcommittee sortedset.Set) ([]byte, error) {
 // aggregateCompressedPks reconstructs uncompressed BLS public.
 func aggregateUncompressedPks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
 	var apk []byte
+	var err error
 
 	pks := make([][]byte, 0)
 
@@ -254,14 +255,13 @@ func aggregateUncompressedPks(p *user.Provisioners, subcommittee sortedset.Set) 
 		}
 	}
 
-	if len(pks) > 0 {
-		/*
-			apk, err := bls.AggregatePKsUnchecked(pks...)
-			if err != nil {
-				return nil, err
-			}
+	if len(pks) == 0 {
+		return nil, errors.New("empty committee")
+	}
 
-		*/
+	apk, err = bls.AggregatePKsUnchecked(pks...)
+	if err != nil {
+		return nil, err
 	}
 
 	return apk, nil

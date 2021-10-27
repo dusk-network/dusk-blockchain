@@ -93,7 +93,7 @@ func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, round uint64, step 
 	vc := hlp.P.CreateVotingCommittee(seed, round, step, hlp.Nr)
 	sub := vc.IntersectCluster(sv.BitSet)
 
-	apk, err := agreement.ReconstructApk(sub.Set)
+	apk, err := agreement.AggregatePks(hlp.P, sub.Set)
 	if err != nil {
 		return err
 	}

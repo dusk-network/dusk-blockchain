@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
@@ -132,10 +133,17 @@ func (p *Provisioners) Add(pubKeyBLS []byte, amount, startHeight, endHeight uint
 	// This is a new provisioner, so let's initialize the Member struct and add them to the list
 	p.Set.Insert(pubKeyBLS)
 
-	m := &Member{}
-	m.PublicKeyBLS = pubKeyBLS
-	m.RawPublicKeyBLS = pubKeyBLS
-	// TODO: use m.RawPublicKeyBLS = bls.RawPkFromPk()
+	var rpk []byte
+	var err error
+
+	if rpk, err = bls.PkToRaw(pubKeyBLS); err != nil {
+		return err
+	}
+
+	m := &Member{
+		PublicKeyBLS:    pubKeyBLS,
+		RawPublicKeyBLS: rpk,
+	}
 
 	m.AddStake(stake)
 
