@@ -185,15 +185,30 @@ func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byt
 		return err
 	}
 
-	c.StopConsensus()
-
 	// Consensus needs a fresh restart so that it is initialized with most
 	// recent round update which is Chain tip and the list of active Provisioners.
-	if err := c.StartConsensus(); err != nil {
+	if err := c.RestartConsensus(); err != nil {
 		log.WithError(err).Error("failed to start consensus loop")
 	}
 
 	return nil
+}
+
+// TryNextConsecutiveBlockIsValid makes an attempt to validate a blk without
+// changing any state.
+// returns error if the block is invalid to current blockchain tip.
+func (c *Chain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
+	fields := logger.Fields{
+		"event":    "check_block",
+		"height":   blk.Header.Height,
+		"hash":     util.StringifyBytes(blk.Header.Hash),
+		"curr_h":   c.tip.Header.Height,
+		"prov_num": c.p.Set.Len(),
+	}
+
+	l := log.WithFields(fields)
+
+	return c.isValidBlock(blk, l)
 }
 
 // ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
@@ -206,7 +221,7 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if err := c.StartConsensus(); err != nil {
+	if err := c.RestartConsensus(); err != nil {
 		log.WithError(err).Warn("sync timer could not restart consensus loop")
 	}
 
@@ -291,6 +306,29 @@ func (c *Chain) executeStateTransition(blk block.Block, l *logrus.Entry) error {
 	return nil
 }
 
+func (c *Chain) isValidBlock(blk block.Block, l *logrus.Entry) error {
+	l.Debug("verifying block")
+	// Check that stateless and stateful checks pass
+	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
+		l.WithError(err).Error("block verification failed")
+		return err
+	}
+
+	// Check the certificate
+	// This check should avoid a possible race condition between accepting two blocks
+	// at the same height, as the probability of the committee creating two valid certificates
+	// for the same round is negligible.
+	l.Debug("verifying block certificate")
+
+	var err error
+	if err = verifiers.CheckBlockCertificate(*c.p, blk, c.tip.Header.Seed); err != nil {
+		l.WithError(err).Error("certificate verification failed")
+		return err
+	}
+
+	return nil
+}
+
 // acceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
@@ -305,33 +343,21 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 	}
 
 	l := log.WithFields(fields)
-
-	l.Debug("verifying block")
-	// 1. Check that stateless and stateful checks pass
-	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
-		l.WithError(err).Error("block verification failed")
-		return err
-	}
-
-	// 2. Check the certificate
-	// This check should avoid a possible race condition between accepting two blocks
-	// at the same height, as the probability of the committee creating two valid certificates
-	// for the same round is negligible.
-	l.Debug("verifying block certificate")
-
 	var err error
-	if err = verifiers.CheckBlockCertificate(*c.p, blk, c.tip.Header.Seed); err != nil {
-		l.WithError(err).Error("certificate verification failed")
+
+	// 1. Ensure block fields and certificate are valid
+	if err = c.isValidBlock(blk, l); err != nil {
+		l.WithError(err).Error("execute state transition failed")
 		return err
 	}
 
-	// 3. Execute State Transition to update Contract Storage
+	// 2. Execute State Transition to update Contract Storage
 	if err = c.executeStateTransition(blk, l); err != nil {
 		l.WithError(err).Error("execute state transition failed")
 		return err
 	}
 
-	// 4. Store the approved block and update in-memory chain tip
+	// 3. Store the approved block and update in-memory chain tip
 	l.Debug("storing block")
 
 	if err := c.loader.Append(&blk); err != nil {

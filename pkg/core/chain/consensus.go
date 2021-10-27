@@ -15,10 +15,17 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 )
 
-// StartConsensus will start the consensus loop. It can be halted at any point by
+// RestartConsensus implements Stop and Start Consensus.
+// This is a safer approach to ensure we do not duplicate Consensus loop.
+func (c *Chain) RestartConsensus() error {
+	c.StopConsensus()
+	return c.startConsensus()
+}
+
+// startConsensus will start the consensus loop. It can be halted at any point by
 // sending a signal through the `stopConsensus` channel (`StopConsensus`
 // as exposed by the `Ledger` interface).
-func (c *Chain) StartConsensus() error {
+func (c *Chain) startConsensus() error {
 	ctx, cancel := context.WithCancel(c.ctx)
 
 	id := c.beginTrace()

@@ -30,9 +30,9 @@ type syncState func(srcPeerAddr string, currentHeight uint64, blk block.Block, k
 
 func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk block.Block, kadcastHeight byte) ([]bytes.Buffer, error) {
 	if blk.Header.Height > currentHeight+1 {
-		// If this block is from far in the future, we should start syncing mode.
-		s.chain.StopConsensus()
 		s.sequencer.add(blk)
+
+		slog.WithField("state", "outsync").Debug(changeStatelabel)
 
 		// Trigger timeout outSync timer. If the peer initiating the Sync
 		// procedure is dishonest, this timer should switch back to InSync
@@ -41,8 +41,6 @@ func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk bloc
 		// A peer is marked as dishonest if it cannot provide a valid
 		// consecutive block before the timer expires
 		s.timer.Start(srcPeerAddr)
-
-		slog.WithField("state", "outsync").Debug(changeStatelabel)
 
 		s.state = s.outSync
 		b, err := s.startSync(srcPeerAddr, blk.Header.Height, currentHeight, kadcastHeight)
@@ -65,6 +63,30 @@ func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk bloc
 func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk block.Block, kadcastHeight byte) ([]bytes.Buffer, error) {
 	var err error
 
+	// Once we validate successfully the next block from the syncing
+	// Peer we can consider terminating Consensus for efficiency
+	// purposes.
+	if currentHeight == s.hrange.from &&
+		blk.Header.Height == s.hrange.from+1 {
+		// This validation should happen only once to ensure we can trust
+		// this peer for syncing up
+		if err = s.chain.TryNextConsecutiveBlockIsValid(blk); err != nil {
+			if srcPeerAddr == s.timer.ownerID {
+				// Syncing Peer has provided invalid next block
+				slog.WithField("r_addr", srcPeerAddr).Warn("syncing peer provided invalid next block")
+				slog.WithField("state", "insync").Debug(changeStatelabel)
+
+				s.state = s.inSync
+			}
+
+			return nil, err
+		}
+
+		log.WithField("r_addr", srcPeerAddr).Info("syncing peer provided the next block")
+
+		s.chain.StopConsensus()
+	}
+
 	if blk.Header.Height > currentHeight+1 {
 		// if there is a gap we add the future block to the sequencer
 		s.sequencer.add(blk)
@@ -83,6 +105,7 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 		if err = s.chain.TryNextConsecutiveBlockOutSync(blk, kadcastHeight); err != nil {
 			slog.WithError(err).WithField("state", "outsync").
 				Warn("could not accept block")
+
 			return nil, err
 		}
 
@@ -93,19 +116,20 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 				Warn("timer error")
 		}
 
-		if blk.Header.Height == s.syncTarget {
+		if blk.Header.Height == s.hrange.to {
 			// Sync Target reached. outSyncTimer is not anymore needed
 			s.timer.Cancel()
 
 			// if we reach the target we get into sync mode
 			// and trigger the consensus again
-			if err = s.chain.StartConsensus(); err != nil {
+			if err = s.chain.RestartConsensus(); err != nil {
 				return nil, err
 			}
 
 			slog.WithField("state", "insync").Debug(changeStatelabel)
 
 			s.state = s.inSync
+			break
 		}
 	}
 
@@ -120,8 +144,12 @@ type synchronizer struct {
 	db    database.DB
 	state syncState
 	*sequencer
-	chain      Ledger
-	syncTarget uint64
+	chain Ledger
+
+	hrange struct {
+		from uint64
+		to   uint64
+	}
 
 	timer *outSyncTimer
 }
@@ -154,11 +182,12 @@ func (s *synchronizer) processBlock(srcPeerID string, currentHeight uint64, blk 
 }
 
 func (s *synchronizer) startSync(strPeerAddr string, tipHeight, currentHeight uint64, _ byte) ([]bytes.Buffer, error) {
+	s.hrange.from = currentHeight
 	s.setSyncTarget(tipHeight, currentHeight+config.MaxInvBlocks)
 
 	slog.WithField("curr_h", currentHeight).
 		WithField("tip", tipHeight).
-		WithField("target", s.syncTarget).
+		WithField("target", s.hrange.to).
 		WithField("r_addr", strPeerAddr).
 		Info("start syncing")
 
@@ -177,9 +206,9 @@ func (s *synchronizer) startSync(strPeerAddr string, tipHeight, currentHeight ui
 }
 
 func (s *synchronizer) setSyncTarget(tipHeight, maxHeight uint64) {
-	s.syncTarget = tipHeight
+	s.hrange.to = tipHeight
 	if tipHeight > maxHeight {
-		s.syncTarget = maxHeight
+		s.hrange.to = maxHeight
 	}
 }
 
