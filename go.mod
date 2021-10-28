@@ -6,9 +6,9 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/drewolson/testflight v1.0.0
-	github.com/dusk-network/bls12_381-sign-go v0.1.1
+	github.com/dusk-network/bls12_381-sign-go v0.1.2
 	github.com/dusk-network/dusk-crypto v0.1.3
-	github.com/dusk-network/dusk-protobuf v0.2.17
+	github.com/dusk-network/dusk-protobuf v0.2.18
 	github.com/etherlabsio/healthcheck v0.0.0-20191224061800-dd3d2fd8c3f6
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
