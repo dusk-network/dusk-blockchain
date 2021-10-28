@@ -111,6 +111,9 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
 			if sv := p.collectReduction(ctx, rMsg, r.Round, step); sv != nil {
+				go func() {
+					<-timeoutChan
+				}()
 				return p.next.Initialize(*sv)
 			}
 		}
