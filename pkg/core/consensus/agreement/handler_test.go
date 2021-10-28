@@ -8,8 +8,8 @@ package agreement
 
 import (
 	"bytes"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -60,19 +60,29 @@ func TestGetVoterKeys(t *testing.T) {
 }
 
 func BenchmarkAgreementVerification(b *testing.B) {
-	logrus.SetLevel(logrus.ErrorLevel)
+	logrus.SetLevel(logrus.InfoLevel)
 
 	const (
-		workersCount      = 4  // default is 4
-		provisionersCount = 64 // 64 is the highest number of provisioners
-		msgMax            = 40 // Agreement messages count to be verified
+		workersCount      = 1
+		provisionersCount = 64
+		msgCount          = 50
+
+		round = uint64(999)
+		step  = uint8(3)
 	)
+
+	b.StopTimer()
 
 	// mocking voters
 	p, keys := consensus.MockProvisioners(provisionersCount)
 	hash, _ := crypto.RandEntropy(32)
-	ev := message.MockAgreement(hash, 1, 3, keys, p)
+	ev := message.MockAgreement(hash, round, step, keys, p)
 	handler := NewHandler(keys[0], *p, []byte{0, 0, 0})
+
+	// Pre-generate committees for this round first and second reduction steps so
+	// that handler.lock overhead is excluded
+	_ = handler.Committee(round, step-1)
+	_ = handler.Committee(round, step)
 
 	a := &Accumulator{
 		handler:            handler,
@@ -85,29 +95,23 @@ func BenchmarkAgreementVerification(b *testing.B) {
 
 	a.CreateWorkers(workersCount)
 
-	b.ResetTimer()
+	b.StartTimer()
 
-	for tN := 0; tN < b.N; tN++ {
-		var wg sync.WaitGroup
-		wg.Add(1)
-		// Drain eventChan and count until we reach number of all sent agreement
-		// messages.
-		go func(target int) {
-			for range a.eventChan {
-				target--
-				if target == 0 {
-					wg.Done()
-					return
-				}
-			}
-		}(msgMax)
-		// Send N Agreement messages for complete verification
-		go func() {
-			for i := 0; i < msgMax; i++ {
-				a.Process(ev)
-			}
-		}()
-
-		wg.Wait()
+	for i := 0; i < msgCount; i++ {
+		a.Process(ev)
 	}
+
+	// Drain all events to ensure all messages are processed
+	c := msgCount
+	for range a.eventChan {
+		c--
+		if c == 0 {
+			return
+		}
+	}
+
+	b.StopTimer()
+
+	a.Stop()
+	time.Sleep(100 * time.Millisecond)
 }
