@@ -9,7 +9,6 @@ package agreement
 import (
 	"bytes"
 	"testing"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -60,10 +59,10 @@ func TestGetVoterKeys(t *testing.T) {
 }
 
 func BenchmarkAgreementVerification(b *testing.B) {
-	logrus.SetLevel(logrus.InfoLevel)
+	logrus.SetLevel(logrus.ErrorLevel)
 
 	const (
-		workersCount      = 1
+		workersCount      = 4
 		provisionersCount = 64
 		msgCount          = 50
 
@@ -113,5 +112,4 @@ func BenchmarkAgreementVerification(b *testing.B) {
 	b.StopTimer()
 
 	a.Stop()
-	time.Sleep(100 * time.Millisecond)
 }

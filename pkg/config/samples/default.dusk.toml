@@ -216,6 +216,8 @@ defaultlocktime = 250000
 defaultamount = 5
 # the timeout for consensus step timers
 consensustimeout = 5
+# useCompressedKeys determines if AggregatePks works with compressed or uncompressed pks.
+useCompressedKeys = false
 
 [genesis]
 legacy = false

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign-go/bls"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -27,8 +28,6 @@ import (
 // MaxCommitteeSize represents the maximum size of the committee for an
 // Agreement quorum.
 const MaxCommitteeSize = 64
-
-const useCompressedKeys = false
 
 // Handler interface is handy for tests.
 type Handler interface {
@@ -189,9 +188,8 @@ func verifyWhole(a message.Agreement) error {
 }
 
 // AggregatePks reconstructs an aggregated BLS public key from a subcommittee.
-// useUncompressedKeys determines if this works with compressed or uncompressed Apk.
 func AggregatePks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
-	if useCompressedKeys {
+	if cfg.Get().Consensus.UseCompressedKeys {
 		return aggregateCompressedPks(subcommittee)
 	}
 

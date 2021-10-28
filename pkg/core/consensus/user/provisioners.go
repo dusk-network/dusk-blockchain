@@ -222,10 +222,8 @@ func (p *Provisioners) TotalWeight() (totalWeight uint64) {
 // GetRawPublicKeyBLS returns a member uncompressed BLS public key.
 // Returns nil if member not found.
 func (p Provisioners) GetRawPublicKeyBLS(pubKeyBLS []byte) []byte {
-	var m *Member
-
-	var ok bool
-	if m, ok = p.Members[string(pubKeyBLS)]; !ok {
+	m, ok := p.Members[string(pubKeyBLS)]
+	if !ok {
 		return nil
 	}
 
