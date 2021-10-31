@@ -163,7 +163,7 @@ connectionTimeout = 10000
 enabled=true
 # network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
 network="tcp"
-address="127.0.0.1:9001"
+address=":9001"
 
 # enable/disable both HTTPS and WSS
 enableTLS = false
