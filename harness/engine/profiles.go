@@ -113,6 +113,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("consensus.defaultoffset", 10)
 	viper.Set("consensus.defaultamount", 50)
 	viper.Set("consensus.consensustimeout", 5)
+	viper.Set("consensus.usecompressedkeys", false)
 
 	viper.Set("api.enabled", false)
 	viper.Set("api.enabletls", false)

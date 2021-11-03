@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -89,6 +90,14 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.Keys) {
 func MockMember(keys key.Keys) *user.Member {
 	member := &user.Member{}
 	member.PublicKeyBLS = keys.BLSPubKey
+
+	var err error
+	member.RawPublicKeyBLS, err = bls.PkToRaw(keys.BLSPubKey)
+
+	if err != nil {
+		panic(err)
+	}
+
 	member.Stakes = make([]user.Stake, 1)
 	member.Stakes[0].Amount = 500
 	member.Stakes[0].EndHeight = 10000

@@ -177,7 +177,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 			// If we get an error from GetStake, it means we either got a public key of a
 			// provisioner who is no longer in the set, or we got a malformed public key.
 			// We can't repair our committee on the fly, so we have to panic.
-			log.Panic(err)
+			log.Panic(fmt.Errorf("pk: %s err: %v", util.StringifyBytes(m.PublicKeyBLS), err))
 		}
 
 		if stake >= score {
@@ -241,16 +241,7 @@ func copyMembers(members map[string]*Member) map[string]*Member {
 	m := make(map[string]*Member)
 
 	for k, v := range members {
-		member := &Member{
-			PublicKeyBLS: make([]byte, len(v.PublicKeyBLS)),
-		}
-
-		if len(v.PublicKeyBLS) > 0 {
-			copy(member.PublicKeyBLS, v.PublicKeyBLS)
-		}
-
-		member.Stakes = append(member.Stakes, v.Stakes...)
-		m[k] = member
+		m[k] = v.Copy()
 	}
 
 	return m

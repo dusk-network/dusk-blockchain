@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign-go/bls"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -126,7 +127,7 @@ func (a *handler) Verify(ev message.Agreement) error {
 		log.WithField("bitset", votes.BitSet).WithField("voted_len", subcommittee.Len()).
 			WithField("total_votes", allVoters).Info()
 
-		apk, err := ReconstructApk(subcommittee.Set)
+		apk, err := AggregatePks(&a.Provisioners, subcommittee.Set)
 		if err != nil {
 			return fmt.Errorf("failed to reconstruct APK in the Agreement verification: %w", err)
 		}
@@ -186,8 +187,17 @@ func verifyWhole(a message.Agreement) error {
 	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, r.Bytes())
 }
 
-// ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.
-func ReconstructApk(subcommittee sortedset.Set) ([]byte, error) {
+// AggregatePks reconstructs an aggregated BLS public key from a subcommittee.
+func AggregatePks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
+	if cfg.Get().Consensus.UseCompressedKeys {
+		return aggregateCompressedPks(subcommittee)
+	}
+
+	return aggregateUncompressedPks(p, subcommittee)
+}
+
+// aggregateCompressedPks reconstructs compressed BLS public key.
+func aggregateCompressedPks(subcommittee sortedset.Set) ([]byte, error) {
 	var apk []byte
 	var err error
 
@@ -224,6 +234,32 @@ func ReconstructApk(subcommittee sortedset.Set) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	return apk, nil
+}
+
+// aggregateCompressedPks reconstructs uncompressed BLS public.
+func aggregateUncompressedPks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
+	var apk []byte
+	var err error
+
+	pks := make([][]byte, 0)
+
+	for _, ipk := range subcommittee {
+		rawPk := p.GetRawPublicKeyBLS(ipk.Bytes())
+		if len(rawPk) != 0 {
+			pks = append(pks, rawPk)
+		}
+	}
+
+	if len(pks) == 0 {
+		return nil, errors.New("empty committee")
+	}
+
+	apk, err = bls.AggregatePKsUnchecked(pks...)
+	if err != nil {
+		return nil, err
 	}
 
 	return apk, nil

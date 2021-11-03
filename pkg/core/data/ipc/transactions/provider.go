@@ -392,6 +392,9 @@ func UMember(r *rusk.Provisioner, t *user.Member) {
 	t.PublicKeyBLS = make([]byte, len(r.PublicKeyBls))
 	copy(t.PublicKeyBLS, r.PublicKeyBls)
 
+	t.RawPublicKeyBLS = make([]byte, len(r.RawPublicKeyBls))
+	copy(t.RawPublicKeyBLS, r.RawPublicKeyBls)
+
 	t.Stakes = make([]user.Stake, len(r.Stakes))
 	for i := range r.Stakes {
 		t.Stakes[i] = user.Stake{

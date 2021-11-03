@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dusk-network/bls12_381-sign-go/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
@@ -19,8 +20,9 @@ type (
 	// Member contains the bytes of a provisioner's Ed25519 public key,
 	// the bytes of his BLS public key, and how much he has staked.
 	Member struct {
-		PublicKeyBLS []byte  `json:"bls_key"`
-		Stakes       []Stake `json:"stakes"`
+		PublicKeyBLS    []byte  `json:"bls_key"`
+		RawPublicKeyBLS []byte  `json:"raw_bls_key"`
+		Stakes          []Stake `json:"stakes"`
 	}
 
 	// Provisioners is a map of Members, and makes up the current set of provisioners.
@@ -45,7 +47,7 @@ func (p Provisioners) Copy() Provisioners {
 	}
 
 	for k, v := range p.Members {
-		cpy.Members[k] = v
+		cpy.Members[k] = v.Copy()
 	}
 
 	return cpy
@@ -59,11 +61,13 @@ func (m *Member) AddStake(stake Stake) {
 // Copy deep a Member.
 func (m *Member) Copy() *Member {
 	cpy := &Member{
-		PublicKeyBLS: make([]byte, len(m.PublicKeyBLS)),
-		Stakes:       make([]Stake, len(m.Stakes)),
+		PublicKeyBLS:    make([]byte, len(m.PublicKeyBLS)),
+		RawPublicKeyBLS: make([]byte, len(m.RawPublicKeyBLS)),
+		Stakes:          make([]Stake, len(m.Stakes)),
 	}
 
 	copy(cpy.PublicKeyBLS, m.PublicKeyBLS)
+	copy(cpy.RawPublicKeyBLS, m.RawPublicKeyBLS)
 
 	for i, s := range m.Stakes {
 		cpy.Stakes[i] = Stake{
@@ -129,8 +133,17 @@ func (p *Provisioners) Add(pubKeyBLS []byte, amount, startHeight, endHeight uint
 	// This is a new provisioner, so let's initialize the Member struct and add them to the list
 	p.Set.Insert(pubKeyBLS)
 
-	m := &Member{}
-	m.PublicKeyBLS = pubKeyBLS
+	var rpk []byte
+	var err error
+
+	if rpk, err = bls.PkToRaw(pubKeyBLS); err != nil {
+		return err
+	}
+
+	m := &Member{
+		PublicKeyBLS:    pubKeyBLS,
+		RawPublicKeyBLS: rpk,
+	}
 
 	m.AddStake(stake)
 
@@ -206,6 +219,17 @@ func (p *Provisioners) TotalWeight() (totalWeight uint64) {
 	return totalWeight
 }
 
+// GetRawPublicKeyBLS returns a member uncompressed BLS public key.
+// Returns nil if member not found.
+func (p Provisioners) GetRawPublicKeyBLS(pubKeyBLS []byte) []byte {
+	m, ok := p.Members[string(pubKeyBLS)]
+	if !ok {
+		return nil
+	}
+
+	return m.RawPublicKeyBLS
+}
+
 // MarshalProvisioners ...
 func MarshalProvisioners(r *bytes.Buffer, p *Provisioners) error {
 	if err := encoding.WriteVarInt(r, uint64(len(p.Members))); err != nil {
@@ -223,6 +247,10 @@ func MarshalProvisioners(r *bytes.Buffer, p *Provisioners) error {
 
 func marshalMember(r *bytes.Buffer, member Member) error {
 	if err := encoding.WriteVarBytes(r, member.PublicKeyBLS); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarBytes(r, member.RawPublicKeyBLS); err != nil {
 		return err
 	}
 
@@ -288,6 +316,10 @@ func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 func unmarshalMember(r *bytes.Buffer) (*Member, error) {
 	member := &Member{}
 	if err := encoding.ReadVarBytes(r, &member.PublicKeyBLS); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.ReadVarBytes(r, &member.RawPublicKeyBLS); err != nil {
 		return nil, err
 	}
 

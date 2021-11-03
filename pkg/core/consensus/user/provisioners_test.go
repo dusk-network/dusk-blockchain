@@ -14,6 +14,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -84,4 +85,18 @@ func TestGetMember(t *testing.T) {
 		assert.Equal(t, uint64(500), s)
 		assert.Equal(t, m.PublicKeyBLS, tk)
 	}
+}
+
+func TestMarshalProvisioners(t *testing.T) {
+	p, _ := consensus.MockProvisioners(1)
+
+	buf := bytes.Buffer{}
+
+	err := user.MarshalProvisioners(&buf, p)
+	assert.NoError(t, err)
+
+	p2, err := user.UnmarshalProvisioners(&buf)
+	assert.NoError(t, err)
+
+	assert.True(t, p.Set.Equal(p2.Set))
 }
