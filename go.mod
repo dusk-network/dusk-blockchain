@@ -94,3 +94,5 @@ require (
 )
 
 go 1.17
+
+replace google.golang.org/protobuf => google.golang.org/protobuf v1.26.1-0.20210525005349-febffdd88e85
