@@ -29,15 +29,18 @@ type ProcessorFunc func(srcPeerID string, m message.Message) ([]bytes.Buffer, er
 // MessageProcessor is connected to all of the processing units that are tied to the peer.
 // It sends an incoming message in the right direction, according to its topic.
 type MessageProcessor struct {
-	dupeMap    *dupemap.DupeMap
-	processors map[topics.Topic]ProcessorFunc
+	dupeMap, repropagateMap *dupemap.DupeMap
+	processors              map[topics.Topic]ProcessorFunc
+	bus                     eventbus.Broker
 }
 
 // NewMessageProcessor returns an initialized MessageProcessor.
 func NewMessageProcessor(bus eventbus.Broker) *MessageProcessor {
 	return &MessageProcessor{
-		dupeMap:    dupemap.NewDupeMapDefault(),
-		processors: make(map[topics.Topic]ProcessorFunc),
+		dupeMap:        dupemap.NewDupeMapDefault(),
+		repropagateMap: dupemap.NewDupeMapDefault(),
+		processors:     make(map[topics.Topic]ProcessorFunc),
+		bus:            bus,
 	}
 }
 
@@ -99,6 +102,46 @@ func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
 	default:
 		return false
 	}
+}
+
+// Repropagate basic consensus messages.
+func (m *MessageProcessor) Repropagate(srcPeerID string, packet []byte, services protocol.ServiceFlag) error {
+	if len(packet) == 0 {
+		return errors.New("empty packet provided")
+	}
+
+	b := bytes.NewBuffer(packet)
+	topic := topics.Topic(b.Bytes()[0])
+
+	msg, err := message.Unmarshal(b, nil)
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling: %s - topic: %s", err, topic)
+	}
+
+	// Repropagate
+	category := msg.Category()
+	switch category {
+	case
+		topics.NewBlock,
+		topics.Reduction,
+		topics.Agreement:
+	default:
+		return nil
+	}
+
+	if !m.repropagateMap.HasAnywhere(bytes.NewBuffer(msg.Id())) {
+		return nil
+	}
+
+	buf, err := message.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	serialized := message.New(msg.Category(), buf)
+	m.bus.Publish(topics.Gossip, serialized)
+
+	return nil
 }
 
 func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respRingBuf *ring.Buffer, services protocol.ServiceFlag) ([]bytes.Buffer, error) {

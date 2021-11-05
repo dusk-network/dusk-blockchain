@@ -337,6 +337,10 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 			return
 		}
 
+		if err = p.processor.Repropagate(p.Addr(), message, p.services); err != nil {
+			plog.Error(err)
+		}
+
 		go func() {
 			// TODO: error here should be checked in order to decrease reputation
 			// or blacklist spammers
