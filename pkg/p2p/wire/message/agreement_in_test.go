@@ -5,6 +5,7 @@
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
 package message
+
 import (
 	"bytes"
 	"testing"
