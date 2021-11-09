@@ -11,7 +11,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/dusk-network/bls12_381-sign/bls12_381-sign-go/bls"
+	"github.com/dusk-network/bls12_381-sign/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
