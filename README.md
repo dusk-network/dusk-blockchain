@@ -29,7 +29,7 @@ NOTE: This guide assumes you are building and running from a UNIX-like operating
 
 ### Requirements
 
-[Go](https://golang.org/) 1.14 or newer.
+[Go](https://golang.org/) 1.17 or newer.
 
 ### Installation
 
