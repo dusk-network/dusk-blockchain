@@ -251,7 +251,7 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 	}
 	l := loop.New(e, &pk)
 
-	c, err := New(context.Background(), db, eb, loader, &MockVerifier{}, nil, proxy, l)
+	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, l)
 	assert.NoError(t, err)
 
 	c.RestartConsensus()

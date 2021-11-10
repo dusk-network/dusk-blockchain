@@ -19,6 +19,7 @@ require (
 	github.com/facebookgo/stats v0.0.0-20151006221625-1b76add642e4 // indirect
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
 	github.com/go-chi/render v1.0.1
+	github.com/golangci/golangci-lint v1.31.0 // indirect
 	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/google/gofountain v0.0.0-20160820054803-4928733085e9
 	github.com/gorilla/context v1.1.1 // indirect

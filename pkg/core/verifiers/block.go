@@ -17,6 +17,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
+// ErrPrevBlockHash Previous block hash does not equal the previous hash in the current block.
+var ErrPrevBlockHash = errors.New("Previous block hash does not equal the previous hash in the current block")
+
 // CheckBlockCertificate ensures that the block certificate is valid.
 func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block, seed []byte) error {
 	// TODO: this should be set back to 1, once we fix this issue:
@@ -73,7 +76,7 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 
 	// blk.Headerhash = prevHeaderHash
 	if !bytes.Equal(blk.Header.PrevBlockHash, prevBlock.Header.Hash) {
-		return errors.New("Previous block hash does not equal the previous hash in the current block")
+		return ErrPrevBlockHash
 	}
 
 	// blk.Headerheight = prevHeaderHeight +1
