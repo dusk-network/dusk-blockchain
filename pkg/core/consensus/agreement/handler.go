@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"math"
 	"time"
 
@@ -191,7 +192,7 @@ func verifyWhole(a message.Agreement) error {
 
 // AggregatePks reconstructs an aggregated BLS public key from a subcommittee.
 func AggregatePks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
-	if UseCompressedKeys {
+	if cfg.Get().Consensus.UseCompressedKeys {
 		return aggregateCompressedPks(subcommittee)
 	}
 
