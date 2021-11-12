@@ -24,6 +24,5 @@ type Ledger interface {
 	RestartConsensus() error
 	// StopConsensus signals the consensus loop to terminate if exists.
 	StopConsensus()
-
 	ProcessSyncTimerExpired(strPeerAddr string) error
 }

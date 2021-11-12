@@ -100,9 +100,7 @@ type Transaction interface {
 
 	// StoreCandidateMessage will...
 	StoreCandidateMessage(cm block.Block) error
-
 	FetchCandidateMessage(hash []byte) (block.Block, error)
-
 	ClearCandidateMessages() error
 
 	// ClearDatabase will remove all information from the database.
@@ -127,7 +125,6 @@ type DB interface {
 	// Transaction commit will happen only if no error is returned by `fn`
 	// and no panic is raised on `fn` execution.
 	Update(fn func(t Transaction) error) error
-
 	Close() error
 }
 

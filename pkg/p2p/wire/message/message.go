@@ -52,7 +52,6 @@ type Message interface {
 	// the unmarshaling of incoming messages. In case the message has been
 	// created internally and never serialized, this should return an empty buffer.
 	CachedBinary() bytes.Buffer
-
 	Header() []byte
 }
 

@@ -10,9 +10,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"math"
 	"time"
+
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/bls12_381-sign/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
