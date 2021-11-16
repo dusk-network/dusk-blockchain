@@ -35,10 +35,8 @@ import (
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
 
-var (
-	ErrBlockAlreadyAccepted   = errors.New("discarded block from the past")
-	ErrBlockFromHighIteration = errors.New("new block is from higher round iteration")
-)
+// ErrBlockAlreadyAccepted block already known by blockchain state.
+var ErrBlockAlreadyAccepted = errors.New("discarded block from the past")
 
 // TODO: This Verifier/Loader interface needs to be re-evaluated and most likely
 // renamed. They don't make too much sense on their own (the `Loader` also
