@@ -7,6 +7,9 @@
 package block
 
 import (
+	"bytes"
+	"errors"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/merkletree"
@@ -106,4 +109,22 @@ func (b *Block) Equals(other *Block) bool {
 	}
 
 	return true
+}
+
+// Tx returns transaction by id if exists.
+func (b Block) Tx(txid []byte) (transactions.ContractCall, error) {
+	if b.Txs != nil {
+		for _, tx := range b.Txs {
+			h, err := tx.CalculateHash()
+			if err != nil {
+				continue
+			}
+
+			if bytes.Equal(h, txid) {
+				return tx, nil
+			}
+		}
+	}
+
+	return nil, errors.New("not found")
 }
