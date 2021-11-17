@@ -53,7 +53,7 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 	}
 	lp := loop.New(e, &pk)
 
-	c, err := chain.New(ctx, db, eb, l, l, nil, proxy, lp)
+	c, err := chain.New(ctx, db, eb, rb, l, l, nil, proxy, lp)
 	assert.NoError(err)
 	return &node{chain: c}
 }
