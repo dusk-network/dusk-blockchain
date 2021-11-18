@@ -9,6 +9,7 @@ package agreement
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign-go/bls"
@@ -349,6 +350,13 @@ func (s *Loop) processAggrAgreement(ctx context.Context, h *handler, aggro messa
 	comm := h.Committee(hdr.Round, hdr.Step)
 
 	voters := comm.Intersect(aggro.Bitset)
+
+	subcommittee := comm.IntersectCluster(aggro.Bitset)
+
+	allVoters := subcommittee.TotalOccurrences()
+	if allVoters < h.Quorum(hdr.Round) {
+		return nil, fmt.Errorf("vote set too small - %v/%v", allVoters, h.Quorum(hdr.Round))
+	}
 	// Aggregate keys
 	apk, err := AggregatePks(&h.Provisioners, voters)
 	if err != nil {
