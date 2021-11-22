@@ -27,6 +27,7 @@ func Generate(c Config) *block.Block {
 		TxRoot:        nil,
 		Seed:          c.seed,
 		Certificate:   block.EmptyCertificate(),
+		StateHash:     make([]byte, 32),
 	}
 
 	txs := make([]transactions.ContractCall, 0)

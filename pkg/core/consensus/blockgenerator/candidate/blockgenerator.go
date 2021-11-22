@@ -127,6 +127,7 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 		TxRoot:        nil,
 		Seed:          seed,
 		Certificate:   block.EmptyCertificate(),
+		StateHash:     make([]byte, 32),
 	}
 
 	// Construct the candidate block
