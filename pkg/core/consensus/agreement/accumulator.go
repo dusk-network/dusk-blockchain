@@ -63,11 +63,13 @@ func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
 		hdr := ev.State()
 
+		// Obtain corresponding block agreement cache given its hash
 		var s *store
 		if s = a.storeMap.getStoreByHash(hdr.BlockHash); s == nil {
 			s = a.storeMap.makeStoreByHash(hdr.BlockHash)
 		}
 
+		// Try to add agreement to our cache
 		collected := s.Get(hdr.Step)
 		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 

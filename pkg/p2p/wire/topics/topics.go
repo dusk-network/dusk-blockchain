@@ -43,6 +43,7 @@ const (
 	NewBlock
 	Reduction
 	Agreement
+	AggrAgreement
 
 	// Peer topics.
 	Gossip
@@ -122,6 +123,7 @@ var Topics = [...]topicBuf{
 	{NewBlock, *(bytes.NewBuffer([]byte{byte(NewBlock)})), "newblock"},
 	{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
 	{Agreement, *(bytes.NewBuffer([]byte{byte(Agreement)})), "agreement"},
+	{AggrAgreement, *(bytes.NewBuffer([]byte{byte(AggrAgreement)})), "aggragreement"},
 	{Gossip, *(bytes.NewBuffer([]byte{byte(Gossip)})), "gossip"},
 	{Unknown, *(bytes.NewBuffer([]byte{byte(Unknown)})), "unknown"},
 	{Reject, *(bytes.NewBuffer([]byte{byte(Reject)})), "reject"},

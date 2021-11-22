@@ -90,7 +90,7 @@ type succesfulAgreement struct {
 // GetControlFn creates a function that returns after a small sleep. This
 // simulates the agreement reaching consensus.
 func (c *succesfulAgreement) GetControlFn() consensus.ControlFn {
-	return func(_ context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) consensus.Results {
+	return func(_ context.Context, _ *consensus.Queue, _ <-chan message.Message, _ <-chan message.Message, _ consensus.RoundUpdate) consensus.Results {
 		c.wg.Wait()
 		return consensus.Results{Blk: *block.NewBlock(), Err: nil}
 	}
@@ -139,7 +139,7 @@ type unsuccesfulAgreement struct{}
 // GetControlFn creates a function that returns after a small sleep. This
 // simulates the agreement reaching consensus.
 func (c *unsuccesfulAgreement) GetControlFn() consensus.ControlFn {
-	return func(ctx context.Context, _ *consensus.Queue, _ <-chan message.Message, _ consensus.RoundUpdate) consensus.Results {
+	return func(ctx context.Context, _ *consensus.Queue, _ <-chan message.Message, _ <-chan message.Message, _ consensus.RoundUpdate) consensus.Results {
 		<-ctx.Done()
 		return consensus.Results{Blk: *block.NewBlock(), Err: errors.New("agreement failed")}
 	}

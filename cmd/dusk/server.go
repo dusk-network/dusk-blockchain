@@ -360,6 +360,7 @@ func registerPeerServices(processor *peer.MessageProcessor, db database.DB, even
 	processor.Register(topics.NewBlock, cp.Process)
 	processor.Register(topics.Reduction, cp.Process)
 	processor.Register(topics.Agreement, cp.Process)
+	processor.Register(topics.AggrAgreement, cp.Process)
 	processor.Register(topics.Challenge, responding.CompleteChallenge)
 }
 

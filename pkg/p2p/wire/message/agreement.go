@@ -50,7 +50,7 @@ type (
 	// the aggregated compressed signatures of all voters.
 	Agreement struct {
 		hdr          header.Header
-		signedVotes  []byte
+		signature    []byte
 		VotesPerStep []*StepVotes
 		Repr         *big.Int
 	}
@@ -76,9 +76,11 @@ func (a Agreement) String() string {
 
 	_, _ = sb.WriteString(a.hdr.String())
 	_, _ = sb.WriteString(" signature='")
-	_, _ = sb.WriteString(util.StringifyBytes(a.signedVotes))
+	_, _ = sb.WriteString(util.StringifyBytes(a.signature))
 	_, _ = sb.WriteString(" repr='")
 	_, _ = sb.WriteString(util.StringifyBytes(a.Repr.Bytes()))
+	_, _ = sb.WriteString(" voteslen='")
+	_, _ = sb.WriteString(fmt.Sprintf("%d", len(a.VotesPerStep)))
 
 	return sb.String()
 }
@@ -92,9 +94,9 @@ func (a Agreement) Copy() payload.Safe {
 	cpy := new(Agreement)
 	cpy.hdr = a.hdr.Copy().(header.Header)
 
-	if a.signedVotes != nil {
-		cpy.signedVotes = make([]byte, len(a.signedVotes))
-		copy(cpy.signedVotes, a.signedVotes)
+	if a.signature != nil {
+		cpy.signature = make([]byte, len(a.signature))
+		copy(cpy.signature, a.signature)
 	}
 
 	cpy.Repr = new(big.Int)
@@ -197,14 +199,14 @@ func (a Agreement) Cmp(other Agreement) int {
 }
 
 // SetSignature set a signature to the Agreement.
-func (a *Agreement) SetSignature(signedVotes []byte) {
-	a.Repr = new(big.Int).SetBytes(signedVotes)
-	a.signedVotes = signedVotes
+func (a *Agreement) SetSignature(signature []byte) {
+	a.Repr = new(big.Int).SetBytes(signature)
+	a.signature = signature
 }
 
-// SignedVotes returns the signed vote.
-func (a Agreement) SignedVotes() []byte {
-	return a.signedVotes
+// Signature returns the signed vote.
+func (a Agreement) Signature() []byte {
+	return a.signature
 }
 
 // Equal checks if two agreement messages are the same.
@@ -270,7 +272,7 @@ func MarshalAgreement(r *bytes.Buffer, a Agreement) error {
 	}
 
 	// Marshal BLS Signature of VoteSet
-	if err := encoding.WriteVarBytes(r, a.SignedVotes()); err != nil {
+	if err := encoding.WriteVarBytes(r, a.Signature()); err != nil {
 		return err
 	}
 
@@ -287,15 +289,17 @@ func MarshalAgreement(r *bytes.Buffer, a Agreement) error {
 // * Header [BLS Public Key; Round; Step]
 // * Agreement [Signed Vote Set; Vote Set; BlockHash].
 func UnmarshalAgreement(r *bytes.Buffer, a *Agreement) error {
-	signedVotes := make([]byte, 0)
-	if err := encoding.ReadVarBytes(r, &signedVotes); err != nil {
+	signature := make([]byte, 0)
+	if err := encoding.ReadVarBytes(r, &signature); err != nil {
+		log.WithError(err).Errorln("failed to unmarshal signature")
 		return err
 	}
 
-	a.SetSignature(signedVotes)
+	a.SetSignature(signature)
 
 	votesPerStep := make([]*StepVotes, 2)
 	if err := UnmarshalVotes(r, votesPerStep); err != nil {
+		log.WithError(err).Errorln("failed to unmarshal step votes")
 		return err
 	}
 
@@ -318,7 +322,7 @@ func newAgreement() *Agreement {
 	return &Agreement{
 		hdr:          header.Header{},
 		VotesPerStep: make([]*StepVotes, 2),
-		signedVotes:  make([]byte, 33),
+		signature:    make([]byte, 33),
 		Repr:         new(big.Int),
 	}
 }
@@ -350,7 +354,7 @@ func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	// Agreement can only ever have two StepVotes, for the two
 	// reduction steps.
 	if length != 2 {
-		return errors.New("malformed Agreement message")
+		return errors.New("malformed Agreement message: " + fmt.Sprintf("Got %d StepVotes (expected 2)", length))
 	}
 
 	for i := uint64(0); i < length; i++ {
@@ -372,7 +376,7 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 	// BitSet
 	var err error
 	if err = encoding.ReadUint64LE(r, &sv.BitSet); err != nil {
-		log.WithError(err).Errorln("failed to unmarshal bitset")
+		log.WithError(err).Errorln("failed to unmarshal stepvotes")
 		return nil, err
 	}
 
@@ -390,7 +394,13 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 // MarshalVotes marshals an array of StepVotes.
 func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	if err := encoding.WriteVarInt(r, uint64(len(votes))); err != nil {
+		log.WithError(err).Errorln("failed to marshal votes length")
 		return err
+	}
+
+	if len(votes) != 2 {
+		log.Infoln("failed to marshal step votes, 2 votes are required")
+		return errors.New("failed to marshal step votes, 2 votes are required")
 	}
 
 	for _, stepVotes := range votes {
@@ -405,12 +415,8 @@ func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 // MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature
 // for an ordered set of votes.
 func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
-	// #611
 	if vote == nil || vote.Signature == nil {
-		log.
-			WithField("vote", vote).
-			Error("could not MarshalStepVotes")
-
+		log.WithField("vote", vote).Error("could not MarshalStepVotes")
 		return errors.New("invalid stepVotes")
 	}
 
