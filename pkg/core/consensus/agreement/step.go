@@ -57,9 +57,6 @@ func (s *Loop) GetControlFn() consensus.ControlFn {
 
 // Run the agreement step loop.
 func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementChan <-chan message.Message, aggrAgreementChan <-chan message.Message, r consensus.RoundUpdate) consensus.Results {
-	var err error
-	var blk block.Block
-
 	// creating accumulator and handler
 	handler := NewHandler(s.Keys, r.P, r.Seed)
 	acc := newAccumulator(handler, WorkerAmount)
@@ -79,13 +76,8 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 			go collectEvent(handler, acc, ev, s.Emitter)
 		case topics.AggrAgreement:
 			// AggrAgreement - Verify, broadcast and create a block candidate
-			var res *consensus.Results
-
-			// Parse message
-			aggr := ev.Payload().(message.AggrAgreement)
-
 			// Process aggregated agreement
-			res, err = s.processAggrAgreement(ctx, handler, aggr, r, s.Emitter)
+			res, err := s.processAggrAgreement(ctx, handler, ev, r, s.Emitter)
 			if err != nil {
 				lg.WithError(err).Errorln("failed to process aggragreement")
 			} else {
@@ -105,94 +97,47 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 		select {
 		// 1a - CollectedVotesChan: We give priority to our own certificate in case it gets produced in time
 		case evs := <-acc.CollectedVotesChan:
-			lg.
-				WithField("round", r.Round).
-				WithField("step", evs[0].State().Step).
-				WithField("stepvotes", evs[0].VotesPerStep).
-				WithField("hash", util.StringifyBytes(evs[0].State().BlockHash)).
-				Info("consensus_achieved")
-
-			// Aggregate all agreement signatures into a single BLS signature
-			sigs := [][]byte{}
-			comm := handler.Committee(r.Round, evs[0].State().Step)
-			pubs := new(sortedset.Set)
-
-			for _, a := range evs {
-				if pubs.Insert(a.State().PubKeyBLS) {
-					sigs = append(sigs, a.Signature())
-				}
-			}
-
-			sig := sigs[0]
-			if len(sigs) > 1 {
-				sig, err = bls.AggregateSig(sigs[0], sigs[1:]...)
-				if err != nil {
-					lg.WithError(err).Error("could not aggregate signatures")
-				}
-			}
-
-			// TODO: #1192 - Propagate AggrAgreement
-			// Create new message
-			bits := comm.Bits(*pubs)
-			agAgreement := message.NewAggrAgreement(evs[0], bits, sig)
-			buf := new(bytes.Buffer)
-
-			err = header.Marshal(buf, evs[0].State())
-			if err != nil {
-				lg.WithError(err).Errorln("failed to marshal aggr agreement header")
-			}
-
-			m := message.NewWithHeader(topics.AggrAgreement, agAgreement, config.KadcastInitHeader)
-			if err = s.Emitter.Republish(m); err != nil {
-				lg.WithError(err).Error("could not republish aggregated agreement event")
-			} else {
-				lg.
-					WithField("round", r.Round).
-					WithField("step", agAgreement.State().Step).
-					WithField("hash", util.StringifyBytes(agAgreement.State().BlockHash)).
-					WithField("bitset", agAgreement.Bitset).
-					Infoln("aggragreement republished")
-			}
-
-			// Create a block and return
-			cert := evs[0].GenerateCertificate()
-
-			blk, err = s.createWinningBlock(ctx, evs[0].State().BlockHash, cert)
-			if err != nil {
-				lg.WithError(err).Errorln("failed to create a winning block")
-			}
-
-			return consensus.Results{Blk: blk, Err: err}
-
+			return s.processCollectedVotes(ctx, handler, evs, r)
 		// 1b - CertificateChan: Certificate sent by other nodes
 		case cert := <-aggrAgreementChan:
-			if s.shouldCollectAggrNow(cert, r.Round, roundQueue) {
+			if s.shouldCollectNow(cert, r.Round, roundQueue) {
 				// AggrAgreement - Verify, broadcast and create a block candidate
-				var res *consensus.Results
-				// Parse message
-				aggr := cert.Payload().(message.AggrAgreement)
 				// Process aggregated agreement
-				res, err = s.processAggrAgreement(ctx, handler, aggr, r, s.Emitter)
-				if err != nil {
+				if res, err := s.processAggrAgreement(ctx, handler, cert, r, s.Emitter); err != nil {
 					lg.WithError(err).Errorln("failed to process aggr agreement")
 				} else {
 					return *res // TODO: Might be wise to do a copy before returning
 				}
 			}
-
 		// 1c - Context.Done()
 		case <-ctx.Done():
 			// finalize the worker pool
 			return consensus.Results{Blk: block.Block{}, Err: context.Canceled}
 		default:
 			select {
+			// 1a - CollectedVotesChan: We give priority to our own certificate in case it gets produced in time
+			case evs := <-acc.CollectedVotesChan:
+				return s.processCollectedVotes(ctx, handler, evs, r)
+			// 1b - CertificateChan: Certificate sent by other nodes
+			case cert := <-aggrAgreementChan:
+				if s.shouldCollectNow(cert, r.Round, roundQueue) {
+					// AggrAgreement - Verify, broadcast and create a block candidate
+					// Process aggregated agreement
+					if res, err := s.processAggrAgreement(ctx, handler, cert, r, s.Emitter); err != nil {
+						lg.WithError(err).Errorln("failed to process aggr agreement")
+					} else {
+						return *res // TODO: Might be wise to do a copy before returning
+					}
+				}
+			// 1c - Context.Done()
+			case <-ctx.Done():
+				// finalize the worker pool
+				return consensus.Results{Blk: block.Block{}, Err: context.Canceled}
 			// 2 - AgreementChan: Collect agreement messages
 			case m := <-agreementChan:
 				if s.shouldCollectNow(m, r.Round, roundQueue) {
 					go collectEvent(handler, acc, m, s.Emitter)
 				}
-			default:
-				continue
 			}
 		}
 	}
@@ -202,15 +147,28 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 // If we get many future events (in which case we might want to return an error
 // to trigger a synchronization).
 func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensus.Queue) bool {
-	hdr := a.Payload().(message.Agreement).State()
+	var hdr header.Header
+	var topicstr string
+
+	switch a.Category() {
+	case topics.Agreement:
+		hdr = a.Payload().(message.Agreement).State()
+		topicstr = "Agreement"
+	case topics.AggrAgreement:
+		hdr = a.Payload().(message.AggrAgreement).State()
+		topicstr = "AggrAgreement"
+	default:
+		return false
+	}
+
 	if hdr.Round < round {
 		lg.
 			WithFields(log.Fields{
-				"topic":  "Agreement",
+				"topic":  topicstr,
 				"round":  hdr.Round,
 				"curr_h": round,
 			}).
-			Debugln("discarding obsolete agreement")
+			Debugln("discarding obsolete message")
 		return false
 	}
 
@@ -221,7 +179,7 @@ func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensu
 			// Only store events up to 10 rounds into the future
 			lg.
 				WithFields(log.Fields{
-					"topic":  "Agreement",
+					"topic":  topicstr,
 					"round":  hdr.Round,
 					"curr_h": round,
 				}).
@@ -230,56 +188,11 @@ func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensu
 		} else {
 			lg.
 				WithFields(log.Fields{
-					"topic":  "Agreement",
+					"topic":  topicstr,
 					"round":  hdr.Round,
 					"curr_h": round,
 				}).
-				Info("discarding too-far agreement")
-		}
-
-		return false
-	}
-
-	return true
-}
-
-// TODO: consider adding a deadline for the Agreements collection and monitor.
-// If we get many future events (in which case we might want to return an error
-// to trigger a synchronization).
-func (s *Loop) shouldCollectAggrNow(a message.Message, round uint64, queue *consensus.Queue) bool {
-	hdr := a.Payload().(message.AggrAgreement).State()
-	if hdr.Round < round {
-		lg.
-			WithFields(log.Fields{
-				"topic":  "AggrAgreement",
-				"round":  hdr.Round,
-				"curr_h": round,
-			}).
-			Debugln("discarding obsolete aggragreement")
-		return false
-	}
-
-	// XXX: According to protocol specs, we should abandon consensus
-	// if we notice valid messages from far into the future.
-	if hdr.Round > round {
-		if hdr.Round-round < 10 {
-			// Only store events up to 10 rounds into the future
-			lg.
-				WithFields(log.Fields{
-					"topic":  "AggrAgreement",
-					"round":  hdr.Round,
-					"curr_h": round,
-				}).
-				Debugln("storing future round for later")
-			queue.PutEvent(hdr.Round, hdr.Step, a)
-		} else {
-			lg.
-				WithFields(log.Fields{
-					"topic":  "AggrAgreement",
-					"round":  hdr.Round,
-					"curr_h": round,
-				}).
-				Info("discarding too-far aggragreement")
+				Info("discarding too-far message")
 		}
 
 		return false
@@ -333,9 +246,73 @@ func collectEvent(h *handler, accumulator *Accumulator, ev message.Message, e *c
 	accumulator.Process(a)
 }
 
-func (s *Loop) processAggrAgreement(ctx context.Context, h *handler, aggro message.AggrAgreement, r consensus.RoundUpdate, e *consensus.Emitter) (*consensus.Results, error) {
+func (s *Loop) processCollectedVotes(ctx context.Context, handler *handler, evs []message.Agreement, r consensus.RoundUpdate) consensus.Results {
+	lg.
+		WithField("round", r.Round).
+		WithField("step", evs[0].State().Step).
+		WithField("stepvotes", evs[0].VotesPerStep).
+		WithField("hash", util.StringifyBytes(evs[0].State().BlockHash)).
+		Info("consensus_achieved")
+
+	// Aggregate all agreement signatures into a single BLS signature
+	sigs := [][]byte{}
+	comm := handler.Committee(r.Round, evs[0].State().Step)
+	pubs := new(sortedset.Set)
+
+	for _, a := range evs {
+		if pubs.Insert(a.State().PubKeyBLS) {
+			sigs = append(sigs, a.Signature())
+		}
+	}
+
+	sig := sigs[0]
+
+	if len(sigs) > 1 {
+		if sigagg, err := bls.AggregateSig(sig, sigs[1:]...); err != nil {
+			lg.WithError(err).Error("could not aggregate signatures")
+		} else {
+			sig = sigagg
+		}
+	}
+
+	// TODO: #1192 - Propagate AggrAgreement
+	// Create new message
+	bits := comm.Bits(*pubs)
+	agAgreement := message.NewAggrAgreement(evs[0], bits, sig)
+	buf := new(bytes.Buffer)
+
+	if err := header.Marshal(buf, evs[0].State()); err != nil {
+		lg.WithError(err).Errorln("failed to marshal aggr agreement header")
+	}
+
+	m := message.NewWithHeader(topics.AggrAgreement, agAgreement, config.KadcastInitHeader)
+	if err := s.Emitter.Republish(m); err != nil {
+		lg.WithError(err).Error("could not republish aggregated agreement event")
+	} else {
+		lg.
+			WithField("round", r.Round).
+			WithField("step", agAgreement.State().Step).
+			WithField("hash", util.StringifyBytes(agAgreement.State().BlockHash)).
+			WithField("bitset", agAgreement.Bitset).
+			Infoln("aggragreement republished")
+	}
+
+	// Create a block and return
+	cert := evs[0].GenerateCertificate()
+
+	blk, err := s.createWinningBlock(ctx, evs[0].State().BlockHash, cert)
+	if err != nil {
+		lg.WithError(err).Errorln("failed to create a winning block")
+	}
+
+	return consensus.Results{Blk: blk, Err: err}
+}
+
+func (s *Loop) processAggrAgreement(ctx context.Context, h *handler, msg message.Message, r consensus.RoundUpdate, e *consensus.Emitter) (*consensus.Results, error) {
 	var err error
 	var blk block.Block
+
+	aggro := msg.Payload().(message.AggrAgreement)
 
 	hdr := aggro.State()
 
