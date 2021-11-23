@@ -7,7 +7,7 @@
 package key
 
 import (
-	"github.com/dusk-network/bls12_381-sign-go/bls"
+	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
 )
 
 // Keys are the keys used during consensus.

@@ -13,7 +13,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/dusk-network/bls12_381-sign-go/bls"
+	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
