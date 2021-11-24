@@ -20,8 +20,12 @@ import (
 func TestGenerate(t *testing.T) {
 	hlp := candidate.NewHelper(50, time.Second)
 
+	fn := func(ctx context.Context, txs []transactions.ContractCall) ([]transactions.ContractCall, error) {
+		return txs, nil
+	}
+
 	_, pubKey := transactions.MockKeys()
-	gen := candidate.New(hlp.Emitter, pubKey)
+	gen := candidate.New(hlp.Emitter, pubKey, fn)
 
 	ctx := context.Background()
 

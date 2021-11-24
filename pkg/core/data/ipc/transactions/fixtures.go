@@ -46,6 +46,12 @@ func (p *PermissiveExecutor) VerifyStateTransition(ctx context.Context, cc []Con
 	return cc, nil
 }
 
+// FilterTransactions returns all ContractCalls deemed valid.
+func (p *PermissiveExecutor) FilterTransactions(ctx context.Context, txs []ContractCall) ([]ContractCall, error) {
+	time.Sleep(stateTransitionDelay)
+	return txs, nil
+}
+
 // ExecuteStateTransition performs a global state mutation and steps the
 // block-height up.
 func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, height uint64) (user.Provisioners, error) {

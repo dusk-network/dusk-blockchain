@@ -79,6 +79,10 @@ type Executor interface {
 	// height. It returns those ContractCalls deemed valid.
 	VerifyStateTransition(context.Context, []ContractCall, uint64) ([]ContractCall, error)
 
+	// FilterTransactions takes a bunch of ContractCalls and the block
+	// height. It returns those ContractCalls deemed valid.
+	FilterTransactions(context.Context, []ContractCall) ([]ContractCall, error)
+
 	// ExecuteStateTransition performs a global state mutation and steps the
 	// block-height up.
 	ExecuteStateTransition(context.Context, []ContractCall, uint64) (user.Provisioners, error)
@@ -350,6 +354,15 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 
 	provisioners.Members = memberMap
 	return *provisioners, nil
+}
+
+// FilterTransactions takes a bunch of ContractCalls and the block
+// height. It returns those ContractCalls deemed valid.
+func (e *executor) FilterTransactions(ctx context.Context, txs []ContractCall) ([]ContractCall, error) {
+	// TODO:// res, err := e.stateClient.FilterTransactions(ctx, vstr)
+
+	time.Sleep(2 * time.Second)
+	return txs, nil
 }
 
 func (e *executor) GetProvisioners(ctx context.Context) (user.Provisioners, error) {

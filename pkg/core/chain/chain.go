@@ -432,8 +432,14 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 	}
 
 	// TODO: consider using the context for timeouts
+	// TODO: Pass block gas limit here
 	_, err := c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, blk.Header.Height)
 	return err
+}
+
+func (c *Chain) FilterTransactions(ctx context.Context, txs []transactions.ContractCall) ([]transactions.ContractCall, error) {
+	// TODO: Pass block gas limit here
+	return c.proxy.Executor().FilterTransactions(c.ctx, txs)
 }
 
 // propagateBlock send inventory message to all peers in gossip network or rebroadcast block in kadcast network.

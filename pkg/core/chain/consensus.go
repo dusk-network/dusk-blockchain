@@ -97,7 +97,7 @@ func (c *Chain) asyncSpin(ctx context.Context, winnerChan chan consensus.Results
 		WithField("prov_size", ru.P.Set.Len()).Debug("start consensus_spin")
 
 	if c.loop != nil {
-		scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock)
+		scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock, c.FilterTransactions)
 		if err != nil {
 			log.WithError(err).Error("could not create consensus state machine")
 			return err

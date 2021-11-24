@@ -8,6 +8,7 @@ package consensus
 
 import (
 	"bytes"
+	"context"
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
@@ -17,6 +18,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -38,6 +40,9 @@ type (
 	// CandidateVerificationFunc is a callback used to verify candidate blocks
 	// after the conclusion of the first reduction step.
 	CandidateVerificationFunc func(block.Block) error
+
+	// FilterTxsFunc is a callback used to retrieve a valid set of txs.
+	FilterTxsFunc func(ctx context.Context, txs []transactions.ContractCall) ([]transactions.ContractCall, error)
 
 	// Emitter is a simple struct to pass the communication channels that the steps should be
 	// able to emit onto.

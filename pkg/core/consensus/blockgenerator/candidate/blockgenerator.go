@@ -42,13 +42,16 @@ type Generator interface {
 type generator struct {
 	*consensus.Emitter
 	genPubKey *keys.PublicKey
+
+	filter consensus.FilterTxsFunc
 }
 
 // New creates a new block generator.
-func New(e *consensus.Emitter, genPubKey *keys.PublicKey) Generator {
+func New(e *consensus.Emitter, genPubKey *keys.PublicKey, f consensus.FilterTxsFunc) Generator {
 	return &generator{
 		Emitter:   e,
 		genPubKey: genPubKey,
+		filter:    f,
 	}
 }
 
@@ -114,6 +117,11 @@ func (bg *generator) Generate(seed []byte, keys [][]byte, r consensus.RoundUpdat
 // with transactions from the mempool.
 func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
 	txs, err := bg.ConstructBlockTxs(keys)
+	if err != nil {
+		return nil, err
+	}
+
+	txs, err = bg.filter(context.Background(), txs)
 	if err != nil {
 		return nil, err
 	}
