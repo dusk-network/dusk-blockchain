@@ -5,7 +5,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/drewolson/testflight v1.0.0
-	github.com/dusk-network/bls12_381-sign-go v0.1.3
+	github.com/dusk-network/bls12_381-sign/go/cgo/bls v0.1.4
 	github.com/dusk-network/dusk-crypto v0.1.3
 	github.com/dusk-network/dusk-protobuf v0.2.18
 	github.com/etherlabsio/healthcheck v0.0.0-20191224061800-dd3d2fd8c3f6
@@ -24,7 +24,7 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.1
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/buntdb v1.2.4
 	github.com/urfave/cli v1.22.3
