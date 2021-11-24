@@ -86,7 +86,6 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 		}
 	}
 
-high_priority_loop:
 	for {
 		// Priority:
 		// 1a - CollectedVotesChan: We give priority to our own certificate in case it gets produced in time
@@ -115,6 +114,7 @@ high_priority_loop:
 			// finalize the worker pool
 			return consensus.Results{Blk: block.Block{}, Err: context.Canceled}
 		default:
+		low_priority:
 			select {
 			// 1a - CollectedVotesChan: We give priority to our own certificate in case it gets produced in time
 			case evs := <-acc.CollectedVotesChan:
@@ -139,7 +139,7 @@ high_priority_loop:
 				if s.shouldCollectNow(m, r.Round, roundQueue) {
 					go collectEvent(handler, acc, m, s.Emitter)
 				}
-				continue high_priority_loop
+				break low_priority
 			}
 		}
 	}
