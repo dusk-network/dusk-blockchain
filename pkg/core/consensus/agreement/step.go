@@ -86,6 +86,7 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 		}
 	}
 
+high_priority_loop:
 	for {
 		// Priority:
 		// 1a - CollectedVotesChan: We give priority to our own certificate in case it gets produced in time
@@ -138,6 +139,7 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 				if s.shouldCollectNow(m, r.Round, roundQueue) {
 					go collectEvent(handler, acc, m, s.Emitter)
 				}
+				continue high_priority_loop
 			}
 		}
 	}
