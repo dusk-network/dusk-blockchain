@@ -139,7 +139,7 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 				if s.shouldCollectNow(m, r.Round, roundQueue) {
 					go collectEvent(handler, acc, m, s.Emitter)
 				}
-				break low_priority
+				break low_priority // Prevents us from getting stuck in the low priority select
 			}
 		}
 	}
