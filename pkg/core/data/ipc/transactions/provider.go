@@ -85,7 +85,7 @@ type Executor interface {
 
 	// ExecuteStateTransition performs a global state mutation and steps the
 	// block-height up.
-	ExecuteStateTransition(context.Context, []ContractCall, uint64) (user.Provisioners, error)
+	ExecuteStateTransition(context.Context, []ContractCall, uint64) (user.Provisioners, []byte, error)
 
 	// GetProvisioners returns the current set of provisioners.
 	GetProvisioners(ctx context.Context) (user.Provisioners, error)
@@ -311,7 +311,7 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 
 // ExecuteStateTransition performs a global state mutation and steps the
 // block-height up.
-func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall, height uint64) (user.Provisioners, error) {
+func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall, height uint64) (user.Provisioners, []byte, error) {
 	vstr := new(rusk.ExecuteStateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.Height = height
@@ -319,7 +319,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
 		if err := MTransaction(tx, call.(*Transaction)); err != nil {
-			return user.Provisioners{}, err
+			return user.Provisioners{}, nil, err
 		}
 
 		vstr.Txs[i] = tx
@@ -328,13 +328,16 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
+	// TODO: Replace this once Rusk schema is updated
+	stateHash, _ := calls[0].CalculateHash()
+
 	res, err := e.stateClient.ExecuteStateTransition(ctx, vstr)
 	if err != nil {
-		return user.Provisioners{}, err
+		return user.Provisioners{}, nil, err
 	}
 
 	if !res.Success {
-		return user.Provisioners{}, errors.New("unsuccessful state transition function execution")
+		return user.Provisioners{}, nil, errors.New("unsuccessful state transition function execution")
 	}
 
 	provisioners := user.NewProvisioners()
@@ -342,7 +345,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 
 	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})
 	if err != nil {
-		return user.Provisioners{}, err
+		return user.Provisioners{}, stateHash, err
 	}
 
 	for i := range pres.Provisioners {
@@ -353,7 +356,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	}
 
 	provisioners.Members = memberMap
-	return *provisioners, nil
+	return *provisioners, stateHash, nil
 }
 
 // FilterTransactions takes a bunch of ContractCalls and the block

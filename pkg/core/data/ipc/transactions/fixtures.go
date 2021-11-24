@@ -54,9 +54,9 @@ func (p *PermissiveExecutor) FilterTransactions(ctx context.Context, txs []Contr
 
 // ExecuteStateTransition performs a global state mutation and steps the
 // block-height up.
-func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, height uint64) (user.Provisioners, error) {
+func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, height uint64) (user.Provisioners, []byte, error) {
 	time.Sleep(stateTransitionDelay)
-	return *p.P, nil
+	return *p.P, make([]byte, 32), nil
 }
 
 // GetProvisioners returns current state of provisioners.

@@ -293,7 +293,7 @@ func (c *Chain) executeStateTransition(blk block.Block, l *logrus.Entry) error {
 		{
 			l.WithField("provisioners", provLen).Info("run state transition")
 
-			provUpdated, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
+			provUpdated, stateHash, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
 			if err != nil {
 				l.WithError(err).Error("Error in executing the state transition")
 				return err
@@ -301,10 +301,13 @@ func (c *Chain) executeStateTransition(blk block.Block, l *logrus.Entry) error {
 
 			l.WithField("provisioners", c.p.Set.Len()).
 				WithField("added", c.p.Set.Len()-provLen).
+				WithField("state_hash", util.StringifyBytes(stateHash)).
 				Info("state transition completed")
 
 			// Update the provisioners as blk.Txs may bring new provisioners to the current state
 			c.p = &provUpdated
+
+			blk.SetStateHash(stateHash)
 		}
 	case ruskHeight == c.tip.Header.Height+1:
 		{
@@ -437,6 +440,7 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 	return err
 }
 
+// FilterTransactions calls Rusk Filter Transaction grpc method.
 func (c *Chain) FilterTransactions(ctx context.Context, txs []transactions.ContractCall) ([]transactions.ContractCall, error) {
 	// TODO: Pass block gas limit here
 	return c.proxy.Executor().FilterTransactions(c.ctx, txs)
