@@ -47,6 +47,9 @@ var Header = graphql.NewObject(
 			"prevblockhash": &graphql.Field{
 				Type: Hex,
 			},
+			"statehash": &graphql.Field{
+				Type: Hex,
+			},
 			"seed": &graphql.Field{
 				Type: Hex,
 			},

@@ -127,7 +127,7 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 		TxRoot:        nil,
 		Seed:          seed,
 		Certificate:   block.EmptyCertificate(),
-		StateHash:     make([]byte, 32),
+		StateHash:     prevBlockHash,
 	}
 
 	// Construct the candidate block
@@ -183,6 +183,8 @@ func (bg *generator) ConstructBlockTxs(keys [][]byte) ([]transactions.ContractCa
 	// XXX: this needs to be adjusted
 	coinbaseTx := transactions.RandDistributeTx(config.GeneratorReward, len(keys))
 	txs = append(txs, coinbaseTx)
+
+	// TODO: VerifyStateTransition
 
 	return txs, nil
 }
