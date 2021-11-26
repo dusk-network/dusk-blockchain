@@ -56,9 +56,7 @@ type Consensus struct {
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing.
-func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey,
-	verifyFn consensus.CandidateVerificationFunc, filterFn consensus.FilterTxsFunc, requestor *candidate.Requestor) (consensus.Phase, consensus.Controller, error) {
-
+func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc, filterFn consensus.FilterTxsFunc, requestor *candidate.Requestor) (consensus.Phase, consensus.Controller, error) {
 	generator := blockgenerator.New(e, pubKey, filterFn)
 	selectionStep := CreateInitialStep(e, consensusTimeOut, generator, verifyFn, db, requestor)
 	agreementStep := agreement.New(e, db, requestor)

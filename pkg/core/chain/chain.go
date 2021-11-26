@@ -33,7 +33,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-var log = logger.WithFields(logger.Fields{"process": "chain"})
+var (
+	errInvalidStateHash = errors.New("invalid state hash")
+	log                 = logger.WithFields(logger.Fields{"process": "chain"})
+)
 
 // ErrBlockAlreadyAccepted block already known by blockchain state.
 var ErrBlockAlreadyAccepted = errors.New("discarded block from the past")
@@ -275,59 +278,42 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 	return nil
 }
 
-func (c *Chain) executeStateTransition(blk block.Block, l *logrus.Entry) error {
+func (c *Chain) executeStateTransition(prevBlk, blk block.Block, l *logrus.Entry) error {
 	// Ensure that both (co-deployed) services dusk and rusk are on the same
-	// height. If not, we should trigger a recovery procedure so both are
-	// always synced up. Rusk service is supposed to atomically update its
-	// height value only on a successful completion of execute state
-	// transition.
-	ruskHeight, err := c.proxy.Executor().GetHeight(c.ctx)
+	// state. If not, we should trigger a recovery procedure so both are
+	// always synced up.
+	stateHash, err := c.proxy.Executor().GetStateHash(c.ctx)
 	if err != nil {
 		return err
 	}
 
-	provLen := c.p.Set.Len()
+	if !bytes.Equal(prevBlk.Header.StateHash, stateHash) {
+		log.WithField("rusk", util.StringifyBytes(stateHash)).
+			WithError(errInvalidStateHash).
+			WithField("node", util.StringifyBytes(blk.Header.StateHash)).
+			Error("execute state transition failed")
 
-	switch {
-	case ruskHeight == c.tip.Header.Height: // both on the same height, both are synced up
-		{
-			l.WithField("provisioners", provLen).Info("run state transition")
-
-			provUpdated, stateHash, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
-			if err != nil {
-				l.WithError(err).Error("Error in executing the state transition")
-				return err
-			}
-
-			l.WithField("provisioners", c.p.Set.Len()).
-				WithField("added", c.p.Set.Len()-provLen).
-				WithField("state_hash", util.StringifyBytes(stateHash)).
-				Info("state transition completed")
-
-			// Update the provisioners as blk.Txs may bring new provisioners to the current state
-			c.p = &provUpdated
-
-			blk.SetStateHash(stateHash)
-		}
-	case ruskHeight == c.tip.Header.Height+1:
-		{
-			// Contract storage has already accepted txs at this height then we should
-			// not duplicate the ExecuteStateTransition call.
-			l.Warn("skip state transition")
-		}
-	case ruskHeight > c.tip.Header.Height+1:
-		{
-			// Out-of-sync state
-			// Contract storage is multiple blocks ahead
-			// TODO: Rebuild contract from Genesis block
-		}
-	case ruskHeight < c.tip.Header.Height:
-		{
-			// Out-of-sync state
-			// Contract storage has missed block updates.
-			// TODO: ExecuteStateTransition for the missing blocks
-		}
+		return errInvalidStateHash
 	}
+
+	provLen := c.p.Set.Len()
+	l.WithField("prov", provLen).Info("run state transition")
+
+	pu, sh, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
+	if err != nil {
+		l.WithError(err).Error("Error in executing the state transition")
+		return err
+	}
+
+	l.WithField("prov", c.p.Set.Len()).
+		WithField("added", c.p.Set.Len()-provLen).
+		WithField("state_hash", util.StringifyBytes(sh)).
+		Info("state transition completed")
+
+	// Update the provisioners as blk.Txs may bring new provisioners to the current state
+	c.p = &pu
+
+	blk.SetStateHash(sh)
 
 	return nil
 }
@@ -378,7 +364,7 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 	}
 
 	// 2. Execute State Transition to update Contract Storage
-	if err = c.executeStateTransition(blk, l); err != nil {
+	if err = c.executeStateTransition(*c.tip, blk, l); err != nil {
 		l.WithError(err).Error("execute state transition failed")
 		return err
 	}

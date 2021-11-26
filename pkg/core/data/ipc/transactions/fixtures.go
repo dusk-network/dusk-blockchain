@@ -64,9 +64,9 @@ func (p *PermissiveExecutor) GetProvisioners(ctx context.Context) (user.Provisio
 	return *p.P, nil
 }
 
-// GetHeight returns current state of rusk height.
-func (p *PermissiveExecutor) GetHeight(ctx context.Context) (uint64, error) {
-	return 0, nil
+// GetStateHash returns Rusk state hash.
+func (p *PermissiveExecutor) GetStateHash(ctx context.Context) ([]byte, error) {
+	return make([]byte, 32), nil
 }
 
 // MockProxy mocks a proxy for ease of testing.

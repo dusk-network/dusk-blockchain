@@ -121,6 +121,8 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 		return nil, err
 	}
 
+	// TODO: Would it be possible here to get state_root hash as result?
+	// TODO: Check with Rusk service if we could build the new state, get state_root hash and then discard the state.
 	txs, err = bg.filter(context.Background(), txs)
 	if err != nil {
 		return nil, err

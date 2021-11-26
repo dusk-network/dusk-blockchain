@@ -90,8 +90,8 @@ type Executor interface {
 	// GetProvisioners returns the current set of provisioners.
 	GetProvisioners(ctx context.Context) (user.Provisioners, error)
 
-	// GetHeight returns rusk state height
-	GetHeight(ctx context.Context) (uint64, error)
+	// GetHeight returns rusk state hash
+	GetStateHash(ctx context.Context) ([]byte, error)
 }
 
 // Proxy toward the rusk client.
@@ -329,7 +329,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	defer cancel()
 
 	// TODO: Replace this once Rusk schema is updated
-	stateHash, _ := calls[0].CalculateHash()
+	stateHash := make([]byte, 32)
 
 	res, err := e.stateClient.ExecuteStateTransition(ctx, vstr)
 	if err != nil {
@@ -362,8 +362,8 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 // FilterTransactions takes a bunch of ContractCalls and the block
 // height. It returns those ContractCalls deemed valid.
 func (e *executor) FilterTransactions(ctx context.Context, txs []ContractCall) ([]ContractCall, error) {
+	// TODO: Use grpc FilterTransactions once Rusk schema is updated
 	// TODO:// res, err := e.stateClient.FilterTransactions(ctx, vstr)
-
 	time.Sleep(2 * time.Second)
 	return txs, nil
 }
@@ -391,16 +391,10 @@ func (e *executor) GetProvisioners(ctx context.Context) (user.Provisioners, erro
 	return *provisioners, nil
 }
 
-func (e *executor) GetHeight(ctx context.Context) (uint64, error) {
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
-	defer cancel()
-
-	res, err := e.stateClient.GetHeight(ctx, &rusk.GetHeightRequest{})
-	if err != nil {
-		return 0, err
-	}
-
-	return res.Height, nil
+// GetStateHash returns Rusk state hash.
+// TODO: Use grpc GetStateHash once Rusk schema is updated.
+func (e *executor) GetStateHash(ctx context.Context) ([]byte, error) {
+	return make([]byte, 32), nil
 }
 
 // UMember deep copies from the rusk.Provisioner.
