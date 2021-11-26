@@ -303,6 +303,8 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 
 	plog := l.WithField("r_addr", p.Conn.RemoteAddr().String())
 
+	// create priority queue list
+
 	for {
 		// Check if context was canceled
 		select {
@@ -338,11 +340,24 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 		}
 
 		go func() {
+			isMsg := true
+			if len(message) > 0 {
+				for _, v := range topics.Priority {
+					if message[0] == byte(v) {
+						// this is priority message
+
+					} else {
+						// this is not a priority message
+
+					}
+				}
+			}
+
 			// TODO: error here should be checked in order to decrease reputation
-			// or blacklist spammers
+			//  or blacklist spammers
 			if _, err = p.processor.Collect(p.Addr(), message, ringBuf, p.services, nil); err != nil {
 				var topic string
-				if len(message) > 0 {
+				if isMsg {
 					topic = topics.Topic(message[0]).String()
 				}
 

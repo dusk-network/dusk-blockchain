@@ -93,6 +93,22 @@ const (
 	KadcastPoint
 )
 
+// Priority topics should be handled in an even proportion to ensure network
+// critical messages are processed in a timely fashion
+var Priority = []Topic{
+	// consensus messages need to be responded to quickly to improve network convergence
+	Candidate,
+	NewBlock,
+	Reduction,
+	Agreement,
+	// these will also be priority because they are anyway hard to spam
+	Kadcast,
+	KadcastPoint,
+	// if a new block has arrived, this is a priority event as it needs
+	// to be attached to the chain as soon as possible in order to mine
+	AcceptedBlock,
+}
+
 type topicBuf struct {
 	Topic
 	bytes.Buffer
