@@ -48,8 +48,9 @@ func (a AggrAgreement) Copy() payload.Safe {
 	cpy := AggrAgreement{
 		Agreement: a.Agreement.Copy().(Agreement),
 		Bitset:    a.Bitset,
-		AggrSig:   a.AggrSig,
+		AggrSig:   make([]byte, 48),
 	}
+	copy(cpy.AggrSig, a.AggrSig)
 	return cpy
 }
 

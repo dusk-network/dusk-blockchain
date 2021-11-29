@@ -281,11 +281,6 @@ func (s *Loop) processCollectedVotes(ctx context.Context, handler *handler, evs 
 	// Create new message
 	bits := comm.Bits(*pubs)
 	agAgreement := message.NewAggrAgreement(evs[0], bits, sig)
-	buf := new(bytes.Buffer)
-
-	if err := header.Marshal(buf, evs[0].State()); err != nil {
-		lg.WithError(err).Errorln("failed to marshal aggr agreement header")
-	}
 
 	m := message.NewWithHeader(topics.AggrAgreement, agAgreement, config.KadcastInitHeader)
 	if err := s.Emitter.Republish(m); err != nil {

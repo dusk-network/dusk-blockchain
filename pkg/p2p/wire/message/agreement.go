@@ -399,7 +399,6 @@ func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	}
 
 	if len(votes) != 2 {
-		log.Infoln("failed to marshal step votes, 2 votes are required")
 		return errors.New("failed to marshal step votes, 2 votes are required")
 	}
 
