@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/bls12_381-sign-go/bls"
+	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"

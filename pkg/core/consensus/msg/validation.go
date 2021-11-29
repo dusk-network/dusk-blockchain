@@ -7,7 +7,7 @@
 package msg
 
 import (
-	"github.com/dusk-network/bls12_381-sign-go/bls"
+	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
 )
 
 // VerifyBLSSignature returns err if signature is invalid.

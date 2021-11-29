@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dusk-network/bls12_381-sign-go/bls"
+	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
