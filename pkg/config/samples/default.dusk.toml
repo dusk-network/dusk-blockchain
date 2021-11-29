@@ -61,7 +61,7 @@ port=7000
 maxDupeMapItems=300000
 # Number of seconds before dupemap expires and gets reset. 
 # Ideally should be less than 15s - average consensus time
-maxDupeMapExpire=5
+maxDupeMapExpire=20
 
 minimumConnections = 5
 maxConnections = 50

@@ -49,8 +49,9 @@ type Consensus struct {
 	eventQueue *consensus.Queue
 	roundQueue *consensus.Queue
 
-	agreementChan chan message.Message
-	eventChan     chan message.Message
+	agreementChan     chan message.Message
+	aggrAgreementChan chan message.Message
+	eventChan         chan message.Message
 }
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
@@ -80,10 +81,14 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 	// TODO: channel size should be configurable
 	agreementChan := make(chan message.Message, 1000)
 	eventChan := make(chan message.Message, 1000)
+	aggrAgreementChan := make(chan message.Message, 1000)
 
 	// subscribe agreement phase to message.Agreement
 	aChan := eventbus.NewChanListener(agreementChan)
 	e.EventBus.Subscribe(topics.Agreement, aChan)
+	// subscribe agreement phase to message.AggrAgreement
+	aggrAgChan := eventbus.NewChanListener(aggrAgreementChan)
+	e.EventBus.Subscribe(topics.AggrAgreement, aggrAgChan)
 
 	// subscribe topics to eventChan
 	evSub := eventbus.NewChanListener(eventChan)
@@ -92,13 +97,14 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 	e.EventBus.SubscribeDefault(evSub)
 
 	c := &Consensus{
-		Emitter:       e,
-		Requestor:     candidate.NewRequestor(e.EventBus),
-		pubKey:        pubKey,
-		eventQueue:    consensus.NewQueue(),
-		roundQueue:    consensus.NewQueue(),
-		agreementChan: agreementChan,
-		eventChan:     eventChan,
+		Emitter:           e,
+		Requestor:         candidate.NewRequestor(e.EventBus),
+		pubKey:            pubKey,
+		eventQueue:        consensus.NewQueue(),
+		roundQueue:        consensus.NewQueue(),
+		agreementChan:     agreementChan,
+		eventChan:         eventChan,
+		aggrAgreementChan: aggrAgreementChan,
 	}
 
 	return c
@@ -144,7 +150,7 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 		defer finalizeStep()
 
 		agreementLoop := ag.GetControlFn()
-		results := agreementLoop(agrCtx, c.roundQueue, c.agreementChan, round)
+		results := agreementLoop(agrCtx, c.roundQueue, c.agreementChan, c.aggrAgreementChan, round)
 
 		resultsChan <- results
 	}()

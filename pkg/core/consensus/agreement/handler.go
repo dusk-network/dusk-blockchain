@@ -181,8 +181,8 @@ func verifyWhole(a message.Agreement) error {
 	// we make a copy of the signature because the crypto package apparently mutates the byte array when
 	// Compressing/Decompressing a point
 	// see https://github.com/dusk-network/dusk-crypto/issues/16
-	sig := make([]byte, len(a.SignedVotes()))
-	copy(sig, a.SignedVotes())
+	sig := make([]byte, len(a.Signature()))
+	copy(sig, a.Signature())
 
 	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, r.Bytes())
 }
