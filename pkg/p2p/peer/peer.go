@@ -292,7 +292,7 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 	// Set up a timer, which triggers the sending of a `keepalive` message
 	// when fired.
 	kat := config.Get().Timeout.TimeoutKeepAliveTime
-	if kat == 0 {
+	if kat <= 0 { // time.Time is an int64, default is a floor
 		kat = defaultKeepAliveTime
 	}
 
