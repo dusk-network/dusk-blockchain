@@ -9,6 +9,7 @@ package chain
 import (
 	"bytes"
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -25,6 +26,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/sirupsen/logrus"
 	logger "github.com/sirupsen/logrus"
@@ -32,6 +34,9 @@ import (
 )
 
 var log = logger.WithFields(logger.Fields{"process": "chain"})
+
+// ErrBlockAlreadyAccepted block already known by blockchain state.
+var ErrBlockAlreadyAccepted = errors.New("discarded block from the past")
 
 // TODO: This Verifier/Loader interface needs to be re-evaluated and most likely
 // renamed. They don't make too much sense on their own (the `Loader` also
@@ -67,6 +72,7 @@ type Loader interface {
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	eventBus *eventbus.EventBus
+	rpcBus   *rpcbus.RPCBus
 	db       database.DB
 
 	// loader abstracts away the persistence aspect of Block operations.
@@ -99,9 +105,11 @@ type Chain struct {
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
 // from (remote) consensus components.
-func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus) (*Chain, error) {
+func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus,
+	loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus) (*Chain, error) {
 	chain := &Chain{
 		eventBus:          eventBus,
+		rpcBus:            rpcBus,
 		db:                db,
 		loader:            loader,
 		verifier:          verifier,
@@ -146,19 +154,34 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	var kadcastHeight byte = 255
+	l := log.WithField("recv_blk_h", blk.Header.Height).WithField("curr_h", c.tip.Header.Height)
+
+	var kh byte = 255
 	if len(m.Header()) > 0 {
-		kadcastHeight = m.Header()[0]
-		log.WithField("blk_height", blk.Header.Height).WithField("kadcast", kadcastHeight).
-			Trace("received block")
-	} else {
-		log.WithField("blk_height", blk.Header.Height).Trace("received block")
+		kh = m.Header()[0]
+		l = l.WithField("kad_h", kh)
 	}
 
-	// Is it worth looking at this?
-	if blk.Header.Height <= c.tip.Header.Height {
-		log.WithField("curr_h", c.tip.Header.Height).WithField("blk_height", blk.Header.Height).
-			Debug("discarded block from the past")
+	l.Trace("block received")
+
+	switch {
+	case blk.Header.Height == c.tip.Header.Height:
+		{
+			// Check if we already accepted this block
+			if bytes.Equal(blk.Header.Hash, c.tip.Header.Hash) {
+				l.WithError(ErrBlockAlreadyAccepted).Debug("failed block processing")
+				return nil, nil
+			}
+
+			// Try to fallback
+			if err := c.tryFallback(blk); err != nil {
+				l.WithError(err).Error("failed fallback procedure")
+			}
+
+			return nil, nil
+		}
+	case blk.Header.Height < c.tip.Header.Height:
+		l.WithError(ErrBlockAlreadyAccepted).Debug("failed block processing")
 		return nil, nil
 	}
 
@@ -166,7 +189,7 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 		c.highestSeen = blk.Header.Height
 	}
 
-	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kadcastHeight)
+	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kh)
 }
 
 // TryNextConsecutiveBlockOutSync is the processing path for accepting a block
@@ -347,7 +370,7 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 
 	// 1. Ensure block fields and certificate are valid
 	if err = c.isValidBlock(blk, l); err != nil {
-		l.WithError(err).Error("execute state transition failed")
+		l.WithError(err).Error("invalid block error")
 		return err
 	}
 
