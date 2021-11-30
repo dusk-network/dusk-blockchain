@@ -28,6 +28,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/buntdb v1.2.4
 	github.com/urfave/cli v1.22.3
+	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0
 	google.golang.org/grpc v1.29.0
