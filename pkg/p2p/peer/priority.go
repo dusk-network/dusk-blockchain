@@ -12,8 +12,11 @@ import (
 // It exploits the FIFO queue semantics of buffered channels and uses atomics to
 // track the buffer utilization.
 //
-// Using modulo on the factor value, it will select a priority item when the factor is even, and
-// in the next, it will by default then select a non-priority
+// The queue's primary mode of operation is to consume items from the subqueue
+// whose buffer is more full, but in addition it forces selection of the subqueue
+// every time the number of items is a whole product of the `factor` field below
+// which essentially makes sure even if one queue is stacking up faster than the
+// other, that they don't get too stale.
 type PriorityQueue struct {
 	sync.Mutex
 	factor                uint32
@@ -25,11 +28,10 @@ type PriorityQueue struct {
 //
 // - size sets the size of each of the queue buckets
 //
-// - factor sets a number that by the sum of items in the queue a priority item
-//   is always selected, if there is one remaining, it acts like an interleaving
-//   factor, every second, every third, or so, as defined, will consume an
-//   available priority item.
-//
+// - factor sets a number which is used with the queue sizes and every
+//   time the priority queue is one of these sizes it will be picked,
+//   and likewise if the non-priority queue is this size, it will be
+//   picked if this same rule didn't pick the priority item already.
 func NewPriorityQueue(size int, factor uint32) (pq *PriorityQueue) {
 	pq = &PriorityQueue{
 		Mutex:       sync.Mutex{},
@@ -78,35 +80,25 @@ func (pq *PriorityQueue) Push(msg []byte) {
 
 // Pop a message from the PriorityQueue.
 //
-// The queue empties by the following rules:
+// The rules for selection from the priority vs nonpriority queue are:
 //
-// - If there is none, return nil
-// - If there is some in one and none in the other, empty the one with some
-// - If there is equal or more priority items than non-priority, process the priority
-//   items
-// - If there is more non-priority items than priority, process the non-priority
-// - It always chooses priority every [factor-th] message, so non-priority messages
-//   cannot flood it, and vice versa, every
+// - if only one queue has items, it is picked
+// - if the number of items in priority queue is factor of factor, but the non-priority
+//   also not at the same time, non-priority is selected, if the non-priority queue
+//   has factor*X items then it is selected instead.
 //
-// This gives favour to priority messages but aims to empty the queue equally, so
-// mostly it interleaves the jobs. This scheme does not introduce a vulnerability
-// where flooding messages of either type will deny processing to the other, as
-// the queue pops non-priority items as soon as there is more of them than
-// non-priority.
+// In this way, both queues will empty favoring towards the more full queue, and
+// ensuring both queues get emptied even if the one is filling up faster than the
+// consumers are using them for a time.
 func (pq *PriorityQueue) Pop() (msg []byte) {
 	P, N := pq.Plen.Load(), pq.Nlen.Load()
 	switch {
 	case P == 0 && N == 0:
-		// if there is no messages, return empty message
 		return
-	case P > 0 && (N < P || P%pq.factor == 0):
-		// If there is more priority messages, or if the sum of number of messages is a
-		// factor of the set priority and a priority message exists send priority.
+	case P > 0 && N < P && P%pq.factor == 0 && N%pq.factor != 0:
 		msg = <-pq.Priority
 		pq.Plen.Dec()
 	case N > 0:
-		// if the previous cases did not fall through and a non-priority message exists,
-		// send it
 		msg = <-pq.Nonpriority
 		pq.Nlen.Dec()
 	}
