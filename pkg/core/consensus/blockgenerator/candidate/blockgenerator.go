@@ -9,6 +9,7 @@ package candidate
 import (
 	"bytes"
 	"context"
+	"errors"
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
@@ -123,8 +124,15 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 
 	// TODO: Would it be possible here to get state_root hash as result?
 	// TODO: Check with Rusk service if we could build the new state, get state_root hash and then discard the state.
-	txs, err = bg.filter(context.Background(), txs)
+	var stateHash []byte
+	txs, stateHash, err = bg.filter(context.Background(), txs)
 	if err != nil {
+		return nil, err
+	}
+
+	if len(stateHash) == 0 {
+		err := errors.New("empty state hash")
+		log.WithError(err).Error("generate block failed")
 		return nil, err
 	}
 
@@ -137,7 +145,7 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 		TxRoot:        nil,
 		Seed:          seed,
 		Certificate:   block.EmptyCertificate(),
-		StateHash:     prevBlockHash,
+		StateHash:     stateHash,
 	}
 
 	// Construct the candidate block

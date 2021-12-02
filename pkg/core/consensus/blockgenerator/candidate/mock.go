@@ -55,8 +55,8 @@ func (m *mock) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUp
 func Mock(e *consensus.Emitter) Generator {
 	key := keys.NewPublicKey()
 
-	fn := func(ctx context.Context, txs []transactions.ContractCall) ([]transactions.ContractCall, error) {
-		return txs, nil
+	fn := func(ctx context.Context, txs []transactions.ContractCall) ([]transactions.ContractCall, []byte, error) {
+		return txs, make([]byte, 32), nil
 	}
 
 	return &mock{
