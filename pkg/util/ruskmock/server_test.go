@@ -69,7 +69,7 @@ func TestVerifyStateTransition(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Should have gotten an empty FailedCalls slice
-	assert.Empty(t, resp.FailedCalls)
+	assert.True(t, resp.Success)
 }
 
 func TestFailedVerifyStateTransition(t *testing.T) {
@@ -95,15 +95,11 @@ func TestFailedVerifyStateTransition(t *testing.T) {
 		calls[i] = call
 	}
 
-	resp, err := c.VerifyStateTransition(ctx, &rusk.VerifyStateTransitionRequest{Txs: calls})
+	resp, err := c.ExecuteStateTransition(ctx, &rusk.ExecuteStateTransitionRequest{Txs: calls})
 	assert.NoError(t, err)
 
 	// FailedCalls should be a slice of numbers 0 to 4
-	assert.Equal(t, 5, len(resp.FailedCalls))
-
-	for i, n := range resp.FailedCalls {
-		assert.Equal(t, uint64(i), n)
-	}
+	assert.Equal(t, 5, len(resp.Txs))
 }
 
 func TestExecuteStateTransition(t *testing.T) {
@@ -129,8 +125,8 @@ func TestExecuteStateTransition(t *testing.T) {
 	assert.NoError(t, err)
 
 	resp, err := c.ExecuteStateTransition(ctx, &rusk.ExecuteStateTransitionRequest{
-		Txs:    []*rusk.Transaction{tx},
-		Height: 1,
+		Txs:         []*rusk.Transaction{tx},
+		BlockHeight: 1,
 	})
 	assert.NoError(t, err)
 

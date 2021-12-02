@@ -24,7 +24,7 @@ type BlockGenerator interface {
 }
 
 // New creates a new BlockGenerator.
-func New(e *consensus.Emitter, genPubKey *keys.PublicKey, f consensus.FilterTxsFunc) BlockGenerator {
+func New(e *consensus.Emitter, genPubKey *keys.PublicKey, f consensus.ExecuteTxsFunc) BlockGenerator {
 	return &blockGenerator{
 		candidateGenerator: candidate.New(e, genPubKey, f),
 	}

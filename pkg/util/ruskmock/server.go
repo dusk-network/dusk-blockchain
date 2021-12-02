@@ -153,7 +153,10 @@ func (s *Server) Serve(network, url string) error {
 // VerifyStateTransition simulates a state transition validation. The outcome is dictated
 // by the server configuration.
 func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStateTransitionRequest) (*rusk.VerifyStateTransitionResponse, error) {
-	log.Infoln("call received to VerifyStateTransition")
+	log.WithField("block_gas_limit", req.BlockGasLimit).
+		WithField("block_height", req.BlockHeight).
+		Infoln("call received to VerifyStateTransition")
+
 	defer log.Infoln("finished call to VerifyStateTransition")
 
 	time.Sleep(stateTransitionDelay)
@@ -165,7 +168,10 @@ func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStat
 
 // ExecuteStateTransition
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
-	log.Infoln("call received to ExecuteStateTransition")
+	log.WithField("block_gas_limit", req.BlockGasLimit).
+		WithField("block_height", req.BlockHeight).
+		Infoln("call received to ExecuteStateTransition")
+
 	defer log.Infoln("finished call to ExecuteStateTransition")
 
 	time.Sleep(stateTransitionDelay)
@@ -178,7 +184,7 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 	}, nil
 }
 
-// Accept impl TODO: no-persist call
+// Accept implements a mock Finalize.
 func (s *Server) Accept(ctx context.Context, req *rusk.AcceptRequest) (*rusk.AcceptResponse, error) {
 	log.WithField("height", s.height).Infoln("call received to ExecuteStateTransition")
 	defer log.Infoln("finished call to ExecuteStateTransition")
@@ -196,9 +202,12 @@ func (s *Server) Accept(ctx context.Context, req *rusk.AcceptRequest) (*rusk.Acc
 	}, nil
 }
 
-// Finalize impl
+// Finalize implements a mock Finalize.
 func (s *Server) Finalize(ctx context.Context, req *rusk.FinalizeRequest) (*rusk.FinalizeResponse, error) {
-	log.WithField("height", s.height).Infoln("call received to ExecuteStateTransition")
+	log.WithField("height", s.height).
+		WithField("state_root", util.StringifyBytes(req.StateRoot)).
+		Infoln("call received to ExecuteStateTransition")
+
 	defer log.Infoln("finished call to ExecuteStateTransition")
 
 	time.Sleep(stateTransitionDelay)

@@ -56,11 +56,6 @@ func (b *Block) SetPrevBlock(prevHeader *Header) {
 	b.Header.PrevBlockHash = prevHeader.Hash
 }
 
-// SetStateHash will set Header state hash.
-func (b *Block) SetStateHash(h []byte) {
-	b.Header.StateHash = h
-}
-
 // CalculateRoot will calculate and return the block merkle root hash.
 func (b *Block) CalculateRoot() ([]byte, error) {
 	// convert Transaction interface to Payload interface

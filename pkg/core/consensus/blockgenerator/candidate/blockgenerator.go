@@ -44,15 +44,15 @@ type generator struct {
 	*consensus.Emitter
 	genPubKey *keys.PublicKey
 
-	filter consensus.FilterTxsFunc
+	executeFn consensus.ExecuteTxsFunc
 }
 
 // New creates a new block generator.
-func New(e *consensus.Emitter, genPubKey *keys.PublicKey, f consensus.FilterTxsFunc) Generator {
+func New(e *consensus.Emitter, genPubKey *keys.PublicKey, executeFn consensus.ExecuteTxsFunc) Generator {
 	return &generator{
 		Emitter:   e,
 		genPubKey: genPubKey,
-		filter:    f,
+		executeFn: executeFn,
 	}
 }
 
@@ -122,10 +122,8 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 		return nil, err
 	}
 
-	// TODO: Would it be possible here to get state_root hash as result?
-	// TODO: Check with Rusk service if we could build the new state, get state_root hash and then discard the state.
 	var stateHash []byte
-	txs, stateHash, err = bg.filter(context.Background(), txs)
+	txs, stateHash, err = bg.executeFn(context.Background(), txs, round)
 	if err != nil {
 		return nil, err
 	}

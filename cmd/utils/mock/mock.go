@@ -16,7 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -24,8 +23,8 @@ import (
 // RunMock will run a grpc mock for rusk wallet and transactor.
 func RunMock(grpcMockHost string) error {
 	s := grpc.NewServer()
-	rusk.RegisterStateServer(s, &rusk.StateMock{})
-	node.RegisterWalletServer(s, &node.WalletMock{})
+	//rusk.RegisterStateServer(s, &rusk.StateMock{})
+	//node.RegisterWalletServer(s, &node.WalletMock{})
 	node.RegisterTransactorServer(s, &node.TransactorMock{})
 
 	log.WithField("grpcMockHost", grpcMockHost).

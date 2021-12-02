@@ -78,7 +78,7 @@ type Executor interface {
 	// VerifyStateTransition TODO:
 	VerifyStateTransition(context.Context, []ContractCall, uint64, uint64) error
 
-	// ExecuteStateTransition
+	// ExecuteStateTransition TODO.
 	ExecuteStateTransition(context.Context, []ContractCall, uint64, uint64) ([]ContractCall, []byte, error)
 
 	// Accept performs TODO.

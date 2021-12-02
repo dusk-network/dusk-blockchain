@@ -278,42 +278,84 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 	return nil
 }
 
-func (c *Chain) executeStateTransition(prevBlk, blk block.Block, l *logrus.Entry) error {
-	// Ensure that both (co-deployed) services dusk and rusk are on the same
-	// state. If not, we should trigger a recovery procedure so both are
-	// always synced up.
-	stateHash, err := c.proxy.Executor().GetStateHash(c.ctx)
-	if err != nil {
+func (c *Chain) runStateTransition(tipBlk, blk block.Block) error {
+	var (
+		respStateHash       []byte
+		provisionersUpdated user.Provisioners
+		err                 error
+		provisionersCount   int
+
+		fields = logger.Fields{
+			"event":  "accept_block",
+			"height": blk.Header.Height,
+			"hash":   util.StringifyBytes(blk.Header.Hash),
+			"curr_h": c.tip.Header.Height,
+		}
+
+		l = log.WithFields(fields)
+	)
+
+	if err = c.sanityCheckStateHash(); err != nil {
 		return err
 	}
 
-	if !bytes.Equal(prevBlk.Header.StateHash, stateHash) {
-		log.WithField("rusk", util.StringifyBytes(stateHash)).
-			WithError(errInvalidStateHash).
-			WithField("node", util.StringifyBytes(blk.Header.StateHash)).
-			Error("execute state transition failed")
+	provisionersCount = c.p.Set.Len()
+	l.WithField("prov", provisionersCount).Info("run state transition")
+
+	switch blk.Header.Certificate.Step {
+	case 3:
+		// Finalized block. first iteration consensus agreement.
+		provisionersUpdated, respStateHash, err = c.proxy.Executor().Finalize(c.ctx, blk.Txs, tipBlk.Header.StateHash, blk.Header.Height)
+		if err != nil {
+			l.WithError(err).Error("Error in executing the state transition")
+			return err
+		}
+	default:
+		// Tentative block. non-first iteration consensus agreement.
+		provisionersUpdated, respStateHash, err = c.proxy.Executor().Accept(c.ctx, blk.Txs, tipBlk.Header.StateHash, blk.Header.Height)
+		if err != nil {
+			l.WithError(err).Error("Error in executing the state transition")
+			return err
+		}
+	}
+
+	// Sanity check to ensure accepted block state_hash is the same as the one Finalize/Accept returned.
+	if !bytes.Equal(respStateHash, blk.Header.StateHash) {
+		log.WithField("rusk", util.StringifyBytes(respStateHash)).WithField("node", util.StringifyBytes(blk.Header.StateHash)).WithError(errInvalidStateHash).Error("inconsistency with state_hash")
 
 		return errInvalidStateHash
 	}
 
-	provLen := c.p.Set.Len()
-	l.WithField("prov", provLen).Info("run state transition")
+	// Update the provisioners.
+	// blk.Txs may bring new provisioners to the current state
+	c.p = &provisionersUpdated
 
-	pu, sh, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
+	l.WithField("prov", c.p.Set.Len()).WithField("added", c.p.Set.Len()-provisionersCount).WithField("state_hash", util.StringifyBytes(respStateHash)).
+		Info("state transition completed")
+
+	return nil
+}
+
+// sanityCheckStateHash ensures most recent local statehash and rusk statehash are the same.
+func (c *Chain) sanityCheckStateHash() error {
+	// Ensure that both (co-deployed) services node and rusk are on the same
+	// state. If not, we should trigger a recovery procedure so both are
+	// always synced up.
+	ruskStateHash, err := c.proxy.Executor().GetEphemeralStateRoot(c.ctx)
 	if err != nil {
-		l.WithError(err).Error("Error in executing the state transition")
 		return err
 	}
 
-	l.WithField("prov", c.p.Set.Len()).
-		WithField("added", c.p.Set.Len()-provLen).
-		WithField("state_hash", util.StringifyBytes(sh)).
-		Info("state transition completed")
+	nodeStateHash := c.tip.Header.StateHash
 
-	// Update the provisioners as blk.Txs may bring new provisioners to the current state
-	c.p = &pu
+	if !bytes.Equal(nodeStateHash, ruskStateHash) || len(nodeStateHash) == 0 {
+		log.WithField("rusk", util.StringifyBytes(ruskStateHash)).
+			WithError(errInvalidStateHash).
+			WithField("node", util.StringifyBytes(nodeStateHash)).
+			Error("check state_hash failed")
 
-	blk.SetStateHash(sh)
+		return errInvalidStateHash
+	}
 
 	return nil
 }
@@ -363,8 +405,8 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 		return err
 	}
 
-	// 2. Execute State Transition to update Contract Storage
-	if err = c.executeStateTransition(*c.tip, blk, l); err != nil {
+	// 2. Perform State Transition to update Contract Storage with Tentative or Finalized state.
+	if err = c.runStateTransition(*c.tip, blk); err != nil {
 		l.WithError(err).Error("execute state transition failed")
 		return err
 	}
@@ -416,20 +458,18 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 // verify potential winning candidates.
 func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 	// We first perform a quick check on the Block Header and
+	// TODO: Double check if c.tip is under race-condition as it's called by consensus and chain goroutines.
 	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
 		return err
 	}
 
-	// TODO: consider using the context for timeouts
-	// TODO: Pass block gas limit here
-	_, err := c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, blk.Header.Height)
-	return err
+	return c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, config.BlockGasLimit, blk.Header.Height)
 }
 
-// FilterTransactions calls Rusk Filter Transaction grpc method.
-func (c *Chain) FilterTransactions(ctx context.Context, txs []transactions.ContractCall) ([]transactions.ContractCall, error) {
-	// TODO: Pass block gas limit here
-	return c.proxy.Executor().FilterTransactions(c.ctx, txs)
+// ExecuteStateTransition calls Rusk ExecuteStateTransitiongrpc method.
+func (c *Chain) ExecuteStateTransition(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64) ([]transactions.ContractCall, []byte, error) {
+	// TODO: Pass block height here
+	return c.proxy.Executor().ExecuteStateTransition(c.ctx, txs, config.BlockGasLimit, blockHeight)
 }
 
 // propagateBlock send inventory message to all peers in gossip network or rebroadcast block in kadcast network.
