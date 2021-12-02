@@ -102,6 +102,7 @@ type Writer struct {
 type Reader struct {
 	*Connection
 	processor *MessageProcessor
+	priority *PriorityQueue
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by

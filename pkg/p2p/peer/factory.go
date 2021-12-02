@@ -23,6 +23,7 @@ func (f *ReaderFactory) SpawnReader(conn *Connection) *Reader {
 	reader := &Reader{
 		Connection: conn,
 		processor:  f.processor,
+		priority: NewPriorityQueue(30,3),
 	}
 
 	return reader
