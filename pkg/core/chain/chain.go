@@ -458,6 +458,7 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 // verify potential winning candidates.
 func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 	var chainTip block.Block
+
 	c.lock.Lock()
 	chainTip = c.tip.Copy().(block.Block)
 	c.lock.Unlock()

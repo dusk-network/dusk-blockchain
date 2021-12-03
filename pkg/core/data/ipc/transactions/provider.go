@@ -75,25 +75,25 @@ type KeyMaster interface {
 
 // Executor encapsulate the Global State operations.
 type Executor interface {
-	// VerifyStateTransition TODO:
+	// VerifyStateTransition performs dry-run state transition to ensure all txs are valid.
 	VerifyStateTransition(context.Context, []ContractCall, uint64, uint64) error
 
-	// ExecuteStateTransition TODO.
+	// ExecuteStateTransition performs dry-run state transition to return valid-only set of txs and state hash.
 	ExecuteStateTransition(context.Context, []ContractCall, uint64, uint64) ([]ContractCall, []byte, error)
 
-	// Accept performs TODO.
+	// Accept creates an ephemeral state transition.
 	Accept(context.Context, []ContractCall, []byte, uint64) (user.Provisioners, []byte, error)
 
-	// Finalize performs TODO.
+	// Finalize creates a finalized state transition.
 	Finalize(context.Context, []ContractCall, []byte, uint64) (user.Provisioners, []byte, error)
 
 	// GetProvisioners returns the current set of provisioners.
 	GetProvisioners(ctx context.Context) (user.Provisioners, error)
 
-	// GetFinalizedStateRoot returns root hash of the finalized state
+	// GetFinalizedStateRoot returns root hash of the finalized state.
 	GetFinalizedStateRoot(ctx context.Context) ([]byte, error)
 
-	// GetEphemeralStateRoot returns root hash of the ephemeral state
+	// GetEphemeralStateRoot returns root hash of the ephemeral state.
 	GetEphemeralStateRoot(ctx context.Context) ([]byte, error)
 }
 
@@ -279,7 +279,7 @@ type executor struct {
 	*proxy
 }
 
-// VerifyStateTransition
+// VerifyStateTransition see also Executor.VerifyStateTransition.
 func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64) error {
 	vstr := new(rusk.VerifyStateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
@@ -433,11 +433,21 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 		return nil, nil, errors.New("unsuccessful state transition function execution")
 	}
 
-	// TODO: convert res.Txs to calls
+	validCalls := make([]ContractCall, 0)
 
-	return calls, res.StateRoot, nil
+	for _, tx := range res.Txs {
+		trans := NewTransaction()
+		if err := UTransaction(tx, trans); err != nil {
+			return nil, nil, err
+		}
+
+		validCalls = append(validCalls, trans)
+	}
+
+	return validCalls, res.StateRoot, nil
 }
 
+// GetProvisioners see also Executor.GetProvisioners.
 func (e *executor) GetProvisioners(ctx context.Context) (user.Provisioners, error) {
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()

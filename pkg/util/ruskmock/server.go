@@ -150,8 +150,7 @@ func (s *Server) Serve(network, url string) error {
 	return nil
 }
 
-// VerifyStateTransition simulates a state transition validation. The outcome is dictated
-// by the server configuration.
+// VerifyStateTransition simulates a state transition validation.
 func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStateTransitionRequest) (*rusk.VerifyStateTransitionResponse, error) {
 	log.WithField("block_gas_limit", req.BlockGasLimit).
 		WithField("block_height", req.BlockHeight).
@@ -166,7 +165,7 @@ func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStat
 	}, nil
 }
 
-// ExecuteStateTransition
+// ExecuteStateTransition mocks a dry-run state transition.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
 	log.WithField("block_gas_limit", req.BlockGasLimit).
 		WithField("block_height", req.BlockHeight).

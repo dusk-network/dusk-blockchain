@@ -123,13 +123,14 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 	}
 
 	var stateHash []byte
+
 	txs, stateHash, err = bg.executeFn(context.Background(), txs, round)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(stateHash) == 0 {
-		err := errors.New("empty state hash")
+		err = errors.New("empty state hash")
 		log.WithError(err).Error("generate block failed")
 		return nil, err
 	}
@@ -199,8 +200,6 @@ func (bg *generator) ConstructBlockTxs(keys [][]byte) ([]transactions.ContractCa
 	// XXX: this needs to be adjusted
 	coinbaseTx := transactions.RandDistributeTx(config.GeneratorReward, len(keys))
 	txs = append(txs, coinbaseTx)
-
-	// TODO: VerifyStateTransition
 
 	return txs, nil
 }
