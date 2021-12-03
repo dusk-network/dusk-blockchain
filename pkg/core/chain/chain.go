@@ -457,9 +457,13 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 // VerifyCandidateBlock can be used as a callback for the consensus in order to
 // verify potential winning candidates.
 func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
+	var chainTip block.Block
+	c.lock.Lock()
+	chainTip = c.tip.Copy().(block.Block)
+	c.lock.Unlock()
+
 	// We first perform a quick check on the Block Header and
-	// TODO: Double check if c.tip is under race-condition as it's called by consensus and chain goroutines.
-	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
+	if err := c.verifier.SanityCheckBlock(chainTip, blk); err != nil {
 		return err
 	}
 
@@ -468,7 +472,6 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 
 // ExecuteStateTransition calls Rusk ExecuteStateTransitiongrpc method.
 func (c *Chain) ExecuteStateTransition(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64) ([]transactions.ContractCall, []byte, error) {
-	// TODO: Pass block height here
 	return c.proxy.Executor().ExecuteStateTransition(c.ctx, txs, config.BlockGasLimit, blockHeight)
 }
 
