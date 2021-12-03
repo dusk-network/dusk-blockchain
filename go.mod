@@ -7,7 +7,7 @@ require (
 	github.com/drewolson/testflight v1.0.0
 	github.com/dusk-network/bls12_381-sign/go/cgo/bls v0.1.4
 	github.com/dusk-network/dusk-crypto v0.1.3
-	github.com/dusk-network/dusk-protobuf v0.2.18
+	github.com/dusk-network/dusk-protobuf v0.2.19
 	github.com/etherlabsio/healthcheck v0.0.0-20191224061800-dd3d2fd8c3f6
 	github.com/facebookgo/grace v0.0.0-20180706040059-75cf19382434
 	github.com/go-chi/render v1.0.1
