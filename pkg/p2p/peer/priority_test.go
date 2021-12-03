@@ -47,13 +47,21 @@ func TestPriorityQueue(t *testing.T) {
 }
 
 // TestPriorityQueuePriorityFlood tests queue behavior under conditions of DoS of
-// priority messages
+// priority messages. The goal of the test is to see how quickly the nonpriority
+// pool drains while 2x as many priority messages come in.
+//
+// In order to eliminate the play of the Go garbage collector, for this and the
+// following test the foregoing freelist is used so no deallocation is required
+// for the lifetime of the test. A benchmark can be derived also from this code
+// to determine the overhead incurred by the queue.
 func TestPriorityQueuePriorityFlood(t *testing.T) {
 
 }
 
 // TestPriorityQueueNonPriorityFlood tests queue behavior under conditions of DoS
-// of non-priority messages
+// of non-priority messages. This is the reverse of the other test. This is to
+// demonstrate that the queue resists flooding via attacks on the priority scheme
+// causing stale message queues.
 func TestPriorityQueueNonPriorityFlood(t *testing.T) {
 
 }
