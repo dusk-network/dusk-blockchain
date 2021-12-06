@@ -35,15 +35,19 @@ func TestPriorityQueue(t *testing.T) {
 	assert.Equal(t, qSize, q.Plen.Load())
 	assert.Equal(t, qSize, q.Nlen.Load())
 	var counter int
+	expected := `expected := []bool{false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,}`
+	out := "expected := []bool{"
 	for msg := q.Pop(); msg != nil; msg = q.Pop() {
-		assert.Equal(t, msg[0]==0, counter%2==0)
-		//if msg[0] == 0 {
-		//	t.Logf("popping non-priority")
-		//} else {
-		//	t.Logf("popping priority")
-		//}
+		if msg[0] == 0 {
+			out += "false,"
+		} else {
+			out += "true,"
+		}
 		counter++
 	}
+	out += "}"
+	assert.Equal(t, out, expected)
+	//t.Logf("\n%s\n", out) // this will print what is coming out to put in the expected above
 }
 
 // TestPriorityQueuePriorityFlood tests queue behavior under conditions of DoS of

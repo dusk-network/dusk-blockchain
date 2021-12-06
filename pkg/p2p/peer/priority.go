@@ -72,6 +72,15 @@ func (pq *PriorityQueue) SetFactor(factor uint32) {
 	pq.RWMutex.Unlock()
 }
 
+func isPriority(msg byte) bool {
+	for _, v := range Priority {
+		if topics.Topic(msg) == v {
+			return true
+		}
+	}
+	return false
+}
+
 // Push a message on the queue, checking if it is a priority message type, and
 // putting it into the channel relevant to the priority.
 //
@@ -85,29 +94,28 @@ func (pq *PriorityQueue) Push(msg []byte) {
 	pq.RWMutex.RLock()
 	defer pq.RWMutex.RUnlock()
 	if len(msg) > 0 {
-		for _, v := range Priority {
-			if msg[0] == byte(v) {
-				// this is priority message
-				select {
-				case pq.Priority <- msg:
-				default:
-					// if the above is blocking, buffer needs to be increased, thus the panic
-					panic("priority queue is breached, buffer needs to be increased in size")
-				}
-				// once channel loads increment atomic counter
-				pq.Plen.Inc()
-				return
+		if isPriority(msg[0]) {
+			// this is priority message
+			select {
+			case pq.Priority <- msg:
+			default:
+				// if the above is blocking, buffer needs to be increased, thus the panic
+				panic("priority queue is breached, buffer needs to be increased in size")
 			}
+			// once channel loads increment atomic counter
+			pq.Plen.Inc()
+			return
+		} else {
+			// this is not a priority message
+			select {
+			case pq.Nonpriority <- msg:
+			default:
+				// if the above is blocking, buffer needs to be increased, thus panic
+				panic("priority queue is breached, buffer needs to be increased in size")
+			}
+			// once channel loads increment atomic counter
+			pq.Nlen.Inc()
 		}
-		// this is not a priority message
-		select {
-		case pq.Nonpriority <- msg:
-		default:
-			// if the above is blocking, buffer needs to be increased, thus panic
-			panic("priority queue is breached, buffer needs to be increased in size")
-		}
-		// once channel loads increment atomic counter
-		pq.Nlen.Inc()
 	} // if message was empty for now silently no-op
 }
 
