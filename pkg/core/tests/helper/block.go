@@ -96,7 +96,7 @@ func RandomHeader(height uint64) *block.Header {
 		PrevBlockHash: transactions.Rand32Bytes(),
 		Seed:          RandomBLSSignature(),
 		TxRoot:        transactions.Rand32Bytes(),
-		StateHash:     transactions.Rand32Bytes(),
+		StateHash:     make([]byte, 32),
 
 		Certificate: RandomCertificate(),
 	}

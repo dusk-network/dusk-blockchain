@@ -102,7 +102,7 @@ func TestFailedVerifyStateTransition(t *testing.T) {
 	assert.Equal(t, 5, len(resp.Txs))
 }
 
-func TestExecuteStateTransition(t *testing.T) {
+func TestAcceptRequest(t *testing.T) {
 	s := setupRuskMockTest(t, DefaultConfig())
 	defer cleanup(s)
 
@@ -124,7 +124,7 @@ func TestExecuteStateTransition(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	resp, err := c.ExecuteStateTransition(ctx, &rusk.ExecuteStateTransitionRequest{
+	resp, err := c.Accept(ctx, &rusk.AcceptRequest{
 		Txs:         []*rusk.Transaction{tx},
 		BlockHeight: 1,
 	})
@@ -141,24 +141,6 @@ func TestExecuteStateTransition(t *testing.T) {
 	rpk2 := s.p.GetRawPublicKeyBLS(pk)
 
 	assert.True(t, bytes.Equal(rpk, rpk2))
-}
-
-func TestFailedExecuteStateTransition(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.PassStateTransition = false
-
-	s := setupRuskMockTest(t, cfg)
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateStateClient(ctx, "localhost:10000")
-
-	resp, err := c.ExecuteStateTransition(ctx, &rusk.ExecuteStateTransitionRequest{})
-	assert.NoError(t, err)
-
-	assert.False(t, resp.Success)
 }
 
 func TestNewStake(t *testing.T) {

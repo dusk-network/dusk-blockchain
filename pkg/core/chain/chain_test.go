@@ -266,6 +266,7 @@ func mockAcceptableBlock(prevBlock block.Block) *block.Block {
 	// Add cert and prev hash
 	blk.Header.Certificate = block.EmptyCertificate()
 	blk.Header.PrevBlockHash = prevBlock.Header.Hash
+	blk.Header.StateHash = make([]byte, 32)
 	return blk
 }
 
