@@ -144,5 +144,9 @@ func marshalHashable(b *bytes.Buffer, h *Header) error {
 		return err
 	}
 
+	if err := binary.Write(b, binary.BigEndian, h.TxRoot); err != nil {
+		return err
+	}
+
 	return nil
 }

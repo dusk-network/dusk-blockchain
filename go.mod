@@ -60,4 +60,4 @@ require (
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )
 
-go 1.13
+go 1.17
