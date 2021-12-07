@@ -1,6 +1,7 @@
 package peer
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"testing"
@@ -16,6 +17,7 @@ type freeList struct {
 }
 
 func newFreeList(size int) (fl freeList) {
+	fl.alloc = make(map[*[]byte]bool)
 	fl.buf = make([][]byte, size)
 	for i := range fl.buf {
 		fl.buf[i] = make([]byte, 64)
@@ -40,15 +42,16 @@ func (fl *freeList) Free(buf *[]byte) {
 	fl.alloc[buf] = false
 }
 
-func genMessage(pri bool) (msg []byte) {
-	msg = make([]byte, 1000)
+var freelist = newFreeList(100)
+
+func genMessage(pri bool) (msg *[]byte) {
+	//msg = make([]byte, 1000)
+	msg = freelist.Alloc()
 	if pri {
 		// randomly select the value in one of the priority topics
-		msg[0] = byte(Priority[rand.Intn(len(Priority))])
+		(*msg)[0] = byte(Priority[rand.Intn(len(Priority))])
 	} else {
-		// just use the very first topic since anyway that makes it land in non-priority,
-		// and because that is zero, nothing to be done
-		//msg[0]=byte(topics.Version) // redundant since iota means the first value, ie zero.
+		(*msg)[0] = byte(topics.Version)
 	}
 	return
 }
@@ -61,8 +64,8 @@ func TestPriorityQueue(t *testing.T) {
 	assert.Equal(t, zero, q.Plen.Load())
 	assert.Equal(t, zero, q.Nlen.Load())
 	for i := uint32(0); i < qSize; i++ {
-		q.Push(genMessage(true))
-		q.Push(genMessage(false))
+		q.Push(*genMessage(true))
+		q.Push(*genMessage(false))
 	}
 	assert.Equal(t, qSize, q.Plen.Load())
 	assert.Equal(t, qSize, q.Nlen.Load())
@@ -76,6 +79,7 @@ func TestPriorityQueue(t *testing.T) {
 			out += "true,"
 		}
 		counter++
+		freelist.Free(&msg)
 	}
 	out += "}"
 	assert.Equal(t, out, expected)
@@ -97,9 +101,9 @@ func TestPriorityQueuePriorityFlood(t *testing.T) {
 	assert.Equal(t, zero, q.Plen.Load())
 	assert.Equal(t, zero, q.Nlen.Load())
 	for i := uint32(0); i < qSize/2; i++ {
-		q.Push(genMessage(true))
-		q.Push(genMessage(true))
-		q.Push(genMessage(false))
+		q.Push(*genMessage(true))
+		q.Push(*genMessage(true))
+		q.Push(*genMessage(false))
 	}
 	assert.Equal(t, qSize, q.Plen.Load())
 	assert.Equal(t, qSize/2, q.Nlen.Load())
