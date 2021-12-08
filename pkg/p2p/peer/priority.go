@@ -72,7 +72,7 @@ func (pq *PriorityQueue) SetFactor(factor uint32) {
 	pq.RWMutex.Unlock()
 }
 
-func isPriority(msg byte) bool {
+func IsPriority(msg byte) bool {
 	for _, v := range Priority {
 		if topics.Topic(msg) == v {
 			return true
@@ -94,7 +94,7 @@ func (pq *PriorityQueue) Push(msg []byte) {
 	pq.RWMutex.RLock()
 	defer pq.RWMutex.RUnlock()
 	if len(msg) > 0 {
-		if isPriority(msg[0]) {
+		if IsPriority(msg[0]) {
 			// this is priority message
 			select {
 			case pq.Priority <- msg:
@@ -121,16 +121,16 @@ func (pq *PriorityQueue) Push(msg []byte) {
 
 // Pop a message from the PriorityQueue.
 //
-// The rules for selection from the priority vs nonpriority queue are:
+// The rules for selection from the priority vs non-priority queue are:
 //
 // - if only one queue has items, it is picked
-// - if the number of items in priority queue is factor of factor, but the non-priority
-//   also not at the same time, non-priority is selected, if the non-priority queue
-//   has factor*X items then it is selected instead.
+// - If the total number of items in the queue is equally divisible by `factor`,
+//   and there is a non-priority item to pop, it selects non-priority, otherwise, it selects
+//   priority
 //
-// In this way, both queues will empty favoring towards the more full queue, and
-// ensuring both queues get emptied even if the one is filling up faster than the
-// consumers are using them for a time.
+// Essentially, if there are priority items, every `factor` items if there is a non-priority
+// item it is popped, ensuring that generally non-priority items will not wait more than
+// `factor` slots before being popped.
 func (pq *PriorityQueue) Pop() (msg []byte) {
 	pq.RWMutex.RLock()
 	defer pq.RWMutex.RUnlock()
@@ -138,7 +138,7 @@ func (pq *PriorityQueue) Pop() (msg []byte) {
 	switch {
 	case P == 0 && N == 0:
 		return
-	case P > 0 && N < P || (P%pq.factor == 0 && N%pq.factor != 0):
+	case P > 0 && N < P && ((P+N)%pq.factor != 0 && N > 0):
 		msg = <-pq.Priority
 		pq.Plen.Dec()
 	case N > 0:
