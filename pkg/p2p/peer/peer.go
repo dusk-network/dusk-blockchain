@@ -102,7 +102,7 @@ type Writer struct {
 type Reader struct {
 	*Connection
 	processor *MessageProcessor
-	priority *PriorityQueue
+	priority  *PriorityQueue
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -304,7 +304,34 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 
 	plog := l.WithField("r_addr", p.Conn.RemoteAddr().String())
 
-	// Create buffered channels for each message type
+	go func() {
+		for {
+			// Get a new message from the queue
+			message := p.priority.Pop()
+			// If the Pop is unblocked by quit then the following ends the goroutine
+			if p.priority.IsShuttingDown() {
+				break
+			}
+			// Check if context was canceled
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			// TODO: error here should be checked in order to decrease reputation
+			//  or blacklist spammers
+			if _, err := p.processor.Collect(p.Addr(), message, ringBuf, p.services, nil); err != nil {
+				var topic string
+				if len(message) > 0 {
+					topic = topics.Topic(message[0]).String()
+				}
+
+				plog.WithField("cs", hex.EncodeToString(checksum.Generate(message))).
+					WithField("topic", topic).
+					WithError(err).Error("failed to process message")
+			}
+		}
+	}()
 
 	for {
 		// Check if context was canceled
@@ -340,21 +367,8 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 			return
 		}
 
-		go func() {
-
-			// TODO: error here should be checked in order to decrease reputation
-			//  or blacklist spammers
-			if _, err = p.processor.Collect(p.Addr(), message, ringBuf, p.services, nil); err != nil {
-				var topic string
-				if len(message) > 0 {
-					topic = topics.Topic(message[0]).String()
-				}
-
-				plog.WithField("cs", hex.EncodeToString(cs)).
-					WithField("topic", topic).
-					WithError(err).Error("failed to process message")
-			}
-		}()
+		// push the message onto the queue
+		p.priority.Push(message)
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)

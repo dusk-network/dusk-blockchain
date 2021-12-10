@@ -39,6 +39,8 @@ type PriorityQueue struct {
 	factor                uint32
 	Priority, Nonpriority chan []byte
 	Plen, Nlen            *atomic.Uint32
+	semaphore             chan struct{}
+	quit                  chan struct{}
 }
 
 // NewPriorityQueue creates a new priority queue for messages
@@ -58,8 +60,23 @@ func NewPriorityQueue(size int, factor uint32) (pq *PriorityQueue) {
 		Nonpriority: make(chan []byte, size),
 		Plen:        atomic.NewUint32(0),
 		Nlen:        atomic.NewUint32(0),
+		semaphore:   make(chan struct{}, size*2),
+		quit:        make(chan struct{}),
 	}
 	return
+}
+
+func (pq *PriorityQueue) Shutdown() {
+	close(pq.quit)
+}
+
+func (pq *PriorityQueue) IsShuttingDown() bool {
+	select {
+	case <-pq.quit:
+		return true
+	default:
+		return false
+	}
 }
 
 // SetFactor changes the factor by which a given sub-queue is forced to be popped
@@ -83,16 +100,15 @@ func IsPriority(msg byte) bool {
 
 // Push a message on the queue, checking if it is a priority message type, and
 // putting it into the channel relevant to the priority.
-//
-// If the channel buffer is full, this function will block, and it is recommended
-// to increase the size specified in the constructor. If the buffer usage is too
-// high or peaky, then there may be bottlenecks in the processing phase.
-//
-// The queue will auto-scale rather than fail by pausing operations and
-// increasing the buffer sizes by 25% if autoGrow is set in the NewPriorityQueue
 func (pq *PriorityQueue) Push(msg []byte) {
 	pq.RWMutex.RLock()
 	defer pq.RWMutex.RUnlock()
+	// In case quit has been called, no point loading a new item
+	select {
+	case <-pq.quit:
+		return
+	default:
+	}
 	if len(msg) > 0 {
 		if IsPriority(msg[0]) {
 			// this is priority message
@@ -104,7 +120,8 @@ func (pq *PriorityQueue) Push(msg []byte) {
 			}
 			// once channel loads increment atomic counter
 			pq.Plen.Inc()
-			return
+			// load the semaphore so any waiting Pop calls unblock
+			pq.semaphore <- struct{}{}
 		} else {
 			// this is not a priority message
 			select {
@@ -115,6 +132,8 @@ func (pq *PriorityQueue) Push(msg []byte) {
 			}
 			// once channel loads increment atomic counter
 			pq.Nlen.Inc()
+			// load the semaphore so any waiting Pop calls unblock
+			pq.semaphore <- struct{}{}
 		}
 	} // if message was empty for now silently no-op
 }
@@ -125,15 +144,22 @@ func (pq *PriorityQueue) Push(msg []byte) {
 //
 // - if only one queue has items, it is picked
 // - If the total number of items in the queue is equally divisible by `factor`,
-//   and there is a non-priority item to pop, it selects non-priority, otherwise, it selects
-//   priority
+//   and there is a non-priority item to pop, it selects non-priority, otherwise,
+//   it selects priority
 //
-// Essentially, if there are priority items, every `factor` items if there is a non-priority
-// item it is popped, ensuring that generally non-priority items will not wait more than
-// `factor` slots before being popped.
+// Essentially, if there are priority items, every `factor` items if there is a
+// non-priority item it is popped, ensuring that generally non-priority items
+// will not wait more than `factor` slots before being popped.
 func (pq *PriorityQueue) Pop() (msg []byte) {
 	pq.RWMutex.RLock()
 	defer pq.RWMutex.RUnlock()
+	// This channel is loaded for every message Push placed on the two queues, so it
+	// can be used to block until there is. The quit channel is there for shutdown.
+	select {
+	case <-pq.semaphore:
+	case <-pq.quit:
+		return
+	}
 	P, N := pq.Plen.Load(), pq.Nlen.Load()
 	switch {
 	case P == 0 && N == 0:
