@@ -165,5 +165,6 @@ func (t *Transactor) GetAddress(ctx context.Context, e *node.EmptyRequest) (*nod
 
 // GetBalance returns the balance of the loaded wallet.
 func (t *Transactor) GetBalance(ctx context.Context, e *node.EmptyRequest) (*node.BalanceResponse, error) {
-	return t.handleBalance()
+	// NOT IMPL
+	return &node.BalanceResponse{}, nil
 }

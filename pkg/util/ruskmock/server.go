@@ -121,7 +121,6 @@ func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
 	rusk.RegisterKeysServer(grpcServer, srv)
 	rusk.RegisterTransferServer(grpcServer, srv)
 	rusk.RegisterStakeServiceServer(grpcServer, srv)
-	rusk.RegisterWalletServer(grpcServer, srv)
 	log.Debugln("GRPC services registered")
 }
 
@@ -329,25 +328,6 @@ func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) 
 	return nil
 }
 
-// GenerateScore returns a mocked Score.
-// We do this entirely randomly, as score verification is completely up to
-// the server configuration. This makes it easier for us to test different
-// scenarios, and it greatly simplifies the bootstrapping of a network.
-func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreRequest) (*rusk.GenerateScoreResponse, error) {
-	log.Infoln("call received to GenerateScore")
-	defer log.Infoln("finished call to GenerateScore")
-
-	return nil, nil
-}
-
-// VerifyScore will return either true or false, depending on the server configuration.
-func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) (*rusk.VerifyScoreResponse, error) {
-	log.Infoln("call received to VerifyScore")
-	defer log.Infoln("finished call to VerifyScore")
-
-	return nil, nil
-}
-
 // GenerateKeys returns the server's wallet private key, and a stealth address.
 // The response will contain Ristretto points under the hood.
 func (s *Server) GenerateKeys(ctx context.Context, req *rusk.GenerateKeysRequest) (*rusk.GenerateKeysResponse, error) {
@@ -482,18 +462,6 @@ func (s *Server) FindStake(ctx context.Context, req *rusk.FindStakeRequest) (*ru
 	defer log.Infoln("finished call to FindStake")
 
 	return nil, nil
-}
-
-// GetBalance locked and unlocked balance values per a ViewKey.
-func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*rusk.GetWalletBalanceResponse, error) {
-	log.Infoln("call received to GetBalance")
-	defer log.Infoln("finished call to GetBalance")
-
-	resp := new(rusk.GetWalletBalanceResponse)
-
-	resp.LockedBalance = 0
-	resp.UnlockedBalance = 0
-	return resp, nil
 }
 
 // Stop the rusk mock server.
