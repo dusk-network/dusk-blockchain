@@ -31,6 +31,13 @@ func RandomBlock(height uint64, txBatchCount uint16) *block.Block {
 	dist := transactions.RandDistributeTx(config.GeneratorReward, 2)
 	b.Txs = append(b.Txs, dist)
 
+	txRoot, err := b.CalculateRoot()
+	if err != nil {
+		panic(err)
+	}
+
+	b.Header.TxRoot = txRoot
+
 	hash, err := b.CalculateHash()
 	if err != nil {
 		panic(err)
@@ -96,6 +103,7 @@ func RandomHeader(height uint64) *block.Header {
 		PrevBlockHash: transactions.Rand32Bytes(),
 		Seed:          RandomBLSSignature(),
 		TxRoot:        transactions.Rand32Bytes(),
+		StateHash:     make([]byte, 32),
 
 		Certificate: RandomCertificate(),
 	}

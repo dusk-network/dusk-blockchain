@@ -18,7 +18,6 @@ import (
 // StartMockServer will start a mock server.
 func StartMockServer(address string) {
 	s := grpc.NewServer()
-	rusk.RegisterStateServer(s, &rusk.StateMock{})
 	rusk.RegisterKeysServer(s, &rusk.KeysMock{})
 	node.RegisterWalletServer(s, &node.WalletMock{})
 	node.RegisterTransactorServer(s, &node.TransactorMock{})

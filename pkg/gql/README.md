@@ -73,6 +73,7 @@ NB: The examples from below represent only query structures. To send a query as 
        version
        seed
        prevblockhash
+       statehash
        txroot
        reward
        feespaid

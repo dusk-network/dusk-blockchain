@@ -38,9 +38,10 @@ type (
 		Height    uint64 `json:"height"`    // Block height
 		Timestamp int64  `json:"timestamp"` // Block timestamp
 
-		PrevBlockHash []byte `json:"prev-hash"` // Hash of previous block (32 bytes)
-		Seed          []byte `json:"seed"`      // Marshaled BLS signature or hash of the previous block seed (32 bytes)
-		TxRoot        []byte `json:"tx-root"`   // Root hash of the merkle tree containing all txes (32 bytes)
+		PrevBlockHash []byte `json:"prev-hash"`  // Hash of previous block (32 bytes)
+		Seed          []byte `json:"seed"`       // Marshaled BLS signature or hash of the previous block seed (32 bytes)
+		TxRoot        []byte `json:"tx-root"`    // Root hash of the merkle tree containing all txes (32 bytes)
+		StateHash     []byte `json:"state-hash"` // Root hash of the Rusk State
 
 		*block.Certificate `json:"certificate"` // Block certificate
 		Hash               []byte               `json:"hash"` // Hash of all previous fields
@@ -62,6 +63,7 @@ func newQueryBlock(b *block.Block) queryBlock {
 	qb.Header.TxRoot = b.Header.TxRoot
 	qb.Header.Certificate = b.Header.Certificate
 	qb.Header.Hash = b.Header.Hash
+	qb.Header.StateHash = b.Header.StateHash
 
 	reward := uint64(0)
 	feesPaid := uint64(0)

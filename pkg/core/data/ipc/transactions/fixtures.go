@@ -39,28 +39,41 @@ func MockExecutor(height uint64) *PermissiveExecutor {
 	}
 }
 
-// VerifyStateTransition returns all ContractCalls passed
-// height. It returns those ContractCalls deemed valid.
-func (p *PermissiveExecutor) VerifyStateTransition(ctx context.Context, cc []ContractCall, height uint64) ([]ContractCall, error) {
+// VerifyStateTransition ...
+func (p *PermissiveExecutor) VerifyStateTransition(context.Context, []ContractCall, uint64, uint64) error {
 	time.Sleep(stateTransitionDelay)
-	return cc, nil
+	return nil
 }
 
-// ExecuteStateTransition performs a global state mutation and steps the
-// block-height up.
-func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, height uint64) (user.Provisioners, error) {
+// ExecuteStateTransition ...
+func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, blockGasLimit uint64, blockHeight uint64) ([]ContractCall, []byte, error) {
 	time.Sleep(stateTransitionDelay)
-	return *p.P, nil
+	return cc, make([]byte, 32), nil
 }
 
-// GetProvisioners returns current state of provisioners.
+// GetProvisioners ...
 func (p *PermissiveExecutor) GetProvisioners(ctx context.Context) (user.Provisioners, error) {
 	return *p.P, nil
 }
 
-// GetHeight returns current state of rusk height.
-func (p *PermissiveExecutor) GetHeight(ctx context.Context) (uint64, error) {
-	return 0, nil
+// GetFinalizedStateRoot ...
+func (p *PermissiveExecutor) GetFinalizedStateRoot(ctx context.Context) ([]byte, error) {
+	return make([]byte, 32), nil
+}
+
+// GetEphemeralStateRoot ...
+func (p *PermissiveExecutor) GetEphemeralStateRoot(ctx context.Context) ([]byte, error) {
+	return make([]byte, 32), nil
+}
+
+// Accept ...
+func (p *PermissiveExecutor) Accept(context.Context, []ContractCall, []byte, uint64) (user.Provisioners, []byte, error) {
+	return *p.P, make([]byte, 32), nil
+}
+
+// Finalize ...
+func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, uint64) (user.Provisioners, []byte, error) {
+	return *p.P, make([]byte, 32), nil
 }
 
 // MockProxy mocks a proxy for ease of testing.

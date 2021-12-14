@@ -9,6 +9,7 @@ package candidate
 import (
 	"bytes"
 	"context"
+	"errors"
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
@@ -42,13 +43,16 @@ type Generator interface {
 type generator struct {
 	*consensus.Emitter
 	genPubKey *keys.PublicKey
+
+	executeFn consensus.ExecuteTxsFunc
 }
 
 // New creates a new block generator.
-func New(e *consensus.Emitter, genPubKey *keys.PublicKey) Generator {
+func New(e *consensus.Emitter, genPubKey *keys.PublicKey, executeFn consensus.ExecuteTxsFunc) Generator {
 	return &generator{
 		Emitter:   e,
 		genPubKey: genPubKey,
+		executeFn: executeFn,
 	}
 }
 
@@ -118,6 +122,19 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 		return nil, err
 	}
 
+	var stateHash []byte
+
+	txs, stateHash, err = bg.executeFn(context.Background(), txs, round)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(stateHash) == 0 {
+		err = errors.New("empty state hash")
+		log.WithError(err).Error("generate block failed")
+		return nil, err
+	}
+
 	// Construct header
 	h := &block.Header{
 		Version:       0,
@@ -127,6 +144,7 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 		TxRoot:        nil,
 		Seed:          seed,
 		Certificate:   block.EmptyCertificate(),
+		StateHash:     stateHash,
 	}
 
 	// Construct the candidate block

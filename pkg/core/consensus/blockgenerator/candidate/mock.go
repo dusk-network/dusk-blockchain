@@ -13,6 +13,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
@@ -53,7 +54,12 @@ func (m *mock) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUp
 // Mock the candidate generator.
 func Mock(e *consensus.Emitter) Generator {
 	key := keys.NewPublicKey()
+
+	fn := func(ctx context.Context, txs []transactions.ContractCall, bh uint64) ([]transactions.ContractCall, []byte, error) {
+		return txs, make([]byte, 32), nil
+	}
+
 	return &mock{
-		generator: New(e, key).(*generator),
+		generator: New(e, key, fn).(*generator),
 	}
 }

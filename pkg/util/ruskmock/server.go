@@ -119,8 +119,6 @@ func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
 	log.Debugln("registering GRPC services")
 	rusk.RegisterStateServer(grpcServer, srv)
 	rusk.RegisterKeysServer(grpcServer, srv)
-	rusk.RegisterBlindBidServiceServer(grpcServer, srv)
-	rusk.RegisterBidServiceServer(grpcServer, srv)
 	rusk.RegisterTransferServer(grpcServer, srv)
 	rusk.RegisterStakeServiceServer(grpcServer, srv)
 	rusk.RegisterWalletServer(grpcServer, srv)
@@ -152,45 +150,75 @@ func (s *Server) Serve(network, url string) error {
 	return nil
 }
 
-// VerifyStateTransition simulates a state transition validation. The outcome is dictated
-// by the server configuration.
+// VerifyStateTransition simulates a state transition validation.
 func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStateTransitionRequest) (*rusk.VerifyStateTransitionResponse, error) {
-	log.Infoln("call received to VerifyStateTransition")
+	log.WithField("block_gas_limit", req.BlockGasLimit).
+		WithField("block_height", req.BlockHeight).
+		Infoln("call received to VerifyStateTransition")
+
 	defer log.Infoln("finished call to VerifyStateTransition")
 
 	time.Sleep(stateTransitionDelay)
 
-	if !s.cfg.PassStateTransitionValidation {
-		indices := make([]uint64, len(req.Txs))
-		for i := range indices {
-			indices[i] = uint64(i)
-		}
-
-		return &rusk.VerifyStateTransitionResponse{
-			FailedCalls: indices,
-		}, nil
-	}
-
 	return &rusk.VerifyStateTransitionResponse{
-		FailedCalls: make([]uint64, 0),
+		Success: true,
 	}, nil
 }
 
-// ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
-// configuration.
+// ExecuteStateTransition mocks a dry-run state transition.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
+	log.WithField("block_gas_limit", req.BlockGasLimit).
+		WithField("block_height", req.BlockHeight).
+		Infoln("call received to ExecuteStateTransition")
+
+	defer log.Infoln("finished call to ExecuteStateTransition")
+
+	time.Sleep(stateTransitionDelay)
+
+	// Mock service always return full set of passed txs
+	return &rusk.ExecuteStateTransitionResponse{
+		Txs:       req.Txs,
+		StateRoot: make([]byte, 32),
+		Success:   true,
+	}, nil
+}
+
+// Accept implements a mock Finalize.
+func (s *Server) Accept(ctx context.Context, req *rusk.AcceptRequest) (*rusk.AcceptResponse, error) {
 	log.WithField("height", s.height).Infoln("call received to ExecuteStateTransition")
 	defer log.Infoln("finished call to ExecuteStateTransition")
 
 	time.Sleep(stateTransitionDelay)
 
-	if err := s.addConsensusNodes(req.Txs, req.Height); err != nil {
+	if err := s.addConsensusNodes(req.Txs, req.BlockHeight); err != nil {
 		log.WithError(err).Errorln("could not add consensus nodes")
 		return nil, err
 	}
 
-	return &rusk.ExecuteStateTransitionResponse{
-		Success: s.cfg.PassStateTransition,
+	return &rusk.AcceptResponse{
+		Success:   s.cfg.PassStateTransition,
+		StateRoot: make([]byte, 32),
+	}, nil
+}
+
+// Finalize implements a mock Finalize.
+func (s *Server) Finalize(ctx context.Context, req *rusk.FinalizeRequest) (*rusk.FinalizeResponse, error) {
+	log.WithField("height", s.height).
+		WithField("state_root", util.StringifyBytes(req.StateRoot)).
+		Infoln("call received to ExecuteStateTransition")
+
+	defer log.Infoln("finished call to ExecuteStateTransition")
+
+	time.Sleep(stateTransitionDelay)
+
+	if err := s.addConsensusNodes(req.Txs, req.BlockHeight); err != nil {
+		log.WithError(err).Errorln("could not add consensus nodes")
+		return nil, err
+	}
+
+	return &rusk.FinalizeResponse{
+		Success:   true,
+		StateRoot: make([]byte, 32),
 	}, nil
 }
 
@@ -209,17 +237,34 @@ func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersR
 	}, nil
 }
 
-// GetHeight returns height of the last call to ExecuteStateTransition.
-func (s *Server) GetHeight(ctx context.Context, req *rusk.GetHeightRequest) (*rusk.GetHeightResponse, error) {
-	log.Infoln("call received to GetHeight")
-	defer log.Infoln("finished call to GetHeight")
+// GetEphemeralStateRoot returns the current set of provisioners.
+func (s *Server) GetEphemeralStateRoot(ctx context.Context, req *rusk.GetEphemeralStateRootRequest) (*rusk.GetEphemeralStateRootResponse, error) {
+	log.Infoln("call received to GetEphemeralStateRoot")
+	defer log.Infoln("finished call to GetEphemeralStateRoot")
 
-	h, err := s.db.FetchHeight()
-	if err != nil {
-		return &rusk.GetHeightResponse{Height: 0}, err
-	}
+	return &rusk.GetEphemeralStateRootResponse{
+		StateRoot: make([]byte, 32),
+	}, nil
+}
 
-	return &rusk.GetHeightResponse{Height: h}, nil
+// GetFinalizedStateRoot returns the current set of provisioners.
+func (s *Server) GetFinalizedStateRoot(ctx context.Context, req *rusk.GetFinalizedStateRootRequest) (*rusk.GetFinalizedStateRootResponse, error) {
+	log.Infoln("call received to GetFinalizedStateRoot")
+	defer log.Infoln("finished call to GetFinalizedStateRoot")
+
+	return &rusk.GetFinalizedStateRootResponse{
+		StateRoot: make([]byte, 32),
+	}, nil
+}
+
+// Echo returns the current set of provisioners.
+func (s *Server) Echo(ctx context.Context, req *rusk.EchoRequest) (*rusk.EchoResponse, error) {
+	log.Infoln("call received to Echo")
+	defer log.Infoln("finished call to Echo")
+
+	return &rusk.EchoResponse{
+		Message: "echo",
+	}, nil
 }
 
 func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) error {
@@ -428,23 +473,6 @@ func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest
 		Type:    4,
 		Payload: buf.Bytes(),
 	}, nil
-}
-
-// NewBid creates a bidding transaction and returns it to the caller.
-func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*rusk.BidTransaction, error) {
-	log.Infoln("call received to NewBid")
-	defer log.Infoln("finished call to NewBid")
-
-	return nil, nil
-}
-
-// FindBid will return all of the bids for a given stealth address.
-// TODO: implement.
-func (s *Server) FindBid(ctx context.Context, req *rusk.FindBidRequest) (*rusk.BidList, error) {
-	log.Infoln("call received to FindBid")
-	defer log.Infoln("finished call to FindBid")
-
-	return nil, nil
 }
 
 // FindStake will return a stake for a given public key.

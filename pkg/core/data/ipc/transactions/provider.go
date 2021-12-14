@@ -75,19 +75,26 @@ type KeyMaster interface {
 
 // Executor encapsulate the Global State operations.
 type Executor interface {
-	// VerifyStateTransition takes a bunch of ContractCalls and the block
-	// height. It returns those ContractCalls deemed valid.
-	VerifyStateTransition(context.Context, []ContractCall, uint64) ([]ContractCall, error)
+	// VerifyStateTransition performs dry-run state transition to ensure all txs are valid.
+	VerifyStateTransition(context.Context, []ContractCall, uint64, uint64) error
 
-	// ExecuteStateTransition performs a global state mutation and steps the
-	// block-height up.
-	ExecuteStateTransition(context.Context, []ContractCall, uint64) (user.Provisioners, error)
+	// ExecuteStateTransition performs dry-run state transition to return valid-only set of txs and state hash.
+	ExecuteStateTransition(context.Context, []ContractCall, uint64, uint64) ([]ContractCall, []byte, error)
+
+	// Accept creates an ephemeral state transition.
+	Accept(context.Context, []ContractCall, []byte, uint64) (user.Provisioners, []byte, error)
+
+	// Finalize creates a finalized state transition.
+	Finalize(context.Context, []ContractCall, []byte, uint64) (user.Provisioners, []byte, error)
 
 	// GetProvisioners returns the current set of provisioners.
 	GetProvisioners(ctx context.Context) (user.Provisioners, error)
 
-	// GetHeight returns rusk state height
-	GetHeight(ctx context.Context) (uint64, error)
+	// GetFinalizedStateRoot returns root hash of the finalized state.
+	GetFinalizedStateRoot(ctx context.Context) ([]byte, error)
+
+	// GetEphemeralStateRoot returns root hash of the ephemeral state.
+	GetEphemeralStateRoot(ctx context.Context) ([]byte, error)
 }
 
 // Proxy toward the rusk client.
@@ -272,50 +279,49 @@ type executor struct {
 	*proxy
 }
 
-// VerifyStateTransition takes a bunch of ContractCalls and the block
-// height. It returns those ContractCalls deemed valid.
-func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCall, height uint64) ([]ContractCall, error) {
+// VerifyStateTransition see also Executor.VerifyStateTransition.
+func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64) error {
 	vstr := new(rusk.VerifyStateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
 		if err := MTransaction(tx, call.(*Transaction)); err != nil {
-			return nil, err
+			return err
 		}
 
 		vstr.Txs[i] = tx
 	}
 
-	vstr.Height = height
+	vstr.BlockHeight = blockHeight
+	vstr.BlockGasLimit = blockGasLimit
 
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
 	res, err := e.stateClient.VerifyStateTransition(ctx, vstr)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	for idx := range res.FailedCalls {
-		calls[idx], calls[len(calls)-1] = calls[len(calls)-1], calls[idx]
-		calls = calls[:len(calls)-1]
+	if !res.Success {
+		return errors.New("verification failed")
 	}
 
-	return calls, nil
+	return nil
 }
 
-// ExecuteStateTransition performs a global state mutation and steps the
-// block-height up.
-func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall, height uint64) (user.Provisioners, error) {
-	vstr := new(rusk.ExecuteStateTransitionRequest)
+// Finalize proxy call performs both Finalize and GetProvisioners grpc calls.
+func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64) (user.Provisioners, []byte, error) {
+	vstr := new(rusk.FinalizeRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
-	vstr.Height = height
+	vstr.BlockHeight = height
+	vstr.StateRoot = stateRoot
 
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
 		if err := MTransaction(tx, call.(*Transaction)); err != nil {
-			return user.Provisioners{}, err
+			return user.Provisioners{}, nil, err
 		}
 
 		vstr.Txs[i] = tx
@@ -324,13 +330,13 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
-	res, err := e.stateClient.ExecuteStateTransition(ctx, vstr)
+	res, err := e.stateClient.Finalize(ctx, vstr)
 	if err != nil {
-		return user.Provisioners{}, err
+		return user.Provisioners{}, nil, err
 	}
 
 	if !res.Success {
-		return user.Provisioners{}, errors.New("unsuccessful state transition function execution")
+		return user.Provisioners{}, nil, errors.New("unsuccessful finalize call")
 	}
 
 	provisioners := user.NewProvisioners()
@@ -338,7 +344,7 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 
 	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})
 	if err != nil {
-		return user.Provisioners{}, err
+		return user.Provisioners{}, nil, err
 	}
 
 	for i := range pres.Provisioners {
@@ -349,9 +355,99 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	}
 
 	provisioners.Members = memberMap
-	return *provisioners, nil
+	return *provisioners, res.StateRoot, nil
 }
 
+// Accept proxy call performs both Accept and GetProvisioners grpc calls.
+func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64) (user.Provisioners, []byte, error) {
+	vstr := new(rusk.AcceptRequest)
+	vstr.Txs = make([]*rusk.Transaction, len(calls))
+	vstr.BlockHeight = height
+	vstr.StateRoot = stateRoot
+
+	for i, call := range calls {
+		tx := new(rusk.Transaction)
+		if err := MTransaction(tx, call.(*Transaction)); err != nil {
+			return user.Provisioners{}, nil, err
+		}
+
+		vstr.Txs[i] = tx
+	}
+
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
+	defer cancel()
+
+	res, err := e.stateClient.Accept(ctx, vstr)
+	if err != nil {
+		return user.Provisioners{}, nil, err
+	}
+
+	if !res.Success {
+		return user.Provisioners{}, nil, errors.New("unsuccessful finalize call")
+	}
+
+	provisioners := user.NewProvisioners()
+	memberMap := make(map[string]*user.Member)
+
+	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})
+	if err != nil {
+		return user.Provisioners{}, nil, err
+	}
+
+	for i := range pres.Provisioners {
+		member := new(user.Member)
+		UMember(pres.Provisioners[i], member)
+		memberMap[string(member.PublicKeyBLS)] = member
+		provisioners.Set.Insert(member.PublicKeyBLS)
+	}
+
+	provisioners.Members = memberMap
+	return *provisioners, res.StateRoot, nil
+}
+
+// ExecuteStateTransition proxy call performs a single grpc ExecuteStateTransition call.
+func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64) ([]ContractCall, []byte, error) {
+	vstr := new(rusk.ExecuteStateTransitionRequest)
+	vstr.Txs = make([]*rusk.Transaction, len(calls))
+	vstr.BlockHeight = blockHeight
+	vstr.BlockGasLimit = blockGasLimit
+
+	for i, call := range calls {
+		tx := new(rusk.Transaction)
+		if err := MTransaction(tx, call.(*Transaction)); err != nil {
+			return nil, nil, err
+		}
+
+		vstr.Txs[i] = tx
+	}
+
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
+	defer cancel()
+
+	res, err := e.stateClient.ExecuteStateTransition(ctx, vstr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !res.Success {
+		return nil, nil, errors.New("unsuccessful state transition function execution")
+	}
+
+	validCalls := make([]ContractCall, 0)
+
+	for _, tx := range res.Txs {
+		trans := NewTransaction()
+		if err := UTransaction(tx, trans); err != nil {
+			return nil, nil, err
+		}
+
+		validCalls = append(validCalls, trans)
+	}
+
+	return validCalls, res.StateRoot, nil
+}
+
+// GetProvisioners see also Executor.GetProvisioners.
 func (e *executor) GetProvisioners(ctx context.Context) (user.Provisioners, error) {
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
@@ -375,16 +471,30 @@ func (e *executor) GetProvisioners(ctx context.Context) (user.Provisioners, erro
 	return *provisioners, nil
 }
 
-func (e *executor) GetHeight(ctx context.Context) (uint64, error) {
+// GetFinalizedStateRoot proxy call to state.GetFinalizedStateRoot grpc.
+func (e *executor) GetFinalizedStateRoot(ctx context.Context) ([]byte, error) {
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
-	res, err := e.stateClient.GetHeight(ctx, &rusk.GetHeightRequest{})
+	r, err := e.stateClient.GetFinalizedStateRoot(ctx, &rusk.GetFinalizedStateRootRequest{})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return res.Height, nil
+	return r.StateRoot, nil
+}
+
+// GetEphemeralStateRoot proxy call to state.GetEphemeralStateRoot grpc.
+func (e *executor) GetEphemeralStateRoot(ctx context.Context) ([]byte, error) {
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
+	defer cancel()
+
+	r, err := e.stateClient.GetEphemeralStateRoot(ctx, &rusk.GetEphemeralStateRootRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	return r.StateRoot, nil
 }
 
 // UMember deep copies from the rusk.Provisioner.
