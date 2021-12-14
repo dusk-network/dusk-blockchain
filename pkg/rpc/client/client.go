@@ -77,16 +77,6 @@ func CreateStakeClient(ctx context.Context, address string) (rusk.StakeServiceCl
 	return rusk.NewStakeServiceClient(conn), conn
 }
 
-// CreateWalletClient creates a client for the Wallet service.
-func CreateWalletClient(ctx context.Context, address string) (rusk.WalletClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Panic(err)
-	}
-
-	return rusk.NewWalletClient(conn), conn
-}
-
 type (
 	// AuthClient is the client used to test the authorization service.
 	AuthClient struct {

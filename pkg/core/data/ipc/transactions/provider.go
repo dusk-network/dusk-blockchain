@@ -51,10 +51,6 @@ type UnconfirmedTxProber interface {
 
 // Provider encapsulates the common Wallet and transaction operations.
 type Provider interface {
-	// GetBalance returns the balance of the client expressed in (unit?) of
-	// DUSK. It accepts the ViewKey as parameter.
-	GetBalance(context.Context, keys.ViewKey) (uint64, uint64, error)
-
 	// NewStake creates a staking transaction.
 	NewStake(context.Context, []byte, uint64) (*Transaction, error)
 
@@ -110,20 +106,18 @@ type proxy struct {
 	keysClient     rusk.KeysClient
 	transferClient rusk.TransferClient
 	stakeClient    rusk.StakeServiceClient
-	walletClient   rusk.WalletClient
 	txTimeout      time.Duration
 	timeout        time.Duration
 }
 
 // NewProxy creates a new Proxy.
 func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, transferClient rusk.TransferClient,
-	stakeClient rusk.StakeServiceClient, walletClient rusk.WalletClient, txTimeout, defaultTimeout time.Duration) Proxy {
+	stakeClient rusk.StakeServiceClient, txTimeout, defaultTimeout time.Duration) Proxy {
 	return &proxy{
 		stateClient:    stateClient,
 		keysClient:     keysClient,
 		transferClient: transferClient,
 		stakeClient:    stakeClient,
-		walletClient:   walletClient,
 		txTimeout:      txTimeout,
 		timeout:        defaultTimeout,
 	}
@@ -178,24 +172,6 @@ func (v *verifier) CalculateBalance(ctx context.Context, b []byte, calls []Contr
 
 type provider struct {
 	*proxy
-}
-
-// GetBalance returns the balance of the client expressed in (unit?) of
-// DUSK. It accepts the ViewKey as parameter.
-func (p *provider) GetBalance(ctx context.Context, vk keys.ViewKey) (uint64, uint64, error) {
-	req := new(rusk.GetBalanceRequest)
-	req.Vk = new(rusk.ViewKey)
-	keys.MViewKey(req.Vk, &vk)
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
-	defer cancel()
-
-	res, err := p.walletClient.GetBalance(ctx, req)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return res.UnlockedBalance, res.LockedBalance, nil
 }
 
 // NewStake creates a new transaction using the user's PrivateKey
