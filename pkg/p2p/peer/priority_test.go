@@ -73,7 +73,7 @@ func TestPriorityQueuePriorityFlood(t *testing.T) {
 		q.Push(*genMessage(true))
 		q.Push(*genMessage(false))
 	}
-	expected := "expected := []bool{true, true, true, false, true, true, false, true, true, false, true, true, false, true, true, true, true, true, true, false, true, true, false, true, true, false, true, true, false, true, true, true, true, true, true, false, true, true, false, true, true, false, true, true, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, }"
+	expected := `expected := []bool{true, true, true, false, true, true, false, true, true, false, true, true, false, true, true, true, true, true, true, false, true, true, false, true, true, false, true, true, false, true, true, true, true, true, true, false, true, true, false, true, true, false, true, true, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, false, true, true, false, true, true, false, true, false, false, true, true, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, }`
 	//t.Logf("%d, %d\n", q.Plen.Load(), q.Nlen.Load())
 	out := "expected := []bool{"
 	// Now, run a loop that pops four and pushes three
@@ -81,6 +81,9 @@ func TestPriorityQueuePriorityFlood(t *testing.T) {
 oot:
 	for i := 0; i < 100; i++ {
 		for j := 0; j < 4; j++ {
+			if q.Nlen.Load() < 1 && q.Plen.Load() < 1 {
+				break
+			}
 			msg = q.Pop()
 			if msg == nil {
 				break oot
