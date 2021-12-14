@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -308,10 +309,6 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 		for {
 			// Get a new message from the queue
 			message := p.priority.Pop()
-			// If the Pop is unblocked by quit then the following ends the goroutine
-			if p.priority.IsShuttingDown() {
-				break
-			}
 			// Check if context was canceled
 			select {
 			case <-ctx.Done():
@@ -330,6 +327,38 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 					WithField("topic", topic).
 					WithError(err).Error("failed to process message")
 			}
+		}
+	}()
+
+	chanStart := make(chan struct{})
+	started := false
+	go func() {
+		<-chanStart
+		for {
+			fmt.Println("top of queue consumer loop")
+			// Get a new message from the queue
+			message := p.priority.Pop()
+			fmt.Println("message popped off queue")
+			// Check if context was canceled
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			fmt.Println("collecting message", message)
+			// TODO: error here should be checked in order to decrease reputation
+			//  or blacklist spammers
+			if _, err := p.processor.Collect(p.Addr(), message, ringBuf, p.services, nil); err != nil {
+				var topic string
+				if len(message) > 0 {
+					topic = topics.Topic(message[0]).String()
+				}
+
+				plog.WithField("cs", hex.EncodeToString(checksum.Generate(message))).
+					WithField("topic", topic).
+					WithError(err).Error("failed to process message")
+			}
+			fmt.Println("collected message")
 		}
 	}()
 
@@ -372,6 +401,10 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)
+		if !started {
+			started = true
+			close(chanStart)
+		}
 	}
 }
 

@@ -6,6 +6,8 @@
 
 package peer
 
+import "context"
+
 // ReaderFactory is responsible for spawning peers. It provides them with the
 // reference to the message processor, which will process the received messages.
 type ReaderFactory struct {
@@ -19,11 +21,11 @@ func NewReaderFactory(processor *MessageProcessor) *ReaderFactory {
 
 // SpawnReader returns a Reader. It will still need to be launched by
 // running ReadLoop in a goroutine.
-func (f *ReaderFactory) SpawnReader(conn *Connection) *Reader {
+func (f *ReaderFactory) SpawnReader(conn *Connection, ctx context.Context) *Reader {
 	reader := &Reader{
 		Connection: conn,
 		processor:  f.processor,
-		priority:   NewPriorityQueue(30, 4),
+		priority:   NewPriorityQueue(ctx, 32, 4),
 	}
 
 	return reader

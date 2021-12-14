@@ -1,10 +1,13 @@
 package peer
 
 import (
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/stretchr/testify/assert"
+	"context"
 	"math/rand"
 	"testing"
+	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/stretchr/testify/assert"
 )
 
 const zero uint32 = 0
@@ -28,7 +31,8 @@ func genMessage(pri bool) (msg *[]byte) {
 // non-priority first
 func TestPriorityQueue(t *testing.T) {
 	rand.Seed(0xdeadbeeffacade)
-	q := NewPriorityQueue(int(qSize), 3)
+	ctx, cancel := context.WithCancel(context.Background())
+	q := NewPriorityQueue(ctx, int(qSize), 3)
 	assert.Equal(t, zero, q.Plen.Load())
 	assert.Equal(t, zero, q.Nlen.Load())
 	for i := uint32(0); i < qSize; i++ {
@@ -37,10 +41,14 @@ func TestPriorityQueue(t *testing.T) {
 	}
 	assert.Equal(t, qSize, q.Plen.Load())
 	assert.Equal(t, qSize, q.Nlen.Load())
+	go func() {
+		time.Sleep(time.Second)
+		cancel()
+	}()
 	var counter int
-	expected := `expected := []bool{false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,false,true,}`
+	expected := `expected := []bool{false,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,false,true,false,false,true,true,}`
 	out := "expected := []bool{"
-	for msg := q.Pop(); msg != nil; msg = q.Pop() {
+	for msg := q.Pop(); q.Plen.Load() > 0 || q.Nlen.Load() > 0 || msg != nil; msg = q.Pop() {
 		if msg[0] == 0 {
 			out += "false,"
 		} else {
@@ -58,7 +66,8 @@ func TestPriorityQueue(t *testing.T) {
 // pool drains while 2x as many priority messages come in.
 func TestPriorityQueuePriorityFlood(t *testing.T) {
 	rand.Seed(0xdeadbeeffacade)
-	q := NewPriorityQueue(int(qSize), 4)
+	ctx, cancel := context.WithCancel(context.Background())
+	q := NewPriorityQueue(ctx, int(qSize), 4)
 	for i := uint32(0); i < qSize/3; i++ {
 		q.Push(*genMessage(true))
 		q.Push(*genMessage(true))
@@ -92,7 +101,8 @@ oot:
 	}
 	out += "}"
 	assert.Equal(t, expected, out)
-	//t.Logf("\n%s\n", out) // this will print what is coming out to put in the expected above
+	t.Logf("\n%s\n", out) // this will print what is coming out to put in the expected above
+	cancel()
 }
 
 // TestPriorityQueueNonPriorityFlood tests queue behavior under conditions of DoS

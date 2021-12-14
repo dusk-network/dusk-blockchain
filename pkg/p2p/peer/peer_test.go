@@ -9,7 +9,9 @@ package peer
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -41,44 +43,52 @@ func TestReader(t *testing.T) {
 
 	// Set up reader factory
 	processor := NewMessageProcessor(eb)
-	agreementChan := make(chan struct{}, 1)
+	agreementChan := make(chan struct{})
 	respFn := func(_ string, _ message.Message) ([]bytes.Buffer, error) {
+		fmt.Fprintln(os.Stderr, "sending signal on agreementChan")
 		agreementChan <- struct{}{}
+
 		return nil, nil
 	}
 
 	processor.Register(topics.Agreement, respFn)
 	factory := NewReaderFactory(processor)
+	ctx, cancel := context.WithCancel(context.Background())
 
 	pConn := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
-	peerReader := factory.SpawnReader(pConn)
+	peerReader := factory.SpawnReader(pConn, ctx)
 
 	peerReader.services = protocol.FullNode
 
-	go peerReader.ReadLoop(context.Background(), nil)
+	go peerReader.ReadLoop(ctx, nil)
 
 	errChan := make(chan error, 1)
 	go func(eChan chan error) {
 		msg := makeAgreementGossip(10)
+		fmt.Fprintln(os.Stderr, "marshalling message")
 
 		buf, err := message.Marshal(msg)
 		if err != nil {
 			eChan <- err
 		}
+		fmt.Fprintln(os.Stderr, "processing message")
 
 		if err := g.Process(&buf); err != nil {
 			eChan <- err
 		}
-
+		fmt.Fprintln(os.Stderr, "writing message to client")
 		_, _ = client.Write(buf.Bytes())
 	}(errChan)
-
+	fmt.Fprintln(os.Stderr, "waiting on agreement message")
 	// We should get the message through this channel
 	select {
 	case err := <-errChan:
 		t.Fatal(err)
 	case <-agreementChan:
+		//case <-time.After(time.Second):
+		//	panic("test timed out")
 	}
+	cancel()
 }
 
 // Test the functionality of the peer.Writer through the use of the ring buffer.

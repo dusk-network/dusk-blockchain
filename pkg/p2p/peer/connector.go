@@ -171,7 +171,8 @@ func (c *Connector) Dial(addr string) (net.Conn, error) {
 
 func (c *Connector) acceptConnection(conn net.Conn) {
 	pConn := NewConnection(conn, c.gossip)
-	peerReader := c.readerFactory.SpawnReader(pConn)
+	ctx, cancel := context.WithCancel(context.Background())
+	peerReader := c.readerFactory.SpawnReader(pConn, ctx)
 	raddr := conn.RemoteAddr().String()
 
 	if err := peerReader.Accept(c.services); err != nil {
@@ -179,6 +180,7 @@ func (c *Connector) acceptConnection(conn net.Conn) {
 			WithError(err).
 			WithField("type", "inbound").
 			Warnln("error performing handshake")
+		cancel()
 		return
 	}
 
@@ -192,12 +194,14 @@ func (c *Connector) acceptConnection(conn net.Conn) {
 	go func() {
 		c.connectFunc(context.Background(), peerReader, peerWriter)
 		c.removePeer(peerReader.Addr())
+		cancel()
 	}()
 }
 
 func (c *Connector) proposeConnection(conn net.Conn) {
 	pConn := NewConnection(conn, c.gossip)
 	peerWriter := NewWriter(pConn, c.eventBus)
+	ctx, cancel := context.WithCancel(context.Background())
 
 	if err := peerWriter.Connect(c.services); err != nil {
 		plog.WithField("r_addr", conn.RemoteAddr().String()).
@@ -211,13 +215,14 @@ func (c *Connector) proposeConnection(conn net.Conn) {
 	plog.WithField("r_addr", address).WithField("type", "outbound").
 		Infoln("peer_connection established")
 
-	peerReader := c.readerFactory.SpawnReader(pConn)
+	peerReader := c.readerFactory.SpawnReader(pConn, ctx)
 
 	c.addPeer(peerWriter.Addr())
 
 	go func() {
 		c.connectFunc(context.Background(), peerReader, peerWriter)
 		c.removePeer(peerWriter.Addr())
+		cancel()
 	}()
 }
 

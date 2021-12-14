@@ -71,8 +71,8 @@ func TestPingLoop(t *testing.T) {
 	processor.Register(topics.Pong, pongFunc)
 
 	factory := NewReaderFactory(processor)
-	reader := factory.SpawnReader(pConn)
-	reader2 := factory.SpawnReader(pConn2)
+	reader := factory.SpawnReader(pConn, context.Background())
+	reader2 := factory.SpawnReader(pConn2, context.Background())
 
 	writer.services = protocol.FullNode
 	writer2.services = protocol.FullNode
@@ -229,7 +229,7 @@ func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, ch
 	respChan := make(chan bytes.Buffer, 10)
 	g := protocol.NewGossip(protocol.TestNet)
 	c := NewConnection(r, g)
-	peer := f.SpawnReader(c)
+	peer := f.SpawnReader(c, context.Background())
 
 	// Run the non-recover readLoop to watch for panics
 	go assert.NotPanics(t, func() { peer.ReadLoop(context.Background(), nil) })

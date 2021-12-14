@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -50,6 +51,7 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
 func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf *ring.Buffer, services protocol.ServiceFlag, header []byte) ([]bytes.Buffer, error) {
+	fmt.Fprintln(os.Stderr, "Collecting", packet)
 	if len(packet) == 0 {
 		return nil, errors.New("empty packet provided")
 	}
@@ -102,6 +104,8 @@ func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
 }
 
 func (m *MessageProcessor) process(srcPeerID string, msg message.Message, respRingBuf *ring.Buffer, services protocol.ServiceFlag) ([]bytes.Buffer, error) {
+	fmt.Fprintln(os.Stderr, "message processing")
+
 	category := msg.Category()
 	if !canRoute(services, category) {
 		return nil, fmt.Errorf("attempted to process an illegal topic %s for node type %v", category, services)
