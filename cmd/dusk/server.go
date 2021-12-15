@@ -21,7 +21,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/stakeautomaton"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -262,8 +261,6 @@ func Setup() *Server {
 		ruskConn:      ruskConn,
 		readerFactory: readerFactory,
 	}
-
-	_ = stakeautomaton.New(eventBus, rpcBus, grpcServer)
 
 	// Setting up and launch kadcast peer
 	srv.launchKadcastPeer(processor)
