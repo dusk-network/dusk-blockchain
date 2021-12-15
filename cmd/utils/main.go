@@ -7,7 +7,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 	"os"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
 
-	"github.com/dusk-network/dusk-blockchain/cmd/utils/transactions"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/cmd/utils/metrics"
@@ -32,7 +30,6 @@ func main() {
 
 	app.Commands = []cli.Command{
 		metricsCMD,
-		transactionsCMD,
 		mockCMD,
 		mockRUSKCMD,
 		setConfigCMD,
@@ -190,21 +187,6 @@ var (
 		Description: `Expose a Dusk metrics endpoint to be consumed by Prometheus`,
 	}
 
-	transactionsCMD = cli.Command{
-		Name:      "transactions",
-		Usage:     "execute transactions (consensus, stake, transfer)",
-		Action:    transactionsAction,
-		ArgsUsage: "",
-		Flags: []cli.Flag{
-			txtypeFlag,
-			grpcAddressFlag,
-			amountFlag,
-			lockTimeFlag,
-			addressFlag,
-		},
-		Description: `Execute/Query transactions for a Dusk node`,
-	}
-
 	mockCMD = cli.Command{
 		Name:      "mock",
 		Usage:     "execute a mock server",
@@ -284,38 +266,6 @@ func metricsAction(ctx *cli.Context) error {
 	hostname := ctx.String(hostnameFlag.Name)
 
 	metrics.RunMetrics(gqlPort, nodePort, nodeAPIPort, port, hostname)
-
-	return nil
-}
-
-// transactionsAction will expose the metrics endpoint.
-func transactionsAction(ctx *cli.Context) error {
-	grpcHost := ctx.String(grpcAddressFlag.Name)
-	amount := ctx.Uint64(amountFlag.Name)
-	lockTime := ctx.Uint64(lockTimeFlag.Name)
-	txtype := ctx.String(txtypeFlag.Name)
-	address := ctx.String(addressFlag.Name)
-
-	transfer := transactions.Transaction{
-		Amount: amount, LockTime: lockTime,
-		TXtype: txtype, Address: address,
-	}
-
-	log.WithField("transfer", transfer).
-		Info("transactions Action started")
-
-	transferResponse, err := transactions.RunTransactions(
-		grpcHost,
-		transfer,
-	)
-	if err != nil {
-		return err
-	}
-
-	txHash := hex.EncodeToString(transferResponse.Hash)
-
-	log.WithField("txHash", txHash).
-		Info("transactions Action completed")
 
 	return nil
 }
