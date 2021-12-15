@@ -30,7 +30,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
@@ -262,12 +261,6 @@ func Setup() *Server {
 		grpcServer:    grpcServer,
 		ruskConn:      ruskConn,
 		readerFactory: readerFactory,
-	}
-
-	// Setting up the transactor component
-	_, err = transactor.New(eventBus, rpcBus, nil, grpcServer, proxy, w, c.CalculateSyncProgress)
-	if err != nil {
-		log.Panic(err)
 	}
 
 	_ = stakeautomaton.New(eventBus, rpcBus, grpcServer)
