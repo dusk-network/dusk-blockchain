@@ -287,6 +287,7 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 		Keys:        BLSKeys,
 		TimerLength: 5 * time.Second,
 	}
+
 	l := loop.New(e)
 
 	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, l)

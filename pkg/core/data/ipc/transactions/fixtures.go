@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -110,17 +109,6 @@ func (m MockProxy) ProberWithParams(verifyTransactionLatency time.Duration) Unco
 
 // Executor ...
 func (m MockProxy) Executor() Executor { return m.E }
-
-// MockKeys mocks the keys.
-func MockKeys() (*keys.SecretKey, *keys.PublicKey) {
-	sk := keys.NewSecretKey()
-	pk := keys.NewPublicKey()
-
-	keys.USecretKey(RuskSecretKey(), sk)
-	keys.UPublicKey(RuskPublicKey(), pk)
-
-	return sk, pk
-}
 
 /******************/
 /** ContractCall **/
@@ -584,21 +572,6 @@ func MockInvalidTx() *Transaction {
 /**********/
 /** KEYS **/
 /**********/
-
-// RandKeys returns a syntactically correct (but semantically rubbish) keypair.
-func RandKeys() (keys.SecretKey, keys.PublicKey) {
-	sk := keys.SecretKey{
-		A: Rand32Bytes(),
-		B: Rand32Bytes(),
-	}
-
-	pk := keys.PublicKey{
-		AG: Rand32Bytes(),
-		BG: Rand32Bytes(),
-	}
-
-	return sk, pk
-}
 
 // RuskPublicKey mocks rusk pk.
 func RuskPublicKey() *rusk.PublicKey {

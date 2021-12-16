@@ -7,12 +7,9 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"fmt"
 	"net"
-	"os"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
@@ -36,11 +33,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"golang.org/x/crypto/ssh/terminal"
 	"google.golang.org/grpc"
 )
-
-var testnet = byte(2)
 
 const voucherRetryTime = 15 * time.Second
 
@@ -93,34 +87,12 @@ func (s *Server) launchKadcastPeer(ctx context.Context, p *peer.MessageProcessor
 	s.kadPeer = kadPeer
 }
 
-func getPassword(prompt string) (string, error) {
-	pw, err := readPassword(prompt)
-	return string(pw), err
-}
-
-// This is to bypass issue with stdin from non-tty.
-func readPassword(prompt string) ([]byte, error) {
-	fd := int(os.Stdin.Fd())
-	if terminal.IsTerminal(fd) {
-		fmt.Fprintln(os.Stderr, prompt)
-		return terminal.ReadPassword(fd)
-	}
-
-	scanner := bufio.NewScanner(os.Stdin)
-	if scanner.Scan() {
-		return scanner.Bytes(), nil
-	}
-
-	return nil, scanner.Err()
-}
-
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
 // launches a new `CommitteeStore`, launches the Blockchain process, creates
 // and launches a monitor client (if configuration demands it), and inits the
 // Stake and Blind Bid channels.
 func Setup() *Server {
 	parentCtx, parentCancel := context.WithCancel(context.Background())
-	_, err := os.Stat(cfg.Get().Wallet.File)
 
 	grpcServer, err := server.SetupGRPC(server.FromCfg())
 	if err != nil {

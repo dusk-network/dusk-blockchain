@@ -8,8 +8,6 @@ package genesis
 
 import (
 	"fmt"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 )
 
 // GetPresetConfig fetches a preset configuration for a genesis block for the
@@ -46,7 +44,7 @@ var configurations = map[string]Config{
 	},
 }
 
-var devnetKeys = []keys.PublicKey{
+var devnetKeys = []PublicKey{
 	{
 		AG: []byte{94, 152, 63, 79, 72, 10, 100, 159, 5, 42, 161, 160, 157, 144, 169, 107, 112, 87, 106, 92, 70, 10, 10, 129, 212, 83, 139, 238, 171, 122, 147, 13},
 		BG: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
