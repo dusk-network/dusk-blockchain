@@ -8,17 +8,16 @@ package config
 
 import (
 	"time"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 )
 
 // A single point of constants definition.
 const (
+	// DUSK is one whole unit of DUSK.
+	DUSK = uint64(10000000000)
+
 	// GeneratorReward is the amount of Block generator default reward.
 	// TODO: TBD.
-	GeneratorReward = 50 * wallet.DUSK
+	GeneratorReward = 50 * DUSK
 
 	MinFee = uint64(100)
 
@@ -35,19 +34,10 @@ const (
 	// KadcastInitialHeight sets the default initial height for Kadcast broadcast algorithm.
 	KadcastInitialHeight byte = 128
 
-	// Block Gas limit TBD.
-	BlockGasLimit = 100000000
+	// Block Gas limit
+	// TODO: TBD
+	BlockGasLimit = 10 * DUSK
 )
 
 // KadcastInitHeader is used as default initial kadcast message header.
 var KadcastInitHeader = []byte{KadcastInitialHeight}
-
-// DecodeGenesis marshals a genesis block into a buffer.
-func DecodeGenesis() *block.Block {
-	cfg, err := genesis.GetPresetConfig(Get().General.Network)
-	if err != nil {
-		panic(err)
-	}
-
-	return genesis.Generate(cfg)
-}

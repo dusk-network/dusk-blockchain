@@ -20,9 +20,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/txrecords"
 )
 
-// DUSK is one whole unit of DUSK.
-const DUSK = uint64(10000000000)
-
 // ErrSeedFileExists is returned if the seed file already exists.
 var ErrSeedFileExists = fmt.Errorf("wallet seed file already exists")
 
