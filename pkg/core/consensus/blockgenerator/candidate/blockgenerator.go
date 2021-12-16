@@ -18,13 +18,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,16 +40,14 @@ type Generator interface {
 
 type generator struct {
 	*consensus.Emitter
-	genPubKey *keys.PublicKey
 
 	executeFn consensus.ExecuteTxsFunc
 }
 
 // New creates a new block generator.
-func New(e *consensus.Emitter, genPubKey *keys.PublicKey, executeFn consensus.ExecuteTxsFunc) Generator {
+func New(e *consensus.Emitter, executeFn consensus.ExecuteTxsFunc) Generator {
 	return &generator{
 		Emitter:   e,
-		genPubKey: genPubKey,
 		executeFn: executeFn,
 	}
 }

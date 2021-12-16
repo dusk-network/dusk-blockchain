@@ -16,7 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -39,7 +38,7 @@ func TestContextCancellation(t *testing.T) {
 		}
 	}
 
-	l := New(e, keys.NewPublicKey())
+	l := New(e)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -101,7 +100,7 @@ func (c *succesfulAgreement) GetControlFn() consensus.ControlFn {
 func TestAgreementCompletion(t *testing.T) {
 	e := consensus.MockEmitter(time.Second)
 	ctx := context.Background()
-	l := New(e, keys.NewPublicKey())
+	l := New(e)
 
 	var wg sync.WaitGroup
 
@@ -150,7 +149,7 @@ func (c *unsuccesfulAgreement) GetControlFn() consensus.ControlFn {
 func TestStall(t *testing.T) {
 	e := consensus.MockEmitter(time.Second)
 	ctx := context.Background()
-	l := New(e, keys.NewPublicKey())
+	l := New(e)
 	_ = l.Spin(ctx, &stallingStep{}, &unsuccesfulAgreement{}, consensus.RoundUpdate{Round: uint64(1)})
 }
 
@@ -181,7 +180,7 @@ func (q *queueingStep) Initialize(_ consensus.InternalPacket) consensus.PhaseFn 
 func TestClearQueues(t *testing.T) {
 	e := consensus.MockEmitter(time.Second)
 	ctx := context.Background()
-	l := New(e, keys.NewPublicKey())
+	l := New(e)
 
 	var wg sync.WaitGroup
 
