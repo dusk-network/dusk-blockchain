@@ -10,7 +10,6 @@ import (
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
@@ -19,7 +18,7 @@ type Reader struct {
 }
 
 // NewReader makes a new kadcast reader that handles TCP packets of broadcasting.
-func NewReader(publisher eventbus.Publisher, gossip *protocol.Gossip, processor *peer.MessageProcessor) *Reader {
+func NewReader(publisher eventbus.Publisher, processor *peer.MessageProcessor) *Reader {
 	// https://www.freecodecamp.org/news/grpc-server-side-streaming-with-go/
 	return nil
 }

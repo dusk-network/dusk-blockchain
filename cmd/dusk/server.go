@@ -106,8 +106,8 @@ func (s *Server) launchKadcliPeer(p *peer.MessageProcessor, ruskConn *grpc.Clien
 	}
 
 	// Launch kadcast client
-	kadPeer := kadcli.NewCliPeer(s.eventBus, s.gossip, p, ruskConn)
-	kadPeer.Launch(kcfg.SrvAddr)
+	kadPeer := kadcli.NewCliPeer(s.eventBus, p, ruskConn)
+	kadPeer.Launch()
 
 	// TODO: Find a clean way to do this. Maybe define a new Kadcast interface
 	//       and we can unify all the kadcast-related initialization.
