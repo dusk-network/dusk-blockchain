@@ -7,37 +7,13 @@
 package transactions
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
-
-// TxRequest is a convenient struct to group all parameters needed to create a
-// transaction.
-type TxRequest struct {
-	SK         keys.SecretKey
-	PK         keys.PublicKey
-	Amount     uint64
-	Fee        uint64
-	Obfuscated bool
-}
-
-// MakeTxRequest populates a TxRequest with all needed data
-// ContractCall. As such, it does not need the Public Key.
-func MakeTxRequest(sk keys.SecretKey, pk keys.PublicKey, amount uint64, fee uint64, isObfuscated bool) TxRequest {
-	return TxRequest{
-		SK:         sk,
-		PK:         pk,
-		Amount:     amount,
-		Fee:        fee,
-		Obfuscated: isObfuscated,
-	}
-}
 
 // UnconfirmedTxProber performs verification of contract calls (transactions).
 type UnconfirmedTxProber interface {
@@ -47,26 +23,6 @@ type UnconfirmedTxProber interface {
 	// primarily by the mempool which can order RUSK to calculate balance for
 	// transactions even if they are unconfirmed.
 	CalculateBalance(context.Context, []byte, []ContractCall) (uint64, error)
-}
-
-// Provider encapsulates the common Wallet and transaction operations.
-type Provider interface {
-	// NewStake creates a staking transaction.
-	NewStake(context.Context, []byte, uint64) (*Transaction, error)
-
-	// NewTransaction creates a new transaction using the user's PrivateKey
-	// It accepts the PublicKey of the recipient, a value, a fee and whether
-	// the transaction should be obfuscated or otherwise.
-	NewTransfer(context.Context, uint64, *keys.StealthAddress) (*Transaction, error)
-}
-
-// KeyMaster Encapsulates the Key creation and retrieval operations.
-type KeyMaster interface {
-	// GenerateKeys creates a SecretKey using a []byte as Seed.
-	GenerateKeys(context.Context, []byte) (keys.SecretKey, keys.PublicKey, keys.ViewKey, error)
-
-	// TODO: implement
-	// FullScanOwnedNotes(ViewKey) (OwnedNotesResponse)
 }
 
 // Executor encapsulate the Global State operations.
@@ -92,31 +48,22 @@ type Executor interface {
 
 // Proxy toward the rusk client.
 type Proxy interface {
-	Provider() Provider
 	Prober() UnconfirmedTxProber
-	KeyMaster() KeyMaster
 	Executor() Executor
 }
 
 type proxy struct {
-	stateClient    rusk.StateClient
-	keysClient     rusk.KeysClient
-	transferClient rusk.TransferClient
-	stakeClient    rusk.StakeServiceClient
-	txTimeout      time.Duration
-	timeout        time.Duration
+	stateClient rusk.StateClient
+	txTimeout   time.Duration
+	timeout     time.Duration
 }
 
 // NewProxy creates a new Proxy.
-func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, transferClient rusk.TransferClient,
-	stakeClient rusk.StakeServiceClient, txTimeout, defaultTimeout time.Duration) Proxy {
+func NewProxy(stateClient rusk.StateClient, txTimeout, defaultTimeout time.Duration) Proxy {
 	return &proxy{
-		stateClient:    stateClient,
-		keysClient:     keysClient,
-		transferClient: transferClient,
-		stakeClient:    stakeClient,
-		txTimeout:      txTimeout,
-		timeout:        defaultTimeout,
+		stateClient: stateClient,
+		txTimeout:   txTimeout,
+		timeout:     defaultTimeout,
 	}
 }
 
@@ -125,19 +72,9 @@ func (p *proxy) Prober() UnconfirmedTxProber {
 	return &verifier{p}
 }
 
-// KeyMaster returned by the Proxy.
-func (p *proxy) KeyMaster() KeyMaster {
-	return &keymaster{p}
-}
-
 // Executor returned by the Proxy.
 func (p *proxy) Executor() Executor {
 	return &executor{p}
-}
-
-// Provider returned by the Proxy.
-func (p *proxy) Provider() Provider {
-	return &provider{p}
 }
 
 type verifier struct {
@@ -169,83 +106,6 @@ func (v *verifier) CalculateBalance(ctx context.Context, b []byte, calls []Contr
 
 type provider struct {
 	*proxy
-}
-
-// NewStake creates a new transaction using the user's PrivateKey
-// It accepts the PublicKey of the recipient, a value, a fee and whether
-// the transaction should be obfuscated or otherwise.
-func (p *provider) NewStake(ctx context.Context, pubKeyBLS []byte, value uint64) (*Transaction, error) {
-	tr := new(rusk.StakeTransactionRequest)
-	tr.Value = value
-	tr.PublicKeyBls = pubKeyBLS
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
-	defer cancel()
-
-	res, err := p.stakeClient.NewStake(ctx, tr)
-	if err != nil {
-		return nil, err
-	}
-
-	trans := NewTransaction()
-	err = UTransaction(res, trans)
-	return trans, err
-}
-
-// NewTransfer creates a new transaction using the user's PrivateKey
-// It accepts the PublicKey of the recipient, a value, a fee and whether
-// the transaction should be obfuscated or otherwise.
-func (p *provider) NewTransfer(ctx context.Context, value uint64, sa *keys.StealthAddress) (*Transaction, error) {
-	tr := new(rusk.TransferTransactionRequest)
-	tr.Value = value
-
-	// XXX: In the schema, this is denoted as `bytes`, however, in the
-	// `BidTransactionRequest` it is denoted as a `StealthAddress`. This should be
-	// homogenized.
-	buf := new(bytes.Buffer)
-	if err := keys.MarshalStealthAddress(buf, sa); err != nil {
-		return nil, err
-	}
-
-	tr.Recipient = buf.Bytes()
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
-	defer cancel()
-
-	res, err := p.transferClient.NewTransfer(ctx, tr)
-	if err != nil {
-		return nil, err
-	}
-
-	trans := NewTransaction()
-	err = UTransaction(res, trans)
-	return trans, err
-}
-
-type keymaster struct {
-	*proxy
-}
-
-// GenerateKeys creates a SecretKey using a []byte as Seed.
-func (k *keymaster) GenerateKeys(ctx context.Context, seed []byte) (keys.SecretKey, keys.PublicKey, keys.ViewKey, error) {
-	sk := keys.NewSecretKey()
-	pk := keys.NewPublicKey()
-	vk := keys.NewViewKey()
-	gskr := new(rusk.GenerateKeysRequest)
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(k.timeout))
-	defer cancel()
-
-	res, err := k.keysClient.GenerateKeys(ctx, gskr)
-	if err != nil {
-		return *sk, *pk, *vk, err
-	}
-
-	keys.USecretKey(res.Sk, sk)
-	keys.UPublicKey(res.Pk, pk)
-	keys.UViewKey(res.Vk, vk)
-
-	return *sk, *pk, *vk, nil
 }
 
 type executor struct {
