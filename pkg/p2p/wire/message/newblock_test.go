@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -25,7 +25,7 @@ func TestUnMarshal(t *testing.T) {
 	hdr.BlockHash = hash
 
 	// mock candidate
-	genesis := config.DecodeGenesis()
+	genesis := genesis.Decode()
 	se := message.MockNewBlock(hdr, *genesis)
 
 	buf := new(bytes.Buffer)
@@ -42,7 +42,7 @@ func TestDeepCopy(t *testing.T) {
 	hdr.BlockHash = hash
 
 	// mock candidate
-	genesis := config.DecodeGenesis()
+	genesis := genesis.Decode()
 	se := message.MockNewBlock(hdr, *genesis)
 
 	buf := new(bytes.Buffer)

@@ -10,7 +10,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -35,7 +35,7 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 
 	// Just add genesis - we will fetch a different set of provisioners from
 	// the `proxy` either way.
-	genesis := config.DecodeGenesis()
+	genesis := genesis.Decode()
 	l := chain.NewDBLoader(db, genesis)
 	_, err := l.LoadTip()
 	assert.NoError(err)
