@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/harness/engine"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -240,7 +240,7 @@ func TestMultipleProvisioners(t *testing.T) {
 
 	defaultLocktime := uint64(100000)
 
-	amount := wallet.DUSK * 10000
+	amount := config.DUSK * 10000
 
 	// Send a bunch of Stake transactions
 	// All nodes are Provisioners
@@ -290,7 +290,7 @@ func TestMeasureNetworkTPS(t *testing.T) {
 
 	*/
 	defaultLocktime := uint64(100000)
-	amount := wallet.DUSK * 10000
+	amount := config.DUSK * 10000
 
 	// Send a bunch of Stake transactions
 	// All nodes are Provisioners

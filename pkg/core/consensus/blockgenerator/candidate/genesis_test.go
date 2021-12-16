@@ -12,7 +12,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
@@ -68,7 +68,7 @@ func TestGenerateGenesis(t *testing.T) {
 
 func TestGenesisBlock(t *testing.T) {
 	// read the hard-coded genesis blob for testnet
-	b := config.DecodeGenesis()
+	b := genesis.Decode()
 
 	// sanity checks
 	if b.Header.Height != 0 {

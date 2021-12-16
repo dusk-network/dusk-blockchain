@@ -9,8 +9,7 @@ package selection
 import (
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
-
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -86,7 +85,7 @@ func (h *Helper) Spawn() []message.NewBlock {
 			PubKeyBLS: keys.BLSPubKey,
 			BlockHash: hash,
 		}
-		genesis := config.DecodeGenesis()
+		genesis := genesis.Decode()
 		evs = append(evs, message.MockNewBlock(hdr, *genesis))
 	}
 
