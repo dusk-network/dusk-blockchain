@@ -73,14 +73,10 @@ func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, u
 
 // MockProxy mocks a proxy for ease of testing.
 type MockProxy struct {
-	Pr Provider
-	V  UnconfirmedTxProber
-	KM KeyMaster
-	E  Executor
-}
+	V UnconfirmedTxProber
 
-// Provider ...
-func (m MockProxy) Provider() Provider { return m.Pr }
+	E Executor
+}
 
 type mockVerifier struct {
 	verifyTransactionLatency time.Duration
@@ -111,9 +107,6 @@ func (m MockProxy) Prober() UnconfirmedTxProber {
 func (m MockProxy) ProberWithParams(verifyTransactionLatency time.Duration) UnconfirmedTxProber {
 	return &mockVerifier{verifyTransactionLatency}
 }
-
-// KeyMaster ...
-func (m MockProxy) KeyMaster() KeyMaster { return m.KM }
 
 // Executor ...
 func (m MockProxy) Executor() Executor { return m.E }
