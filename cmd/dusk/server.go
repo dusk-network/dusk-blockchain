@@ -8,7 +8,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -22,10 +21,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	walletdb "github.com/dusk-network/dusk-blockchain/pkg/core/data/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
@@ -123,42 +119,8 @@ func readPassword(prompt string) ([]byte, error) {
 // and launches a monitor client (if configuration demands it), and inits the
 // Stake and Blind Bid channels.
 func Setup() *Server {
-	var pw string
-
 	parentCtx, parentCancel := context.WithCancel(context.Background())
 	_, err := os.Stat(cfg.Get().Wallet.File)
-
-	switch {
-	case cfg.Get().General.TestHarness:
-		pw = os.Getenv("DUSK_WALLET_PASS")
-	case os.IsNotExist(err):
-		fmt.Fprintln(os.Stderr, "Wallet file not found. Creating new file...")
-
-		for {
-			pw, err = getPassword("Enter password:")
-			if err != nil {
-				log.Panic(err)
-			}
-
-			var pw2 string
-
-			pw2, err = getPassword("Confirm password:")
-			if err != nil {
-				log.Panic(err)
-			}
-
-			if pw == pw2 {
-				break
-			}
-		}
-	case err != nil:
-		log.Panic(err)
-	default:
-		pw, err = getPassword("Enter password:")
-		if err != nil {
-			log.Panic(err)
-		}
-	}
 
 	grpcServer, err := server.SetupGRPC(server.FromCfg())
 	if err != nil {
@@ -182,20 +144,9 @@ func Setup() *Server {
 
 	proxy, ruskConn := setupGRPCClients(gctx)
 
-	var w *wallet.Wallet
-
-	if _, err = os.Stat(cfg.Get().Wallet.File); err == nil {
-		w, err = loadWallet(pw)
-	} else {
-		w, err = createWallet(nil, pw, proxy.KeyMaster())
-	}
-
-	if err != nil {
-		log.Panic(err)
-	}
-
 	m := mempool.NewMempool(db, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run(parentCtx)
+
 	processor.Register(topics.Tx, m.ProcessTx)
 
 	// Instantiate API server
@@ -211,14 +162,16 @@ func Setup() *Server {
 		}
 	}
 
+	// TODO: consensus keys
 	e := &consensus.Emitter{
 		EventBus:    eventBus,
 		RPCBus:      rpcBus,
-		Keys:        w.Keys(),
+		Keys:        consensuskey.Keys{},
 		TimerLength: cfg.ConsensusTimeOut,
 	}
 
-	cl := loop.New(e, &w.PublicKey)
+	// TODO: Wallet Public here needed?
+	cl := loop.New(e, nil)
 	processor.Register(topics.Candidate, cl.ProcessCandidate)
 
 	c, err := LaunchChain(parentCtx, cl, proxy, eventBus, rpcBus, grpcServer, db)
@@ -402,62 +355,4 @@ func setupGRPCClients(ctx context.Context) (transactions.Proxy, *grpc.ClientConn
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
 	return transactions.NewProxy(ruskClient, keysClient, transferClient, stakeClient, txTimeout, defaultTimeout), ruskConn
-}
-
-func loadWallet(password string) (*wallet.Wallet, error) {
-	// First load the database
-	db, err := walletdb.New(cfg.Get().Wallet.Store)
-	if err != nil {
-		return nil, err
-	}
-
-	// Then load the wallet
-	return wallet.LoadFromFile(testnet, db, password, cfg.Get().Wallet.File)
-}
-
-func createWallet(seed []byte, password string, keyMaster transactions.KeyMaster) (*wallet.Wallet, error) {
-	// First load the database
-	db, err := walletdb.New(cfg.Get().Wallet.Store)
-	if err != nil {
-		return nil, err
-	}
-
-	if seed == nil {
-		seed, err = wallet.GenerateNewSeed(nil)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	sk, pk, vk, err := keyMaster.GenerateKeys(context.Background(), seed)
-	if err != nil {
-		return nil, err
-	}
-
-	skBuf := new(bytes.Buffer)
-	if err = keys.MarshalSecretKey(skBuf, &sk); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-
-	keysJSON := wallet.KeysJSON{
-		Seed:      seed,
-		SecretKey: skBuf.Bytes(),
-		PublicKey: pk,
-		ViewKey:   vk,
-	}
-
-	consensusKeys := consensuskey.NewRandKeys()
-
-	keysJSON.SecretKeyBLS = consensusKeys.BLSSecretKey
-	keysJSON.PublicKeyBLS = consensusKeys.BLSPubKey
-
-	// Then create the wallet with seed and password
-	w, err := wallet.LoadFromSeed(testnet, db, password, cfg.Get().Wallet.File, keysJSON)
-	if err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-
-	return w, nil
 }
