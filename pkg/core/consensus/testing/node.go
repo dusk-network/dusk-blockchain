@@ -14,7 +14,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
@@ -40,18 +39,13 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 	_, err := l.LoadTip()
 	assert.NoError(err)
 
-	pk := keys.PublicKey{
-		AG: make([]byte, 32),
-		BG: make([]byte, 32),
-	}
-
 	e := &consensus.Emitter{
 		EventBus:    eb,
 		RPCBus:      rb,
 		Keys:        BLSKeys,
 		TimerLength: 5 * time.Second,
 	}
-	lp := loop.New(e, &pk)
+	lp := loop.New(e)
 
 	c, err := chain.New(ctx, db, eb, rb, l, l, nil, proxy, lp)
 	assert.NoError(err)

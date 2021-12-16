@@ -24,8 +24,7 @@ func TestGenerate(t *testing.T) {
 		return txs, make([]byte, 32), nil
 	}
 
-	_, pubKey := transactions.MockKeys()
-	gen := candidate.New(hlp.Emitter, pubKey, fn)
+	gen := candidate.New(hlp.Emitter, fn)
 
 	ctx := context.Background()
 

@@ -162,16 +162,15 @@ func Setup() *Server {
 		}
 	}
 
-	// TODO: consensus keys
 	e := &consensus.Emitter{
-		EventBus:    eventBus,
-		RPCBus:      rpcBus,
+		EventBus: eventBus,
+		RPCBus:   rpcBus,
+		// TODO: consensus keys
 		Keys:        consensuskey.Keys{},
 		TimerLength: cfg.ConsensusTimeOut,
 	}
 
-	// TODO: Wallet Public here needed?
-	cl := loop.New(e, nil)
+	cl := loop.New(e)
 	processor.Register(topics.Candidate, cl.ProcessCandidate)
 
 	c, err := LaunchChain(parentCtx, cl, proxy, eventBus, rpcBus, grpcServer, db)
