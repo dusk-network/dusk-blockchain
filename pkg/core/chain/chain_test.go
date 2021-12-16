@@ -19,7 +19,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -281,10 +280,6 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 	}
 
 	BLSKeys := key.NewRandKeys()
-	pk := keys.PublicKey{
-		AG: make([]byte, 32),
-		BG: make([]byte, 32),
-	}
 
 	e := &consensus.Emitter{
 		EventBus:    eb,
@@ -292,7 +287,8 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 		Keys:        BLSKeys,
 		TimerLength: 5 * time.Second,
 	}
-	l := loop.New(e, &pk)
+
+	l := loop.New(e)
 
 	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, l)
 	assert.NoError(t, err)
