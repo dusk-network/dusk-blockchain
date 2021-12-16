@@ -10,15 +10,19 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 )
+
+// PublicKey is a Phoenix public key, consisting of two JubJub points.
+type PublicKey struct {
+	AG []byte `json:"a_g"`
+	BG []byte `json:"b_g"`
+}
 
 // Config is a list of configuration parameters for generating a genesis block.
 type Config struct {
 	timestamp int64
 
-	initialParticipants []keys.PublicKey
+	initialParticipants []PublicKey
 	committeeMembers    [][]byte
 
 	initialCommitteeSize uint
@@ -35,7 +39,7 @@ type Config struct {
 // NewConfig will construct a new genesis config. This function does sanity checks
 // on all passed parameters, and ensures a correct genesis block can be produced
 // from them.
-func NewConfig(timestamp int64, initialParticipants []keys.PublicKey, committeeMembers [][]byte, initialCommitteeSize uint, seed []byte, stakeValue, coinbaseValue uint64, coinbaseAmount uint) (Config, error) {
+func NewConfig(timestamp int64, initialParticipants []PublicKey, committeeMembers [][]byte, initialCommitteeSize uint, seed []byte, stakeValue, coinbaseValue uint64, coinbaseAmount uint) (Config, error) {
 	if timestamp > time.Now().Unix() {
 		return Config{}, errors.New("can not generate genesis blocks from the future")
 	}
