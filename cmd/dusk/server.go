@@ -18,6 +18,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -63,7 +64,7 @@ type Server struct {
 // component and performs a DB sanity check.
 func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcbus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (*chain.Chain, error) {
 	// creating and firing up the chain process
-	genesis := cfg.DecodeGenesis()
+	genesis := genesis.Decode()
 	l := chain.NewDBLoader(db, genesis)
 
 	chainProcess, err := chain.New(ctx, db, eventBus, rpcbus, l, l, srv, proxy, cl)

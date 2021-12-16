@@ -10,9 +10,9 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
@@ -44,7 +44,7 @@ func Generate(c Config) *block.Block {
 
 		stake := transactions.NewTransaction()
 		stake.Payload.CallData = buf.Bytes()
-		amount := c.stakeValue * wallet.DUSK
+		amount := c.stakeValue * config.DUSK
 		amountBytes := make([]byte, 32)
 		binary.LittleEndian.PutUint64(amountBytes[0:8], amount)
 
@@ -64,11 +64,11 @@ func Generate(c Config) *block.Block {
 		// Add 200 coinbase outputs
 		for i := uint(0); i < c.coinbaseAmount; i++ {
 			buf := new(bytes.Buffer)
-			if err := encoding.WriteUint64LE(buf, c.coinbaseValue*wallet.DUSK); err != nil {
+			if err := encoding.WriteUint64LE(buf, c.coinbaseValue*config.DUSK); err != nil {
 				panic(err)
 			}
 
-			amount := c.coinbaseValue * wallet.DUSK
+			amount := c.coinbaseValue * config.DUSK
 			amountBytes := make([]byte, 32)
 			binary.LittleEndian.PutUint64(amountBytes[0:8], amount)
 
@@ -106,4 +106,14 @@ func Generate(c Config) *block.Block {
 
 	b.Header.Hash = hash
 	return b
+}
+
+// Decode marshals a genesis block into a buffer.
+func Decode() *block.Block {
+	cfg, err := GetPresetConfig(config.Get().General.Network)
+	if err != nil {
+		panic(err)
+	}
+
+	return Generate(cfg)
 }

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -92,7 +93,7 @@ func (s *Server) bootstrapBlockchain() error {
 		// Then we should regenerate DB from Genesis block.
 
 		// Reconstruct Genesis Provisioners
-		g := config.DecodeGenesis()
+		g := genesis.Decode()
 		if err := chain.ReconstructCommittee(provisioners, g); err != nil {
 			return fmt.Errorf("couldn't reconstruct genesis committee: %v", err)
 		}

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -194,7 +194,7 @@ func MockNewBlockMsg(t *testing.T, hdr *header.Header) message.Message {
 	}
 
 	// Mock candidate
-	genesis := config.DecodeGenesis()
+	genesis := genesis.Decode()
 	genesis.Header.Hash = h.BlockHash
 	se := message.MockNewBlock(h, *genesis)
 
