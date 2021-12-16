@@ -12,7 +12,6 @@ import (
 	"encoding/hex"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -21,14 +20,13 @@ import (
 // GenerateGenesisBlock is a developer utility for regenerating the genesis block
 // as they would be different per network type. Once a genesis block is
 // approved, its hex blob should be copied into config.TestNetGenesisBlob.
-func GenerateGenesisBlock(e *consensus.Emitter, generatorPubKey *keys.PublicKey) (string, error) {
+func GenerateGenesisBlock(e *consensus.Emitter) (string, error) {
 	f := func(ctx context.Context, txs []transactions.ContractCall, bh uint64) ([]transactions.ContractCall, []byte, error) {
 		return txs, make([]byte, 32), nil
 	}
 
 	g := &generator{
 		Emitter:   e,
-		genPubKey: generatorPubKey,
 		executeFn: f,
 	}
 
