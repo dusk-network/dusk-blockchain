@@ -76,6 +76,13 @@ type kadcastConfiguration struct {
 	Raptor bool
 }
 
+type kadcastClientConfiguration struct {
+	Enabled bool
+
+	// IP and port (e.g. "localhost:5000")
+	SrvAddr string
+}
+
 type monitorConfiguration struct {
 	Address string
 	Enabled bool

@@ -106,18 +106,21 @@ type proxy struct {
 	keysClient     rusk.KeysClient
 	transferClient rusk.TransferClient
 	stakeClient    rusk.StakeServiceClient
+	networkClient  rusk.NetworkClient
 	txTimeout      time.Duration
 	timeout        time.Duration
 }
 
 // NewProxy creates a new Proxy.
 func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, transferClient rusk.TransferClient,
-	stakeClient rusk.StakeServiceClient, txTimeout, defaultTimeout time.Duration) Proxy {
+	stakeClient rusk.StakeServiceClient, networkClient rusk.NetworkClient,
+	txTimeout, defaultTimeout time.Duration) Proxy {
 	return &proxy{
 		stateClient:    stateClient,
 		keysClient:     keysClient,
 		transferClient: transferClient,
 		stakeClient:    stakeClient,
+		networkClient:  networkClient,
 		txTimeout:      txTimeout,
 		timeout:        defaultTimeout,
 	}

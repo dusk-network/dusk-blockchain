@@ -33,6 +33,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcli"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -94,6 +95,23 @@ func (s *Server) launchKadcastPeer(p *peer.MessageProcessor) {
 	// Launch kadcast peer services and join network defined by bootstrappers
 	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
 	s.kadPeer = kadPeer
+}
+
+func (s *Server) launchKadcliPeer(p *peer.MessageProcessor, ruskConn *grpc.ClientConn) {
+	kcfg := cfg.Get().Kadcli
+
+	if !kcfg.Enabled {
+		log.Warn("Kadcli service is disabled")
+		return
+	}
+
+	// Launch kadcast client
+	kadPeer := kadcli.NewCliPeer(s.eventBus, s.gossip, p, ruskConn)
+	kadPeer.Launch(kcfg.SrvAddr)
+
+	// TODO: Find a clean way to do this. Maybe define a new Kadcast interface
+	//       and we can unify all the kadcast-related initialization.
+	//s.kadPeer = kadPeer
 }
 
 func getPassword(prompt string) (string, error) {
@@ -273,7 +291,9 @@ func Setup() *Server {
 	_ = stakeautomaton.New(eventBus, rpcBus, grpcServer)
 
 	// Setting up and launch kadcast peer
-	srv.launchKadcastPeer(processor)
+	// TODO: Add config flag to use gRPC version
+	//srv.launchKadcastPeer(processor)
+	srv.launchKadcliPeer(processor, ruskConn)
 
 	// Start serving from the gRPC server
 	go func() {
@@ -374,10 +394,11 @@ func setupGRPCClients(ctx context.Context) (transactions.Proxy, *grpc.ClientConn
 	keysClient, _ := client.CreateKeysClient(ctx, addr)
 	transferClient, _ := client.CreateTransferClient(ctx, addr)
 	stakeClient, _ := client.CreateStakeClient(ctx, addr)
+	networkClient, _ := client.CreateNetworkClient(ctx, addr)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	return transactions.NewProxy(ruskClient, keysClient, transferClient, stakeClient, txTimeout, defaultTimeout), ruskConn
+	return transactions.NewProxy(ruskClient, keysClient, transferClient, stakeClient, networkClient, txTimeout, defaultTimeout), ruskConn
 }
 
 func loadWallet(password string) (*wallet.Wallet, error) {
