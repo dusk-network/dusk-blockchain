@@ -167,8 +167,7 @@ func Setup() *Server {
 		TimerLength: cfg.ConsensusTimeOut,
 	}
 
-	// TODO: Wallet Public here needed?
-	cl := loop.New(e, nil)
+	cl := loop.New(e)
 	processor.Register(topics.Candidate, cl.ProcessCandidate)
 
 	c, err := LaunchChain(ctx, cl, proxy, eventBus, rpcBus, grpcServer, db)
@@ -314,11 +313,8 @@ func setupGRPCClients(ctx context.Context) (transactions.Proxy, *grpc.ClientConn
 	}
 
 	ruskClient, ruskConn := client.CreateStateClient(ctx, addr)
-	keysClient, _ := client.CreateKeysClient(ctx, addr)
-	transferClient, _ := client.CreateTransferClient(ctx, addr)
-	stakeClient, _ := client.CreateStakeClient(ctx, addr)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	return transactions.NewProxy(ruskClient, keysClient, transferClient, stakeClient, txTimeout, defaultTimeout), ruskConn
+	return transactions.NewProxy(ruskClient, txTimeout, defaultTimeout), ruskConn
 }
