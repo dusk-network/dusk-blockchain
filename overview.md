@@ -228,15 +228,27 @@ In here is a tool to test execution of transactions for staking and transfers.
 
 ## cmd/voucher
 
+A simple p2p voucher seeding node (what does that mean? It appears to mainly be for finding and distributing the list of active peer addresses on the network)
+
 ## cmd/voucher/challenger
+
+This package provides the protocols for assessing a valid and correctly functioning peer on the Dusk network
 
 ## cmd/voucher/node
 
+This is a peer information store used to keep and process information regarding network peers and their status and addresses.
+
 ## cmd/wallet
+
+The entrypoint for running the Dusk CLI wallet (RPC client and keychain for performing transactions)
 
 ## cmd/wallet/conf
 
+This contains wallet configuration initialization and configuration, as well as a network client dialing library that links node services to the external wallet client. This dialer might be in a bad place.
+
 ## cmd/wallet/prompt
+
+Implements a menu driven interface for the CLI wallet, including staking and transfers of tokens between addresses.
 
 ## devnet-wallets
 
