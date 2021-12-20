@@ -354,59 +354,115 @@ Verification of BLS signatures.
 
 ## pkg/core/consensus/reduction
 
+Implementation of the reduction phase that eliminates candidates in the consensus agreement.
+
 ## pkg/core/consensus/reduction/firststep
+
+Implementation of the first step of the reduction phase.
 
 ## pkg/core/consensus/reduction/secondstep
 
+Implementation of the second step of the reduction phase.
+
 ## pkg/core/consensus/selection
+
+Implementation of selection phase that determines the winning bidder of the Proof of Blind Bid winner and consensus block producer for the current block height.
 
 ## pkg/core/consensus/stakeautomaton
 
+Watchdog process that automates the renewal of staking contracts the user intends to continuously maintain.
+
 ## pkg/core/consensus/testing
+
+Miscellaneous functions used in testing the consensus.
 
 ## pkg/core/consensus/user
 
+Managing the list of participating users, their roles and status in the consensus.
+
 ## pkg/core/data
+
+Nothing here, underneath is codecs for various wire and storage formats of blockchain, wallet and consensus data.
 
 ## pkg/core/data/base58
 
+Encoding and decoding Base58 (no check) encoding.
+
 ## pkg/core/data/block
+
+Encoding, decoding and format of blocks, block headers and consensus certificates.
 
 ## pkg/core/data/database
 
+Wrapper to K/V access for database back end and specific handling for transactions.
+
 ## pkg/core/data/ipc
+
+This folder gathers IPC related items.
 
 ## pkg/core/data/ipc/common
 
+Echo implementation to ping Rusk server.
+
 ## pkg/core/data/ipc/keys
+
+Phoenix asymmetric cryptographic primitives, codec, signatures, validation, address generation.
 
 ## pkg/core/data/ipc/transactions
 
+Codecs and accessors for all types of transaction messages used between Node and Rusk VM.
+
 ## pkg/core/data/txrecords
+
+A custom query filter aimed at simplifying a transaction information display for user interfaces.
 
 ## pkg/core/data/wallet
 
+Wallet service with HD keychain and transaction index, minimal back end interface.
+
 ## pkg/core/database
+
+An abstract driver interface for enabling multiple types of storage strategy suited to different types of data, *and a blockchain data specific interface* - with the purpose being data access workload optimised storage.
 
 ## pkg/core/database/heavy
 
+Database driver providing persistent storage via LevelDB.
+
 ## pkg/core/database/lite
+
+Driver providing an ephemeral data store.
 
 ## pkg/core/database/testing
 
+Mocks and tests for heavy and lite database drivers.
+
 ## pkg/core/database/utils
+
+Miscellaneous helper functions used by other parts of pkg/core/database
 
 ## pkg/core/loop
 
+State machine that drives, monitors and directs the processing during a round of the consensus.
+
 ## pkg/core/mempool
+
+Implements the buffer for valid transactions not yet in a block. Includes an optimised memory key/value data store and rebroadcaster.
 
 ## pkg/core/tests
 
+Nothing here.
+
 ## pkg/core/tests/helper
+
+A collection of helper functions for tests in pkg/core
 
 ## pkg/core/transactor
 
+An API for executing the various types of transactions that the node understands. Staking, transfers, balances, and triggering smart contracts.
+
 ## pkg/core/verifiers
+
+Verification functions for various sanity checks on blocks, coinbases and consensus messages.
 
 ## pkg/gql
 
@@ -477,5 +533,3 @@ Verification of BLS signatures.
 ## pkg/util/ruskmock
 
 ## scripts
-
-106 directories
