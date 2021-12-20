@@ -15,7 +15,7 @@ import (
 
 var log = logger.WithFields(logger.Fields{"process": "kadcli"})
 
-// Peer is a wrapper of all 2 kadcli processing routing.
+// Peer is a wrapper for both kadcast grpc sides
 type Peer struct {
 	// dusk node components
 	eventBus  *eventbus.EventBus
@@ -42,7 +42,7 @@ func (p *Peer) Launch() error {
 	go p.w.Serve()
 
 	// A reader for Kadcast messages
-	p.r = NewReader(p.eventBus, p.processor)
+	p.r = NewReader(p.eventBus, p.processor, p.conn)
 	go p.r.Serve()
 
 	// A gRPC connection to Rusk
