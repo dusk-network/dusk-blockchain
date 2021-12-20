@@ -252,55 +252,105 @@ Implements a menu driven interface for the CLI wallet, including staking and tra
 
 ## devnet-wallets
 
+Contains a (rather large) set of wallets for working with devnet.
+
 ## docs
+
+In here is one readme about using ELK.. elastic search thing?
 
 ## docs/internal
 
+Internal documentation on details about Zenhub workflow for Dusk project managers.
+
 ## docs/LICENSE
+
+Licences for used/modified code from btcd, golang (the compiler itself?) and moneroutils
 
 ## harness
 
 ## harness/engine
 
+Contains the full test harnes implementation, dusk nodes with rusk mocks, graphql and grpc endpoint, and managed simulated network between each spawned node.
+
 ## harness/tests
+
+Tests to validate the test harness mocked node, transactions per second benchmark, and simulated network.
 
 ## harness/tests/node
 
+Tests basic functionality, runs a node, makes simple queries, checks results are consistent.
+
 ## mocks
+
+Mocks for testing things that work with Event, EventHandler and EventProcessor (p2p/eventbus related?)
 
 ## pkg
 
+Just a couple of markdown documents here, standard idiomatic golang repository libraries folder.
+
 ## pkg/api
+
+Top level http API interface for accessing EventBus, RPCBus and StormDB services, internal and external messaging, and data storage.
 
 ## pkg/config
 
+Definitions, accessors and storage implementation for configuration of all systems in dusk-blockchain.
+
 ## pkg/config/genesis
+
+Specification for the genesis block data structure, a generator, and several presets for different test networks.
 
 ## pkg/config/samples
 
+Example configuration files and the default Dusk configuration file
+
 ## pkg/core
+
+Here can be found one document about the mempool high level overview.
 
 ## pkg/core/candidate
 
+Block candidate validation and protocol implementation
+
 ## pkg/core/chain
+
+Contains the Verifier, Loader and Ledger interfaces, mocks, the database store, block synchronizer implementation.
 
 ## pkg/core/consensus
 
+The interfaces and high level api's around the implementation of the SBA* consensus, with lots of mocks and tests.
+
 ## pkg/core/consensus/agreement
+
+Accumulator, the score keeper of the agreement process, and the top level protocol processing for performing a round of the consensus and agreement upon a new block and its contents.
 
 ## pkg/core/consensus/blockgenerator
 
+Top level interface and mock for the block generation process.
+
 ## pkg/core/consensus/blockgenerator/candidate
+
+The interface, implementation and mocks for constructing a candidate block from available transactions and provisioners.
 
 ## pkg/core/consensus/capi
 
+API for deploying a dusk consensus network, managing peers, rounds, members, and stakes.
+
 ## pkg/core/consensus/committee
+
+Handler for managing participation in the consensus comittee and inspecting the membership and vote status.
 
 ## pkg/core/consensus/header
 
+Structure and implementation of the common consensus message header.
+
 ## pkg/core/consensus/key
 
+A simple pair type that aggregates individual BLS keys.
+
 ## pkg/core/consensus/msg
+
+Verification of BLS signatures.
 
 ## pkg/core/consensus/reduction
 
