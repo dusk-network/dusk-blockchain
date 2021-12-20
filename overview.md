@@ -546,32 +546,58 @@ Core gRPC server functionality with authentication and session management for th
 
 ## pkg/util
 
-
+There is notes here about the configuration system, based on viper.
 
 ## pkg/util/container
 
 ## pkg/util/container/ring
 
+A ring buffer that works with raw wire/storage encoded raw bytes data. Used in the EventBus.
+
 ## pkg/util/diagnostics
+
+Instrumentation for using profiling with Dusk.
 
 ## pkg/util/legacy
 
+Converter that upgrades the old provisioners data structure to the new Rusk Committee.
+
 ## pkg/util/nativeutils
+
+This is a large number of libraries from the pub/sub broker eventbus, logging, error handling, a transmission protocol, two different set implementations.
 
 ## pkg/util/nativeutils/eventbus
 
+This is a generic interface for interconnecting different components of Dusk including separated runtimes like the Rusk VM
+
 ## pkg/util/nativeutils/hashset
+
+A concurrent safe hash set implementation.
 
 ## pkg/util/nativeutils/logging
 
+Simplified setup and configuration for logrus.
+
 ## pkg/util/nativeutils/prerror
+
+Error type with priorities.
 
 ## pkg/util/nativeutils/rcudp
 
+Simple short-message (max one UDP packet) reliable transport protocol using Raptor FEC codes for retransmit-avoidance.
+
 ## pkg/util/nativeutils/rpcbus
+
+Process-internal message passing system based on sending return channels in requests.
 
 ## pkg/util/nativeutils/sortedset
 
+Binary tree (which?) based sorted set for large numbers (such as hashes).
+
 ## pkg/util/ruskmock
 
+Rusk mock that can be programmed to give predefined or dummy responses to use in tests of Dusk-Rusk communication.
+
 ## scripts
+
+Miscellaneous scripts such as a Go-based build script for Dusk and some launch control scripts.
