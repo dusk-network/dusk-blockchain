@@ -92,9 +92,9 @@ func (s *Server) launchKadcastPeer(p *peer.MessageProcessor) {
 	s.kadPeer = kadPeer
 }
 
-func (s *Server) launchKadcliPeer(p *peer.MessageProcessor, ruskConn *grpc.ClientConn) {
+func (s *Server) launchKadcliPeer(p *peer.MessageProcessor, g *protocol.Gossip, ruskConn *grpc.ClientConn) {
 	// launch kadcast client
-	kadPeer := kadcli.NewCliPeer(s.eventBus, p, ruskConn)
+	kadPeer := kadcli.NewCliPeer(s.eventBus, p, g, ruskConn)
 	kadPeer.Launch()
 	s.kadGrpc = kadPeer
 }
@@ -280,7 +280,7 @@ func Setup() *Server {
 	if kcfg.Enabled {
 		switch kcfg.UseGrpc {
 		case true:
-			srv.launchKadcliPeer(processor, ruskConn)
+			srv.launchKadcliPeer(processor, gossip, ruskConn)
 		case false:
 			srv.launchKadcastPeer(processor)
 		}

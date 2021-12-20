@@ -7,6 +7,7 @@
 package kadcli
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -25,15 +26,17 @@ import (
 // other network nodes.
 type Reader struct {
 	processor *peer.MessageProcessor
+	gossip    *protocol.Gossip
 
 	cli  rusk.NetworkClient
 	stop chan bool
 }
 
 // NewReader makes a new kadcast reader that handles TCP packets of broadcasting.
-func NewReader(publisher eventbus.Publisher, processor *peer.MessageProcessor, ruskConn *grpc.ClientConn) *Reader {
+func NewReader(publisher eventbus.Publisher, g *protocol.Gossip, p *peer.MessageProcessor, ruskConn *grpc.ClientConn) *Reader {
 	return &Reader{
-		processor: processor,
+		processor: p,
+		gossip:    g,
 		cli:       rusk.NewNetworkClient(ruskConn),
 		stop:      make(chan bool),
 	}
@@ -79,19 +82,26 @@ func (r *Reader) Serve() {
 
 // processMessage propagates the received kadcast message into the event bus.
 func (r *Reader) processMessage(message *rusk.Message) {
-	// Extract checksum
-	msg, cs, err := checksum.Extract(message.Message)
+	reader := bytes.NewReader(message.Message)
+	// read message (extract length and magic)
+	b, err := r.gossip.ReadMessage(reader)
+	if err != nil {
+		log.WithError(err).Warnln("error reading message")
+		return
+	}
+	// extract checksum
+	msg, cs, err := checksum.Extract(b)
 	if err != nil {
 		log.WithError(err).Warnln("error extracting message and cs")
 		return
 	}
-	// Verify checksum
+	// verify checksum
 	if !checksum.Verify(msg, cs) {
 		log.WithError(errors.New("invalid checksum")).
 			Warnln("error verifying message cs")
 		return
 	}
-	// Collect (and process) the message
+	// collect (process) the message
 	go func() {
 		if _, err = r.processor.Collect(message.Metadata.SrcAddress, message.Message, nil, protocol.FullNode, nil); err != nil {
 			var topic string
