@@ -21,6 +21,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Reader abstracts all of the logic and fields needed to receive messages from
+// other network nodes.
 type Reader struct {
 	processor *peer.MessageProcessor
 
@@ -68,14 +70,14 @@ func (r *Reader) Serve() {
 					log.Fatalf("recv error %v", err)
 				}
 				// Message received
-				log.Infof("received msg: %v", msg)
 				go r.processMessage(msg)
+				log.Infof("received msg: %v", msg)
 			}
 		}
 	}()
 }
 
-// processMessage propagates the received kadcast message into the event bus
+// processMessage propagates the received kadcast message into the event bus.
 func (r *Reader) processMessage(message *rusk.Message) {
 	// Extract checksum
 	msg, cs, err := checksum.Extract(message.Message)
@@ -96,6 +98,7 @@ func (r *Reader) processMessage(message *rusk.Message) {
 			if len(msg) > 0 {
 				topic = topics.Topic(msg[0]).String()
 			}
+			// log error
 			log.WithField("cs", hex.EncodeToString(cs)).
 				WithField("topic", topic).
 				WithError(err).Error("failed to process message")

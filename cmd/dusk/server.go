@@ -60,6 +60,7 @@ type Server struct {
 	ruskConn      *grpc.ClientConn
 	readerFactory *peer.ReaderFactory
 	kadPeer       *kadcast.Peer
+	kadGrpc       *kadcli.Peer
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
@@ -91,8 +92,8 @@ func (s *Server) launchKadcastPeer(p *peer.MessageProcessor) {
 		return
 	}
 
+	// launch kadcast peer services and join network defined by bootstrappers
 	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, nil, p, kcfg.Raptor)
-	// Launch kadcast peer services and join network defined by bootstrappers
 	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
 	s.kadPeer = kadPeer
 }
@@ -105,13 +106,10 @@ func (s *Server) launchKadcliPeer(p *peer.MessageProcessor, ruskConn *grpc.Clien
 		return
 	}
 
-	// Launch kadcast client
+	// launch kadcast client
 	kadPeer := kadcli.NewCliPeer(s.eventBus, p, ruskConn)
 	kadPeer.Launch()
-
-	// TODO: Find a clean way to do this. Maybe define a new Kadcast interface
-	//       and we can unify all the kadcast-related initialization.
-	//s.kadPeer = kadPeer
+	s.kadGrpc = kadPeer
 }
 
 func getPassword(prompt string) (string, error) {
@@ -291,8 +289,8 @@ func Setup() *Server {
 	_ = stakeautomaton.New(eventBus, rpcBus, grpcServer)
 
 	// Setting up and launch kadcast peer
-	// TODO: Add config flag to use gRPC version
-	//srv.launchKadcastPeer(processor)
+	// Only one of them should be configured to be used
+	srv.launchKadcastPeer(processor)
 	srv.launchKadcliPeer(processor, ruskConn)
 
 	// Start serving from the gRPC server
@@ -329,8 +327,13 @@ func (s *Server) Close() {
 	s.grpcServer.GracefulStop()
 	_ = s.ruskConn.Close()
 
+	// kadcast native
 	if s.kadPeer != nil {
 		s.kadPeer.Close()
+	}
+	// kadcast grpc
+	if s.kadGrpc != nil {
+		s.kadGrpc.Close()
 	}
 }
 

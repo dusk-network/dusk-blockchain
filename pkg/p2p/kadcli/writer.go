@@ -29,7 +29,7 @@ type Writer struct {
 
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
-// in a goroutine..
+// in a goroutine.
 func NewWriter(subscriber eventbus.Subscriber, conn *grpc.ClientConn) *Writer {
 	return &Writer{
 		subscriber: subscriber,
@@ -37,22 +37,18 @@ func NewWriter(subscriber eventbus.Subscriber, conn *grpc.ClientConn) *Writer {
 	}
 }
 
-// Serve subscribes to eventbus Kadcast messages and injects the writer
-func (w *Writer) Serve() error {
-
+// Serve subscribes to eventbus Kadcast messages and injects the writer.
+func (w *Writer) Serve() {
 	// Kadcast subs
 	l1 := eventbus.NewStreamListener(w)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, l1)
-
 	// KadcastPoint subs
 	l2 := eventbus.NewStreamListener(w)
 	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l2)
-
-	return nil
 }
 
+// Write sends a message through the Kadcast gRPC interface.
 func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
-
 	go func() {
 		var err error
 
@@ -69,9 +65,7 @@ func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
 		if err != nil {
 			log.WithError(err).Warn("write failed")
 		}
-
 	}()
-
 	return 0, nil
 }
 
@@ -80,6 +74,7 @@ func (w *Writer) WriteToAll(data, header []byte, priority byte) error {
 	if len(header) == 0 {
 		return errors.New("empty message header")
 	}
+	// exctract header topic
 	height := header[0]
 	return w.broadcastPacket(height, data)
 }
@@ -90,17 +85,19 @@ func (w *Writer) WriteToPoint(data, header []byte, priority byte) error {
 	if len(header) == 0 {
 		return errors.New("empty message header")
 	}
+	// extract destination address
 	addr := string(header)
 	return w.sendPacket(addr, data)
 }
 
-// BroadcastPacket passes a message to the kadkast peer to be broadcasted
+// BroadcastPacket passes a message to the kadkast peer to be broadcasted.
 func (w *Writer) broadcastPacket(maxHeight byte, payload []byte) error {
 	h := uint32(maxHeight)
 	m := &rusk.BroadcastMessage{
 		KadcastHeight: h,
 		Message:       payload,
 	}
+	// broadcast message
 	if _, err := w.cli.Broadcast(context.TODO(), m); err != nil {
 		log.WithError(err).Warn("failed to broadcast message")
 		return err
@@ -108,7 +105,7 @@ func (w *Writer) broadcastPacket(maxHeight byte, payload []byte) error {
 	return nil
 }
 
-// sendPacket passes a message to the kadkast peer to be sent to a peer
+// sendPacket passes a message to the kadkast peer to be sent to a peer.
 func (w *Writer) sendPacket(addr string, payload []byte) error {
 	m := &rusk.SendMessage{
 		TargetAddress: addr,
