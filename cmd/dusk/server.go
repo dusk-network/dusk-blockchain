@@ -86,12 +86,6 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 
 func (s *Server) launchKadcastPeer(p *peer.MessageProcessor) {
 	kcfg := cfg.Get().Kadcast
-
-	if !kcfg.Enabled {
-		log.Warn("Kadcast service is disabled")
-		return
-	}
-
 	// launch kadcast peer services and join network defined by bootstrappers
 	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, nil, p, kcfg.Raptor)
 	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
@@ -99,13 +93,6 @@ func (s *Server) launchKadcastPeer(p *peer.MessageProcessor) {
 }
 
 func (s *Server) launchKadcliPeer(p *peer.MessageProcessor, ruskConn *grpc.ClientConn) {
-	kcfg := cfg.Get().Kadcli
-
-	if !kcfg.Enabled {
-		log.Warn("Kadcli service is disabled")
-		return
-	}
-
 	// launch kadcast client
 	kadPeer := kadcli.NewCliPeer(s.eventBus, p, ruskConn)
 	kadPeer.Launch()
@@ -289,9 +276,15 @@ func Setup() *Server {
 	_ = stakeautomaton.New(eventBus, rpcBus, grpcServer)
 
 	// Setting up and launch kadcast peer
-	// Only one of them should be configured to be used
-	srv.launchKadcastPeer(processor)
-	srv.launchKadcliPeer(processor, ruskConn)
+	kcfg := cfg.Get().Kadcast
+	if kcfg.Enabled {
+		switch kcfg.UseGrpc {
+		case true:
+			srv.launchKadcliPeer(processor, ruskConn)
+		case false:
+			srv.launchKadcastPeer(processor)
+		}
+	}
 
 	// Start serving from the gRPC server
 	go func() {

@@ -92,17 +92,20 @@ address="monitor.dusk.network:1337"
 # NB: The messages propagated in kadcast are not propagated in gossip
 enabled=false
 
-# Enable/Disable RC-UDP transport
+# Use the gRPC interface instead of the native implementation
+usegrpc=true
+
+# [native] Enable/Disable RC-UDP transport
 raptor=true
 
-# Both listeners (UDP and TCP) are binding on this local addr
+# [native] Both listeners (UDP and TCP) are binding on this local addr
 # NB The addr should be reachable from outside
 address="127.0.0.1:7100"
 
-# Maximum delegates per bucket
+# [native] Maximum delegates per bucket
 maxDelegatesNum=3
 
-# List of bootstarpping nodes
+# [native] List of bootstarpping nodes
 bootstrappers=["voucher.dusk.network:9090","voucher.dusk.network:9091","voucher.dusk.network:9092"]
 
 
