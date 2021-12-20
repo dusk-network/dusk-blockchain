@@ -466,45 +466,87 @@ Verification functions for various sanity checks on blocks, coinbases and consen
 
 ## pkg/gql
 
+A websocket and GraphQL enabled RPC for searching the blockchain database, including subscriptions to notifications.
+
 ## pkg/gql/notifications
+
+Notifications implementation, primarily distributes new accepted blocks to subscribers, as well as broker-internal coordination messages.
 
 ## pkg/gql/query
 
+Implements a simple human readable query syntax for requesting from blocks and transactions specific fields and cross-cutting matches like address searches.
+
 ## pkg/p2p
+
+Some documentation on the p2p wire format, gossip and point to point messaging architecture.
 
 ## pkg/p2p/kadcast
 
+The original implementation of the Kademlia Distributed Hash Table based reliable broadcast routing protocol.
+
 ## pkg/p2p/kadcast/encoding
+
+Message definitions and codecs for kadcast message types.
 
 ## pkg/p2p/peer
 
+Peer to peer message sending and receiving, including one-to-many gossip message distribution.
+
 ## pkg/p2p/peer/dupemap
+
+A cuckoo filter based deduplication engine.
 
 ## pkg/p2p/peer/responding
 
+Implementations of the various response types for queries between network peers.
+
 ## pkg/p2p/wire
+
+Being otherwise empty, this *folder contains encoder specification document and the Event and Store interfaces.*
 
 ## pkg/p2p/wire/checksum
 
+Checksum algorithm used in wire messages to ensure error free reception. Based on a truncated blake2b hash.
+
 ## pkg/p2p/wire/encoding
+
+Encoding formats for integers and variable sized raw bytes.
 
 ## pkg/p2p/wire/message
 
+Definitions of all message data structure formats and their wire/storage codecs, mocks and tests.
+
 ## pkg/p2p/wire/message/payload
+
+This is actually just an interface for a concurrent safe deep copy function.
 
 ## pkg/p2p/wire/protocol
 
+Protocol data transport formatting and network identifiers.
+
 ## pkg/p2p/wire/topics
+
+Definitions of the 1 byte message topic identifiers used in the wire encoding and by EventBus
 
 ## pkg/p2p/wire/util
 
+Helpers used in the pkg/p2p/wire package. In fact just has a function to get a machine's Point of Presence on the internet, ie the gateway router of the LAN, if its interface is not internet routable.
+
 ## pkg/rpc
+
+Contains a token based session authentication system.
 
 ## pkg/rpc/client
 
+Client interfaces for all of the gRPC based RPC and IPC interfaces used to access and between Dusk blockchain and Rusk VM state machine.
+
 ## pkg/rpc/server
 
+Core gRPC server functionality with authentication and session management for the clients in the client folder above.
+
 ## pkg/util
+
+
 
 ## pkg/util/container
 
