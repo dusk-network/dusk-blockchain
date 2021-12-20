@@ -28,6 +28,12 @@ import (
 
 var lg = log.WithField("process", "consensus").WithField("actor", "candidate_generator")
 
+var (
+	errEmptyStateHash       = errors.New("empty state hash")
+	errEmptyTxsList         = errors.New("empty list of transactions")
+	errDistributeTxNotFound = errors.New("distribute tx not found")
+)
+
 // MaxTxSetSize defines the maximum amount of transactions.
 // It is TBD along with block size and processing.MaxFrameSize.
 const MaxTxSetSize = 825000
@@ -80,7 +86,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 	if err != nil {
 		log.
 			WithError(err).
-			Error("failed to bg.Generate")
+			Error("failed to generate candidate block")
 		return nil, err
 	}
 
@@ -110,6 +116,28 @@ func (bg *generator) Generate(seed []byte, keys [][]byte, r consensus.RoundUpdat
 	return bg.GenerateBlock(r.Round, seed, r.Hash, keys)
 }
 
+func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCall, round uint64) ([]transactions.ContractCall, []byte, error) {
+	txs, stateHash, err := bg.executeFn(ctx, txs, round)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(txs) == 0 {
+		return nil, nil, errEmptyTxsList
+	}
+
+	// Ensure last item from returned txs is the Distribute tx
+	if txs[len(txs)-1].Type() != transactions.Distribute {
+		return nil, nil, errDistributeTxNotFound
+	}
+
+	if len(stateHash) == 0 {
+		return nil, nil, errEmptyStateHash
+	}
+
+	return txs, stateHash, nil
+}
+
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
 func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
@@ -118,16 +146,8 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 		return nil, err
 	}
 
-	var stateHash []byte
-
-	txs, stateHash, err = bg.executeFn(context.Background(), txs, round)
+	txs, stateHash, err := bg.execute(context.Background(), txs, round)
 	if err != nil {
-		return nil, err
-	}
-
-	if len(stateHash) == 0 {
-		err = errors.New("empty state hash")
-		log.WithError(err).Error("generate block failed")
 		return nil, err
 	}
 

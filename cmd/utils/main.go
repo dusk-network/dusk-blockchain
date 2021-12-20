@@ -56,24 +56,6 @@ var (
 		Value: 10,
 	}
 
-	lockTimeFlag = cli.Uint64Flag{
-		Name:  "locktime",
-		Usage: "locktime , eg: --locktime=1",
-		Value: 10,
-	}
-
-	txtypeFlag = cli.StringFlag{
-		Name:  "txtype",
-		Usage: "Dusk hostname , eg: --txtype=consensus",
-		Value: "consensus",
-	}
-
-	addressFlag = cli.StringFlag{
-		Name:  "address",
-		Usage: "Dusk address , eg: --address=self",
-		Value: "self",
-	}
-
 	gqlPortFlag = cli.IntFlag{
 		Name:  "gqlport",
 		Usage: "GQL PORT , eg: --gqlport=9500",

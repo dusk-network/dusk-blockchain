@@ -52,7 +52,6 @@ func (m *mock) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUp
 
 // Mock the candidate generator.
 func Mock(e *consensus.Emitter) Generator {
-
 	fn := func(ctx context.Context, txs []transactions.ContractCall, bh uint64) ([]transactions.ContractCall, []byte, error) {
 		return txs, make([]byte, 32), nil
 	}

@@ -20,9 +20,8 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-var (
-	ErrAlreadyExists = errors.New("file already exists")
-)
+// ErrAlreadyExists file already exists.
+var ErrAlreadyExists = errors.New("file already exists")
 
 // Keys are the keys used during consensus.
 type Keys struct {
@@ -31,10 +30,10 @@ type Keys struct {
 }
 
 // NewRandKeys creates a new pair of BLS keys.
-func NewRandKeys() *Keys {
+func NewRandKeys() Keys {
 	sk, pk := bls.GenerateKeys()
 
-	return &Keys{
+	return Keys{
 		BLSPubKey:    pk,
 		BLSSecretKey: sk,
 	}
@@ -46,6 +45,7 @@ type KeysJSON struct {
 	PublicKeyBLS []byte `json:"public_key_bls"`
 }
 
+// NewFromFile reads keys from a file and tries to decrypt them.
 func NewFromFile(password, path string) (*Keys, error) {
 	keysJSONArr, err := fetchEncrypted(password, path)
 	if err != nil {
