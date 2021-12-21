@@ -129,9 +129,7 @@ client. This dialer might be in a bad place.
 Implements a menu driven interface for the CLI wallet, including staking and
 transfers of tokens between addresses.
 
-## [devnet](./devnet)
-
--wallets
+## [devnet-wallets](./devnet-wallets)
 
 Contains a (rather large) set of wallets for working with devnet.
 
