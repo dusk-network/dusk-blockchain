@@ -6,10 +6,10 @@ discover the relevant documentation for their questions and purposes.
 <!-- ToC start -->
 ## Contents
 
+   1. [Contents](#contents)
    1. [Software Licences](#software-licences)
    1. [Internal use documents ](#internal-use-documents-)
    1. [Elastic Stack on Docker](#elastic-stack-on-docker)
-   1. [Cleanup](#cleanup)
 <!-- ToC end -->
 
 ## Software Licences
@@ -73,8 +73,9 @@ make build && ./bin/utils metrics
 ```
 make build && watch "./bin/utils transactions --txtype=transfer --amount=1 --locktime=1 --grpcaddr=unix://$GOPATH/src/github.com/dusk-network/dusk-blockchain/devnet/dusk_data/dusk0/dusk-grpc.sock"
 ```
-## Cleanup
-To Remove the docker with:
+7. Cleanup
+
+Remove the docker with:
 ```
 docker-compose rm
 ```
