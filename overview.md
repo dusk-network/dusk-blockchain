@@ -4,6 +4,8 @@ This intends to be a first-point-of-contact for developers looking into the
 structure and looking for opportunities to contribute to the project, and to
 help with the long term arc of migrating away from Go to Rust.
 
+## Top level and repo related documents that don't fit elsewhere
+
 [README.md](./README.md) The readme. Contains very basic getting started and
 pointers to other info.
 
@@ -25,15 +27,6 @@ Issue template for bug reports
 [docs/README.md](./docs/README.md) Currently empty. Should be a for orienting
 within docs folder.
 
-[docs/internal/zenhub.md](./docs/internal/zenhub.md) Guidelines for working with
-Zenhub so our project managers lives are simpler.
-
-[docs/elk.md](./docs/elk.md) Instructions for Elastic Stack on Docker, related
-to using Kibana for log analysis
-
-[cmd/deployer/README.md](./cmd/deployer/README.md) Notes about Deployer,
-configuration and launch.
-
 [CONTRIBUTING.md](./CONTRIBUTING.md) Contribution guidelines for Dusk Golang
 repositories.
 
@@ -54,6 +47,9 @@ Deployer is the name here as the totality of the full node on the Dusk network
 is more than one component. Deployer is the launcher that coordinates the
 startup and shutdown of Dusk and Rusk, the node and the VM. It monitors to see
 they are still live, restarts them if needed, and shuts them down as required.
+
+[cmd/deployer/README.md](./cmd/deployer/README.md) Notes about Deployer,
+configuration and launch.
 
 ## [cmd/dusk](./cmd/dusk)
 
@@ -143,10 +139,16 @@ Contains a (rather large) set of wallets for working with devnet.
 
 In here is one readme about using ELK.. elastic search thing?
 
+[docs/elk.md](./docs/elk.md) Instructions for Elastic Stack on Docker, related
+to using Kibana for log analysis
+
 ## [docs/internal](./docs/internal)
 
 Internal documentation on details about Zenhub workflow for Dusk project
 managers.
+
+[docs/internal/zenhub.md](./docs/internal/zenhub.md) Guidelines for working with
+Zenhub so our project managers lives are simpler.
 
 ## [docs/LICENSE](./docs/LICENSE)
 
