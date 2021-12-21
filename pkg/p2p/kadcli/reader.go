@@ -42,8 +42,8 @@ func NewReader(publisher eventbus.Publisher, g *protocol.Gossip, p *peer.Message
 	}
 }
 
-// Serve starts accepting and processing stream data.
-func (r *Reader) Serve() {
+// Listen starts accepting and processing stream data.
+func (r *Reader) Listen() {
 	// create stream handler
 	stream, err := r.cli.Listen(context.Background(), &rusk.Null{})
 	if err != nil {

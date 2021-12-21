@@ -43,7 +43,7 @@ func (p *Peer) Launch() {
 	go p.w.Serve()
 	// A reader for Kadcast messages
 	p.r = NewReader(p.eventBus, p.gossip, p.processor, p.conn)
-	go p.r.Serve()
+	go p.r.Listen()
 }
 
 // Close terminates kadcli service.
