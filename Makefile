@@ -132,3 +132,7 @@ wallet-windows: install-tools
 	#xgo --go=latest --targets=windows/amd64 -out=./bin/wallet ./cmd/wallet #407
 	#xgo --go=latest --targets=windows/386 -out=./bin/wallet ./cmd/wallet #407
 ########################################################################################
+markdown-toc:
+	go install github.com/sebdah/markdown-toc
+	# "If markdown-toc is not now available as a CLI command, check you have configured GOBIN currently:",
+	$(shell env|grep GOBIN)
