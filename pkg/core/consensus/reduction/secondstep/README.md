@@ -1,7 +1,6 @@
-# Package Title
+# [pkg/core/consensus/reduction/secondstep](./pkg/core/consensus/reduction/secondstep)
 
-Blurb about what this package does in one sentence here. Optional badges and
-multiple paragraphs but it may belong in an Introduction if it is long.
+Implementation of the second step of the reduction phase.
 
 <!-- ToC start -->
 
@@ -11,11 +10,14 @@ section will be filled in here by markdown-toc
 
 <!-- ToC end -->
 
-## Top level sections of document have two #s
+## Gotchas
 
-### Subsections have 3 #s
-
-#### 4, and more, if you want, but this should be enough.
+- Caution should be taken when deciding on what terms the timeout should be
+  increased. A bug was caught where, on completely valid results, the timeout
+  would still increase as the node was not part of the agreement committee. The
+  issue was
+  logged [here](https://github.com/dusk-network/dusk-blockchain/issues/700) and
+  fixed in [this PR](https://github.com/dusk-network/dusk-blockchain/pull/650).
 
 <!-- 
 # to regenerate this file's table of contents:

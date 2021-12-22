@@ -1,7 +1,6 @@
-# Package Title
+# [pkg/core/consensus/reduction/firststep](./pkg/core/consensus/reduction/firststep)
 
-Blurb about what this package does in one sentence here. Optional badges and
-multiple paragraphs but it may belong in an Introduction if it is long.
+Implementation of the first step of the reduction phase.
 
 <!-- ToC start -->
 

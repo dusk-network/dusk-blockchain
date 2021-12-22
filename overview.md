@@ -243,9 +243,6 @@ reporting.
 The interfaces and high level api's around the implementation of the SBA*
 consensus, with lots of mocks and tests.
 
-[pkg/core/loop/README.md](./pkg/core/loop/README.md) Some notes about the
-consensus loop.
-
 ## [pkg/core/consensus/agreement](./pkg/core/consensus/agreement)
 
 Accumulator, the score keeper of the agreement process, and the top level
@@ -291,7 +288,7 @@ Structure and implementation of the common consensus message header.
 
 ## [pkg/core/consensus/key](./pkg/core/consensus/key)
 
-A simple pair type that aggregates individual BLS keys.
+Implements a BLS12-381 key pair.
 
 ## [pkg/core/consensus/msg](./pkg/core/consensus/msg)
 
@@ -441,6 +438,9 @@ Miscellaneous helper functions used by other parts of pkg/core/database
 
 State machine that drives, monitors and directs the processing during a round of
 the consensus.
+
+[pkg/core/loop/README.md](./pkg/core/loop/README.md) Some notes about the
+consensus loop.
 
 ## [pkg/core/mempool](./pkg/core/mempool)
 
