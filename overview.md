@@ -592,7 +592,7 @@ the clients in the client folder above.
 
 ## [pkg/util](./pkg/util)
 
-There is notes here about the configuration system, based on viper.
+~~There is notes here about the configuration system, based on viper.~~
 
 ## [pkg/util/container](./pkg/util/container)
 
