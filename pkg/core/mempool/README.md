@@ -5,11 +5,12 @@ DB transaction layer\). A blockchain transaction has one of a finite number of
 states at any given time. Below are listed the logical states of a transaction.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [States](#states)
+   1. [Mempool responsibilities:](#mempool-responsibilities:)
+   1. [Implementation](#implementation)
+      1. [Underlying pool](#underlying-pool)
 <!-- ToC end -->
 
 ## States
@@ -61,11 +62,5 @@ pending ideas for pools:
   Pending
 * persistent - persistent KV storage. Pending
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

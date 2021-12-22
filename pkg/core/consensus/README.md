@@ -4,11 +4,14 @@ The interfaces and high level api's around the implementation of the SBA*
 consensus, with lots of mocks and tests.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [SBA\* Consensus](#sba\-consensus)
+      1. [Intro](#intro)
+         1. [Security Model](#security-model)
+         1. [Block Generator](#block-generator)
+         1. [Provisioner](#provisioner)
+   1. [Gotchas](#gotchas)
 <!-- ToC end -->
 
 ## SBA\* Consensus
@@ -88,11 +91,5 @@ single block, which can then be added to the chain.
   and fixed
   in [this PR](https://github.com/dusk-network/dusk-blockchain/pull/650).
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

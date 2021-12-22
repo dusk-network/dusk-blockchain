@@ -4,11 +4,46 @@ Being otherwise empty, this *folder also contains encoder specification document
 and the Event and Store interfaces.*
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Encoding](#encoding)
+      1. [Methods](#methods)
+         1. [Integers \(integers.go\)](#integers-\integersgo\)
+         1. [CompactSize integers \(varint.go\)](#compactsize-integers-\varintgo\)
+         1. [Booleans \(miscdata.go\)](#booleans-\miscdatago\)
+         1. [256-bit and 512-bit data structures \(miscdata.go\)](#256-bit-and-512-bit-data-structures-\miscdatago\)
+         1. [Strings and byte slices \(vardata.go\)](#strings-and-byte-slices-\vardatago\)
+         1. [Arrays/slices](#arrays/slices)
+         1. [Structs](#structs)
+   1. [](#)
+   1. [Message encoding](#message-encoding)
+   1. [Topics](#topics)
+   1. [Common structures](#common-structures)
+      1. [VarInt](#varint)
+      1. [protocol.Version](#protocolversion)
+      1. [Block Certificate](#block-certificate)
+      1. [message.InvVect](#messageinvvect)
+      1. [transactions.Input](#transactionsinput)
+      1. [transactions.Crossover](#transactionscrossover)
+      1. [transactions.Output](#transactionsoutput)
+      1. [transactions.Fee](#transactionsfee)
+      1. [StepVotes](#stepvotes)
+   1. [Message outline](#message-outline)
+      1. [Version](#version)
+      1. [VerAck](#verack)
+      1. [Ping](#ping)
+      1. [Pong](#pong)
+      1. [Inv](#inv)
+      1. [GetData](#getdata)
+      1. [GetBlocks](#getblocks)
+      1. [Block](#block)
+      1. [Tx](#tx)
+      1. [MemPool](#mempool)
+      1. [Candidate](#candidate)
+      1. [GetCandidate](#getcandidate)
+      1. [NewBlock](#newblock)
+      1. [Reduction](#reduction)
+      1. [Agreement](#agreement)
 <!-- ToC end -->
 
 ## Encoding
@@ -569,11 +604,5 @@ collection of all the votes that were cast in 2 steps of reduction, and is
 paramount in reaching consensus on a certain block.
 
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

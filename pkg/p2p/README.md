@@ -4,11 +4,12 @@ Some documentation on the p2p wire format, gossip and point to point messaging
 architecture.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Architecture](#architecture)
+      1. [Reader](#reader)
+      1. [Writer](#writer)
+      1. [Component layout](#component-layout)
 <!-- ToC end -->
 
 ## Architecture
@@ -54,11 +55,5 @@ the `Writer`. This allows for directed delivery of messages to a single node.
 ### Component layout
 
 ![P2P component layout](p2p_component_diagram.jpg)
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

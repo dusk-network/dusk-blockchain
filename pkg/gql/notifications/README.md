@@ -8,11 +8,15 @@ for more specific events \(e.g a client needs a notification on a specific
 tx\_hash accepted\)
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Design](#design)
+   1. [Messages](#messages)
+      1. [On block accepted](#on-block-accepted)
+      1. [Configuration](#configuration)
+1. [Number of pub/sub brokers to broadcast new blocks. ](#number-of-pub/sub-brokers-to-broadcast-new-blocks-)
+1. [0 brokersNum disables notifications system](#0-brokersnum-disables-notifications-system)
+      1. [Examples](#examples)
 <!-- ToC end -->
 
 ## Design
@@ -67,11 +71,5 @@ clientsPerBroker = 1000
 to `ws://127.0.0.1:9001/ws` and consuming notifications
 
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

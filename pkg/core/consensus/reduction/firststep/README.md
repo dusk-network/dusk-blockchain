@@ -3,11 +3,11 @@
 Implementation of the first step of the reduction phase.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Top level sections of document have two #s](#top-level-sections-of-document-have-two-s)
+      1. [Subsections have 3 #s](#subsections-have-3-s)
+         1. [4, and more, if you want, but this should be enough.](#4-and-more-if-you-want-but-this-should-be-enough)
 <!-- ToC end -->
 
 ## Top level sections of document have two #s
@@ -16,11 +16,5 @@ section will be filled in here by markdown-toc
 
 #### 4, and more, if you want, but this should be enough.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

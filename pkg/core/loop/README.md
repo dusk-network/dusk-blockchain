@@ -3,11 +3,11 @@
 The `Loop` is the most high-level component of the SBA\* consensus implementation. It simulates a state-machine like architecture, with a functional flavor, where consensus phases are sequenced one after the other, returning functions as they complete, based on their outcomes.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Architecture](#architecture)
+      1. [Communications](#communications)
+      1. [Running](#running)
 <!-- ToC end -->
 
 ## Architecture
@@ -33,11 +33,5 @@ To start the consensus loop, simply create the state machine by calling `CreateS
 
 With these two phases, all we have left to do to start the consensus loop, is to formulate a [`RoundUpdate`](../consensus/comms.go#L50). This contains all the stateful information needed by the consensus to do its job. Finally, with all of these items in place, call `loop.Spin`, passing these items, in order to launch the consensus loop. Once this is called, the consensus will progress until an error is encountered, or until it is cancelled through a context cancellation.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

@@ -5,11 +5,19 @@ The `Chain` is a component which is fully responsible for building the blockchai
 Additionally, it is aware of the node's state in the network at all times, and controls the execution of the consensus by responding to perceived state changes.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Structure](#structure)
+      1. [Loader](#loader)
+      1. [Verifier](#verifier)
+      1. [Synchronizer](#synchronizer)
+      1. [Loop](#loop)
+      1. [Proxy](#proxy)
+   1. [Synchronizer](#synchronizer-1)
+      1. [Responsibility](#responsibility)
+      1. [API](#api)
+      1. [Design](#design)
+   1. [](#)
 <!-- ToC end -->
 
 ## Structure
@@ -65,11 +73,6 @@ It will be aware when the node is syncing or not. If the node is not syncing, th
 
 Depending on whether or not the node is syncing, the Synchronizer can also request blocks from the network. This can be done in quantities of up to 500. Blocks are requested by gossiping a `GetBlocks` message, using the chain tip as the locator hash, which informs nodes about where we are in the chain.
 
-
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
 
 ---
 

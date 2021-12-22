@@ -4,11 +4,21 @@ A websocket and GraphQL enabled RPC for searching the blockchain database,
 including subscriptions to notifications.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Intro](#intro)
+      1. [API Endpoints](#api-endpoints)
+      1. [Scenarios](#scenarios)
+   1. [Configuration](#configuration)
+1. [GraphQL API service](#graphql-api-service)
+1. [enable graphql service](#enable-graphql-service)
+1. [enable/disable both HTTPS and WSS](#enable/disable-both-https-and-wss)
+1. [cert file path](#cert-file-path)
+1. [key file path](#key-file-path)
+1. [maximum requests per second ](#maximum-requests-per-second-)
+1. [uniqueness of a request is based on: ](#uniqueness-of-a-request-is-based-on:-)
+1. [Remote IP, Request method and path](#remote-ip-request-method-and-path)
+   1. [Example queries](#example-queries)
 <!-- ToC end -->
 ## Intro
 
@@ -277,11 +287,5 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

@@ -3,11 +3,12 @@
 Miscellaneous functions used in testing the consensus.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Consensus integration testbed](#consensus-integration-testbed)
+      1. [How it works](#how-it-works)
+      1. [How to use](#how-to-use)
+      1. [Future work](#future-work)
 <!-- ToC end -->
 
 ## Consensus integration testbed
@@ -64,11 +65,5 @@ This integration testing suite is currently quite simplistic, but should be
 easily extendable and updatable in the future, once the need for more test cases
 arises.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

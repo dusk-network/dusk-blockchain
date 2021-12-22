@@ -4,11 +4,20 @@ Definitions, accessors and storage implementation for configuration of all
 systems in dusk-blockchain.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Features](#features)
+   1. [Example usage:](#example-usage:)
+1. [Try to load a config file from any of the searchPaths](#try-to-load-a-config-file-from-any-of-the-searchpaths)
+1. [and overwrite general.network setting](#and-overwrite-generalnetwork-setting)
+1. [with shorthand letter](#with-shorthand-letter)
+1. [Load a specified config file and overwrite logger.level](#load-a-specified-config-file-and-overwrite-loggerlevel)
+1. [config file name can be in form of dusk.toml, dusk.json, dusk.yaml, dusk.tf](#config-file-name-can-be-in-form-of-dusktoml-duskjson-duskyaml-dusktf)
+1. [Load config file found in $searchPaths and overwrite general.network value](#load-config-file-found-in-$searchpaths-and-overwrite-generalnetwork-value)
+1. [Load config where a file config value is overwritten by both ENV var and CLI flag but CLI flag has higher priority](#load-config-where-a-file-config-value-is-overwritten-by-both-env-var-and-cli-flag-but-cli-flag-has-higher-priority)
+1. [with shorthand letter](#with-shorthand-letter-1)
+   1. [Viper](#viper)
+   1. [](#)
 <!-- ToC end -->
 
 ## Features
@@ -72,11 +81,6 @@ The priority of the sources is the following:
 5. key/value store
 6. defaults
 ```
-
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
 
 ---
 Copyright (C) 2018-now Dusk Network

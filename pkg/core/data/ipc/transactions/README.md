@@ -4,11 +4,9 @@ Codecs and accessors for all types of transaction messages used between Node and
 Rusk VM.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Gotchas](#gotchas)
 <!-- ToC end -->
 
 ## Gotchas
@@ -19,11 +17,5 @@ section will be filled in here by markdown-toc
   these transactions, as the mismatch could cause potential problems down the
   line.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

@@ -3,11 +3,11 @@
 This package implements a full block generator component, to be used by participants of the blind-bid protocol in the SBA\* consensus. It is internally made up of two distinct components, a [score generator](./score/README.md), and a [candidate generator](./candidate/README.md).
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Abstract](#abstract)
+   1. [Blind Bid Algorithm](#blind-bid-algorithm)
+      1. [Procedure](#procedure)
 <!-- ToC end -->
 
 ## Abstract
@@ -30,11 +30,5 @@ The `Blind Bid` algorithm is outlined in the following steps
 6. Potential bidder computes `Y =H(S,X)`, score `Q=F(d,Y)`, and identifier `Z =H(S,M)`.
 7. Bidder selects a bid root `RT` and broadcasts proof `π = Π(Z, RT, Q, S; K, d, N)`.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

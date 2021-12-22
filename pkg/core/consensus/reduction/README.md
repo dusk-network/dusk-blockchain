@@ -12,11 +12,14 @@ for readers. That said, code which is identical across the two components is
 defined in the top-level of the package, and imported down.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Abstract](#abstract)
+   1. [Values](#values)
+      1. [Block Reduction Event](#block-reduction-event)
+   1. [Architecture](#architecture)
+      1. [Differences between the two components](#differences-between-the-two-components)
+      1. [Aggregator](#aggregator)
 <!-- ToC end -->
 
 ## Abstract
@@ -88,11 +91,5 @@ any\). Additionally, it saves the senders BLS public key in a `sortedset.Set`.
 Once the amount of keys and signatures for a certain blockhash exceeds a
 threshold, the `Aggregator` will return the collected information.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

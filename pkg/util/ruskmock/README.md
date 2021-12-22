@@ -5,11 +5,11 @@ testing and DevNet launches, and replaces the Rust version of RUSK seamlessly,
 thanks to the abstraction offered by Protocol Buffers and GRPC.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Usage](#usage)
+   1. [How it works](#how-it-works)
+   1. [Future work](#future-work)
 <!-- ToC end -->
 
 ## Usage
@@ -82,11 +82,5 @@ the `FindBid` method needs to be implemented - it currently does not do
 anything, and just returns nil pointers. Since it is not necessary at this point
 in time, this should not be an issue.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

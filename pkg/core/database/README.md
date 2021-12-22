@@ -5,11 +5,21 @@ suited to different types of data, *and a blockchain data specific interface* -
 with the purpose being data access workload optimised storage.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [General concept](#general-concept)
+   1. [Terminology](#terminology)
+   1. [Available Drivers](#available-drivers)
+   1. [Testing Drivers](#testing-drivers)
+   1. [Code example:](#code-example:)
+   1. [Additional features](#additional-features)
+   1. [Drivers](#drivers)
+      1. [Light Driver](#light-driver)
+      1. [Heavy Driver](#heavy-driver)
+   1. [General concept](#general-concept-1)
+   1. [K/V storage schema to store a single `pkg/core/block.Block` into blockchain](#k/v-storage-schema-to-store-a-single-pkg/core/blockblock-into-blockchain)
+   1. [K/V storage schema to store a candidate `pkg/core/block.Block`](#k/v-storage-schema-to-store-a-candidate-pkg/core/blockblock)
+   1. [K/V storage schema to store block generator bid values](#k/v-storage-schema-to-store-block-generator-bid-values)
 <!-- ToC end -->
 
 ## General concept
@@ -175,11 +185,5 @@ Table notation
 | :---: | :---: | :---: | :---: | :---: |
 | 0x08 | ExpiryHeight | D + K | 1 per bidding transaction made by user | FetchBidValues |
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

@@ -3,11 +3,15 @@
 This package implements the component which performs the [Agreement Phase](./agreement.md) of the consensus.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Abstract](#abstract)
+   1. [Values](#values)
+      1. [Block Agreement Event](#block-agreement-event)
+   1. [Architecture](#architecture)
+      1. [Main component](#main-component)
+      1. [Accumulator](#accumulator)
+   1. [](#)
 <!-- ToC end -->
 
 
@@ -58,11 +62,6 @@ For each call to the `Run` function, the agreement component instantiates a new 
 Under the hood, the `Accumulator` makes use of a thread pool in order to parallelize event verification and storage. The amount of workers is configurable, but is standardly set to 4.
 
 To store events, the `Accumulator` uses a `store`, which is a thread-safe wrapper around a map.
-
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
 
 ---
 

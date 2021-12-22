@@ -10,11 +10,12 @@ An abstract description of the Selection phase in the SBA\* consensus protocol
 can be found [here](./selection.md).
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Abstract](#abstract)
+   1. [Values](#values)
+      1. [Score Message](#score-message)
+   1. [Architecture](#architecture)
 <!-- ToC end -->
 
 ## Abstract
@@ -77,11 +78,5 @@ highest score in memory when the timer expires. Once this timer expires, the
 message is returned and can be used to vote in
 the [reduction step](../reduction/README.md).
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

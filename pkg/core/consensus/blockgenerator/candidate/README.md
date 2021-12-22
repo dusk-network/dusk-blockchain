@@ -3,11 +3,12 @@
 This package implements a candidate generator, for the blind-bid protocol of the SBA\* consensus protocol.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Abstract](#abstract)
+   1. [Values](#values)
+      1. [Candidate \(Block\)](#candidate-\block\)
+   1. [Architecture](#architecture)
 <!-- ToC end -->
 
 ## Abstract
@@ -44,11 +45,5 @@ The component should be initialized with a public key, to which the potential re
 
 This message is then fully ready to be encoded and gossiped to the network.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

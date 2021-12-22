@@ -3,7 +3,7 @@
 Deployer is an application that simplifies the procedure of (re)starting a dusk-blockchain node (both dusk-blockchain and rusk services). It should also facilitate automatic diagnostic of runtime issues.
 
 <!-- ToC start -->
-## Contents
+##  Contents
 
    1. [Rules](#rules)
    1. [How to run](#how-to-run)
@@ -27,11 +27,5 @@ RUSK_PATH=
 deployer --config /home/.dusk/dusk.toml
 ```
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

@@ -4,11 +4,13 @@ Verification functions for various sanity checks on blocks, coinbases and
 consensus messages.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Stateless verification functionality](#stateless-verification-functionality)
+      1. [Exposed functionality](#exposed-functionality)
+         1. [CheckBlockCertificate](#checkblockcertificate)
+         1. [CheckBlockHeader](#checkblockheader)
+         1. [CheckMultiCoinbases](#checkmulticoinbases)
 <!-- ToC end -->
 ## Stateless verification functionality
 
@@ -42,11 +44,5 @@ This function performs a multitude of checks on the correctness of a block heade
 
 Simply iterates over the transactions in the block, and makes sure there is only one transaction that has the `Distribute` transaction type. Note that this function does not check whether or not the `Distribute` transaction is in the right place.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

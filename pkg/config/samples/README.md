@@ -3,17 +3,10 @@
 Example configuration files and the default Dusk configuration file
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [](#)
 <!-- ToC end -->
-
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
 
 ---
 

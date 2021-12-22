@@ -6,11 +6,10 @@ to extract **voting committees** which are eligible to decide on blocks during
 the SBA\* consensus protocol.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Abstract](#abstract)
+   1. [Gotchas](#gotchas)
 <!-- ToC end -->
 
 ## Abstract
@@ -35,11 +34,5 @@ step.
   potential attack vector for a node to be able to achieve a majority vote and
   therefore, break consensus rules.
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

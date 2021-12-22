@@ -3,11 +3,9 @@
 Implementation of the second step of the reduction phase.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-section will be filled in here by markdown-toc
-
+   1. [Gotchas](#gotchas)
 <!-- ToC end -->
 
 ## Gotchas
@@ -19,11 +17,5 @@ section will be filled in here by markdown-toc
   logged [here](https://github.com/dusk-network/dusk-blockchain/issues/700) and
   fixed in [this PR](https://github.com/dusk-network/dusk-blockchain/pull/650).
 
-<!-- 
-# to regenerate this file's table of contents:
-markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
--->
-
----
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)
