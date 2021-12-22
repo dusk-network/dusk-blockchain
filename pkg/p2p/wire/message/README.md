@@ -1,7 +1,7 @@
-# Package Title
+# [pkg/p2p/wire/message](./pkg/p2p/wire/message)
 
-Blurb about what this package does in one sentence here. Optional badges and
-multiple paragraphs but it may belong in an Introduction if it is long.
+Definitions of all message data structure formats and their wire/storage codecs,
+mocks and tests.
 
 <!-- ToC start -->
 

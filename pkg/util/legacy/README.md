@@ -1,7 +1,7 @@
-# Package Title
+# [pkg/util/legacy](./pkg/util/legacy)
 
-Blurb about what this package does in one sentence here. Optional badges and
-multiple paragraphs but it may belong in an Introduction if it is long.
+Converter that upgrades the old provisioners data structure to the new Rusk
+Committee.
 
 <!-- ToC start -->
 

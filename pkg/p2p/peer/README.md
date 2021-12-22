@@ -1,7 +1,7 @@
-# Package Title
+# [pkg/p2p/peer](./pkg/p2p/peer)
 
-Blurb about what this package does in one sentence here. Optional badges and
-multiple paragraphs but it may belong in an Introduction if it is long.
+Peer to peer message sending and receiving, including one-to-many gossip message
+distribution.
 
 <!-- ToC start -->
 
@@ -11,11 +11,14 @@ section will be filled in here by markdown-toc
 
 <!-- ToC end -->
 
-## Top level sections of document have two #s
+## Gotchas
 
-### Subsections have 3 #s
+### Message processing
 
-#### 4, and more, if you want, but this should be enough.
+It is required that a message which comes from the wire implements
+the `payload.Safe` interface and has an unmarshalling function that can be
+called through `message.Unmarshal`. Otherwise, the message will be decoded as
+nil, and more often than not cause a panic.
 
 <!-- 
 # to regenerate this file's table of contents:

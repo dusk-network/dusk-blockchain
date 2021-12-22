@@ -1,7 +1,6 @@
-# Package Title
+# [pkg/p2p/wire/message/payload](./pkg/p2p/wire/message/payload)
 
-Blurb about what this package does in one sentence here. Optional badges and
-multiple paragraphs but it may belong in an Introduction if it is long.
+This is actually just an interface for a concurrent safe deep copy function.
 
 <!-- ToC start -->
 
@@ -10,12 +9,6 @@ multiple paragraphs but it may belong in an Introduction if it is long.
 section will be filled in here by markdown-toc
 
 <!-- ToC end -->
-
-## Top level sections of document have two #s
-
-### Subsections have 3 #s
-
-#### 4, and more, if you want, but this should be enough.
 
 <!-- 
 # to regenerate this file's table of contents:

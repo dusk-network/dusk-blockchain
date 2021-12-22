@@ -1,7 +1,7 @@
-# Package Title
+# [pkg/util/nativeutils](./pkg/util/nativeutils)
 
-Blurb about what this package does in one sentence here. Optional badges and
-multiple paragraphs but it may belong in an Introduction if it is long.
+This is a large number of libraries from the pub/sub broker eventbus, logging,
+error handling, a transmission protocol, two different set implementations.
 
 <!-- ToC start -->
 
@@ -10,12 +10,6 @@ multiple paragraphs but it may belong in an Introduction if it is long.
 section will be filled in here by markdown-toc
 
 <!-- ToC end -->
-
-## Top level sections of document have two #s
-
-### Subsections have 3 #s
-
-#### 4, and more, if you want, but this should be enough.
 
 <!-- 
 # to regenerate this file's table of contents:
