@@ -1,10 +1,27 @@
-# Provisioners and Sortition
+# Package Title
 
-This package implements the data structure which holds the Provisioner committee, and implements methods on top of this committee in order to be able to extract **voting committees** which are eligible to decide on blocks during the SBA\* consensus protocol.
+Blurb about what this package does in one sentence here. Optional badges and
+multiple paragraphs but it may belong in an Introduction if it is long.
 
-## Abstract
+<!-- ToC start -->
 
-Deterministic sortition is an optimization of cryptographic sortition introduced by Micali et al. It extends the functionality of cryptographic sortition in a Random Oracle setting in a non-interactive fashion, improving both the network throughput and space-efficiency.
+## Contents
 
-Deterministic sortition is an algorithm that recursively hashes the public seed with situational parameters of each step, mapping the outcome to the current stakes of the Provisioners in order to extract a pseudo-random `Committee`, per step.
+section will be filled in here by markdown-toc
 
+<!-- ToC end -->
+
+## Top level sections of document have two #s
+
+### Subsections have 3 #s
+
+#### 4, and more, if you want, but this should be enough.
+
+<!-- 
+# to regenerate this file's table of contents:
+markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
+-->
+
+---
+Copyright © 2018-2022 Dusk Network
+[MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

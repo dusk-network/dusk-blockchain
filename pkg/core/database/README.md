@@ -1,95 +1,27 @@
-# README
+# Package Title
 
-## General concept
+Blurb about what this package does in one sentence here. Optional badges and
+multiple paragraphs but it may belong in an Introduction if it is long.
 
-Package database represents a database layer in Dusk Network. Current design should embody both backend-agnostic and storage-agnostic concepts.
+<!-- ToC start -->
 
-## Terminology
+## Contents
 
-`Storage`: Underlying storage can be any kind of KV stores \(BoltDB, LMDB, LevelDB, RocksDB, Redis\), non-KV stores \(SQLite\) or even a custom ACID-complient flat-file store.
+section will be filled in here by markdown-toc
 
-`Backend/Driver`: represents a DB implementation that uses one or multiple underlying storages to provide block chain database specifics with regard to particular purpose. It must implement Driver, DB and Tx intefaces.
+<!-- ToC end -->
 
-Interfaces exposed to upper layers:
+## Top level sections of document have two #s
 
-* `database.Driver`: DB connection initiator. Inspired by database/sql/driver
-* `database.DB`: A thin layer on top of database.Tx providing a manageable Tx execution. Inspired by BoltDB
-* `database.Tx`: A transaction layer tightly coupled with DUSK block chain specifics to fully benefit from underlying storage capabilities
+### Subsections have 3 #s
 
-## Available Drivers
+#### 4, and more, if you want, but this should be enough.
 
-* `/database/heavy` driver is designed to provide efficient, robust and persistent DUSK block chain DB on top of syndtr/goleveldb/leveldb store \(unofficial LevelDB porting\). It must be Mainnet-complient.
+<!-- 
+# to regenerate this file's table of contents:
+markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
+-->
 
-## Testing Drivers
-
-* `/database/testing` implements a boilerplate method to verify if a registered driver does satisfy minimum database requirements. The package defines a set of unit tests that are executed only on registered drivers. It can serve also as a detailed and working database guideline.
-
-## Code example:
-
-More code examples can be found in `/database/heavy/database_test.go`
-
-```text
-// By changing Driver name, one can switch between different backends
-// Each backend is bound to one or multiple underlying stores
-readonly := false
-
-// Retrieve
-driver, _ := database.From(lite.DriverName)
-db, err := driver.Open(path, protocol.DevNet, readonly)
-
-if err != nil {
-    ...
-}
-
-defer db.Close()
-
-blocks := make([]*block.Block, 100)
-// Populate blocks here ...
-
-// a managed read-write DB Tx to store all blocks via atomic update
-err = db.Update(func(tx database.Tx) error {
-    for _, block := range blocks {
-        err := tx.StoreBlock(block)
-        if err != nil {
-            return err
-        }
-    }
-    return nil
-})
-
-if err != nil {
-    fmt.Printf("Transaction failed. No blocks stored")
-    return
-}
-
- // a managed read-only DB Tx to check if all blocks have been stored
-_ = db.View(func(tx database.Tx) error {
-    for _, block := range blocks {
-        exists, err := tx.FetchBlockExists(block.Header.Hash)
-        if err != nil {
-            fmt.Printf(err.Error())
-            return nil
-        }
-
-        if !exists {
-            fmt.Printf("Block with Height %d was not found", block.Header.Height)
-            return nil
-        }
-    }
-    return nil
-})
-```
-
-## Additional features
-
-Additional features that can be provided by a Driver:
-
-* Read-only transactions/connections
-* Validated storage connection
-* Profiling: Collect transactions and connections statistics
-* Traces: Log transactions data
-* Alarming: Trigger an event in case of critical backend or storage failure
-* Iterators/Cursors
-* Safe Concurrency model: One read-write transaction, many read-only transactions
-* Redundancy: blockchain data stored in a secondary in-memory or on-disk structure
-
+---
+Copyright © 2018-2022 Dusk Network
+[MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

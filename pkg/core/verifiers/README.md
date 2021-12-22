@@ -1,31 +1,27 @@
-# Stateless verification functionality
+# Package Title
 
-This package exposes functionality to do stateless checks on new blocks. With stateless checks, we mean anything that is not related to VM execution of the contained transactions. 
+Blurb about what this package does in one sentence here. Optional badges and
+multiple paragraphs but it may belong in an Introduction if it is long.
 
-## Exposed functionality
+<!-- ToC start -->
 
-What follows is an outline of each check exposed by this package.
+## Contents
 
-### CheckBlockCertificate
+section will be filled in here by markdown-toc
 
-Checks the block's certificate for correctness. Since the block certificate contains many fields, there is a list of checks performed by this function:
+<!-- ToC end -->
 
-- BLS signature verification for the signatures of the first and second step
-- Committee inclusion check for the included voter bitmaps for the first and second step
-- Ensuring that the step number, included in the certificate, corresponds with the provided signatures and bitmaps
+## Top level sections of document have two #s
 
-It should be noted, that the certificate checks are not performed on the genesis block. Due to the impossibility of the genesis block having an active committee (unless something was completely hardcoded), this block will not be checked. This does not pose a security risk, as the genesis block itself is also hardcoded.
+### Subsections have 3 #s
 
-### CheckBlockHeader
+#### 4, and more, if you want, but this should be enough.
 
-This function performs a multitude of checks on the correctness of a block header. These checks include:
+<!-- 
+# to regenerate this file's table of contents:
+markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
+-->
 
-- Making sure the block header version is up-to-date with the latest one
-- Ensuring that the block header contains the correct **previous block hash**, as determined by its height
-- Ensuring that the block height is correct (logically follows the previous block)
-- Checking that the timestamp is not before the previous block timestamp
-- Calculating the transaction merkle root hash, and comparing it to the one on the block for equality
-
-### CheckMultiCoinbases
-
-Simply iterates over the transactions in the block, and makes sure there is only one transaction that has the `Distribute` transaction type. Note that this function does not check whether or not the `Distribute` transaction is in the right place.
+---
+Copyright © 2018-2022 Dusk Network
+[MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

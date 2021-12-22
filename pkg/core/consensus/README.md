@@ -1,15 +1,27 @@
-# Consensus
+# Package Title
 
-This package implements all needed components to run the [SBA\* consensus algorithm](./consensus.md) in isolation. This means, that all the "pieces" of the consensus are housed within this package, including communication infrastructure and testing frameworks. However, it still needs to be put together in order to have a fully running consensus. This code is defined in the [loop package](../loop/README.md) in this repo.
+Blurb about what this package does in one sentence here. Optional badges and
+multiple paragraphs but it may belong in an Introduction if it is long.
 
-## Values
+<!-- ToC start -->
 
-### Message Header
+## Contents
 
-| Field | Type |
-| :--- | :--- |
-| pubkeyBLS | BLS Signature |
-| round | uint64 |
-| step | uint64 |
-| blockhash | uint256 |
+section will be filled in here by markdown-toc
 
+<!-- ToC end -->
+
+## Top level sections of document have two #s
+
+### Subsections have 3 #s
+
+#### 4, and more, if you want, but this should be enough.
+
+<!-- 
+# to regenerate this file's table of contents:
+markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
+-->
+
+---
+Copyright © 2018-2022 Dusk Network
+[MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)
