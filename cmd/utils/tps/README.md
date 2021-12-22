@@ -1,0 +1,16 @@
+# [cmd/utils/tps](./cmd/utils/tps)
+
+A transaction generator specifically for stress testing transaction processing.
+
+<!-- ToC start -->
+
+## Contents
+
+section will be filled in here by markdown-toc
+
+<!-- ToC end -->
+
+<!-- 
+# to regenerate this file:
+markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
+-->

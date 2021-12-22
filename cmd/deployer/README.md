@@ -1,4 +1,4 @@
-# Deployer
+# [cmd/deployer](./cmd/deployer)
 
 Deployer is an application that simplifies the procedure of (re)starting a dusk-blockchain node (both dusk-blockchain and rusk services). It should also facilitate automatic diagnostic of runtime issues.
 
@@ -20,10 +20,14 @@ Deployer is an application that simplifies the procedure of (re)starting a dusk-
  
  
 ## How to run
-
 ```bash
 DUSK_BLOCKCHAIN_PATH=
 RUSK_PATH=
 
 deployer --config /home/.dusk/dusk.toml
 ```
+
+<!-- 
+# to regenerate this file:
+markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
+-->
