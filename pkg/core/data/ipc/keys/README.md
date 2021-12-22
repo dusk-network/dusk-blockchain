@@ -1,7 +1,7 @@
-# Package Title
+# [pkg/core/data/ipc/keys](./pkg/core/data/ipc/keys)
 
-Blurb about what this package does in one sentence here. Optional badges and
-multiple paragraphs but it may belong in an Introduction if it is long.
+Phoenix asymmetric cryptographic primitives, codec, signatures, validation,
+address generation.
 
 <!-- ToC start -->
 

@@ -371,22 +371,9 @@ certificates.
 Wrapper to K/V access for database back end and specific handling for
 transactions.
 
-[pkg/core/database/README.md](./pkg/core/database/README.md) Documentation for
-the database interface used for storing data from flat files to key/value stores
-for addresses, transactions, and the like
-
-[pkg/core/database/heavy.md](./pkg/core/database/heavy.md) Notes about the
-interface for bulky block data
-
-[pkg/core/database/lite.md](./pkg/core/database/lite.md) Notes about the
-memory-only database driver
-
 ## [pkg/core/data/ipc](./pkg/core/data/ipc)
 
 This folder gathers IPC related items.
-
-[pkg/core/data/ipc/transactions/gotchas.md](./pkg/core/data/ipc/transactions/gotchas.md)
-Notes about the lack of formal canonical binary format, a year old.
 
 ## [pkg/core/data/ipc/common](./pkg/core/data/ipc/common)
 
@@ -401,6 +388,9 @@ address generation.
 
 Codecs and accessors for all types of transaction messages used between Node and
 Rusk VM.
+
+[pkg/core/data/ipc/transactions/gotchas.md](./pkg/core/data/ipc/transactions/gotchas.md)
+Notes about the lack of formal canonical binary format, a year old.
 
 ## [pkg/core/data/txrecords](./pkg/core/data/txrecords)
 
@@ -417,6 +407,16 @@ interface.
 An abstract driver interface for enabling multiple types of storage strategy
 suited to different types of data, *and a blockchain data specific interface* -
 with the purpose being data access workload optimised storage.
+
+[pkg/core/database/README.md](./pkg/core/database/README.md) Documentation for
+the database interface used for storing data from flat files to key/value stores
+for addresses, transactions, and the like
+
+[pkg/core/database/heavy.md](./pkg/core/database/heavy.md) Notes about the
+interface for bulky block data
+
+[pkg/core/database/lite.md](./pkg/core/database/lite.md) Notes about the
+memory-only database driver
 
 ## [pkg/core/database/heavy](./pkg/core/database/heavy)
 

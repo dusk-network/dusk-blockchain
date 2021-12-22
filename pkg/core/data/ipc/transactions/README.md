@@ -1,7 +1,7 @@
-# Package Title
+# [pkg/core/data/ipc/transactions](./pkg/core/data/ipc/transactions)
 
-Blurb about what this package does in one sentence here. Optional badges and
-multiple paragraphs but it may belong in an Introduction if it is long.
+Codecs and accessors for all types of transaction messages used between Node and
+Rusk VM.
 
 <!-- ToC start -->
 
@@ -11,11 +11,13 @@ section will be filled in here by markdown-toc
 
 <!-- ToC end -->
 
-## Top level sections of document have two #s
+## Gotchas
 
-### Subsections have 3 #s
-
-#### 4, and more, if you want, but this should be enough.
+- It is important to note, that currently, the hashing functions for
+  transactions are just marshalling the entire thing, and then hashing those
+  bytes. In the future, we need to make sure this aligns with how Rusk will hash
+  these transactions, as the mismatch could cause potential problems down the
+  line.
 
 <!-- 
 # to regenerate this file's table of contents:
