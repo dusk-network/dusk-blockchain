@@ -65,16 +65,13 @@ func (r *Reader) Listen() {
 				// receive a message
 				msg, err := stream.Recv()
 				if err == io.EOF {
-					// stream is done
 					// TODO: Notify someone? Retry mechanism?
-					log.Panic("stream done (eof)")
 					return
 				} else if err != nil {
 					log.Fatalf("recv error %v", err)
 				}
 				// Message received
 				go r.processMessage(msg)
-				log.Infof("received msg: %v", msg)
 			}
 		}
 	}()
@@ -83,6 +80,7 @@ func (r *Reader) Listen() {
 // processMessage propagates the received kadcast message into the event bus.
 func (r *Reader) processMessage(message *rusk.Message) {
 	reader := bytes.NewReader(message.Message)
+
 	// read message (extract length and magic)
 	b, err := r.gossip.ReadMessage(reader)
 	if err != nil {
@@ -101,9 +99,10 @@ func (r *Reader) processMessage(message *rusk.Message) {
 			Warnln("error verifying message cs")
 		return
 	}
+
 	// collect (process) the message
 	go func() {
-		if _, err = r.processor.Collect(message.Metadata.SrcAddress, message.Message, nil, protocol.FullNode, nil); err != nil {
+		if _, err = r.processor.Collect(message.Metadata.SrcAddress, msg, nil, protocol.FullNode, nil); err != nil {
 			var topic string
 			if len(msg) > 0 {
 				topic = topics.Topic(msg[0]).String()
