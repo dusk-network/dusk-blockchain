@@ -89,3 +89,8 @@ Remove the docker with:
 ```
 docker-compose rm
 ```
+
+<!-- 
+# to regenerate this file's table of contents:
+markdown-toc README.md --replace --skip-headers 2 --inline --header "##  Contents"
+-->
