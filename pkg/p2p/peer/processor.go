@@ -94,6 +94,7 @@ func (m *MessageProcessor) shouldBeCached(t topics.Topic) bool {
 		topics.NewBlock,
 		topics.Reduction,
 		topics.Agreement,
+		topics.AggrAgreement,
 		topics.GetCandidate:
 		return true
 	default:

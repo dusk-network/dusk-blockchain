@@ -182,4 +182,6 @@ type consensusConfiguration struct {
 	DefaultAmount   uint64
 	// ConsensusTimeOut is the time out for consensus step timers.
 	ConsensusTimeOut int64
+	// UseCompressedKeys determines if AggregatePks works with compressed or uncompressed pks.
+	UseCompressedKeys bool
 }

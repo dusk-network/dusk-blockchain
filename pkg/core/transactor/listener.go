@@ -163,24 +163,6 @@ func (t *Transactor) handleSendStandardTx(req *node.TransferRequest) (*node.Tran
 	return &node.TransactionResponse{Hash: hash}, nil
 }
 
-func (t *Transactor) handleBalance() (*node.BalanceResponse, error) {
-	if t.w == nil {
-		return nil, errWalletNotLoaded
-	}
-
-	// NOTE: maybe we will separate the locked and unlocked balances
-	// This call should be updated in that case
-	ctx := context.Background()
-
-	ub, lb, err := t.proxy.Provider().GetBalance(ctx, t.w.ViewKey)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Tracef("wallet balance: %d, mempool balance: %d", ub, 0)
-	return &node.BalanceResponse{UnlockedBalance: ub, LockedBalance: lb}, nil
-}
-
 func (t *Transactor) handleClearWalletDatabase() (*node.GenericResponse, error) {
 	if t.w == nil {
 		if err := os.RemoveAll(cfg.Get().Wallet.Store); err != nil {

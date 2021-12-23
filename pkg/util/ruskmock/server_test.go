@@ -12,11 +12,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
+
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/stretchr/testify/assert"
@@ -67,7 +69,7 @@ func TestVerifyStateTransition(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Should have gotten an empty FailedCalls slice
-	assert.Empty(t, resp.FailedCalls)
+	assert.True(t, resp.Success)
 }
 
 func TestFailedVerifyStateTransition(t *testing.T) {
@@ -93,18 +95,14 @@ func TestFailedVerifyStateTransition(t *testing.T) {
 		calls[i] = call
 	}
 
-	resp, err := c.VerifyStateTransition(ctx, &rusk.VerifyStateTransitionRequest{Txs: calls})
+	resp, err := c.ExecuteStateTransition(ctx, &rusk.ExecuteStateTransitionRequest{Txs: calls})
 	assert.NoError(t, err)
 
 	// FailedCalls should be a slice of numbers 0 to 4
-	assert.Equal(t, 5, len(resp.FailedCalls))
-
-	for i, n := range resp.FailedCalls {
-		assert.Equal(t, uint64(i), n)
-	}
+	assert.Equal(t, 5, len(resp.Txs))
 }
 
-func TestExecuteStateTransition(t *testing.T) {
+func TestAcceptRequest(t *testing.T) {
 	s := setupRuskMockTest(t, DefaultConfig())
 	defer cleanup(s)
 
@@ -118,7 +116,7 @@ func TestExecuteStateTransition(t *testing.T) {
 	sc, _ := client.CreateStakeClient(ctx, "localhost:10000")
 	value := uint64(712389)
 
-	pk, _ := crypto.RandEntropy(96)
+	_, pk, rpk := bls.GenerateKeysWithRaw()
 
 	tx, err := sc.NewStake(ctx, &rusk.StakeTransactionRequest{
 		Value:        value,
@@ -126,9 +124,9 @@ func TestExecuteStateTransition(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	resp, err := c.ExecuteStateTransition(ctx, &rusk.ExecuteStateTransitionRequest{
-		Txs:    []*rusk.Transaction{tx},
-		Height: 1,
+	resp, err := c.Accept(ctx, &rusk.AcceptRequest{
+		Txs:         []*rusk.Transaction{tx},
+		BlockHeight: 1,
 	})
 	assert.NoError(t, err)
 
@@ -138,24 +136,11 @@ func TestExecuteStateTransition(t *testing.T) {
 	// chosen value
 	m := s.p.Members[string(pk)]
 	assert.Equal(t, value, m.Stakes[0].Amount)
-}
 
-func TestFailedExecuteStateTransition(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.PassStateTransition = false
+	// Ensure mapping Compressed Pk to Uncompressed Pk is correct
+	rpk2 := s.p.GetRawPublicKeyBLS(pk)
 
-	s := setupRuskMockTest(t, cfg)
-	defer cleanup(s)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, _ := client.CreateStateClient(ctx, "localhost:10000")
-
-	resp, err := c.ExecuteStateTransition(ctx, &rusk.ExecuteStateTransitionRequest{})
-	assert.NoError(t, err)
-
-	assert.False(t, resp.Success)
+	assert.True(t, bytes.Equal(rpk, rpk2))
 }
 
 func TestNewStake(t *testing.T) {

@@ -63,12 +63,12 @@ type Server struct {
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
 // component and performs a DB sanity check.
-func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, srv *grpc.Server, db database.DB) (*chain.Chain, error) {
+func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Proxy, eventBus *eventbus.EventBus, rpcbus *rpcbus.RPCBus, srv *grpc.Server, db database.DB) (*chain.Chain, error) {
 	// creating and firing up the chain process
 	genesis := cfg.DecodeGenesis()
 	l := chain.NewDBLoader(db, genesis)
 
-	chainProcess, err := chain.New(ctx, db, eventBus, l, l, srv, proxy, cl)
+	chainProcess, err := chain.New(ctx, db, eventBus, rpcbus, l, l, srv, proxy, cl)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func Setup() *Server {
 	cl := loop.New(e, &w.PublicKey)
 	processor.Register(topics.Candidate, cl.ProcessCandidate)
 
-	c, err := LaunchChain(ctx, cl, proxy, eventBus, grpcServer, db)
+	c, err := LaunchChain(ctx, cl, proxy, eventBus, rpcBus, grpcServer, db)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -292,7 +292,11 @@ func Setup() *Server {
 		}
 	}()
 
-	go c.StartConsensus()
+	if err := c.RestartConsensus(); err != nil {
+		log.WithError(err).Warn("StartConsensus returned err")
+		// If we can not start consensus, we shouldn't be able to start at all.
+		panic(err)
+	}
 
 	return srv
 }
@@ -301,7 +305,6 @@ func Setup() *Server {
 func (s *Server) Close() {
 	// TODO: disconnect peers
 	// _ = s.c.Close(cfg.Get().Database.Driver)
-	s.c.StopConsensus()
 	s.rpcBus.Close()
 	s.grpcServer.GracefulStop()
 	_ = s.ruskConn.Close()
@@ -357,6 +360,7 @@ func registerPeerServices(processor *peer.MessageProcessor, db database.DB, even
 	processor.Register(topics.NewBlock, cp.Process)
 	processor.Register(topics.Reduction, cp.Process)
 	processor.Register(topics.Agreement, cp.Process)
+	processor.Register(topics.AggrAgreement, cp.Process)
 	processor.Register(topics.Challenge, responding.CompleteChallenge)
 }
 
@@ -370,11 +374,10 @@ func setupGRPCClients(ctx context.Context) (transactions.Proxy, *grpc.ClientConn
 	keysClient, _ := client.CreateKeysClient(ctx, addr)
 	transferClient, _ := client.CreateTransferClient(ctx, addr)
 	stakeClient, _ := client.CreateStakeClient(ctx, addr)
-	walletClient, _ := client.CreateWalletClient(ctx, addr)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	return transactions.NewProxy(ruskClient, keysClient, transferClient, stakeClient, walletClient, txTimeout, defaultTimeout), ruskConn
+	return transactions.NewProxy(ruskClient, keysClient, transferClient, stakeClient, txTimeout, defaultTimeout), ruskConn
 }
 
 func loadWallet(password string) (*wallet.Wallet, error) {

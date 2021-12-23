@@ -11,8 +11,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
-	"github.com/dusk-network/bls12_381-sign-go/bls"
+	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -43,9 +45,9 @@ type handler struct {
 
 // NewHandler returns an initialized handler.
 //nolint:golint
-func NewHandler(keys key.Keys, p user.Provisioners) *handler {
+func NewHandler(keys key.Keys, p user.Provisioners, seed []byte) *handler {
 	return &handler{
-		Handler: committee.NewHandler(keys, p),
+		Handler: committee.NewHandler(keys, p, seed),
 	}
 }
 
@@ -80,6 +82,20 @@ func (a *handler) Quorum(round uint64) int {
 func (a *handler) Verify(ev message.Agreement) error {
 	hdr := ev.State()
 
+	start := time.Now()
+
+	defer func() {
+		// Measure duration of a complete verification of an agreement message.
+		// Report any duration above 1s.
+		alarmThreshold := int64(1000)
+		elapsed := time.Since(start)
+		ms := elapsed.Milliseconds()
+
+		if ms > alarmThreshold {
+			lg.WithField("duration_ms", ms).Info("verify agreement done")
+		}
+	}()
+
 	if err := verifyWhole(ev); err != nil {
 		return fmt.Errorf("failed to verify Agreement Sender: %w", err)
 	}
@@ -111,7 +127,7 @@ func (a *handler) Verify(ev message.Agreement) error {
 		log.WithField("bitset", votes.BitSet).WithField("voted_len", subcommittee.Len()).
 			WithField("total_votes", allVoters).Info()
 
-		apk, err := ReconstructApk(subcommittee.Set)
+		apk, err := AggregatePks(&a.Provisioners, subcommittee.Set)
 		if err != nil {
 			return fmt.Errorf("failed to reconstruct APK in the Agreement verification: %w", err)
 		}
@@ -165,20 +181,31 @@ func verifyWhole(a message.Agreement) error {
 	// we make a copy of the signature because the crypto package apparently mutates the byte array when
 	// Compressing/Decompressing a point
 	// see https://github.com/dusk-network/dusk-crypto/issues/16
-	sig := make([]byte, len(a.SignedVotes()))
-	copy(sig, a.SignedVotes())
+	sig := make([]byte, len(a.Signature()))
+	copy(sig, a.Signature())
 
 	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, r.Bytes())
 }
 
-// ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.
-func ReconstructApk(subcommittee sortedset.Set) ([]byte, error) {
+// AggregatePks reconstructs an aggregated BLS public key from a subcommittee.
+func AggregatePks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
+	if cfg.Get().Consensus.UseCompressedKeys {
+		return aggregateCompressedPks(subcommittee)
+	}
+
+	return aggregateUncompressedPks(p, subcommittee)
+}
+
+// aggregateCompressedPks reconstructs compressed BLS public key.
+func aggregateCompressedPks(subcommittee sortedset.Set) ([]byte, error) {
 	var apk []byte
 	var err error
 
 	if len(subcommittee) == 0 {
 		return nil, errors.New("Subcommittee is empty")
 	}
+
+	pks := make([][]byte, 0)
 
 	for i, ipk := range subcommittee {
 		pk := ipk.Bytes()
@@ -192,10 +219,47 @@ func ReconstructApk(subcommittee sortedset.Set) ([]byte, error) {
 			continue
 		}
 
-		apk, err = bls.AggregatePk(apk, pk)
+		if len(pk) != 96 {
+			panic("invalid pubkey size")
+		}
+
+		pks = append(pks, pk)
+	}
+
+	if len(pks) > 0 {
+		// Instead of calling AggregatePk per each PubKey, we mitigate Cgo
+		// overhead by aggregating a set of Pubkeys in a single call.
+		// Benchmarking indicates 30% faster execution.
+		apk, err = bls.AggregatePk(apk, pks...)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	return apk, nil
+}
+
+// aggregateCompressedPks reconstructs uncompressed BLS public.
+func aggregateUncompressedPks(p *user.Provisioners, subcommittee sortedset.Set) ([]byte, error) {
+	var apk []byte
+	var err error
+
+	pks := make([][]byte, 0)
+
+	for _, ipk := range subcommittee {
+		rawPk := p.GetRawPublicKeyBLS(ipk.Bytes())
+		if len(rawPk) != 0 {
+			pks = append(pks, rawPk)
+		}
+	}
+
+	if len(pks) == 0 {
+		return nil, errors.New("empty committee")
+	}
+
+	apk, err = bls.AggregatePKsUnchecked(pks...)
+	if err != nil {
+		return nil, err
 	}
 
 	return apk, nil

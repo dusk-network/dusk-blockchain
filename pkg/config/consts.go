@@ -34,6 +34,9 @@ const (
 
 	// KadcastInitialHeight sets the default initial height for Kadcast broadcast algorithm.
 	KadcastInitialHeight byte = 128
+
+	// Block Gas limit TBD.
+	BlockGasLimit = 100000000
 )
 
 // KadcastInitHeader is used as default initial kadcast message header.

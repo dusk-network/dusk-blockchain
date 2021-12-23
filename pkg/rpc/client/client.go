@@ -57,26 +57,6 @@ func CreateKeysClient(ctx context.Context, address string) (rusk.KeysClient, *gr
 	return rusk.NewKeysClient(conn), conn
 }
 
-// CreateBlindBidServiceClient creates a client for the Blindbid service.
-func CreateBlindBidServiceClient(ctx context.Context, address string) (rusk.BlindBidServiceClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Panic(err)
-	}
-
-	return rusk.NewBlindBidServiceClient(conn), conn
-}
-
-// CreateBidServiceClient creates a client for the Bid service.
-func CreateBidServiceClient(ctx context.Context, address string) (rusk.BidServiceClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Panic(err)
-	}
-
-	return rusk.NewBidServiceClient(conn), conn
-}
-
 // CreateTransferClient creates a client for the Transfer service.
 func CreateTransferClient(ctx context.Context, address string) (rusk.TransferClient, *grpc.ClientConn) {
 	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
@@ -95,16 +75,6 @@ func CreateStakeClient(ctx context.Context, address string) (rusk.StakeServiceCl
 	}
 
 	return rusk.NewStakeServiceClient(conn), conn
-}
-
-// CreateWalletClient creates a client for the Wallet service.
-func CreateWalletClient(ctx context.Context, address string) (rusk.WalletClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Panic(err)
-	}
-
-	return rusk.NewWalletClient(conn), conn
 }
 
 type (

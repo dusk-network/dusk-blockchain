@@ -61,7 +61,7 @@ port=7000
 maxDupeMapItems=300000
 # Number of seconds before dupemap expires and gets reset. 
 # Ideally should be less than 15s - average consensus time
-maxDupeMapExpire=5
+maxDupeMapExpire=20
 
 minimumConnections = 5
 maxConnections = 50
@@ -216,6 +216,8 @@ defaultlocktime = 250000
 defaultamount = 5
 # the timeout for consensus step timers
 consensustimeout = 5
+# useCompressedKeys determines if AggregatePks works with compressed or uncompressed pks.
+useCompressedKeys = false
 
 [genesis]
 legacy = false

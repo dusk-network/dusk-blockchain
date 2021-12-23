@@ -32,7 +32,7 @@ func TestCopy(t *testing.T) {
 	assert.Equal(red.PubKeyBLS, h.PubKeyBLS)
 
 	// SignedVotes
-	assert.Equal(aggro.SignedVotes(), cpy.SignedVotes())
+	assert.Equal(aggro.Signature(), cpy.Signature())
 
 	// VotesPerStep
 	for i, vps := range aggro.VotesPerStep {

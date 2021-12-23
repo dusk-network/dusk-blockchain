@@ -19,7 +19,7 @@ import (
 func TestStep0Committee(t *testing.T) {
 	assert.NotPanics(t, func() {
 		p, ks := consensus.MockProvisioners(10)
-		h := committee.NewHandler(ks[0], *p)
+		h := committee.NewHandler(ks[0], *p, []byte{0, 0, 0, 0})
 		h.AmMember(1, 0, 10)
 	})
 }

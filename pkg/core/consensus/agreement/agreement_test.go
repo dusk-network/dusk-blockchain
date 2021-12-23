@@ -30,7 +30,7 @@ func TestMockValidity(t *testing.T) {
 	nr := 10
 	hlp := agreement.NewHelper(nr)
 	hash, _ := crypto.RandEntropy(32)
-	handler := agreement.NewHandler(hlp.Keys, *hlp.P)
+	handler := agreement.NewHandler(hlp.Keys, *hlp.P, []byte{0, 0, 0, 0})
 
 	evs := hlp.Spawn(hash)
 	for _, ev := range evs {
@@ -56,13 +56,14 @@ func TestAgreement(t *testing.T) {
 
 	agreementEvs := hlp.Spawn(blk.Header.Hash)
 	agreementChan := make(chan message.Message, 100)
+	aggrAgreementChan := make(chan message.Message, 100)
 
 	for _, aggro := range agreementEvs {
 		agreementChan <- message.New(topics.Agreement, aggro)
 	}
 
 	ctx := context.Background()
-	results := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(blk.Header.Hash))
+	results := loop.Run(ctx, consensus.NewQueue(), agreementChan, aggrAgreementChan, hlp.RoundUpdate(blk.Header.Hash))
 
 	assert.Equal(t, blk.Header.Hash, results.Blk.Header.Hash)
 }
@@ -84,6 +85,7 @@ func TestRequestor(t *testing.T) {
 
 	agreementEvs := hlp.Spawn(blk.Header.Hash)
 	agreementChan := make(chan message.Message, 100)
+	aggrAgreementChan := make(chan message.Message, 100)
 
 	for _, aggro := range agreementEvs {
 		agreementChan <- message.New(topics.Agreement, aggro)
@@ -97,7 +99,7 @@ func TestRequestor(t *testing.T) {
 	wg.Add(1)
 
 	go func() {
-		results := loop.Run(ctx, consensus.NewQueue(), agreementChan, hlp.RoundUpdate(blk.Header.Hash))
+		results := loop.Run(ctx, consensus.NewQueue(), agreementChan, aggrAgreementChan, hlp.RoundUpdate(blk.Header.Hash))
 
 		wg.Done()
 		resChan <- results

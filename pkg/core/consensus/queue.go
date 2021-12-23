@@ -7,9 +7,11 @@
 package consensus
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/sirupsen/logrus"
 )
 
@@ -106,17 +108,43 @@ func (eq *Queue) Clear(round uint64) {
 	eq.entries = newEntries
 }
 
-// Flush all events stored for a specific round from the queue, and return them.
+// Flush all events stored for a specific round from the queue, and return them
+// Messages are sorted giving priority to AggrAgreement and then to their step.
 func (eq *Queue) Flush(round uint64) []message.Message {
 	eq.lock.Lock()
 	defer eq.lock.Unlock()
 
 	if eq.entries[round] != nil {
 		events := make([]message.Message, 0)
-		for step, evs := range eq.entries[round] {
-			events = append(events, evs...)
+		evround := eq.entries[round]
+
+		steps := make([]uint8, 0, len(evround))
+		for k := range evround {
+			steps = append(steps, k)
+		}
+		// Give priority to oldest steps
+		sort.SliceStable(steps, func(i, j int) bool {
+			return steps[i] < steps[j]
+		})
+
+		for _, step := range steps {
+			events = append(events, evround[step]...)
 			eq.entries[round][step] = nil
 		}
+		// Give priority to AggrAgreement messages otherwise use previous step order
+		sort.SliceStable(events, func(i, j int) bool {
+			topic_i := events[i].Category()
+			if topic_i == topics.AggrAgreement {
+				if events[j].Category() != topics.AggrAgreement {
+					return true
+				}
+				return i < j
+			}
+			if events[j].Category() != topics.AggrAgreement {
+				return false
+			}
+			return i < j
+		})
 
 		eq.items -= len(events)
 		return events

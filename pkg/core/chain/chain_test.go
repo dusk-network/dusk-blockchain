@@ -153,7 +153,7 @@ func TestAcceptBlock(t *testing.T) {
 	cert.Step = 5
 	blk.Header.Certificate = cert
 
-	assert.NoError(c.AcceptBlock(*blk))
+	assert.NoError(c.acceptBlock(*blk))
 
 	// Should have `blk` as blockchain head now
 	assert.True(bytes.Equal(blk.Header.Hash, c.tip.Header.Hash))
@@ -213,6 +213,49 @@ func TestSyncProgress(t *testing.T) {
 	assert.Equal(resp.Progress, float32(50.0))
 }
 
+func TestFallbackProcedure(t *testing.T) {
+	// Set up a chain instance with mocking verifiers
+	_, chain := setupChainTest(t, 1)
+
+	// Accept block at height 1 with Certificate.Step = 6 (second iteration)
+	blk1 := helper.RandomBlock(1, 3)
+
+	cert1 := block.EmptyCertificate()
+	cert1.Step = 6
+	blk1.Header.Certificate = cert1
+
+	chain.ProcessBlockFromNetwork("", message.New(topics.Block, *blk1))
+
+	b, err := chain.loader.BlockAt(1)
+	assert.NoError(t, err)
+
+	// assert block was accepted successfully
+	assert.True(t, bytes.Equal(b.Header.Hash, blk1.Header.Hash))
+
+	// Enforce fallback procedure at block height 1
+	blk2 := helper.RandomBlock(1, 3)
+
+	cert2 := block.EmptyCertificate()
+	cert2.Step = 3 // (first iteration certificate)
+	blk2.Header.Certificate = cert2
+
+	chain.ProcessBlockFromNetwork("", message.New(topics.Block, *blk2))
+
+	b, err = chain.loader.BlockAt(1)
+	assert.NoError(t, err)
+
+	// assert block at height 1 has been rewritten from fallback procedure
+	assert.True(t, bytes.Equal(b.Header.Hash, blk2.Header.Hash))
+
+	// Ensure fallback will be canceled if blk is from higher iteration
+	chain.ProcessBlockFromNetwork("", message.New(topics.Block, *blk1))
+
+	b, err = chain.loader.BlockAt(1)
+	assert.NoError(t, err)
+
+	assert.True(t, bytes.Equal(b.Header.Hash, blk2.Header.Hash))
+}
+
 // mock a block which can be accepted by the chain.
 // note that this is only valid for height 1, as the certificate
 // is not checked on height 1 (for network bootstrapping)
@@ -223,6 +266,7 @@ func mockAcceptableBlock(prevBlock block.Block) *block.Block {
 	// Add cert and prev hash
 	blk.Header.Certificate = block.EmptyCertificate()
 	blk.Header.PrevBlockHash = prevBlock.Header.Hash
+	blk.Header.StateHash = make([]byte, 32)
 	return blk
 }
 
@@ -251,9 +295,9 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 	}
 	l := loop.New(e, &pk)
 
-	c, err := New(context.Background(), db, eb, loader, &MockVerifier{}, nil, proxy, l)
+	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, l)
 	assert.NoError(t, err)
 
-	go c.StartConsensus()
+	c.RestartConsensus()
 	return eb, c
 }

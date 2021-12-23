@@ -101,16 +101,20 @@ func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
+	if err := encoding.Write256(r, h.StateHash); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, h.TxRoot); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // MarshalHeader marshals the header of a block into a binary buffer.
 func MarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	if err := MarshalHashable(r, h); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(r, h.TxRoot); err != nil {
 		return err
 	}
 
@@ -149,6 +153,11 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 
 	h.Seed = make([]byte, 0)
 	if err := encoding.ReadVarBytes(r, &h.Seed); err != nil {
+		return err
+	}
+
+	h.StateHash = make([]byte, 32)
+	if err := encoding.Read256(r, h.StateHash); err != nil {
 		return err
 	}
 

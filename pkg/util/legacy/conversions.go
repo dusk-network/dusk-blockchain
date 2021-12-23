@@ -21,6 +21,7 @@ func ProvisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
 	for _, n := range p.Members {
 		ruskProvisioners[i] = new(rusk.Provisioner)
 		ruskProvisioners[i].PublicKeyBls = n.PublicKeyBLS
+		ruskProvisioners[i].RawPublicKeyBls = n.RawPublicKeyBLS
 		ruskProvisioners[i].Stakes = make([]*rusk.Stake, len(n.Stakes))
 
 		for j, s := range n.Stakes {

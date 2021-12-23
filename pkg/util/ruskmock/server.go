@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -32,7 +33,7 @@ var log = logrus.WithField("process", "mock rusk server")
 
 const (
 	stateTransitionDelay = 1 * time.Second
-	stakeGracePeriod     = 2
+	stakeGracePeriod     = 10
 )
 
 // Server is a stand-in Rusk server, which can be used during any kind of
@@ -43,7 +44,9 @@ type Server struct {
 	cfg *Config
 	s   *grpc.Server
 
-	p  *user.Provisioners
+	p      *user.Provisioners
+	height uint64
+
 	db *BuntStore
 }
 
@@ -71,26 +74,43 @@ func New(cfg *Config, c config.Registry) (*Server, error) {
 	registerGRPCServers(grpcServer, srv)
 	srv.s = grpcServer
 
-	return srv, srv.bootstrapBlockchain()
+	if err := srv.bootstrapBlockchain(); err != nil {
+		panic(err)
+	}
+
+	return srv, nil
 }
 
 func (s *Server) bootstrapBlockchain() error {
 	log.Infoln("bootstrapping blockchain")
 
-	// Reconstruct Genesis Provisioners
-	g := config.DecodeGenesis()
-	if err := chain.ReconstructCommittee(s.p, g); err != nil {
-		return err
+	provisioners, errFetch := s.db.FetchProvisioners()
+	if errFetch != nil {
+		provisioners = user.NewProvisioners()
+
+		// Could not restore provisioners from DB.
+		// Then we should regenerate DB from Genesis block.
+
+		// Reconstruct Genesis Provisioners
+		g := config.DecodeGenesis()
+		if err := chain.ReconstructCommittee(provisioners, g); err != nil {
+			return fmt.Errorf("couldn't reconstruct genesis committee: %v", err)
+		}
+
+		if err := s.db.PersistStakeContractAndHeight(provisioners, 0); err != nil {
+			return fmt.Errorf("couldn't persist genesis committee: %v", err)
+		}
 	}
 
-	provisioners, err := s.db.FetchProvisioners()
-	if err == nil {
-		s.p = provisioners
-	} else {
-		// Could not fetch any provisioners from DB.
-		// Then we should update.
-		_ = s.db.StoreProvisioners(s.p)
+	h, err := s.db.FetchHeight()
+	if err != nil {
+		return fmt.Errorf("couldn't fetch height: %v", err)
 	}
+
+	log.WithField("height", h).Info("network state initialized")
+
+	s.height = h
+	s.p = provisioners
 
 	return nil
 }
@@ -99,11 +119,8 @@ func registerGRPCServers(grpcServer *grpc.Server, srv *Server) {
 	log.Debugln("registering GRPC services")
 	rusk.RegisterStateServer(grpcServer, srv)
 	rusk.RegisterKeysServer(grpcServer, srv)
-	rusk.RegisterBlindBidServiceServer(grpcServer, srv)
-	rusk.RegisterBidServiceServer(grpcServer, srv)
 	rusk.RegisterTransferServer(grpcServer, srv)
 	rusk.RegisterStakeServiceServer(grpcServer, srv)
-	rusk.RegisterWalletServer(grpcServer, srv)
 	log.Debugln("GRPC services registered")
 }
 
@@ -132,51 +149,75 @@ func (s *Server) Serve(network, url string) error {
 	return nil
 }
 
-// VerifyStateTransition simulates a state transition validation. The outcome is dictated
-// by the server configuration.
+// VerifyStateTransition simulates a state transition validation.
 func (s *Server) VerifyStateTransition(ctx context.Context, req *rusk.VerifyStateTransitionRequest) (*rusk.VerifyStateTransitionResponse, error) {
-	log.Infoln("call received to VerifyStateTransition")
+	log.WithField("block_gas_limit", req.BlockGasLimit).
+		WithField("block_height", req.BlockHeight).
+		Infoln("call received to VerifyStateTransition")
+
 	defer log.Infoln("finished call to VerifyStateTransition")
 
 	time.Sleep(stateTransitionDelay)
 
-	if !s.cfg.PassStateTransitionValidation {
-		indices := make([]uint64, len(req.Txs))
-		for i := range indices {
-			indices[i] = uint64(i)
-		}
-
-		return &rusk.VerifyStateTransitionResponse{
-			FailedCalls: indices,
-		}, nil
-	}
-
 	return &rusk.VerifyStateTransitionResponse{
-		FailedCalls: make([]uint64, 0),
+		Success: true,
 	}, nil
 }
 
-// ExecuteStateTransition simulates a state transition. The outcome is dictated by the server
-// configuration.
+// ExecuteStateTransition mocks a dry-run state transition.
 func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
-	log.Infoln("call received to ExecuteStateTransition")
+	log.WithField("block_gas_limit", req.BlockGasLimit).
+		WithField("block_height", req.BlockHeight).
+		Infoln("call received to ExecuteStateTransition")
+
 	defer log.Infoln("finished call to ExecuteStateTransition")
 
 	time.Sleep(stateTransitionDelay)
 
-	if !s.cfg.PassStateTransition {
-		return &rusk.ExecuteStateTransitionResponse{
-			Success: s.cfg.PassStateTransition,
-		}, nil
-	}
+	// Mock service always return full set of passed txs
+	return &rusk.ExecuteStateTransitionResponse{
+		Txs:       req.Txs,
+		StateRoot: make([]byte, 32),
+		Success:   true,
+	}, nil
+}
 
-	if err := s.addConsensusNodes(req.Txs, req.Height); err != nil {
+// Accept implements a mock Finalize.
+func (s *Server) Accept(ctx context.Context, req *rusk.AcceptRequest) (*rusk.AcceptResponse, error) {
+	log.WithField("height", s.height).Infoln("call received to ExecuteStateTransition")
+	defer log.Infoln("finished call to ExecuteStateTransition")
+
+	time.Sleep(stateTransitionDelay)
+
+	if err := s.addConsensusNodes(req.Txs, req.BlockHeight); err != nil {
 		log.WithError(err).Errorln("could not add consensus nodes")
 		return nil, err
 	}
 
-	return &rusk.ExecuteStateTransitionResponse{
-		Success: s.cfg.PassStateTransition,
+	return &rusk.AcceptResponse{
+		Success:   s.cfg.PassStateTransition,
+		StateRoot: make([]byte, 32),
+	}, nil
+}
+
+// Finalize implements a mock Finalize.
+func (s *Server) Finalize(ctx context.Context, req *rusk.FinalizeRequest) (*rusk.FinalizeResponse, error) {
+	log.WithField("height", s.height).
+		WithField("state_root", util.StringifyBytes(req.StateRoot)).
+		Infoln("call received to ExecuteStateTransition")
+
+	defer log.Infoln("finished call to ExecuteStateTransition")
+
+	time.Sleep(stateTransitionDelay)
+
+	if err := s.addConsensusNodes(req.Txs, req.BlockHeight); err != nil {
+		log.WithError(err).Errorln("could not add consensus nodes")
+		return nil, err
+	}
+
+	return &rusk.FinalizeResponse{
+		Success:   true,
+		StateRoot: make([]byte, 32),
 	}, nil
 }
 
@@ -195,10 +236,42 @@ func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersR
 	}, nil
 }
 
+// GetEphemeralStateRoot returns the current set of provisioners.
+func (s *Server) GetEphemeralStateRoot(ctx context.Context, req *rusk.GetEphemeralStateRootRequest) (*rusk.GetEphemeralStateRootResponse, error) {
+	log.Infoln("call received to GetEphemeralStateRoot")
+	defer log.Infoln("finished call to GetEphemeralStateRoot")
+
+	return &rusk.GetEphemeralStateRootResponse{
+		StateRoot: make([]byte, 32),
+	}, nil
+}
+
+// GetFinalizedStateRoot returns the current set of provisioners.
+func (s *Server) GetFinalizedStateRoot(ctx context.Context, req *rusk.GetFinalizedStateRootRequest) (*rusk.GetFinalizedStateRootResponse, error) {
+	log.Infoln("call received to GetFinalizedStateRoot")
+	defer log.Infoln("finished call to GetFinalizedStateRoot")
+
+	return &rusk.GetFinalizedStateRootResponse{
+		StateRoot: make([]byte, 32),
+	}, nil
+}
+
+// Echo returns the current set of provisioners.
+func (s *Server) Echo(ctx context.Context, req *rusk.EchoRequest) (*rusk.EchoResponse, error) {
+	log.Infoln("call received to Echo")
+	defer log.Infoln("finished call to Echo")
+
+	return &rusk.EchoResponse{
+		Message: "echo",
+	}, nil
+}
+
 func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) error {
 	log.Debugln("adding consensus nodes")
 
-	var added bool
+	p := s.p.Copy()
+
+	var updated bool
 
 	for _, tx := range txs {
 		if tx.Type == uint32(transactions.Stake) {
@@ -218,48 +291,41 @@ func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) 
 
 			// Add grace period for stakes.
 			stakeStartHeight := startHeight + stakeGracePeriod
-			if err := s.p.Add(pk, value, stakeStartHeight, startHeight+lock-2); err != nil {
+			if err := p.Add(pk, value, stakeStartHeight, startHeight+lock-2); err != nil {
 				return err
 			}
 
-			added = true
+			updated = true
 
 			log.WithFields(logrus.Fields{
 				"BLS key":      util.StringifyBytes(pk),
+				"Raw BLS key":  util.StringifyBytes(p.GetRawPublicKeyBLS(pk)),
 				"amount":       value,
 				"start height": stakeStartHeight,
 				"end height":   startHeight + lock - 2,
-			}).Debugln("added provisioner")
+			}).Infoln("added provisioner")
 		}
 	}
 
-	if added {
-		log.WithField("size", s.p.Set.Len()).Debugln("update provisioners db")
+	if updated {
+		log.WithField("size", p.Set.Len()).Infoln("update provisioners db")
 		// New provisioners added on last block.
 		// Update ondisk copy of provisioners.
-		return s.db.StoreProvisioners(s.p)
+		if err := s.db.PersistStakeContractAndHeight(&p, startHeight); err != nil {
+			return err
+		}
+
+		s.p = &p
+	} else {
+		// No new provisioners added, update height field only
+		if err := s.db.PersistHeight(startHeight); err != nil {
+			return err
+		}
 	}
 
+	s.height = startHeight
+
 	return nil
-}
-
-// GenerateScore returns a mocked Score.
-// We do this entirely randomly, as score verification is completely up to
-// the server configuration. This makes it easier for us to test different
-// scenarios, and it greatly simplifies the bootstrapping of a network.
-func (s *Server) GenerateScore(ctx context.Context, req *rusk.GenerateScoreRequest) (*rusk.GenerateScoreResponse, error) {
-	log.Infoln("call received to GenerateScore")
-	defer log.Infoln("finished call to GenerateScore")
-
-	return nil, nil
-}
-
-// VerifyScore will return either true or false, depending on the server configuration.
-func (s *Server) VerifyScore(ctx context.Context, req *rusk.VerifyScoreRequest) (*rusk.VerifyScoreResponse, error) {
-	log.Infoln("call received to VerifyScore")
-	defer log.Infoln("finished call to VerifyScore")
-
-	return nil, nil
 }
 
 // GenerateKeys returns the server's wallet private key, and a stealth address.
@@ -389,23 +455,6 @@ func (s *Server) NewStake(ctx context.Context, req *rusk.StakeTransactionRequest
 	}, nil
 }
 
-// NewBid creates a bidding transaction and returns it to the caller.
-func (s *Server) NewBid(ctx context.Context, req *rusk.BidTransactionRequest) (*rusk.BidTransaction, error) {
-	log.Infoln("call received to NewBid")
-	defer log.Infoln("finished call to NewBid")
-
-	return nil, nil
-}
-
-// FindBid will return all of the bids for a given stealth address.
-// TODO: implement.
-func (s *Server) FindBid(ctx context.Context, req *rusk.FindBidRequest) (*rusk.BidList, error) {
-	log.Infoln("call received to FindBid")
-	defer log.Infoln("finished call to FindBid")
-
-	return nil, nil
-}
-
 // FindStake will return a stake for a given public key.
 // TODO: Implement.
 func (s *Server) FindStake(ctx context.Context, req *rusk.FindStakeRequest) (*rusk.FindStakeResponse, error) {
@@ -413,18 +462,6 @@ func (s *Server) FindStake(ctx context.Context, req *rusk.FindStakeRequest) (*ru
 	defer log.Infoln("finished call to FindStake")
 
 	return nil, nil
-}
-
-// GetBalance locked and unlocked balance values per a ViewKey.
-func (s *Server) GetBalance(ctx context.Context, req *rusk.GetBalanceRequest) (*rusk.GetWalletBalanceResponse, error) {
-	log.Infoln("call received to GetBalance")
-	defer log.Infoln("finished call to GetBalance")
-
-	resp := new(rusk.GetWalletBalanceResponse)
-
-	resp.LockedBalance = 0
-	resp.UnlockedBalance = 0
-	return resp, nil
 }
 
 // Stop the rusk mock server.

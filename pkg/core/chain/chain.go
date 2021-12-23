@@ -9,6 +9,7 @@ package chain
 import (
 	"bytes"
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -25,12 +26,20 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/sirupsen/logrus"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
-var log = logger.WithFields(logger.Fields{"process": "chain"})
+var (
+	errInvalidStateHash = errors.New("invalid state hash")
+	log                 = logger.WithFields(logger.Fields{"process": "chain"})
+)
+
+// ErrBlockAlreadyAccepted block already known by blockchain state.
+var ErrBlockAlreadyAccepted = errors.New("discarded block from the past")
 
 // TODO: This Verifier/Loader interface needs to be re-evaluated and most likely
 // renamed. They don't make too much sense on their own (the `Loader` also
@@ -62,21 +71,11 @@ type Loader interface {
 	Append(*block.Block) error
 }
 
-// Ledger is the Chain interface used in tests.
-type Ledger interface {
-	TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error
-	TryNextConsecutiveBlockOutSync(blk block.Block, targetSyncHeight uint64, kadcastHeight byte) error
-
-	StartConsensus()
-	StopConsensus()
-
-	ProcessSyncTimerExpired(strPeerAddr string) error
-}
-
 // Chain represents the nodes blockchain.
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	eventBus *eventbus.EventBus
+	rpcBus   *rpcbus.RPCBus
 	db       database.DB
 
 	// loader abstracts away the persistence aspect of Block operations.
@@ -95,7 +94,7 @@ type Chain struct {
 	// Consensus loop.
 	loop              *loop.Consensus
 	stopConsensusChan chan struct{}
-	id                uint64
+	loopID            uint64
 
 	// Syncing related things.
 	*synchronizer
@@ -109,9 +108,11 @@ type Chain struct {
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
 // from (remote) consensus components.
-func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus) (*Chain, error) {
+func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus,
+	loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus) (*Chain, error) {
 	chain := &Chain{
 		eventBus:          eventBus,
+		rpcBus:            rpcBus,
 		db:                db,
 		loader:            loader,
 		verifier:          verifier,
@@ -156,19 +157,34 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	var kadcastHeight byte = 255
+	l := log.WithField("recv_blk_h", blk.Header.Height).WithField("curr_h", c.tip.Header.Height)
+
+	var kh byte = 255
 	if len(m.Header()) > 0 {
-		kadcastHeight = m.Header()[0]
-		log.WithField("blk_height", blk.Header.Height).WithField("kadcast", kadcastHeight).
-			Trace("received block")
-	} else {
-		log.WithField("blk_height", blk.Header.Height).Trace("received block")
+		kh = m.Header()[0]
+		l = l.WithField("kad_h", kh)
 	}
 
-	// Is it worth looking at this?
-	if blk.Header.Height <= c.tip.Header.Height {
-		log.WithField("curr_h", c.tip.Header.Height).WithField("blk_height", blk.Header.Height).
-			Debug("discarded block from the past")
+	l.Trace("block received")
+
+	switch {
+	case blk.Header.Height == c.tip.Header.Height:
+		{
+			// Check if we already accepted this block
+			if bytes.Equal(blk.Header.Hash, c.tip.Header.Hash) {
+				l.WithError(ErrBlockAlreadyAccepted).Debug("failed block processing")
+				return nil, nil
+			}
+
+			// Try to fallback
+			if err := c.tryFallback(blk); err != nil {
+				l.WithError(err).Error("failed fallback procedure")
+			}
+
+			return nil, nil
+		}
+	case blk.Header.Height < c.tip.Header.Height:
+		l.WithError(ErrBlockAlreadyAccepted).Debug("failed block processing")
 		return nil, nil
 	}
 
@@ -176,45 +192,69 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 		c.highestSeen = blk.Header.Height
 	}
 
-	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kadcastHeight)
+	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kh)
 }
 
 // TryNextConsecutiveBlockOutSync is the processing path for accepting a block
 // from the network during out-of-sync state.
-func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, targetSyncHeight uint64, kadcastHeight byte) error {
+func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting sync block")
+	return c.acceptBlock(blk)
+}
 
-	if err := c.acceptBlock(blk); err != nil {
+// TryNextConsecutiveBlockInSync is the processing path for accepting a block
+// from the network during in-sync state. Returns err if the block is not valid.
+func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error {
+	// Make an attempt to accept a new block. If succeeds, we could safely restart the Consensus Loop.
+	// If not, peer reputation score should be decreased.
+	if err := c.acceptSuccessiveBlock(blk, kadcastHeight); err != nil {
 		return err
 	}
 
-	// If node is in OutSync mode, we drop consensus only if Peer provides us
-	// with a fully valid next block.
-	c.StopConsensus()
-
-	// Start a Consensus loop when the block at targetSyncHeight has been
-	// accepted successfully.
-	if targetSyncHeight == blk.Header.Height {
-		go c.StartConsensus()
+	// Consensus needs a fresh restart so that it is initialized with most
+	// recent round update which is Chain tip and the list of active Provisioners.
+	if err := c.RestartConsensus(); err != nil {
+		log.WithError(err).Error("failed to start consensus loop")
 	}
 
 	return nil
 }
 
-// TryNextConsecutiveBlockInSync is the processing path for accepting a block
-// from the network during in-sync state.
-func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error {
-	c.StopConsensus()
+// TryNextConsecutiveBlockIsValid makes an attempt to validate a blk without
+// changing any state.
+// returns error if the block is invalid to current blockchain tip.
+func (c *Chain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
+	fields := logger.Fields{
+		"event":    "check_block",
+		"height":   blk.Header.Height,
+		"hash":     util.StringifyBytes(blk.Header.Hash),
+		"curr_h":   c.tip.Header.Height,
+		"prov_num": c.p.Set.Len(),
+	}
 
-	// Make an attempt to accept new block.
-	// If fails, we still need to recover Consensus Loop.
-	err := c.acceptSuccessiveBlock(blk, kadcastHeight)
+	l := log.WithFields(fields)
 
-	// Consensus needs a fresh restart so that it is initialized with most
-	// recent round update (Chain Tip and List of active Provisioners)
-	go c.StartConsensus()
+	return c.isValidBlock(blk, l)
+}
 
-	return err
+// ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
+// It implements transition back to inSync state.
+// strPeerAddr is the address of the peer initiated the syncing but failed to deliver.
+func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
+	log.WithField("curr", c.tip.Header.Height).
+		WithField("src_addr", strPeerAddr).Warn("sync timer expired")
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if err := c.RestartConsensus(); err != nil {
+		log.WithError(err).Warn("sync timer could not restart consensus loop")
+	}
+
+	log.WithField("state", "inSync").Traceln("change sync state")
+
+	c.state = c.inSync
+	return nil
 }
 
 // acceptSuccessiveBlock will accept a block which directly follows the chain
@@ -238,65 +278,140 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 	return nil
 }
 
+func (c *Chain) runStateTransition(tipBlk, blk block.Block) error {
+	var (
+		respStateHash       []byte
+		provisionersUpdated user.Provisioners
+		err                 error
+		provisionersCount   int
+
+		fields = logger.Fields{
+			"event":  "accept_block",
+			"height": blk.Header.Height,
+			"hash":   util.StringifyBytes(blk.Header.Hash),
+			"curr_h": c.tip.Header.Height,
+		}
+
+		l = log.WithFields(fields)
+	)
+
+	if err = c.sanityCheckStateHash(); err != nil {
+		return err
+	}
+
+	provisionersCount = c.p.Set.Len()
+	l.WithField("prov", provisionersCount).Info("run state transition")
+
+	switch blk.Header.Certificate.Step {
+	case 3:
+		// Finalized block. first iteration consensus agreement.
+		provisionersUpdated, respStateHash, err = c.proxy.Executor().Finalize(c.ctx, blk.Txs, tipBlk.Header.StateHash, blk.Header.Height)
+		if err != nil {
+			l.WithError(err).Error("Error in executing the state transition")
+			return err
+		}
+	default:
+		// Tentative block. non-first iteration consensus agreement.
+		provisionersUpdated, respStateHash, err = c.proxy.Executor().Accept(c.ctx, blk.Txs, tipBlk.Header.StateHash, blk.Header.Height)
+		if err != nil {
+			l.WithError(err).Error("Error in executing the state transition")
+			return err
+		}
+	}
+
+	// Sanity check to ensure accepted block state_hash is the same as the one Finalize/Accept returned.
+	if !bytes.Equal(respStateHash, blk.Header.StateHash) {
+		log.WithField("rusk", util.StringifyBytes(respStateHash)).WithField("node", util.StringifyBytes(blk.Header.StateHash)).WithError(errInvalidStateHash).Error("inconsistency with state_hash")
+
+		return errInvalidStateHash
+	}
+
+	// Update the provisioners.
+	// blk.Txs may bring new provisioners to the current state
+	c.p = &provisionersUpdated
+
+	l.WithField("prov", c.p.Set.Len()).WithField("added", c.p.Set.Len()-provisionersCount).WithField("state_hash", util.StringifyBytes(respStateHash)).
+		Info("state transition completed")
+
+	return nil
+}
+
+// sanityCheckStateHash ensures most recent local statehash and rusk statehash are the same.
+func (c *Chain) sanityCheckStateHash() error {
+	// Ensure that both (co-deployed) services node and rusk are on the same
+	// state. If not, we should trigger a recovery procedure so both are
+	// always synced up.
+	ruskStateHash, err := c.proxy.Executor().GetEphemeralStateRoot(c.ctx)
+	if err != nil {
+		return err
+	}
+
+	nodeStateHash := c.tip.Header.StateHash
+
+	if !bytes.Equal(nodeStateHash, ruskStateHash) || len(nodeStateHash) == 0 {
+		log.WithField("rusk", util.StringifyBytes(ruskStateHash)).
+			WithError(errInvalidStateHash).
+			WithField("node", util.StringifyBytes(nodeStateHash)).
+			Error("check state_hash failed")
+
+		return errInvalidStateHash
+	}
+
+	return nil
+}
+
+func (c *Chain) isValidBlock(blk block.Block, l *logrus.Entry) error {
+	l.Debug("verifying block")
+	// Check that stateless and stateful checks pass
+	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
+		l.WithError(err).Error("block verification failed")
+		return err
+	}
+
+	// Check the certificate
+	// This check should avoid a possible race condition between accepting two blocks
+	// at the same height, as the probability of the committee creating two valid certificates
+	// for the same round is negligible.
+	l.Debug("verifying block certificate")
+
+	var err error
+	if err = verifiers.CheckBlockCertificate(*c.p, blk, c.tip.Header.Seed); err != nil {
+		l.WithError(err).Error("certificate verification failed")
+		return err
+	}
+
+	return nil
+}
+
 // acceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved.
 func (c *Chain) acceptBlock(blk block.Block) error {
 	fields := logger.Fields{
-		"event":  "accept_block",
-		"height": blk.Header.Height,
-		"hash":   util.StringifyBytes(blk.Header.Hash),
-		"curr_h": c.tip.Header.Height,
+		"event":    "accept_block",
+		"height":   blk.Header.Height,
+		"hash":     util.StringifyBytes(blk.Header.Hash),
+		"curr_h":   c.tip.Header.Height,
+		"prov_num": c.p.Set.Len(),
 	}
 
 	l := log.WithFields(fields)
+	var err error
 
-	l.Trace("verifying block")
-	// 1. Check that stateless and stateful checks pass
-	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
-		l.WithError(err).Error("block verification failed")
+	// 1. Ensure block fields and certificate are valid
+	if err = c.isValidBlock(blk, l); err != nil {
+		l.WithError(err).Error("invalid block error")
 		return err
 	}
 
-	// 2. Check the certificate
-	// This check should avoid a possible race condition between accepting two blocks
-	// at the same height, as the probability of the committee creating two valid certificates
-	// for the same round is negligible.
-	l.Trace("verifying block certificate")
-
-	prov_num := c.p.Set.Len()
-
-	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
-		l.WithError(err).WithField("provisioners", prov_num).
-			Error("certificate verification failed")
+	// 2. Perform State Transition to update Contract Storage with Tentative or Finalized state.
+	if err = c.runStateTransition(*c.tip, blk); err != nil {
+		l.WithError(err).Error("execute state transition failed")
 		return err
 	}
 
-	// 3. Call ExecuteStateTransitionFunction
-
-	l.WithField("provisioners", prov_num).Info("run state transition")
-
-	// TODO: the context here should maybe used to set a timeout
-	provisioners, err := c.proxy.Executor().ExecuteStateTransition(c.ctx, blk.Txs, blk.Header.Height)
-	if err != nil {
-		l.WithError(err).Error("Error in executing the state transition")
-		return err
-	}
-
-	// Update the provisioners as blk.Txs may bring new provisioners to the current state
-	c.p = &provisioners
-	c.tip = &blk
-
-	l.WithField("provisioners", c.p.Set.Len()).
-		WithField("added", c.p.Set.Len()-prov_num).
-		Info("state transition completed")
-
-	if config.Get().API.Enabled {
-		go c.storeStakesInStormDB(blk.Header.Height)
-	}
-
-	// 4. Store the approved block
+	// 3. Store the approved block and update in-memory chain tip
 	l.Debug("storing block")
 
 	if err := c.loader.Append(&blk); err != nil {
@@ -304,38 +419,61 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 		return err
 	}
 
-	if err := c.db.Update(func(t database.Transaction) error {
-		return t.ClearCandidateMessages()
-	}); err != nil {
-		l.WithError(err).Error("candidate deletion failed")
-		return err
-	}
+	c.tip = &blk
 
-	// 6. Notify other subsystems for the accepted block
+	// 5. Perform all post-events on accepting a block
+	c.postAcceptBlock(blk, l)
+
+	return nil
+}
+
+// postAcceptBlock performs all post-events on accepting a block.
+func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
+	// 1. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
-	l.Trace("notifying internally")
+	l.Debug("notifying internally")
 
 	msg := message.New(topics.AcceptedBlock, blk)
 	errList := c.eventBus.Publish(topics.AcceptedBlock, msg)
 
-	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
-	l.Trace("procedure ended")
+	// 2. Clear obsolete Candidate blocks
+	if err := c.db.Update(func(t database.Transaction) error {
+		return t.ClearCandidateMessages()
+	}); err != nil {
+		// failure here should not be treated as critical
+		l.WithError(err).Warn("candidate deletion failed")
+	}
 
-	return nil
+	// 3. Update Storm DB
+	if config.Get().API.Enabled {
+		go c.storeStakesInStormDB(blk.Header.Height)
+	}
+
+	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
+	l.Debug("procedure ended")
 }
 
 // VerifyCandidateBlock can be used as a callback for the consensus in order to
 // verify potential winning candidates.
 func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
+	var chainTip block.Block
+
+	c.lock.Lock()
+	chainTip = c.tip.Copy().(block.Block)
+	c.lock.Unlock()
+
 	// We first perform a quick check on the Block Header and
-	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
+	if err := c.verifier.SanityCheckBlock(chainTip, blk); err != nil {
 		return err
 	}
 
-	// TODO: consider using the context for timeouts
-	_, err := c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, blk.Header.Height)
-	return err
+	return c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, config.BlockGasLimit, blk.Header.Height)
+}
+
+// ExecuteStateTransition calls Rusk ExecuteStateTransitiongrpc method.
+func (c *Chain) ExecuteStateTransition(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64) ([]transactions.ContractCall, []byte, error) {
+	return c.proxy.Executor().ExecuteStateTransition(c.ctx, txs, config.BlockGasLimit, blockHeight)
 }
 
 // propagateBlock send inventory message to all peers in gossip network or rebroadcast block in kadcast network.
@@ -464,24 +602,4 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 	if err != nil {
 		log.Warn("Could not store provisioners on memoryDB")
 	}
-}
-
-// ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
-// It implements transition back to inSync state.
-// strPeerAddr is the address of the peer initiated the syncing but failed to deliver.
-func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
-	log.WithField("curr", c.tip.Header.Height).
-		WithField("src_addr", strPeerAddr).Warn("sync timer expired")
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	// Recover Consensus loop
-	// TODO: Ensure no double-loop problem here
-	go c.StartConsensus()
-
-	log.WithField("state", "inSync").Traceln("change sync state")
-
-	c.state = c.inSync
-	return nil
 }

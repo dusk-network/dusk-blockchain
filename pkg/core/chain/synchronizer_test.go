@@ -84,11 +84,15 @@ func (m *mockChain) TryNextConsecutiveBlockOutSync(_ block.Block, _ byte) error 
 	return nil
 }
 
-func (m *mockChain) ProduceBlock() error {
+func (m *mockChain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
 	return nil
 }
 
-func (m *mockChain) StopBlockProduction() {}
+func (m *mockChain) RestartConsensus() error {
+	return nil
+}
+
+func (m *mockChain) StopConsensus() {}
 
 func (m *mockChain) ProcessSyncTimerExpired(string) error {
 	return nil

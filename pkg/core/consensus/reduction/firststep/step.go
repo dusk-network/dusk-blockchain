@@ -86,7 +86,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 		tlog.Traceln("ending first reduction step")
 	}()
 
-	p.handler = reduction.NewHandler(p.Keys, r.P)
+	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
@@ -111,6 +111,9 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
 			if sv := p.collectReduction(ctx, rMsg, r.Round, step); sv != nil {
+				go func() {
+					<-timeoutChan
+				}()
 				return p.next.Initialize(*sv)
 			}
 		}

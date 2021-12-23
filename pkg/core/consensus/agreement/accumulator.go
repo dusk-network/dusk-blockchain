@@ -8,6 +8,7 @@ package agreement
 
 import (
 	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	log "github.com/sirupsen/logrus"
@@ -62,11 +63,13 @@ func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
 		hdr := ev.State()
 
+		// Obtain corresponding block agreement cache given its hash
 		var s *store
 		if s = a.storeMap.getStoreByHash(hdr.BlockHash); s == nil {
 			s = a.storeMap.makeStoreByHash(hdr.BlockHash)
 		}
 
+		// Try to add agreement to our cache
 		collected := s.Get(hdr.Step)
 		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 
@@ -77,16 +80,27 @@ func (a *Accumulator) Accumulate() {
 		}
 
 		lg.WithFields(log.Fields{
-			"step":   ev.State().Step,
-			"round":  ev.State().Round,
-			"count":  count,
-			"quorum": a.handler.Quorum(hdr.Round),
-			"len":    a.storeMap.len(),
-		}).Info("collected agreement")
+			"step":       ev.State().Step,
+			"round":      ev.State().Round,
+			"aggr_count": count,
+			"quorum":     a.handler.Quorum(hdr.Round),
+			"hash_count": a.storeMap.len(),
+		}).Debug("collected agreement")
 
 		if count >= a.handler.Quorum(hdr.Round) {
 			votes := s.Get(hdr.Step)
 			a.CollectedVotesChan <- votes
+
+			lg.WithFields(log.Fields{
+				"step":        ev.State().Step,
+				"round":       ev.State().Round,
+				"aggr_count":  count,
+				"quorum":      a.handler.Quorum(hdr.Round),
+				"hash_count":  a.storeMap.len(),
+				"steps_count": s.Len(),
+				"duration":    time.Now().Unix() - s.CreatedAt(),
+			}).Info("quorum reached")
+
 			return
 		}
 	}

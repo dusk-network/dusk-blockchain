@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/bls12_381-sign-go/bls"
+	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -30,6 +30,13 @@ func RandomBlock(height uint64, txBatchCount uint16) *block.Block {
 	// Append a coinbase to the end, like a valid block should
 	dist := transactions.RandDistributeTx(config.GeneratorReward, 2)
 	b.Txs = append(b.Txs, dist)
+
+	txRoot, err := b.CalculateRoot()
+	if err != nil {
+		panic(err)
+	}
+
+	b.Header.TxRoot = txRoot
 
 	hash, err := b.CalculateHash()
 	if err != nil {
@@ -96,6 +103,7 @@ func RandomHeader(height uint64) *block.Header {
 		PrevBlockHash: transactions.Rand32Bytes(),
 		Seed:          RandomBLSSignature(),
 		TxRoot:        transactions.Rand32Bytes(),
+		StateHash:     make([]byte, 32),
 
 		Certificate: RandomCertificate(),
 	}

@@ -262,6 +262,8 @@ func Unmarshal(b *bytes.Buffer, h []byte) (Message, error) {
 		err = UnmarshalReductionMessage(b, msg)
 	case topics.Agreement:
 		err = UnmarshalAgreementMessage(b, msg)
+	case topics.AggrAgreement:
+		err = UnmarshalAggrAgreementMessage(b, msg)
 	case topics.Challenge:
 		UnmarshalChallengeMessage(b, msg)
 	case topics.Response:
@@ -356,6 +358,10 @@ func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) 
 	case topics.Agreement:
 		agreement := payload.(Agreement)
 		err = MarshalAgreement(buf, agreement)
+	case topics.AggrAgreement:
+		aggr := payload.(AggrAgreement)
+		err = MarshalAggrAgreement(buf, aggr)
+
 	default:
 		return fmt.Errorf("unsupported marshaling of message type: %v", topic.String())
 	}

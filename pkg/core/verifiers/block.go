@@ -17,8 +17,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
+// ErrPrevBlockHash Previous block hash does not equal the previous hash in the current block.
+var ErrPrevBlockHash = errors.New("Previous block hash does not equal the previous hash in the current block")
+
 // CheckBlockCertificate ensures that the block certificate is valid.
-func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) error {
+func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block, seed []byte) error {
 	// TODO: this should be set back to 1, once we fix this issue:
 	// https://github.com/dusk-network/dusk-blockchain/issues/925
 	if blk.Header.Height < 2 {
@@ -34,19 +37,19 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 	stepTwoBatchedSig := blk.Header.Certificate.StepTwoBatchedSig
 
 	// Now, check the certificate's correctness for both reduction steps
-	if err := checkBlockCertificateForStep(stepOneBatchedSig, blk.Header.Certificate.StepOneCommittee, blk.Header.Height, stepOne, provisioners, blk.Header.Hash); err != nil {
+	if err := checkBlockCertificateForStep(stepOneBatchedSig, blk.Header.Certificate.StepOneCommittee, blk.Header.Height, stepOne, provisioners, blk.Header.Hash, seed); err != nil {
 		return err
 	}
 
-	return checkBlockCertificateForStep(stepTwoBatchedSig, blk.Header.Certificate.StepTwoCommittee, blk.Header.Height, stepTwo, provisioners, blk.Header.Hash)
+	return checkBlockCertificateForStep(stepTwoBatchedSig, blk.Header.Certificate.StepTwoCommittee, blk.Header.Height, stepTwo, provisioners, blk.Header.Hash, seed)
 }
 
-func checkBlockCertificateForStep(batchedSig []byte, bitSet uint64, round uint64, step uint8, provisioners user.Provisioners, blockHash []byte) error {
+func checkBlockCertificateForStep(batchedSig []byte, bitSet uint64, round uint64, step uint8, provisioners user.Provisioners, blockHash, seed []byte) error {
 	size := committeeSize(provisioners.SubsetSizeAt(round))
-	committee := provisioners.CreateVotingCommittee(round, step, size)
+	committee := provisioners.CreateVotingCommittee(seed, round, step, size)
 	subcommittee := committee.IntersectCluster(bitSet)
 
-	apk, err := agreement.ReconstructApk(subcommittee.Set)
+	apk, err := agreement.AggregatePks(&provisioners, subcommittee.Set)
 	if err != nil {
 		return err
 	}
@@ -73,7 +76,7 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 
 	// blk.Headerhash = prevHeaderHash
 	if !bytes.Equal(blk.Header.PrevBlockHash, prevBlock.Header.Hash) {
-		return errors.New("Previous block hash does not equal the previous hash in the current block")
+		return ErrPrevBlockHash
 	}
 
 	// blk.Headerheight = prevHeaderHeight +1

@@ -24,16 +24,19 @@ type Handler struct {
 	key.Keys
 	Provisioners user.Provisioners
 	Committees   []user.VotingCommittee
-	lock         sync.RWMutex
+	seed         []byte
+
+	lock sync.RWMutex
 }
 
 // NewHandler creates a new committee.Handler by instantiating the committee
 // slice, setting the keys and setting the Provisioner set.
-func NewHandler(keys key.Keys, p user.Provisioners) *Handler {
+func NewHandler(keys key.Keys, p user.Provisioners, seed []byte) *Handler {
 	return &Handler{
 		Keys:         keys,
 		Committees:   make([]user.VotingCommittee, math.MaxUint8),
 		Provisioners: p,
+		seed:         seed,
 	}
 }
 
@@ -56,7 +59,7 @@ func (b *Handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8, maxSize i
 // Committee returns a VotingCommittee for a given round and step.
 func (b *Handler) Committee(round uint64, step uint8, maxSize int) user.VotingCommittee {
 	if b.membersAt(step) == 0 {
-		b.generateCommittees(round, step, maxSize)
+		b.generateCommittees(b.seed, round, step, maxSize)
 	}
 
 	b.lock.RLock()
@@ -66,13 +69,13 @@ func (b *Handler) Committee(round uint64, step uint8, maxSize int) user.VotingCo
 	return committee
 }
 
-func (b *Handler) generateCommittees(round uint64, step uint8, maxSize int) {
+func (b *Handler) generateCommittees(seed []byte, round uint64, step uint8, maxSize int) {
 	size := b.CommitteeSize(round, maxSize)
 
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	committees := b.Provisioners.GenerateCommittees(round, PregenerationAmount, step, size)
+	committees := b.Provisioners.GenerateCommittees(seed, round, PregenerationAmount, step, size)
 	for i, committee := range committees {
 		if step == math.MaxUint8 {
 			panic("Consensus reached max steps")
