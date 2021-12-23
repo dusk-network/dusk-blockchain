@@ -94,8 +94,8 @@ func (s *Server) launchKadcastPeer(p *peer.MessageProcessor) {
 
 func (s *Server) launchKadcliPeer(p *peer.MessageProcessor, g *protocol.Gossip, ruskConn *grpc.ClientConn) {
 	// launch kadcast client
-	kadPeer := kadcli.NewCliPeer(s.eventBus, p, g, ruskConn)
-	kadPeer.Launch()
+	kadPeer := kadcli.NewCliPeer(s.eventBus, p, g)
+	kadPeer.Launch(ruskConn)
 	s.kadGrpc = kadPeer
 }
 

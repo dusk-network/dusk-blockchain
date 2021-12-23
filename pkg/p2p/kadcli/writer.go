@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	"google.golang.org/grpc"
 )
 
 // Writer abstracts all of the logic and fields needed to write messages to
@@ -33,11 +32,11 @@ type Writer struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine.
-func NewWriter(s eventbus.Subscriber, g *protocol.Gossip, conn *grpc.ClientConn) *Writer {
+func NewWriter(s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient) *Writer {
 	return &Writer{
 		subscriber: s,
 		gossip:     g,
-		cli:        rusk.NewNetworkClient(conn),
+		cli:        rusk,
 	}
 }
 

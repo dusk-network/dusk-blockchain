@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -23,26 +24,25 @@ type Peer struct {
 	processor *peer.MessageProcessor
 	gossip    *protocol.Gossip
 
-	// rusk connection
-	conn *grpc.ClientConn
-
 	// processors
 	w *Writer
 	r *Reader
 }
 
 // NewCliPeer makes a kadcli peer instance.
-func NewCliPeer(eventBus *eventbus.EventBus, processor *peer.MessageProcessor, gossip *protocol.Gossip, ruskConn *grpc.ClientConn) *Peer {
-	return &Peer{eventBus: eventBus, processor: processor, gossip: gossip, conn: ruskConn}
+func NewCliPeer(eventBus *eventbus.EventBus, processor *peer.MessageProcessor, gossip *protocol.Gossip) *Peer {
+	return &Peer{eventBus: eventBus, processor: processor, gossip: gossip}
 }
 
 // Launch starts kadcli service and connects to server.
-func (p *Peer) Launch() {
-	// A writer for Kadcast messages
-	p.w = NewWriter(p.eventBus, p.gossip, p.conn)
+func (p *Peer) Launch(conn *grpc.ClientConn) {
+	// gRPC rusk client
+	ruskc := rusk.NewNetworkClient(conn)
+	// a writer for Kadcast messages
+	p.w = NewWriter(p.eventBus, p.gossip, ruskc)
 	go p.w.Serve()
-	// A reader for Kadcast messages
-	p.r = NewReader(p.eventBus, p.gossip, p.processor, p.conn)
+	// a reader for Kadcast messages
+	p.r = NewReader(p.eventBus, p.gossip, p.processor, ruskc)
 	go p.r.Listen()
 }
 

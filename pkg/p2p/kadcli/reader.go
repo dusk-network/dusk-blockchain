@@ -19,7 +19,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	"google.golang.org/grpc"
 )
 
 // Reader abstracts all of the logic and fields needed to receive messages from
@@ -33,11 +32,11 @@ type Reader struct {
 }
 
 // NewReader makes a new kadcast reader that handles TCP packets of broadcasting.
-func NewReader(publisher eventbus.Publisher, g *protocol.Gossip, p *peer.MessageProcessor, ruskConn *grpc.ClientConn) *Reader {
+func NewReader(publisher eventbus.Publisher, g *protocol.Gossip, p *peer.MessageProcessor, rusk rusk.NetworkClient) *Reader {
 	return &Reader{
 		processor: p,
 		gossip:    g,
-		cli:       rusk.NewNetworkClient(ruskConn),
+		cli:       rusk,
 		stop:      make(chan bool),
 	}
 }
