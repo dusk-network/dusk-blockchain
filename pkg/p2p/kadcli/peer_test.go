@@ -34,47 +34,40 @@ const (
 
 // NetworkServer mocks the Rusk network server.
 type NetworkServer struct {
-	g *protocol.Gossip
+	bcastChan chan *rusk.BroadcastMessage
 }
 
 // Listen for messages coming from the network.
 func (n *NetworkServer) Listen(in *rusk.Null, srv rusk.Network_ListenServer) error {
-	buf := new(bytes.Buffer)
-
-	// Using a block as an example
-	blk := helper.RandomBlock(5525, 10)
-	if err := message.MarshalBlock(buf, blk); err != nil {
-		return fmt.Errorf("failed to marshal block: %v", err)
-	}
-
-	// Add topic to message
-	if err := topics.Prepend(buf, topics.Block); err != nil {
-		return fmt.Errorf("failed to add topic: %v", err)
-	}
-
-	// Make it protocol-ready
-	if err := n.g.Process(buf); err != nil {
-		return fmt.Errorf("failed to process (gossip): %v", err)
-	}
-
-	// Send message
-	msg := &rusk.Message{
-		Message: buf.Bytes(),
-		Metadata: &rusk.MessageMetadata{
-			KadcastHeight: uint32(1),
-			SrcAddress:    RUSK_ADDR,
-		},
-	}
-	if err := srv.Send(msg); err != nil {
-		return fmt.Errorf("failed to send msg: %v", err.Error())
-	}
+	go func() {
+		for {
+			select {
+			case msg := <-n.bcastChan:
+				m := &rusk.Message{
+					Message: msg.Message,
+					Metadata: &rusk.MessageMetadata{
+						KadcastHeight: msg.KadcastHeight,
+						SrcAddress:    RUSK_ADDR,
+					},
+				}
+				if err := srv.Send(m); err != nil {
+					fmt.Println("failed to send msg: " + err.Error())
+				}
+				return
+			}
+		}
+	}()
 	return nil
 }
 
 // Broadcast a message to the network.
 func (n *NetworkServer) Broadcast(ctx context.Context, msg *rusk.BroadcastMessage) (*rusk.Null, error) {
-	fmt.Println("server.Broadcast: ", msg.KadcastHeight)
 	res := &rusk.Null{}
+	fmt.Println("server.Broadcast: ", msg.KadcastHeight)
+
+	// send the message to all listeners
+	n.bcastChan <- msg
+
 	return res, nil
 }
 
@@ -96,7 +89,7 @@ func NewRuskMock(gossip *protocol.Gossip, errChan chan error) (*grpc.Server, err
 	// create grpc server
 	s := grpc.NewServer()
 	srv := &NetworkServer{
-		g: gossip,
+		bcastChan: make(chan *rusk.BroadcastMessage),
 	}
 	rusk.RegisterNetworkServer(s, srv)
 
@@ -113,7 +106,7 @@ func NewRuskMock(gossip *protocol.Gossip, errChan chan error) (*grpc.Server, err
 
 // TestListenStreamReader tests the kadcli.Reader receiving a block
 // from the rusk:Network.Listen stream-based endpoint.
-func TestListenStreamReader(t *testing.T) {
+func TestFull(t *testing.T) {
 	assert := assert.New(t)
 	rcvChan := make(chan message.Message)
 	errChan := make(chan error)
@@ -143,85 +136,17 @@ func TestListenStreamReader(t *testing.T) {
 	// Create a client that connects to rusk mock server
 	_, grpcConn := client.CreateNetworkClient(context.Background(), RUSK_ADDR)
 
-	// Create our kadcli (gRPC) Reader
-	r := NewReader(eb, g, p, grpcConn)
-
-	// Subscribe to gRPC stream
-	go r.Listen()
-
-	// Process status/output
-	select {
-	case err := <-errChan:
-		t.Fatal(err)
-	case m := <-rcvChan:
-		b := m.Payload().(block.Block)
-		assert.True(m.Category() == topics.Block)
-		assert.True(b.Header.Height == 5525)
-		assert.True(len(b.Txs) == 12)
-	}
-
-	// Disconnect client and stop server
-	grpcConn.Close()
-	srv.Stop()
-}
-
-// TestBroadcastWriter tests the kadcli.Writer by broadcasting
-// a block via rusk:Network.Broadcast endpoint
-func TestBroadcastWriter(t *testing.T) {
-
-	assert := assert.New(t)
-	rcvChan := make(chan message.Message)
-	errChan := make(chan error)
-
-	// Basic infrastructure
-	eb := eventbus.New()
-	p := peer.NewMessageProcessor(eb)
-	g := protocol.NewGossip(protocol.TestNet)
-
-	// Have a callback ready on Block topic to capture the broadcasted message
-	respFn := func(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
-		if srcPeerID != RUSK_ADDR {
-			errChan <- errors.New("callback: wrong source address")
-			return nil, nil
-		}
-		rcvChan <- m
-		return nil, nil
-	}
-	p.Register(topics.Block, respFn)
-
-	// Create a rusk mock server
-	srv, err := NewRuskMock(g, errChan)
-	if err != nil {
-		t.Fatalf("rusk mock failed: %v", err)
-	}
-
-	// Create a client that connects to rusk mock server
-	_, grpcConn := client.CreateNetworkClient(context.Background(), RUSK_ADDR)
-
-	// Create our kadcli (gRPC) Reader and Writer
+	// Create our kadcli (gRPC) Reader and Writer instances
 	r := NewReader(eb, g, p, grpcConn)
 	w := NewWriter(eb, g, grpcConn)
 
 	// Subscribe to gRPC stream
 	go r.Listen()
 
-	// Prepare a block message
-	buf := new(bytes.Buffer)
-
-	// Using a block as an example
-	blk := helper.RandomBlock(5525, 10)
-	if err := message.MarshalBlock(buf, blk); err != nil {
-		t.Errorf("failed to marshal block: %v", err)
-	}
-
-	// Add topic to message
-	if err := topics.Prepend(buf, topics.Block); err != nil {
-		t.Errorf("failed to add topic: %v", err)
-	}
-
-	// Make it protocol-ready
-	if err := g.Process(buf); err != nil {
-		t.Errorf("failed to process (gossip): %v", err)
+	// Prepare a message to be sent
+	buf, err := createBlockMessage()
+	if err != nil {
+		t.Errorf("block msg: %v", err)
 	}
 
 	// Send a broadcast message
@@ -240,8 +165,29 @@ func TestBroadcastWriter(t *testing.T) {
 		assert.True(len(b.Txs) == 12)
 	}
 
-	// Disconnect client and stop server
+	// Clean up connection
 	grpcConn.Close()
 	srv.Stop()
 
+}
+
+// createBlockMessage returns a properly encoded wire message
+// containing a random block
+func createBlockMessage() (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	g := protocol.NewGossip(protocol.TestNet)
+	// Create the random block and marshal it
+	blk := helper.RandomBlock(5525, 10)
+	if err := message.MarshalBlock(buf, blk); err != nil {
+		return nil, fmt.Errorf("failed to marshal block: %v", err)
+	}
+	// Add topic to message
+	if err := topics.Prepend(buf, topics.Block); err != nil {
+		return nil, fmt.Errorf("failed to add topic: %v", err)
+	}
+	// Make it protocol-ready
+	if err := g.Process(buf); err != nil {
+		return nil, fmt.Errorf("failed to process (gossip): %v", err)
+	}
+	return buf, nil
 }
