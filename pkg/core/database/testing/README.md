@@ -3,8 +3,7 @@
 Mocks and tests for heavy and lite database drivers.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

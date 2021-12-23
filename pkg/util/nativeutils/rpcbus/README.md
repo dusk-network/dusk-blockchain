@@ -4,8 +4,7 @@ Process-internal message passing system based on sending return channels in
 requests.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

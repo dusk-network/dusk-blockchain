@@ -4,8 +4,7 @@ Nothing directly exists in here, but the following items are the various tools
 and services that make things happen.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

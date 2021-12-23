@@ -3,8 +3,7 @@
 Driver providing an ephemeral data store.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

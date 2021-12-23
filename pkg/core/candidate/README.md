@@ -3,8 +3,7 @@
 Block candidate protocol and validation implementation.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

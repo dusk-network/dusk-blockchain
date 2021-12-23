@@ -4,8 +4,7 @@ A ring buffer that works with raw wire/storage encoded raw bytes data. Used in
 the EventBus.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

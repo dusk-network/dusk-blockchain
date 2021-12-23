@@ -3,8 +3,7 @@
 Things for tests. [helper](./helper/) contains helpers for tests.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

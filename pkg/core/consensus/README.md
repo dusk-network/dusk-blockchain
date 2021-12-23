@@ -4,16 +4,14 @@ The interfaces and high level api's around the implementation of the SBA*
 consensus, with lots of mocks and tests.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [SBA\* Consensus](#sba\-consensus)
-    1. [Intro](#intro)
-        1. [Security Model](#security-model)
-        1. [Block Generator](#block-generator)
-        1. [Provisioner](#provisioner)
-1. [Gotchas](#gotchas)
-
+   1. [SBA\* Consensus](#sba\-consensus)
+      1. [Intro](#intro)
+         1. [Security Model](#security-model)
+         1. [Block Generator](#block-generator)
+         1. [Provisioner](#provisioner)
+   1. [Gotchas](#gotchas)
 <!-- ToC end -->
 
 ## SBA\* Consensus

@@ -8,17 +8,15 @@ for more specific events \(e.g a client needs a notification on a specific
 tx\_hash accepted\)
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Design](#design)
-1. [Messages](#messages)
-    1. [On block accepted](#on-block-accepted)
-    1. [Configuration](#configuration)
+   1. [Design](#design)
+   1. [Messages](#messages)
+      1. [On block accepted](#on-block-accepted)
+      1. [Configuration](#configuration)
 1. [Number of pub/sub brokers to broadcast new blocks. ](#number-of-pub/sub-brokers-to-broadcast-new-blocks-)
 1. [0 brokersNum disables notifications system](#0-brokersnum-disables-notifications-system)
-    1. [Examples](#examples)
-
+      1. [Examples](#examples)
 <!-- ToC end -->
 
 ## Design

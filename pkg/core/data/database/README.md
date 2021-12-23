@@ -4,8 +4,7 @@ Wrapper to K/V access for database back end and specific handling for
 transactions.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

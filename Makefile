@@ -136,5 +136,8 @@ markdown-toc:
 	go install github.com/sebdah/markdown-toc
 	# "If markdown-toc is not now available as a CLI command, check you have configured GOBIN currently:",
 	$(shell env|grep GOBIN)
+generate-toc:
+	$(shell find . -type f|grep README.md|xargs -I SUB markdown-toc SUB --replace --skip-headers 2 --inline --header "##  Contents")
 generate-index:
 	go run ./scripts/docindex/. .
+

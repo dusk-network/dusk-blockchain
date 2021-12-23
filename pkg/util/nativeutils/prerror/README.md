@@ -3,8 +3,7 @@
 Error type with priorities.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

@@ -4,8 +4,7 @@ A custom query filter aimed at simplifying a transaction information display for
 user interfaces.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

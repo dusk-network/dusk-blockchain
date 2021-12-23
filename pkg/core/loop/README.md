@@ -6,13 +6,11 @@ functional flavor, where consensus phases are sequenced one after the other,
 returning functions as they complete, based on their outcomes.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Architecture](#architecture)
-    1. [Communications](#communications)
-    1. [Running](#running)
-
+   1. [Architecture](#architecture)
+      1. [Communications](#communications)
+      1. [Running](#running)
 <!-- ToC end -->
 
 ## Architecture

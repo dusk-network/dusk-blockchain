@@ -6,13 +6,11 @@ made up of two distinct components, a [score generator](./score/README.md), and
 a [candidate generator](./candidate/README.md).
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Abstract](#abstract)
-1. [Blind Bid Algorithm](#blind-bid-algorithm)
-    1. [Procedure](#procedure)
-
+   1. [Abstract](#abstract)
+   1. [Blind Bid Algorithm](#blind-bid-algorithm)
+      1. [Procedure](#procedure)
 <!-- ToC end -->
 
 ## Abstract

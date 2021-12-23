@@ -4,8 +4,7 @@ Top level http API interface for accessing EventBus, RPCBus and StormDB
 services, internal and external messaging, and data storage.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

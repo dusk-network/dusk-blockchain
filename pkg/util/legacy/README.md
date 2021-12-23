@@ -4,8 +4,7 @@ Converter that upgrades the old provisioners data structure to the new Rusk
 Committee.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

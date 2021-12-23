@@ -4,8 +4,7 @@ Provides mock versions of Rusk and Wallet and Transactor to use in tests for
 generating dummy transactions and so forth.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

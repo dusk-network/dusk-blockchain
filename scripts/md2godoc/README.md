@@ -3,9 +3,11 @@
 Automatically create godoc package headers from README.md's
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
+   1. [Abstract ](#abstract-)
+   1. [Implementation Notes](#implementation-notes)
+1. [to regenerate this file's table of contents:](#to-regenerate-this-files-table-of-contents:)
 <!-- ToC end -->
 
 ## Abstract 

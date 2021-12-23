@@ -4,12 +4,11 @@ The original implementation of the Kademlia Distributed Hash Table based
 reliable broadcast routing protocol.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Usage](#usage)
-1. [## Usage](#-usage)
-    1. [Configuration](#configuration)
+   1. [Usage](#usage)
+   1. [## Usage](#-usage)
+         1. [Configuration](#configuration)
 1. [By enabling it, node will join an experimental kadcast network](#by-enabling-it-node-will-join-an-experimental-kadcast-network)
 1. [In addition, topics.Block and topics.Tx will be propagated in kadcast network](#in-addition-topicsblock-and-topicstx-will-be-propagated-in-kadcast-network)
 1. [NB: The messages propagated in kadcast are not propagated in gossip](#nb:-the-messages-propagated-in-kadcast-are-not-propagated-in-gossip)
@@ -19,25 +18,24 @@ reliable broadcast routing protocol.
 1. [Maximum delegates per bucket ](#maximum-delegates-per-bucket-)
 1. [System parameter β from protocol](#system-parameter-β-from-protocol)
 1. [Example list of bootstarpping nodes](#example-list-of-bootstarpping-nodes)
-   1. [Code snippet](#code-snippet)
+         1. [Code snippet](#code-snippet)
 1. [Initiate kadcast message propagation](#initiate-kadcast-message-propagation)
-    1. [Broadcast Message flow](#broadcast-message-flow)
-    1. [## Broadcast Message flow](#-broadcast-message-flow)
-    1. [Point-to-point Message flow](#point-to-point-message-flow)
-    1. [## Point-to-point Message flow](#-point-to-point-message-flow)
-    1. [Transport protocols](#transport-protocols)
-    1. [## Transport protocols](#-transport-protocols)
-       1. [TCP Dial and Send](#tcp-dial-and-send)
-       1. [Raptor Code UDP](#raptor-code-udp)
-    1. [Kadcast Wire Messages](#kadcast-wire-messages)
-    1. [## Kadcast Wire Messages](#-kadcast-wire-messages)
-    1. [Maintainer and Kademlia Routing State](#maintainer-and-kademlia-routing-state)
-    1. [## Maintainer and Kademlia Routing State](#-maintainer-and-kademlia-routing-state)
-        1. [FindNodes-Nodes Message Flow  (pseudo peers A and B)](#findnodes-nodes-message-flow--pseudo-peers-a-and-b)
-        1. [Ping-Pong Message Flow (pseudo peers A and B)](#ping-pong-message-flow-pseudo-peers-a-and-b)
-    1. [Collecting Message](#collecting-message)
-    1. [## Collecting Message](#-collecting-message)
-
+   1. [Broadcast Message flow](#broadcast-message-flow)
+   1. [## Broadcast Message flow](#-broadcast-message-flow)
+   1. [Point-to-point Message flow](#point-to-point-message-flow)
+   1. [## Point-to-point Message flow](#-point-to-point-message-flow)
+   1. [Transport protocols](#transport-protocols)
+   1. [## Transport protocols](#-transport-protocols)
+            1. [TCP Dial and Send](#tcp-dial-and-send)
+            1. [Raptor Code UDP](#raptor-code-udp)
+   1. [Kadcast Wire Messages](#kadcast-wire-messages)
+   1. [## Kadcast Wire Messages](#-kadcast-wire-messages)
+   1. [Maintainer and Kademlia Routing State](#maintainer-and-kademlia-routing-state)
+   1. [## Maintainer and Kademlia Routing State](#-maintainer-and-kademlia-routing-state)
+      1. [FindNodes-Nodes Message Flow  (pseudo peers A and B)](#findnodes-nodes-message-flow--pseudo-peers-a-and-b)
+      1. [Ping-Pong Message Flow (pseudo peers A and B)](#ping-pong-message-flow-pseudo-peers-a-and-b)
+   1. [Collecting Message](#collecting-message)
+   1. [## Collecting Message](#-collecting-message)
 <!-- ToC end -->
 
 `p2p/kadcast`  package is an attempt to implement kadcast protocol specification

@@ -7,22 +7,20 @@ Official reference implementation of the DUSK Network protocol in Golang.
 [![Go Report Card](https://goreportcard.com/badge/github.com/dusk-network/dusk-blockchain?style=flat-square)](https://goreportcard.com/report/github.com/dusk-network/dusk-blockchain)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/dusk-network/dusk-blockchain)](https://pkg.go.dev/github.com/dusk-network/dusk-blockchain)
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Specification Requirements](#specification-requirements)
-    1. [Minimum Specifications](#minimum-specifications)
-    1. [Recommended Specifications](#recommended-specifications)
-1. [Installation Guide](#installation-guide)
-    1. [Requirements](#requirements)
-    1. [Installation](#installation)
-1. [Wallet](#wallet)
-    1. [Building the wallet](#building-the-wallet)
-    1. [Running the wallet](#running-the-wallet)
-    1. [How to use the wallet](#how-to-use-the-wallet)
-1. [License](#license)
-1. [Contributing](#contributing)
-
+   1. [Specification Requirements](#specification-requirements)
+      1. [Minimum Specifications](#minimum-specifications)
+      1. [Recommended Specifications](#recommended-specifications)
+   1. [Installation Guide](#installation-guide)
+      1. [Requirements](#requirements)
+      1. [Installation](#installation)
+   1. [Wallet](#wallet)
+      1. [Building the wallet](#building-the-wallet)
+      1. [Running the wallet](#running-the-wallet)
+      1. [How to use the wallet](#how-to-use-the-wallet)
+   1. [License](#license)
+   1. [Contributing](#contributing)
 <!-- ToC end -->
 
 ## Specification Requirements

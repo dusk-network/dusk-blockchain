@@ -4,8 +4,7 @@ Specification for the genesis block data structure, a generator, and several
 presets for different test networks.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

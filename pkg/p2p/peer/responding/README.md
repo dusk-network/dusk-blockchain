@@ -3,8 +3,7 @@
 Implementations of the various response types for queries between network peers.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

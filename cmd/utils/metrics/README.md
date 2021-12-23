@@ -4,8 +4,7 @@ Provides information about various performance and data metrics of the node and
 blockchain activity, blocks, pending transactions, and so on.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

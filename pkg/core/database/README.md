@@ -7,23 +7,21 @@ two independent incomplete documents with the same intent, even a header is
 duplicated.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [General concept](#general-concept)
-1. [Terminology](#terminology)
-1. [Available Drivers](#available-drivers)
-1. [Testing Drivers](#testing-drivers)
-1. [Code example:](#code-example:)
-1. [Additional features](#additional-features)
-1. [Drivers](#drivers)
-    1. [Light Driver](#light-driver)
-    1. [Heavy Driver](#heavy-driver)
-1. [General concept](#general-concept-1)
-1. [K/V storage schema to store a single `pkg/core/block.Block` into blockchain](#k/v-storage-schema-to-store-a-single-pkg/core/blockblock-into-blockchain)
-1. [K/V storage schema to store a candidate `pkg/core/block.Block`](#k/v-storage-schema-to-store-a-candidate-pkg/core/blockblock)
-1. [K/V storage schema to store block generator bid values](#k/v-storage-schema-to-store-block-generator-bid-values)
-
+   1. [General concept](#general-concept)
+   1. [Terminology](#terminology)
+   1. [Available Drivers](#available-drivers)
+   1. [Testing Drivers](#testing-drivers)
+   1. [Code example:](#code-example:)
+   1. [Additional features](#additional-features)
+   1. [Drivers](#drivers)
+      1. [Light Driver](#light-driver)
+      1. [Heavy Driver](#heavy-driver)
+   1. [General concept](#general-concept-1)
+   1. [K/V storage schema to store a single `pkg/core/block.Block` into blockchain](#k/v-storage-schema-to-store-a-single-pkg/core/blockblock-into-blockchain)
+   1. [K/V storage schema to store a candidate `pkg/core/block.Block`](#k/v-storage-schema-to-store-a-candidate-pkg/core/blockblock)
+   1. [K/V storage schema to store block generator bid values](#k/v-storage-schema-to-store-block-generator-bid-values)
 <!-- ToC end -->
 
 ## General concept

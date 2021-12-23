@@ -6,9 +6,10 @@ directory tree and concatenate this section with generated rubrics that
 hyperlink to the package folder where the readme with the header is found.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
+   1. [Implementation notes](#implementation-notes)
+1. [to regenerate this file's table of contents:](#to-regenerate-this-files-table-of-contents:)
 <!-- ToC end -->
 
 ## Implementation notes

@@ -3,8 +3,7 @@
 Protocol data transport formatting and network identifiers.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

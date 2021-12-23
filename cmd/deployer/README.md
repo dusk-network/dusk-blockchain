@@ -5,12 +5,10 @@ dusk-blockchain node (both dusk-blockchain and rusk services). It should also
 facilitate automatic diagnostic of runtime issues.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Rules](#rules)
-1. [How to run](#how-to-run)
-
+   1. [Rules](#rules)
+   1. [How to run](#how-to-run)
 <!-- ToC end -->
 
 ## Rules

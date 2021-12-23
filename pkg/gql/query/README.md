@@ -4,8 +4,7 @@ Implements a simple human readable query syntax for requesting from blocks and
 transactions specific fields and cross-cutting matches like address searches.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

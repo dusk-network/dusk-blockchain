@@ -3,8 +3,7 @@
 This folder gathers IPC related items.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

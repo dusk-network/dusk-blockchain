@@ -4,8 +4,7 @@ In the top level here is a single interface to use the other tools within
 folders, metrics, monitoring, and RPC access.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

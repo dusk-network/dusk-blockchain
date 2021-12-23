@@ -4,8 +4,7 @@ A simple p2p voucher seeding node (what does that mean? It appears to mainly be
 for finding and distributing the list of active peer addresses on the network)
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

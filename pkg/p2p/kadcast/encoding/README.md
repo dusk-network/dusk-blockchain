@@ -2,8 +2,7 @@
 
 Message definitions and codecs for kadcast message types.
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

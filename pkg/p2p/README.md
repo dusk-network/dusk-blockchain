@@ -4,14 +4,13 @@ Some documentation on the p2p wire format, gossip and point to point messaging
 architecture.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Architecture](#architecture)
-    1. [Reader](#reader)
-    1. [Writer](#writer)
-    1. [Component layout](#component-layout)
-
+   1. [Architecture](#architecture)
+      1. [Reader](#reader)
+      1. [Writer](#writer)
+      1. [Component layout](#component-layout)
+   1. [Wire Protocol Spec](#wire-protocol-spec)
 <!-- ToC end -->
 
 ## Architecture

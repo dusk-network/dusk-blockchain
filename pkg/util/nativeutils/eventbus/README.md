@@ -4,8 +4,7 @@ This is a generic interface for interconnecting different components of Dusk
 including separated runtimes like the Rusk VM.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

@@ -4,11 +4,10 @@ Definitions, accessors and storage implementation for configuration of all
 systems in dusk-blockchain.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Features](#features)
-1. [Example usage:](#example-usage:)
+   1. [Features](#features)
+   1. [Example usage:](#example-usage:)
 1. [Try to load a config file from any of the searchPaths](#try-to-load-a-config-file-from-any-of-the-searchpaths)
 1. [and overwrite general.network setting](#and-overwrite-generalnetwork-setting)
 1. [with shorthand letter](#with-shorthand-letter)
@@ -17,8 +16,7 @@ systems in dusk-blockchain.
 1. [Load config file found in $searchPaths and overwrite general.network value](#load-config-file-found-in-$searchpaths-and-overwrite-generalnetwork-value)
 1. [Load config where a file config value is overwritten by both ENV var and CLI flag but CLI flag has higher priority](#load-config-where-a-file-config-value-is-overwritten-by-both-env-var-and-cli-flag-but-cli-flag-has-higher-priority)
 1. [with shorthand letter](#with-shorthand-letter-1)
-    1. [Viper](#viper)
-
+   1. [Viper](#viper)
 <!-- ToC end -->
 
 ## Features

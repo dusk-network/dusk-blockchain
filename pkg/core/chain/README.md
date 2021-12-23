@@ -10,20 +10,18 @@ controls the execution of the consensus by responding to perceived state
 changes.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Structure](#structure)
-    1. [Loader](#loader)
-    1. [Verifier](#verifier)
-    1. [Synchronizer](#synchronizer)
-    1. [Loop](#loop)
-    1. [Proxy](#proxy)
-1. [Synchronizer](#synchronizer-1)
-    1. [Responsibility](#responsibility)
-    1. [API](#api)
-    1. [Design](#design)
-
+   1. [Structure](#structure)
+      1. [Loader](#loader)
+      1. [Verifier](#verifier)
+      1. [Synchronizer](#synchronizer)
+      1. [Loop](#loop)
+      1. [Proxy](#proxy)
+   1. [Synchronizer](#synchronizer-1)
+      1. [Responsibility](#responsibility)
+      1. [API](#api)
+      1. [Design](#design)
 <!-- ToC end -->
 
 ## Structure

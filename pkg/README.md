@@ -5,8 +5,7 @@ contains all of the libraries used primarily internally by applications in
 the [cmd/]() folder.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

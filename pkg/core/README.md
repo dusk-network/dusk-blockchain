@@ -5,8 +5,7 @@ everything that interacts with the internals of the Node - consensus, storage
 and validation.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

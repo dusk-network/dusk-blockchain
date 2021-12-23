@@ -6,12 +6,10 @@ to extract **voting committees** which are eligible to decide on blocks during
 the SBA\* consensus protocol.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Abstract](#abstract)
-1. [Gotchas](#gotchas)
-
+   1. [Abstract](#abstract)
+   1. [Gotchas](#gotchas)
 <!-- ToC end -->
 
 ## Abstract

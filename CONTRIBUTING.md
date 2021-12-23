@@ -16,6 +16,7 @@ merged.
     + [Logging](#logging)
 * [Opening issues](#opening-issues)
 * [Opening pull requests](#opening-pull-requests)
+* [Documentation](#documentation)
 
 ## Coding conventions
 
@@ -198,3 +199,23 @@ informs the monitoring of which process the log entry is coming from.
   discretion after that.
 * Once you have merged your pull request, you should delete your branch, in
   order to keep the branch list clean.
+
+## Documentation
+
+In order to promote the production of the dreaded documentation, there is a set
+of rules about how to construct them.
+
+In [docs](./docs) there is a
+[template](./docs/template.README.md). It contains a template for how to
+construct the README.md of a folder.
+
+To update the table of contents of the repository documentation:
+
+    make generate-toc
+
+To regenerate the index to update the the catalog of documents:
+
+    make generate-index
+
+> **todo:** some info about godoc comments for exported symbols, pointer to 
+> good info about recommended patterns. The README.md should still be the first point of contact, and avoid duplicating effort on API documentation by using godoc comments, and for anything else, architecture, usage, examples, should be in README.md so no time is wasted finding it.

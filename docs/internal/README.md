@@ -4,11 +4,9 @@ Internal documentation on details about Zenhub workflow for Dusk project
 managers.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Issues management](#issues-management)
-
+   1. [Issues management](#issues-management)
 <!-- ToC end -->
 
 ## Issues management

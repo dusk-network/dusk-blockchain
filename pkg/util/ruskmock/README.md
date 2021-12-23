@@ -5,13 +5,11 @@ testing and DevNet launches, and replaces the Rust version of RUSK seamlessly,
 thanks to the abstraction offered by Protocol Buffers and GRPC.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Usage](#usage)
-1. [How it works](#how-it-works)
-1. [Future work](#future-work)
-
+   1. [Usage](#usage)
+   1. [How it works](#how-it-works)
+   1. [Future work](#future-work)
 <!-- ToC end -->
 
 ## Usage

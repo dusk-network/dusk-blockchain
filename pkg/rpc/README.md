@@ -3,8 +3,7 @@
 Contains a token based session authentication system.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

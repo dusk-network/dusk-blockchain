@@ -4,15 +4,13 @@ Verification functions for various sanity checks on blocks, coinbases and
 consensus messages.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Stateless verification functionality](#stateless-verification-functionality)
-    1. [Exposed functionality](#exposed-functionality)
-        1. [CheckBlockCertificate](#checkblockcertificate)
-        1. [CheckBlockHeader](#checkblockheader)
-        1. [CheckMultiCoinbases](#checkmulticoinbases)
-
+   1. [Stateless verification functionality](#stateless-verification-functionality)
+      1. [Exposed functionality](#exposed-functionality)
+         1. [CheckBlockCertificate](#checkblockcertificate)
+         1. [CheckBlockHeader](#checkblockheader)
+         1. [CheckMultiCoinbases](#checkmulticoinbases)
 <!-- ToC end -->
 
 ## Stateless verification functionality

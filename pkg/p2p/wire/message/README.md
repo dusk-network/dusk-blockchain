@@ -4,9 +4,36 @@ Definitions of all message data structure formats and their wire/storage codecs,
 mocks and tests.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
+   1. [Message encoding](#message-encoding)
+   1. [Topics](#topics)
+   1. [Common structures](#common-structures)
+      1. [VarInt](#varint)
+      1. [protocol.Version](#protocolversion)
+      1. [Block Certificate](#block-certificate)
+      1. [message.InvVect](#messageinvvect)
+      1. [transactions.Input](#transactionsinput)
+      1. [transactions.Crossover](#transactionscrossover)
+      1. [transactions.Output](#transactionsoutput)
+      1. [transactions.Fee](#transactionsfee)
+      1. [StepVotes](#stepvotes)
+   1. [Message outline](#message-outline)
+      1. [Version](#version)
+      1. [VerAck](#verack)
+      1. [Ping](#ping)
+      1. [Pong](#pong)
+      1. [Inv](#inv)
+      1. [GetData](#getdata)
+      1. [GetBlocks](#getblocks)
+      1. [Block](#block)
+      1. [Tx](#tx)
+      1. [MemPool](#mempool)
+      1. [Candidate](#candidate)
+      1. [GetCandidate](#getcandidate)
+      1. [NewBlock](#newblock)
+      1. [Reduction](#reduction)
+      1. [Agreement](#agreement)
 <!-- ToC end -->
 
 ## Message encoding

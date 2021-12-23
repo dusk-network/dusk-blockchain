@@ -3,8 +3,7 @@
 Example configuration files and the default Dusk configuration file
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

@@ -4,16 +4,14 @@ This package implements the component which performs
 the [Agreement Phase](./agreement.md) of the consensus.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Abstract](#abstract)
-1. [Values](#values)
-    1. [Block Agreement Event](#block-agreement-event)
-1. [Architecture](#architecture)
-    1. [Main component](#main-component)
-    1. [Accumulator](#accumulator)
-
+   1. [Abstract](#abstract)
+   1. [Values](#values)
+      1. [Block Agreement Event](#block-agreement-event)
+   1. [Architecture](#architecture)
+      1. [Main component](#main-component)
+      1. [Accumulator](#accumulator)
 <!-- ToC end -->
 
 ## Abstract

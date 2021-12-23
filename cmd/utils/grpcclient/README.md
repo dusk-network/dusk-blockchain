@@ -4,8 +4,7 @@ Provides staking automation and access to the live configuration system.
 
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

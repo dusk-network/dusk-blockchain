@@ -3,8 +3,7 @@
 Various utility libraries.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

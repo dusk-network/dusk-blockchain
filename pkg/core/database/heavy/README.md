@@ -3,8 +3,7 @@
 Database driver providing persistent storage via LevelDB.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

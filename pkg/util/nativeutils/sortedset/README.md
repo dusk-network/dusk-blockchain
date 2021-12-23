@@ -3,8 +3,7 @@
 Binary tree (which?) based sorted set for large numbers (such as hashes).
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

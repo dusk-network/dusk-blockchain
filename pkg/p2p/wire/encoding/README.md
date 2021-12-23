@@ -12,9 +12,16 @@ example of this, please refer to the tests or any implementation of this library
 in the codebase.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
+   1. [Methods](#methods)
+      1. [Integers \(integers.go\)](#integers-\integersgo\)
+      1. [CompactSize integers \(varint.go\)](#compactsize-integers-\varintgo\)
+      1. [Booleans \(miscdata.go\)](#booleans-\miscdatago\)
+      1. [256-bit and 512-bit data structures \(miscdata.go\)](#256-bit-and-512-bit-data-structures-\miscdatago\)
+      1. [Strings and byte slices \(vardata.go\)](#strings-and-byte-slices-\vardatago\)
+      1. [Arrays/slices](#arrays/slices)
+      1. [Structs](#structs)
 <!-- ToC end -->
 
 ## Methods

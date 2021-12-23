@@ -3,14 +3,12 @@
 Miscellaneous functions used in testing the consensus.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Consensus integration testbed](#consensus-integration-testbed)
-    1. [How it works](#how-it-works)
-    1. [How to use](#how-to-use)
-    1. [Future work](#future-work)
-
+   1. [Consensus integration testbed](#consensus-integration-testbed)
+      1. [How it works](#how-it-works)
+      1. [How to use](#how-to-use)
+      1. [Future work](#future-work)
 <!-- ToC end -->
 
 ## Consensus integration testbed

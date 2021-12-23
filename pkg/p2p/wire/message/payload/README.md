@@ -3,8 +3,7 @@
 This is actually just an interface for a concurrent safe deep copy function.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

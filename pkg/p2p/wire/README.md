@@ -15,7 +15,6 @@ and the Event and Store interfaces.*
          1. [Strings and byte slices \(vardata.go\)](#strings-and-byte-slices-\vardatago\)
          1. [Arrays/slices](#arrays/slices)
          1. [Structs](#structs)
-   1. [](#)
    1. [Message encoding](#message-encoding)
    1. [Topics](#topics)
    1. [Common structures](#common-structures)

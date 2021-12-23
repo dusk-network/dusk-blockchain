@@ -6,8 +6,7 @@ relaying and processing. Smart contracts and the global network state are
 offloaded to the Rusk VM.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

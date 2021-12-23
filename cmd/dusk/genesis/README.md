@@ -3,8 +3,7 @@
 This just contains one function that prints the genesis block in JSON format.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

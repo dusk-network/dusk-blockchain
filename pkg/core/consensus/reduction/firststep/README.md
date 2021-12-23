@@ -3,8 +3,7 @@
 Implementation of the first step of the reduction phase.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

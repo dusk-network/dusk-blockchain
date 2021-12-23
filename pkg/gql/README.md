@@ -4,13 +4,12 @@ A websocket and GraphQL enabled RPC for searching the blockchain database,
 including subscriptions to notifications.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Intro](#intro)
-    1. [API Endpoints](#api-endpoints)
-    1. [Scenarios](#scenarios)
-1. [Configuration](#configuration)
+   1. [Intro](#intro)
+      1. [API Endpoints](#api-endpoints)
+      1. [Scenarios](#scenarios)
+   1. [Configuration](#configuration)
 1. [GraphQL API service](#graphql-api-service)
 1. [enable graphql service](#enable-graphql-service)
 1. [enable/disable both HTTPS and WSS](#enable/disable-both-https-and-wss)
@@ -19,8 +18,7 @@ including subscriptions to notifications.
 1. [maximum requests per second ](#maximum-requests-per-second-)
 1. [uniqueness of a request is based on: ](#uniqueness-of-a-request-is-based-on:-)
 1. [Remote IP, Request method and path](#remote-ip-request-method-and-path)
-    1. [Example queries](#example-queries)
-
+   1. [Example queries](#example-queries)
 <!-- ToC end -->
 
 ## Intro

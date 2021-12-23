@@ -4,14 +4,12 @@ This package implements a candidate generator, for the blind-bid protocol of the
 SBA\* consensus protocol.
 
 <!-- ToC start -->
+##  Contents
 
-## Contents
-
-1. [Abstract](#abstract)
-1. [Values](#values)
-    1. [Candidate \(Block\)](#candidate-block)
-1. [Architecture](#architecture)
-
+   1. [Abstract](#abstract)
+   1. [Values](#values)
+      1. [Candidate (Block)](#candidate-block)
+   1. [Architecture](#architecture)
 <!-- ToC end -->
 
 ## Abstract

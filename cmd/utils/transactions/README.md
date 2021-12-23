@@ -3,8 +3,7 @@
 In here is a tool to test execution of transactions for staking and transfers.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

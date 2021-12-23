@@ -4,8 +4,7 @@ Miscellaneous scripts such as a Go-based build script for Dusk and some launch
 control scripts.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

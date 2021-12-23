@@ -4,8 +4,7 @@ Phoenix asymmetric cryptographic primitives, codec, signatures, validation,
 address generation.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

@@ -3,8 +3,7 @@
 Miscellaneous helper functions used by other parts of pkg/core/database.
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 

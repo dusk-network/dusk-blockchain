@@ -4,8 +4,7 @@ Mocks for testing things that work with Event, EventHandler and EventProcessor (
 p2p/eventbus related?)
 
 <!-- ToC start -->
-
-## Contents
+##  Contents
 
 <!-- ToC end -->
 
