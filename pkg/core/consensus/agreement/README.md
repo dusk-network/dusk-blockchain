@@ -13,7 +13,6 @@ the [Agreement Phase](./agreement.md) of the consensus.
 1. [Architecture](#architecture)
     1. [Main component](#main-component)
     1. [Accumulator](#accumulator)
-1. [](#)
 
 <!-- ToC end -->
 
@@ -102,8 +101,6 @@ configurable, but is standardly set to 4.
 
 To store events, the `Accumulator` uses a `store`, which is a thread-safe
 wrapper around a map.
-
----
 
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)
