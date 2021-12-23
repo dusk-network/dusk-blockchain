@@ -3,7 +3,8 @@
 Verification of BLS signatures.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

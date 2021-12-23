@@ -3,7 +3,8 @@
 A transaction generator specifically for stress testing transaction processing.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

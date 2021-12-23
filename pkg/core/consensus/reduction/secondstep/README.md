@@ -3,9 +3,11 @@
 Implementation of the second step of the reduction phase.
 
 <!-- ToC start -->
-##  Contents
 
-   1. [Gotchas](#gotchas)
+## Contents
+
+1. [Gotchas](#gotchas)
+
 <!-- ToC end -->
 
 ## Gotchas

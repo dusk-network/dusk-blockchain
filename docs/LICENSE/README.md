@@ -4,7 +4,8 @@ Licences for used/modified code from btcd, golang (the compiler itself?) and
 moneroutils
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

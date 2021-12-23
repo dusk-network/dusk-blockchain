@@ -3,7 +3,8 @@
 Simplified setup and configuration for logrus.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

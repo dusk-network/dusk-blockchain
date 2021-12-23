@@ -4,12 +4,14 @@ Some documentation on the p2p wire format, gossip and point to point messaging
 architecture.
 
 <!-- ToC start -->
-##  Contents
 
-   1. [Architecture](#architecture)
-      1. [Reader](#reader)
-      1. [Writer](#writer)
-      1. [Component layout](#component-layout)
+## Contents
+
+1. [Architecture](#architecture)
+    1. [Reader](#reader)
+    1. [Writer](#writer)
+    1. [Component layout](#component-layout)
+
 <!-- ToC end -->
 
 ## Architecture
@@ -54,6 +56,12 @@ the `Writer`. This allows for directed delivery of messages to a single node.
 
 ### Component layout
 
-![P2P component layout](p2p_component_diagram.jpg)
+![P2P component layout](./p2p_component_diagram.jpg)
+
+## Wire Protocol Spec
+
+See [here](./wire.md) for details of the encoding format used by the p2p 
+systems.
+
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

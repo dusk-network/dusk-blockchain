@@ -12,14 +12,16 @@ for readers. That said, code which is identical across the two components is
 defined in the top-level of the package, and imported down.
 
 <!-- ToC start -->
-##  Contents
 
-   1. [Abstract](#abstract)
-   1. [Values](#values)
-      1. [Block Reduction Event](#block-reduction-event)
-   1. [Architecture](#architecture)
-      1. [Differences between the two components](#differences-between-the-two-components)
-      1. [Aggregator](#aggregator)
+## Contents
+
+1. [Abstract](#abstract)
+1. [Values](#values)
+    1. [Block Reduction Event](#block-reduction-event)
+1. [Architecture](#architecture)
+    1. [Differences between the two components](#differences-between-the-two-components)
+    1. [Aggregator](#aggregator)
+
 <!-- ToC end -->
 
 ## Abstract

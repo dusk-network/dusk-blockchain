@@ -5,11 +5,13 @@ testing and DevNet launches, and replaces the Rust version of RUSK seamlessly,
 thanks to the abstraction offered by Protocol Buffers and GRPC.
 
 <!-- ToC start -->
-##  Contents
 
-   1. [Usage](#usage)
-   1. [How it works](#how-it-works)
-   1. [Future work](#future-work)
+## Contents
+
+1. [Usage](#usage)
+1. [How it works](#how-it-works)
+1. [Future work](#future-work)
+
 <!-- ToC end -->
 
 ## Usage
@@ -38,14 +40,14 @@ Since the mock RUSK server can not actually validate this input, it is left
 instead to a configuration object to decide what passes and what doesn't.
 
 ```golang
-// Config contains a list of settings that determine the behavior
-// of the `Server`.
-type Config struct {
-PassScoreValidation           bool
-PassTransactionValidation     bool
-PassStateTransition           bool
-PassStateTransitionValidation bool
-}
+    // Config contains a list of settings that determine the behavior
+    // of the `Server`.
+    type Config struct {
+        PassScoreValidation           bool
+        PassTransactionValidation     bool
+        PassStateTransition           bool
+        PassStateTransitionValidation bool
+    }
 ```
 
 In a normal scenario, all of these are set to `true`, allowing for seamless

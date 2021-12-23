@@ -4,7 +4,8 @@ Implements a menu driven interface for the CLI wallet, including staking and
 transfers of tokens between addresses.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

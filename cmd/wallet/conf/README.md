@@ -5,7 +5,8 @@ a network client dialing library that links node services to the external wallet
 client. This dialer might be in a bad place.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

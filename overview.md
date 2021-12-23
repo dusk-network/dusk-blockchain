@@ -9,8 +9,8 @@ help with the long term arc of migrating away from Go to Rust.
 [README.md](./README.md) The readme. Contains very basic getting started and
 pointers to other info.
 
-[logging.md](./logging.md) A set of notes containing example grep invocations to
-filter the logs.
+[logging.md](docs/logging.md) A set of notes containing example grep invocations
+to filter the logs.
 
 [.github/CODE_OF_CONDUCT.md](./.github/CODE_OF_CONDUCT.md) Our standards of
 civility and manners, and mediation guidelines.
@@ -155,7 +155,7 @@ moneroutils
 
 ## [harness](./harness)
 
-[harness.md](./harness.md) Some notes for working with the test harness
+[harness.md](harness/harness.md) Some notes for working with the test harness
 
 ## [harness/engine](./harness/engine)
 

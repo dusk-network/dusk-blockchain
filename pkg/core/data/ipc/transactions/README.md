@@ -4,9 +4,11 @@ Codecs and accessors for all types of transaction messages used between Node and
 Rusk VM.
 
 <!-- ToC start -->
-##  Contents
 
-   1. [Gotchas](#gotchas)
+## Contents
+
+1. [Gotchas](#gotchas)
+
 <!-- ToC end -->
 
 ## Gotchas

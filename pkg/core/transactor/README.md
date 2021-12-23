@@ -4,7 +4,8 @@ An API for executing the various types of transactions that the node
 understands. Staking, transfers, balances, and triggering smart contracts.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

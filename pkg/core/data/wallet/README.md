@@ -4,7 +4,8 @@ Wallet service with HD keychain and transaction index, minimal back end
 interface.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

@@ -3,7 +3,8 @@
 A cuckoo filter based deduplication engine.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

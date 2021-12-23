@@ -3,7 +3,8 @@
 Here are the templates that define the three main types of issues.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

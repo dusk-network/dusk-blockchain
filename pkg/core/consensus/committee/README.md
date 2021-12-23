@@ -4,7 +4,8 @@ Handler for managing participation in the consensus comittee and inspecting the
 membership and vote status.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

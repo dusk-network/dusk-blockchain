@@ -4,7 +4,8 @@ This is a peer information store used to keep and process information regarding
 network peers and their status and addresses.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

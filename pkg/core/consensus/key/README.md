@@ -3,7 +3,8 @@
 Implements a BLS12-381 key pair.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

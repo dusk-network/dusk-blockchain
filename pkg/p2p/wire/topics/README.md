@@ -4,7 +4,8 @@ Definitions of the 1 byte message topic identifiers used in the wire encoding
 and by EventBus.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

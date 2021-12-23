@@ -1,1 +1,0 @@
-- It is important to note, that currently, the hashing functions for transactions are just marshalling the entire thing, and then hashing those bytes. In the future, we need to make sure this aligns with how Rusk will hash these transactions, as the mismatch could cause potential problems down the line.

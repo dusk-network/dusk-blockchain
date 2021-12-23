@@ -1,10 +1,11 @@
 # Workflows
 
-These are continuous integration/continuous deployment scripts for Github 
-for validating changes before merging to the main branch.
+These are continuous integration/continuous deployment scripts for Github for
+validating changes before merging to the main branch.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

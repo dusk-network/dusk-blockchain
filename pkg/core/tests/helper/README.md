@@ -3,7 +3,8 @@
 A collection of helper functions for tests in pkg/core
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

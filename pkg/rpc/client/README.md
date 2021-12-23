@@ -4,7 +4,8 @@ Client interfaces for all of the gRPC based RPC and IPC interfaces used to
 access and between Dusk blockchain and Rusk VM state machine.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

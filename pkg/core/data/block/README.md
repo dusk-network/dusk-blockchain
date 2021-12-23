@@ -4,7 +4,8 @@ Encoding, decoding and format of blocks, block headers and consensus
 certificates.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

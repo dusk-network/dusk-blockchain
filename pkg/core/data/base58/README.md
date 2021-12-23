@@ -3,7 +3,8 @@
 Encoding and decoding Base58 (no check) encoding.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

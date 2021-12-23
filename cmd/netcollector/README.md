@@ -4,7 +4,8 @@ A simple client that monitors transaction processing volumes via RPC to a Dusk
 node.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

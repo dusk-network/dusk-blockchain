@@ -1,11 +1,12 @@
 # Dusk Blockchain Packages
 
-In accordance with Go standard repository layout conventions, this folder 
-contains all of the libraries used primarily internally by applications in 
+In accordance with Go standard repository layout conventions, this folder
+contains all of the libraries used primarily internally by applications in
 the [cmd/]() folder.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

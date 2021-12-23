@@ -4,7 +4,8 @@ Tests to validate the test harness mocked node, transactions per second
 benchmark, and simulated network.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

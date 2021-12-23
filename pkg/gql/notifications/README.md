@@ -8,15 +8,17 @@ for more specific events \(e.g a client needs a notification on a specific
 tx\_hash accepted\)
 
 <!-- ToC start -->
-##  Contents
 
-   1. [Design](#design)
-   1. [Messages](#messages)
-      1. [On block accepted](#on-block-accepted)
-      1. [Configuration](#configuration)
+## Contents
+
+1. [Design](#design)
+1. [Messages](#messages)
+    1. [On block accepted](#on-block-accepted)
+    1. [Configuration](#configuration)
 1. [Number of pub/sub brokers to broadcast new blocks. ](#number-of-pub/sub-brokers-to-broadcast-new-blocks-)
 1. [0 brokersNum disables notifications system](#0-brokersnum-disables-notifications-system)
-      1. [Examples](#examples)
+    1. [Examples](#examples)
+
 <!-- ToC end -->
 
 ## Design
@@ -69,7 +71,6 @@ clientsPerBroker = 1000
 
 `TestWebsocketEndpoint` introduces a sample websocket client connecting
 to `ws://127.0.0.1:9001/ws` and consuming notifications
-
 
 Copyright © 2018-2022 Dusk Network
 [MIT Licence](https://github.com/dusk-network/dusk-blockchain/blob/master/LICENSE)

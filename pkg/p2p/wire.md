@@ -2,7 +2,8 @@
 
 ## Message encoding
 
-Messages sent over the wire are length-prefixed frames of data, with the following structure:
+Messages sent over the wire are length-prefixed frames of data, with the
+following structure:
 
 | Field | Size \(bytes\) |
 | :--- | :--- |
@@ -15,7 +16,8 @@ Messages sent over the wire are length-prefixed frames of data, with the followi
 
 ## Topics
 
-Below is a list of supported topics which can be sent and received over the wire:
+Below is a list of supported topics which can be sent and received over the
+wire:
 
 * Version
 * VerAck
@@ -35,11 +37,13 @@ Below is a list of supported topics which can be sent and received over the wire
 
 ## Common structures
 
-This section defines the common structures that are used in wire messages. Field types are denoted as their golang types.
+This section defines the common structures that are used in wire messages. Field
+types are denoted as their golang types.
 
 ### VarInt
 
-Much like VarInt in Bitcoin, it is used to encode variable sized numbers to save space.
+Much like VarInt in Bitcoin, it is used to encode variable sized numbers to save
+space.
 
 | Value | Size | Format |
 | :--- | :--- | :--- |
@@ -68,7 +72,8 @@ Protocol version, expressed in a semver format.
 | 8 | Committee Bitset Step 1 | uint64 | The committee members who voted on step 1, represented with 0 or 1 |
 | 8 | Committee Bitset Step 2 | uint64 | The committee members who voted on step 2, represented with 0 or 1 |
 
-A block certificate, proving that this block was fairly decided upon during consensus. Equivalent to a proof-of-work in Bitcoin.
+A block certificate, proving that this block was fairly decided upon during
+consensus. Equivalent to a proof-of-work in Bitcoin.
 
 ### message.InvVect
 
@@ -119,7 +124,8 @@ A block certificate, proving that this block was fairly decided upon during cons
 
 ## Message outline
 
-Below follows an outline and description for each message that can be sent and received over the wire. Field types are denoted as their golang types.
+Below follows an outline and description for each message that can be sent and
+received over the wire. Field types are denoted as their golang types.
 
 ### Version
 
@@ -129,19 +135,26 @@ Below follows an outline and description for each message that can be sent and r
 | 8 | Timestamp | int64 | UNIX timestamp of when the message was created |
 | 4 | Service flag | uint32 | Identifier for the services this node offers |
 
-A version message, which is sent when a node attempts to connect with another node in the network. The receiving node sends it's own version message back in response. Nodes should not send any other messages to each other until both of them have sent a version message.
+A version message, which is sent when a node attempts to connect with another
+node in the network. The receiving node sends it's own version message back in
+response. Nodes should not send any other messages to each other until both of
+them have sent a version message.
 
 ### VerAck
 
-This message is sent as a reply to the version message, to acknowledge a peer has received and accepted this version message. It contains no other information.
+This message is sent as a reply to the version message, to acknowledge a peer
+has received and accepted this version message. It contains no other
+information.
 
 ### Ping
 
-This message is used to inquire if a node is still active and maintaining its connection on the other end. The Ping message contains no other information.
+This message is used to inquire if a node is still active and maintaining its
+connection on the other end. The Ping message contains no other information.
 
 ### Pong
 
-This message is used to respond to other nodes' Ping messages, informing them that a connection is still being maintained. It carries no other information.
+This message is used to respond to other nodes' Ping messages, informing them
+that a connection is still being maintained. It carries no other information.
 
 ### Inv
 
@@ -150,11 +163,14 @@ This message is used to respond to other nodes' Ping messages, informing them th
 | 1-9 | Count | VarInt | Amount of items contains in the inventory message |
 | 33 \* Count | Inv List | \[\]peermsg.InvVect | Inventory items |
 
-Inventory messages are used to advertise transactions and blocks to the network. It can be received unsolicited, or as a reply to GetBlocks.
+Inventory messages are used to advertise transactions and blocks to the network.
+It can be received unsolicited, or as a reply to GetBlocks.
 
 ### GetData
 
-A GetData message is sent as a response to an inventory message, and should contain the hashes of the items that the peer wishes to receive the data for. It is structed exactly the same as the Inv message, only the header topic differs.
+A GetData message is sent as a response to an inventory message, and should
+contain the hashes of the items that the peer wishes to receive the data for. It
+is structed exactly the same as the Inv message, only the header topic differs.
 
 ### GetBlocks
 
@@ -163,7 +179,10 @@ A GetData message is sent as a response to an inventory message, and should cont
 | 1-9 | Count | VarInt | Amount of locators |
 | 32 \* Count | Locators | \[\]\[\]byte | Locator hashes, revealing a node's last known block |
 
-A GetBlocks message is sent when a block is received which has a height that is further than 1 apart from the currently known highest block. When a GetBlocks is sent, an Inv is returned containing up to 500 block hashes that the requesting peer is missing, which it can then download with GetData.
+A GetBlocks message is sent when a block is received which has a height that is
+further than 1 apart from the currently known highest block. When a GetBlocks is
+sent, an Inv is returned containing up to 500 block hashes that the requesting
+peer is missing, which it can then download with GetData.
 
 ### Block
 
@@ -179,7 +198,9 @@ A GetBlocks message is sent when a block is received which has a height that is 
 | 32 | Hash | \[\]byte | Hash of this block |
 | ?? | Txs | \[\]tx | All transactions contained in this block |
 
-A Dusk block. Note that the certificate is generated during consensus. For this reason, this field is empty when a block is transmitted with a Candidate message.
+A Dusk block. Note that the certificate is generated during consensus. For this
+reason, this field is empty when a block is transmitted with a Candidate
+message.
 
 The block hash is the hash of the following fields:
 
@@ -205,7 +226,10 @@ The block hash is the hash of the following fields:
 
 ### MemPool
 
-This message is used to request the mempool contents of another node in the network. Used by nodes which just recently joined, and wish to have an updated view of the current pending transaction queue. Responses are typically given with `Inv` messages. The message carries no other information.
+This message is used to request the mempool contents of another node in the
+network. Used by nodes which just recently joined, and wish to have an updated
+view of the current pending transaction queue. Responses are typically given
+with `Inv` messages. The message carries no other information.
 
 ### Candidate
 
@@ -213,7 +237,9 @@ This message is used to request the mempool contents of another node in the netw
 | :--- | :--- | :--- | :--- |
 | ?? | Block | Block |  |
 
-A standalone candidate block provided to a requesting node. This message will only be sent out in response to a `GetCandidate`, as the candidate block is normally included in a `NewBlock` message.
+A standalone candidate block provided to a requesting node. This message will
+only be sent out in response to a `GetCandidate`, as the candidate block is
+normally included in a `NewBlock` message.
 
 ### GetCandidate
 
@@ -221,7 +247,8 @@ A standalone candidate block provided to a requesting node. This message will on
 | :--- | :--- | :--- | :--- |
 | 32 | Block Hash | \[\]byte | Hash of the requested candidate block |
 
-This message can be used by nodes which are missing a certain candidate block at any point during consensus. Responses will be of the `Candidate` topci.
+This message can be used by nodes which are missing a certain candidate block at
+any point during consensus. Responses will be of the `Candidate` topci.
 
 ### NewBlock
 
@@ -236,7 +263,8 @@ This message can be used by nodes which are missing a certain candidate block at
 | 32 | Previous Hash | \[\]byte | Hash of the previous block |
 | ?? | Candidate | Block | Candidate block |
 
-A consensus NewBlock message, generated by an extracted Provisioner of the Selection step. It propagates the Candidate block.
+A consensus NewBlock message, generated by an extracted Provisioner of the
+Selection step. It propagates the Candidate block.
 
 ### Reduction
 
@@ -248,7 +276,8 @@ A consensus NewBlock message, generated by an extracted Provisioner of the Selec
 | 32 | Block Hash | \[\]byte | The block hash that this node is voting on |
 | 33 | Signed Hash | \[\]byte | Compressed BLS Signature of the block hash field |
 
-A reduction message, sent by provisioners during consensus. It is essentially a vote for one of the Candidate blocks they received prior to the reduction phase.
+A reduction message, sent by provisioners during consensus. It is essentially a
+vote for one of the Candidate blocks they received prior to the reduction phase.
 
 ### Agreement
 
@@ -261,5 +290,7 @@ A reduction message, sent by provisioners during consensus. It is essentially a 
 | 2\*?? | Votes | \[\]StepVotes | The compressed representation of the votes that were cast during a step |
 | ?? | Committee Representation | big.Int | Bitmap representation of committee members which voted |
 
-An agreement message, sent by provisioners during consensus. It's a compressed collection of all the votes that were cast in 2 steps of reduction, and is paramount in reaching consensus on a certain block.
+An agreement message, sent by provisioners during consensus. It's a compressed
+collection of all the votes that were cast in 2 steps of reduction, and is
+paramount in reaching consensus on a certain block.
 

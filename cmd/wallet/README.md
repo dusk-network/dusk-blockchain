@@ -4,7 +4,8 @@ The entrypoint for running the Dusk CLI wallet (RPC client and keychain for
 performing transactions)
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

@@ -4,15 +4,17 @@ Simple short-message (max one UDP packet) reliable transport protocol using
 Raptor FEC codes for retransmit-avoidance.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 1. [Raptor code over User Datagram Protocol](#raptor-code-over-user-datagram-protocol)
-   1. [Writer](#writer)
-   1. [## Writer](#-writer)
-      1. [Tuning](#tuning)
-   1. [Reader](#reader)
-   1. [## Reader](#-reader)
-      1. [Tuning](#tuning-1)
+    1. [Writer](#writer)
+    1. [## Writer](#-writer)
+        1. [Tuning](#tuning)
+    1. [Reader](#reader)
+    1. [## Reader](#-reader)
+        1. [Tuning](#tuning-1)
+
 <!-- ToC end -->
 
 # Raptor code over User Datagram Protocol

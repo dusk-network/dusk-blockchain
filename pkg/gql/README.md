@@ -4,12 +4,13 @@ A websocket and GraphQL enabled RPC for searching the blockchain database,
 including subscriptions to notifications.
 
 <!-- ToC start -->
-##  Contents
 
-   1. [Intro](#intro)
-      1. [API Endpoints](#api-endpoints)
-      1. [Scenarios](#scenarios)
-   1. [Configuration](#configuration)
+## Contents
+
+1. [Intro](#intro)
+    1. [API Endpoints](#api-endpoints)
+    1. [Scenarios](#scenarios)
+1. [Configuration](#configuration)
 1. [GraphQL API service](#graphql-api-service)
 1. [enable graphql service](#enable-graphql-service)
 1. [enable/disable both HTTPS and WSS](#enable/disable-both-https-and-wss)
@@ -18,11 +19,16 @@ including subscriptions to notifications.
 1. [maximum requests per second ](#maximum-requests-per-second-)
 1. [uniqueness of a request is based on: ](#uniqueness-of-a-request-is-based-on:-)
 1. [Remote IP, Request method and path](#remote-ip-request-method-and-path)
-   1. [Example queries](#example-queries)
+    1. [Example queries](#example-queries)
+
 <!-- ToC end -->
+
 ## Intro
 
-GraphQL package is here to provide a read-only access to any persistent/non-persistent node data. It is intended to play the same role to DUSK Blockchain data as SQL to RDBMS, providing query flexibility and multiple-fetches in single a query.
+GraphQL package is here to provide a read-only access to any
+persistent/non-persistent node data. It is intended to play the same role to
+DUSK Blockchain data as SQL to RDBMS, providing query flexibility and
+multiple-fetches in single a query.
 
 It should allow fetching:
 
@@ -70,7 +76,8 @@ maxRequestLimit = 20
 
 ## Example queries
 
-NB: The examples from below represent only query structures. To send a query as a http request the following schema must be used:
+NB: The examples from below represent only query structures. To send a query as
+a http request the following schema must be used:
 
 ```javascript
 {  
@@ -272,6 +279,7 @@ NB: The examples from below represent only query structures. To send a query as 
   ```
 
 - Calculate count of blocks (tip - old height) since 1970-01-01T00:00:20+00:00
+
 ```graphql
 {
 	tip: blocks(height: -1) {

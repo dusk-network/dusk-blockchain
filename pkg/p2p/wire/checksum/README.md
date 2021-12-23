@@ -4,7 +4,8 @@ Checksum algorithm used in wire messages to ensure error free reception. Based
 on a truncated blake2b hash.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

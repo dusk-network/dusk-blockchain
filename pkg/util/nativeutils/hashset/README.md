@@ -3,7 +3,8 @@
 A concurrent safe hash set implementation.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

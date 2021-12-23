@@ -4,7 +4,8 @@ This is a large number of libraries from the pub/sub broker eventbus, logging,
 error handling, a transmission protocol, two different set implementations.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

@@ -4,7 +4,8 @@ Watchdog process that automates the renewal of staking contracts the user
 intends to continuously maintain.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

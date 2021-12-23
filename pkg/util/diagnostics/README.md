@@ -3,7 +3,8 @@
 Instrumentation for using profiling with Dusk.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

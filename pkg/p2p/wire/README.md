@@ -304,7 +304,7 @@ buf := bytes.NewBuffer(bs)
 err := StealthTX.Encode(buf)
 ```
 
----
+
 
 todo: there might be some duplication as this page merges two nearly similar
 documents that didn't live in the same place.

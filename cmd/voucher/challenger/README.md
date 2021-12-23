@@ -4,7 +4,8 @@ This package provides the protocols for assessing a valid and correctly
 functioning peer on the Dusk network
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

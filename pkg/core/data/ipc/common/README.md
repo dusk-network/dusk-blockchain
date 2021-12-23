@@ -3,7 +3,8 @@
 Echo implementation to ping Rusk server.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

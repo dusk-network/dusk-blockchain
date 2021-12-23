@@ -1,11 +1,12 @@
 # [pkg/core](./pkg/core)
 
-This folder contains all of the libraries that implement the functionality 
-of everything that interacts with the internals of the Node - consensus, 
-storage and validation.
+This folder contains all of the libraries that implement the functionality of
+everything that interacts with the internals of the Node - consensus, storage
+and validation.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

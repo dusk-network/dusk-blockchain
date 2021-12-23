@@ -1,14 +1,16 @@
 # Documentation for Dusk Blockchain Node
 
-This will be the central point from which users can orient in order to
-discover the relevant documentation for their questions and purposes.
+This will be the central point from which users can orient in order to discover
+the relevant documentation for their questions and purposes.
 
 <!-- ToC start -->
-##  Contents
 
-   1. [Software Licences](#software-licences)
-   1. [Internal use documents](#internal-use-documents)
-   1. [Elastic Stack on Docker](#elastic-stack-on-docker)
+## Contents
+
+1. [Software Licences](#software-licences)
+1. [Internal use documents](#internal-use-documents)
+1. [Elastic Stack on Docker](#elastic-stack-on-docker)
+
 <!-- ToC end -->
 
 ## Software Licences
@@ -18,8 +20,8 @@ redistributed in whole or part within this repository.
 
 ## Internal use documents
 
-[internal/zenhub.md](./internal/zenhub.md) regarding the special
-considerations for facilitating the use of Zenhub for project management.
+[internal/zenhub.md](./internal/zenhub.md) regarding the special considerations
+for facilitating the use of Zenhub for project management.
 
 ## Elastic Stack on Docker
 

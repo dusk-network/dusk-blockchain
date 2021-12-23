@@ -3,7 +3,8 @@
 Encoding formats for integers and variable sized raw bytes.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

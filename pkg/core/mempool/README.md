@@ -5,12 +5,14 @@ DB transaction layer\). A blockchain transaction has one of a finite number of
 states at any given time. Below are listed the logical states of a transaction.
 
 <!-- ToC start -->
-##  Contents
 
-   1. [States](#states)
-   1. [Mempool responsibilities:](#mempool-responsibilities:)
-   1. [Implementation](#implementation)
-      1. [Underlying pool](#underlying-pool)
+## Contents
+
+1. [States](#states)
+1. [Mempool responsibilities:](#mempool-responsibilities:)
+1. [Implementation](#implementation)
+    1. [Underlying pool](#underlying-pool)
+
 <!-- ToC end -->
 
 ## States

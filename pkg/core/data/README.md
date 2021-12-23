@@ -4,7 +4,8 @@ Definitions of data types and interfaces used in the core components and their
 codecs for wire and storage purposes.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 

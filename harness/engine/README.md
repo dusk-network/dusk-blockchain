@@ -5,7 +5,8 @@ graphql and grpc endpoint, and managed simulated network between each spawned
 node.
 
 <!-- ToC start -->
-##  Contents
+
+## Contents
 
 <!-- ToC end -->
 
