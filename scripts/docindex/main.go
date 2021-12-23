@@ -26,25 +26,26 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
+	
 	fmt.Fprintln(target, indexHeader)
-
+	
 	err = filepath.Walk(root,
 		func(path string, info os.FileInfo, err error) error {
-
+			
 			if strings.HasSuffix(path, "README.md") {
-
+				
 				fmt.Fprintf(target, "### [%s](./%s)\n\n", path, path)
-
+				
+				path = filepath.Join(root, filepath.Clean(path))
 				src, err := ioutil.ReadFile(path)
 				if err != nil {
 					return nil
 				}
-
+				
 				split := strings.Split(string(src), "<!-- ToC start -->")
 				sc := bufio.NewScanner(strings.NewReader(split[0]))
 				var lines []string
-
+				
 				for sc.Scan() {
 					txt := sc.Text()
 					// skip the header and blank lines
@@ -52,16 +53,16 @@ func main() {
 						lines = append(lines, sc.Text())
 					}
 				}
-
+				
 				trimmed := strings.TrimSpace(strings.Join(lines, "\n"))
-
+				
 				fmt.Fprintln(target, trimmed)
 			}
-
+			
 			return nil
 		},
 	)
-
+	
 	if err != nil {
 		fmt.Println("error:", err)
 	}
