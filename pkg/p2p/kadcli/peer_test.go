@@ -73,16 +73,20 @@ func (n *NetworkServer) Listen(in *rusk.Null, srv rusk.Network_ListenServer) err
 
 // Broadcast a message to the network.
 func (n *NetworkServer) Broadcast(ctx context.Context, msg *rusk.BroadcastMessage) (*rusk.Null, error) {
-	return nil, nil
+	fmt.Println("server.Broadcast: ", msg.KadcastHeight)
+	res := &rusk.Null{}
+	return res, nil
 }
 
 // Send a message to a specific target in the network.
 func (n *NetworkServer) Send(ctx context.Context, msg *rusk.SendMessage) (*rusk.Null, error) {
-	return nil, nil
+	fmt.Println("server.Send: ", msg.TargetAddress)
+	res := &rusk.Null{}
+	return res, nil
 }
 
 // NewRuskMock creates a Rusk Network server mock for tests.
-func NewRuskMock(gossip *protocol.Gossip, errChan chan error) (*NetworkServer, error) {
+func NewRuskMock(gossip *protocol.Gossip, errChan chan error) (*grpc.Server, error) {
 	// create listener
 	l, err := net.Listen("tcp", RUSK_ADDR)
 	if err != nil {
@@ -104,7 +108,7 @@ func NewRuskMock(gossip *protocol.Gossip, errChan chan error) (*NetworkServer, e
 		}
 	}()
 
-	return srv, nil
+	return s, nil
 }
 
 // TestListenStreamReader tests the kadcli.Reader receiving a block
@@ -131,16 +135,16 @@ func TestListenStreamReader(t *testing.T) {
 	p.Register(topics.Block, respFn)
 
 	// Create a rusk mock server
-	_, err := NewRuskMock(g, errChan)
+	srv, err := NewRuskMock(g, errChan)
 	if err != nil {
 		t.Fatalf("rusk mock failed: %v", err)
 	}
 
 	// Create a client that connects to rusk mock server
-	_, grpConn := client.CreateNetworkClient(context.Background(), RUSK_ADDR)
+	_, grpcConn := client.CreateNetworkClient(context.Background(), RUSK_ADDR)
 
 	// Create our kadcli (gRPC) Reader
-	r := NewReader(eb, g, p, grpConn)
+	r := NewReader(eb, g, p, grpcConn)
 
 	// Subscribe to gRPC stream
 	go r.Listen()
@@ -155,4 +159,89 @@ func TestListenStreamReader(t *testing.T) {
 		assert.True(b.Header.Height == 5525)
 		assert.True(len(b.Txs) == 12)
 	}
+
+	// Disconnect client and stop server
+	grpcConn.Close()
+	srv.Stop()
+}
+
+// TestBroadcastWriter tests the kadcli.Writer by broadcasting
+// a block via rusk:Network.Broadcast endpoint
+func TestBroadcastWriter(t *testing.T) {
+
+	assert := assert.New(t)
+	rcvChan := make(chan message.Message)
+	errChan := make(chan error)
+
+	// Basic infrastructure
+	eb := eventbus.New()
+	p := peer.NewMessageProcessor(eb)
+	g := protocol.NewGossip(protocol.TestNet)
+
+	// Have a callback ready on Block topic to capture the broadcasted message
+	respFn := func(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
+		if srcPeerID != RUSK_ADDR {
+			errChan <- errors.New("callback: wrong source address")
+			return nil, nil
+		}
+		rcvChan <- m
+		return nil, nil
+	}
+	p.Register(topics.Block, respFn)
+
+	// Create a rusk mock server
+	srv, err := NewRuskMock(g, errChan)
+	if err != nil {
+		t.Fatalf("rusk mock failed: %v", err)
+	}
+
+	// Create a client that connects to rusk mock server
+	_, grpcConn := client.CreateNetworkClient(context.Background(), RUSK_ADDR)
+
+	// Create our kadcli (gRPC) Reader and Writer
+	r := NewReader(eb, g, p, grpcConn)
+	w := NewWriter(eb, g, grpcConn)
+
+	// Subscribe to gRPC stream
+	go r.Listen()
+
+	// Prepare a block message
+	buf := new(bytes.Buffer)
+
+	// Using a block as an example
+	blk := helper.RandomBlock(5525, 10)
+	if err := message.MarshalBlock(buf, blk); err != nil {
+		t.Errorf("failed to marshal block: %v", err)
+	}
+
+	// Add topic to message
+	if err := topics.Prepend(buf, topics.Block); err != nil {
+		t.Errorf("failed to add topic: %v", err)
+	}
+
+	// Make it protocol-ready
+	if err := g.Process(buf); err != nil {
+		t.Errorf("failed to process (gossip): %v", err)
+	}
+
+	// Send a broadcast message
+	if err := w.WriteToAll(buf.Bytes(), []byte{127}, 0); err != nil {
+		t.Errorf("failed to broadcast: %v", err)
+	}
+
+	// Process status/output
+	select {
+	case err := <-errChan:
+		t.Fatal(err)
+	case m := <-rcvChan:
+		b := m.Payload().(block.Block)
+		assert.True(m.Category() == topics.Block)
+		assert.True(b.Header.Height == 5525)
+		assert.True(len(b.Txs) == 12)
+	}
+
+	// Disconnect client and stop server
+	grpcConn.Close()
+	srv.Stop()
+
 }
