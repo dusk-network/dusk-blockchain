@@ -1,15 +1,25 @@
 # [scripts/md2godoc](./scripts/md2godoc)
 
-Go has a reasonably decent inline documentation generation protocol called 
-'godoc', which captures and processes text found in specific locations in a 
+Automatically create godoc package headers from README.md's
+
+<!-- ToC start -->
+
+## Contents
+
+<!-- ToC end -->
+
+## Abstract 
+
+Go has a reasonably decent inline documentation generation protocol called
+'godoc', which captures and processes text found in specific locations in a
 source file comment blocks.
 
-Due to the ambiguous definition of where the package header text should come 
+Due to the ambiguous definition of where the package header text should come
 from, and the many quirks of the format, basically, the comment on line zero,
-and as such many projects, such as [btcd](https://github.com/btcsuite/btcd) 
+and as such many projects, such as [btcd](https://github.com/btcsuite/btcd)
 designate a `doc.go` to hold this, and leave the rest of the headers empty.
 
-Well, Dusk sources have a copyright header in this position also. But also, 
+Well, Dusk sources have a copyright header in this position also. But also,
 [godoc for this repository](https://pkg.go.dev/github.com/dusk-network/dusk-blockchain)
 - the site - shows the `README.md`.
 
@@ -19,15 +29,9 @@ which shows the readme is displayed.
 This is all very well, but [with the docs.go in place](https://pkg.go.dev/github.com/golang/mock/gomock)
 the documentation being shown is in the source code comments.
 
-To cut a very long story short, this script lets you treat the markdown as 
-the single place to edit the documentation, while exporting this with 
+To cut a very long story short, this script lets you treat the markdown as
+the single place to edit the documentation, while exporting this with
 minimum pain to also show correctly on godoc, even offline.
-
-<!-- ToC start -->
-
-## Contents
-
-<!-- ToC end -->
 
 ## Implementation Notes
 
