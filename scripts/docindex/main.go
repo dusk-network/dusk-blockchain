@@ -19,21 +19,15 @@ import (
 //go:embed indexheader.md
 var indexHeader string
 
+var root = "."
+
 func main() {
-	
-	if len(os.Args) < 2 {
-		fmt.Println("file path of the repository is required")
-		os.Exit(1)
-	}
-	
 	target, err := os.OpenFile("./index.md", os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
 		panic(err)
 	}
 	
 	fmt.Fprintln(target, indexHeader)
-	
-	root := os.Args[1]
 	
 	err = filepath.Walk(root,
 		func(path string, info os.FileInfo, err error) error {
