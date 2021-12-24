@@ -103,7 +103,7 @@ func TestBroadcastWriter(t *testing.T) {
 	cli := NewMockNetworkClient(rcvChan)
 
 	// create our kadcli Writer
-	w := NewWriter(eb, g, cli)
+	w := NewWriter(eb, cli)
 
 	// create a mock message
 	buf, err := createBlockMessage()
@@ -140,7 +140,19 @@ func TestBroadcastWriter(t *testing.T) {
 		t.Error("invalid checksum")
 	}
 	// validate message content
-	// TODO
+	if len(msg) == 0 {
+		t.Error("empty packet received")
+	}
+	rb := bytes.NewBuffer(msg)
+	topic := topics.Topic(rb.Bytes()[0])
+	assert.True(topic == topics.Block)
+	res, err := message.Unmarshal(rb, []byte{})
+	if err != nil {
+		t.Error("failed to unmarshal")
+	}
+	if _, ok := res.Payload().(block.Block); !ok {
+		t.Error("failed to cast to block")
+	}
 }
 
 //

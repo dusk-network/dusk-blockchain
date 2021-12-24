@@ -7,11 +7,9 @@
 package kadcli
 
 import (
-	"bytes"
 	"context"
 	"errors"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -21,7 +19,6 @@ import (
 // other network nodes.
 type Writer struct {
 	subscriber eventbus.Subscriber
-	gossip     *protocol.Gossip
 
 	kadcastSubscription      uint32
 	kadcastPointSubscription uint32
@@ -32,10 +29,9 @@ type Writer struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine.
-func NewWriter(s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient) *Writer {
+func NewWriter(s eventbus.Subscriber, rusk rusk.NetworkClient) *Writer {
 	return &Writer{
 		subscriber: s,
-		gossip:     g,
 		cli:        rusk,
 	}
 }
@@ -51,6 +47,7 @@ func (w *Writer) Serve() {
 }
 
 // Write sends a message through the Kadcast gRPC interface.
+// Note: Assumes the message is properly encoded (no pre-processing done here)
 func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
 	// check header
 	if len(header) == 0 {
@@ -76,37 +73,30 @@ func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
 }
 
 // WriteToAll broadcasts message to the entire network.
+// The kadcast height is read from message Header.
+// Note: Assumes the message is properly encoded (no pre-processing done here)
 func (w *Writer) WriteToAll(data, header []byte, priority byte) error {
 	// check header
 	if len(header) == 0 {
 		return errors.New("empty message header")
 	}
-	// create the message
-	b := bytes.NewBuffer(data)
-	if err := w.gossip.Process(b); err != nil {
-		return err
-	}
 	// exctract kadcast height
 	height := header[0]
 	// broadcast
-	return w.broadcastPacket(height, b.Bytes())
+	return w.broadcastPacket(height, data)
 }
 
 // WriteToPoint writes a message to a single destination.
 // The receiver address is read from message Header.
+// Note: Assumes the message is properly encoded (no pre-processing done here)
 func (w *Writer) WriteToPoint(data, header []byte, priority byte) error {
 	// check header
 	if len(header) == 0 {
 		return errors.New("empty message header")
 	}
-	// create the message
-	b := bytes.NewBuffer(data)
-	if err := w.gossip.Process(b); err != nil {
-		return err
-	}
 	// extract destination address
 	addr := string(header)
-	return w.sendPacket(addr, b.Bytes())
+	return w.sendPacket(addr, data)
 }
 
 // BroadcastPacket passes a message to the kadkast peer to be broadcasted.
