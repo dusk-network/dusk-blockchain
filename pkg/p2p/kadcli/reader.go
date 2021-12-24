@@ -28,7 +28,7 @@ type Reader struct {
 	gossip    *protocol.Gossip
 
 	cli  rusk.NetworkClient
-	stop chan bool
+	stop context.CancelFunc
 }
 
 // NewReader makes a new kadcast reader that handles TCP packets of broadcasting.
@@ -37,7 +37,6 @@ func NewReader(publisher eventbus.Publisher, g *protocol.Gossip, p *peer.Message
 		processor: p,
 		gossip:    g,
 		cli:       rusk,
-		stop:      make(chan bool),
 	}
 }
 
@@ -50,15 +49,15 @@ func (r *Reader) Listen() {
 		return
 	}
 
-	// create stop channel
-	r.stop = make(chan bool)
+	// create a context
+	ctx, cancel := context.WithCancel(context.Background())
+	r.stop = cancel
 
 	// listen for messages
 	go func() {
-		// TODO: deadline/ttl?
 		for {
 			select {
-			case <-r.stop:
+			case <-ctx.Done():
 				return
 			default:
 				// receive a message
@@ -116,7 +115,6 @@ func (r *Reader) processMessage(message *rusk.Message) {
 
 // Close closes reader TCP listener.
 func (r *Reader) Close() error {
-	r.stop <- true
-	close(r.stop)
+	r.stop()
 	return nil
 }

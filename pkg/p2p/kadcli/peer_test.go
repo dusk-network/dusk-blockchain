@@ -89,9 +89,8 @@ func TestListenStreamReader(t *testing.T) {
 }
 
 // TestBroadcastWriter tests the kadcli.Writer by broadcasting
-// a block message through a mocked rusk client
+// a block message through a mocked rusk client.
 func TestBroadcastWriter(t *testing.T) {
-
 	assert := assert.New(t)
 	rcvChan := make(chan *rusk.BroadcastMessage)
 
@@ -113,8 +112,8 @@ func TestBroadcastWriter(t *testing.T) {
 
 	go func() {
 		// send a broadcast message
-		if err := w.WriteToAll(buf.Bytes(), []byte{127}, 0); err != nil {
-			t.Errorf("failed to broadcast: %v", err)
+		if errw := w.WriteToAll(buf.Bytes(), []byte{127}, 0); errw != nil {
+			t.Errorf("failed to broadcast: %v", errw)
 		}
 	}()
 
@@ -143,13 +142,16 @@ func TestBroadcastWriter(t *testing.T) {
 	if len(msg) == 0 {
 		t.Error("empty packet received")
 	}
+	// check topic
 	rb := bytes.NewBuffer(msg)
 	topic := topics.Topic(rb.Bytes()[0])
 	assert.True(topic == topics.Block)
+	// unmarshal message
 	res, err := message.Unmarshal(rb, []byte{})
 	if err != nil {
 		t.Error("failed to unmarshal")
 	}
+	// check payload
 	if _, ok := res.Payload().(block.Block); !ok {
 		t.Error("failed to cast to block")
 	}
@@ -234,16 +236,18 @@ type MockNetworkClient struct {
 	msgChan chan *rusk.BroadcastMessage
 }
 
-// NewMockNetworkClient returns a new instance of a mock network client
+// NewMockNetworkClient returns a new instance of a mock network client.
 func NewMockNetworkClient(msgChan chan *rusk.BroadcastMessage) *MockNetworkClient {
 	return &MockNetworkClient{
 		msgChan: msgChan,
 	}
 }
 
-// Broadcast will check the message is formatted properly
+// Broadcast will check the message is formatted properly.
 func (c *MockNetworkClient) Broadcast(ctx context.Context, in *rusk.BroadcastMessage, opts ...grpc.CallOption) (*rusk.Null, error) {
+	// send message back
 	c.msgChan <- in
+	// return
 	res := &rusk.Null{}
 	return res, nil
 }
@@ -264,7 +268,7 @@ func (c *MockNetworkClient) Send(ctx context.Context, in *rusk.SendMessage, opts
 //
 
 // createBlockMessage returns a properly encoded wire message
-// containing a random block
+// containing a random block.
 func createBlockMessage() (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	g := protocol.NewGossip(protocol.TestNet)

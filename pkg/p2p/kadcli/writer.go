@@ -47,7 +47,7 @@ func (w *Writer) Serve() {
 }
 
 // Write sends a message through the Kadcast gRPC interface.
-// Note: Assumes the message is properly encoded (no pre-processing done here)
+// Note: Assumes the message is properly encoded (no pre-processing done here).
 func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
 	// check header
 	if len(header) == 0 {
@@ -74,7 +74,7 @@ func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
 
 // WriteToAll broadcasts message to the entire network.
 // The kadcast height is read from message Header.
-// Note: Assumes the message is properly encoded (no pre-processing done here)
+// Note: Assumes the message is properly encoded (no pre-processing done here).
 func (w *Writer) WriteToAll(data, header []byte, priority byte) error {
 	// check header
 	if len(header) == 0 {
@@ -88,7 +88,7 @@ func (w *Writer) WriteToAll(data, header []byte, priority byte) error {
 
 // WriteToPoint writes a message to a single destination.
 // The receiver address is read from message Header.
-// Note: Assumes the message is properly encoded (no pre-processing done here)
+// Note: Assumes the message is properly encoded (no pre-processing done here).
 func (w *Writer) WriteToPoint(data, header []byte, priority byte) error {
 	// check header
 	if len(header) == 0 {
