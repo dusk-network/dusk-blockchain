@@ -4,7 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-package kadcli
+package kadcast
 
 import (
 	"bytes"

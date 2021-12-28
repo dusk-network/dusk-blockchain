@@ -4,7 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-package kadcli
+package kadcast
 
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
@@ -29,12 +29,13 @@ type Peer struct {
 	r *Reader
 }
 
-// NewCliPeer makes a kadcli peer instance.
-func NewCliPeer(eventBus *eventbus.EventBus, processor *peer.MessageProcessor, gossip *protocol.Gossip) *Peer {
+// NewKadcastPeer returns a new kadcast (gRPC interface) peer instance.
+func NewKadcastPeer(eventBus *eventbus.EventBus, processor *peer.MessageProcessor, gossip *protocol.Gossip) *Peer {
 	return &Peer{eventBus: eventBus, processor: processor, gossip: gossip}
 }
 
-// Launch starts kadcli service and connects to server.
+// Launch starts kadcast peer reader and writers, binds them to the event buss,
+// and establishes connection to rusk network server.
 func (p *Peer) Launch(conn *grpc.ClientConn) {
 	// gRPC rusk client
 	ruskc := rusk.NewNetworkClient(conn)
@@ -46,7 +47,7 @@ func (p *Peer) Launch(conn *grpc.ClientConn) {
 	go p.r.Listen()
 }
 
-// Close terminates kadcli service.
+// Close terminates kadcast peer instance.
 func (p *Peer) Close() {
 	// close writer
 	if p.w != nil {
