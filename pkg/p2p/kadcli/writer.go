@@ -7,9 +7,11 @@
 package kadcli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
@@ -19,20 +21,28 @@ import (
 // other network nodes.
 type Writer struct {
 	subscriber eventbus.Subscriber
+	gossip     *protocol.Gossip
 
 	kadcastSubscription      uint32
 	kadcastPointSubscription uint32
 
-	cli rusk.NetworkClient
+	client rusk.NetworkClient
+
+	context context.Context
+	stop    context.CancelFunc
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine.
-func NewWriter(s eventbus.Subscriber, rusk rusk.NetworkClient) *Writer {
+func NewWriter(s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient) *Writer {
+	ctx, stop := context.WithCancel(context.TODO())
 	return &Writer{
 		subscriber: s,
-		cli:        rusk,
+		gossip:     g,
+		client:     rusk,
+		context:    ctx,
+		stop:       stop,
 	}
 }
 
@@ -58,11 +68,11 @@ func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
 		var err error
 		// send a p2p message
 		if len(header) > 1 {
-			err = w.WriteToPoint(data, header, priority)
+			err = w.writeToPoint(data, header, priority)
 		}
 		// broadcast a message
 		if len(header) == 1 {
-			err = w.WriteToAll(data, header, priority)
+			err = w.writeToAll(data, header, priority)
 		}
 		// log errors
 		if err != nil {
@@ -72,63 +82,63 @@ func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
 	return 0, nil
 }
 
-// WriteToAll broadcasts message to the entire network.
+// writeToAll broadcasts message to the entire network.
 // The kadcast height is read from message Header.
-// Note: Assumes the message is properly encoded (no pre-processing done here).
-func (w *Writer) WriteToAll(data, header []byte, priority byte) error {
+func (w *Writer) writeToAll(data, header []byte, _ byte) error {
 	// check header
 	if len(header) == 0 {
 		return errors.New("empty message header")
 	}
-	// exctract kadcast height
-	height := header[0]
-	// broadcast
-	return w.broadcastPacket(height, data)
+	// create the message
+	b := bytes.NewBuffer(data)
+	if err := w.gossip.Process(b); err != nil {
+		return err
+	}
+	// extract kadcast height
+	height := uint32(header[0])
+	// prepare message
+	m := &rusk.BroadcastMessage{
+		KadcastHeight: height,
+		Message:       b.Bytes(),
+	}
+	// broadcast message
+	if _, err := w.client.Broadcast(w.context, m); err != nil {
+		log.WithError(err).Warn("failed to broadcast message")
+		return err
+	}
+	return nil
 }
 
-// WriteToPoint writes a message to a single destination.
+// writeToPoint writes a message to a single destination.
 // The receiver address is read from message Header.
-// Note: Assumes the message is properly encoded (no pre-processing done here).
-func (w *Writer) WriteToPoint(data, header []byte, priority byte) error {
+func (w *Writer) writeToPoint(data, header []byte, _ byte) error {
 	// check header
 	if len(header) == 0 {
 		return errors.New("empty message header")
+	}
+	// create the message
+	b := bytes.NewBuffer(data)
+	if err := w.gossip.Process(b); err != nil {
+		return err
 	}
 	// extract destination address
 	addr := string(header)
-	return w.sendPacket(addr, data)
-}
-
-// BroadcastPacket passes a message to the kadkast peer to be broadcasted.
-func (w *Writer) broadcastPacket(maxHeight byte, payload []byte) error {
-	h := uint32(maxHeight)
-	m := &rusk.BroadcastMessage{
-		KadcastHeight: h,
-		Message:       payload,
-	}
-	// broadcast message
-	if _, err := w.cli.Broadcast(context.TODO(), m); err != nil {
-		log.WithError(err).Warn("failed to broadcast message")
-		return err
-	}
-	return nil
-}
-
-// sendPacket passes a message to the kadkast peer to be sent to a peer.
-func (w *Writer) sendPacket(addr string, payload []byte) error {
+	// prepare message
 	m := &rusk.SendMessage{
 		TargetAddress: addr,
-		Message:       payload,
+		Message:       b.Bytes(),
 	}
-	if _, err := w.cli.Send(context.TODO(), m); err != nil {
+	// send message
+	if _, err := w.client.Send(w.context, m); err != nil {
 		log.WithError(err).Warn("failed to broadcast message")
 		return err
 	}
 	return nil
 }
 
-// Close unsubscribes from eventbus events.
+// Close unsubscribes from eventbus events and cancels any remaining writes.
 func (w *Writer) Close() error {
+	w.stop()
 	w.subscriber.Unsubscribe(topics.Kadcast, w.kadcastSubscription)
 	w.subscriber.Unsubscribe(topics.KadcastPoint, w.kadcastPointSubscription)
 	return nil

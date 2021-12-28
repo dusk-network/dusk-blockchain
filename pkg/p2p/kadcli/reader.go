@@ -27,8 +27,8 @@ type Reader struct {
 	processor *peer.MessageProcessor
 	gossip    *protocol.Gossip
 
-	cli  rusk.NetworkClient
-	stop context.CancelFunc
+	client rusk.NetworkClient
+	stop   context.CancelFunc
 }
 
 // NewReader makes a new kadcast reader that handles TCP packets of broadcasting.
@@ -36,16 +36,16 @@ func NewReader(publisher eventbus.Publisher, g *protocol.Gossip, p *peer.Message
 	return &Reader{
 		processor: p,
 		gossip:    g,
-		cli:       rusk,
+		client:    rusk,
 	}
 }
 
 // Listen starts accepting and processing stream data.
 func (r *Reader) Listen() {
 	// create stream handler
-	stream, err := r.cli.Listen(context.Background(), &rusk.Null{})
+	stream, err := r.client.Listen(context.Background(), &rusk.Null{})
 	if err != nil {
-		log.Fatalf("open stream error %v", err)
+		log.WithError(err).Fatal("open stream error")
 		return
 	}
 
@@ -63,10 +63,10 @@ func (r *Reader) Listen() {
 				// receive a message
 				msg, err := stream.Recv()
 				if err == io.EOF {
-					// TODO: Notify someone? Retry mechanism?
+					log.Warnln("reader reached EOF")
 					return
 				} else if err != nil {
-					log.Fatalf("recv error %v", err)
+					log.WithError(err).Fatal("receive error")
 				}
 				// Message received
 				go r.processMessage(msg)
@@ -82,7 +82,8 @@ func (r *Reader) processMessage(message *rusk.Message) {
 	// read message (extract length and magic)
 	b, err := r.gossip.ReadMessage(reader)
 	if err != nil {
-		log.WithError(err).Warnln("error reading message")
+		log.WithField("r_addr", message.Metadata.SrcAddress).
+			WithError(err).Warnln("error reading message")
 		return
 	}
 	// extract checksum

@@ -39,7 +39,7 @@ func (p *Peer) Launch(conn *grpc.ClientConn) {
 	// gRPC rusk client
 	ruskc := rusk.NewNetworkClient(conn)
 	// a writer for Kadcast messages
-	p.w = NewWriter(p.eventBus, ruskc)
+	p.w = NewWriter(p.eventBus, p.gossip, ruskc)
 	go p.w.Serve()
 	// a reader for Kadcast messages
 	p.r = NewReader(p.eventBus, p.gossip, p.processor, ruskc)

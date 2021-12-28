@@ -93,7 +93,7 @@ type mockVerifier struct {
 
 func (v *mockVerifier) VerifyTransaction(ctx context.Context, cc ContractCall) error {
 	if IsMockInvalid(cc) {
-		return errors.New("Invalid transaction")
+		return errors.New("invalid transaction")
 	}
 
 	if v.verifyTransactionLatency > 0 {

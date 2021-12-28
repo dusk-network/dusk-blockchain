@@ -390,11 +390,10 @@ func setupGRPCClients(ctx context.Context) (transactions.Proxy, *grpc.ClientConn
 	keysClient, _ := client.CreateKeysClient(ctx, addr)
 	transferClient, _ := client.CreateTransferClient(ctx, addr)
 	stakeClient, _ := client.CreateStakeClient(ctx, addr)
-	networkClient, _ := client.CreateNetworkClient(ctx, addr)
 
 	txTimeout := time.Duration(cfg.Get().RPC.Rusk.ContractTimeout) * time.Millisecond
 	defaultTimeout := time.Duration(cfg.Get().RPC.Rusk.DefaultTimeout) * time.Millisecond
-	return transactions.NewProxy(ruskClient, keysClient, transferClient, stakeClient, networkClient, txTimeout, defaultTimeout), ruskConn
+	return transactions.NewProxy(ruskClient, keysClient, transferClient, stakeClient, txTimeout, defaultTimeout), ruskConn
 }
 
 func loadWallet(password string) (*wallet.Wallet, error) {

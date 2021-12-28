@@ -102,7 +102,8 @@ func TestBroadcastWriter(t *testing.T) {
 	cli := NewMockNetworkClient(rcvChan)
 
 	// create our kadcli Writer
-	w := NewWriter(eb, cli)
+	w := NewWriter(eb, g, cli)
+	w.Serve()
 
 	// create a mock message
 	buf, err := createBlockMessage()
@@ -110,12 +111,13 @@ func TestBroadcastWriter(t *testing.T) {
 		t.Errorf("fail to create msg: %v", err)
 	}
 
-	go func() {
-		// send a broadcast message
-		if errw := w.WriteToAll(buf.Bytes(), []byte{127}, 0); errw != nil {
-			t.Errorf("failed to broadcast: %v", errw)
-		}
-	}()
+	// send a broadcast message
+	pubm := message.NewWithHeader(topics.Block, *buf, []byte{127})
+
+	errList := eb.Publish(topics.Kadcast, pubm)
+	if len(errList) > 0 {
+		t.Fatal("error publishing to evt bus")
+	}
 
 	// process status/output
 	m := <-rcvChan
@@ -174,7 +176,10 @@ func (n *MockNetworkServer) Listen(in *rusk.Null, srv rusk.Network_ListenServer)
 	if err != nil {
 		return fmt.Errorf("fail to create msg: %v", err)
 	}
-
+	// make it protocol-ready
+	if err := n.g.Process(buf); err != nil {
+		return fmt.Errorf("failed to process (gossip): %v", err)
+	}
 	// prepare the grpc message
 	msg := &rusk.Message{
 		Message: buf.Bytes(),
@@ -271,7 +276,6 @@ func (c *MockNetworkClient) Send(ctx context.Context, in *rusk.SendMessage, opts
 // containing a random block.
 func createBlockMessage() (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
-	g := protocol.NewGossip(protocol.TestNet)
 	// Create the random block and marshal it
 	blk := helper.RandomBlock(5525, 10)
 	if err := message.MarshalBlock(buf, blk); err != nil {
@@ -280,10 +284,6 @@ func createBlockMessage() (*bytes.Buffer, error) {
 	// Add topic to message
 	if err := topics.Prepend(buf, topics.Block); err != nil {
 		return nil, fmt.Errorf("failed to add topic: %v", err)
-	}
-	// Make it protocol-ready
-	if err := g.Process(buf); err != nil {
-		return nil, fmt.Errorf("failed to process (gossip): %v", err)
 	}
 	return buf, nil
 }
