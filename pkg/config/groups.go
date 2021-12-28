@@ -62,22 +62,6 @@ type networkConfiguration struct {
 
 type kadcastConfiguration struct {
 	Enabled bool
-	Network string
-
-	// Use gRPC instead of native implementation
-	UseGrpc bool
-
-	// IP nature
-	Address string
-
-	// A set of network addresses of bootstrapping nodes
-	Bootstrappers []string
-
-	// Kadcast protocol configs
-	MaxDelegatesNum byte
-
-	// Enable/disable RC-UDP transport
-	Raptor bool
 }
 
 type monitorConfiguration struct {

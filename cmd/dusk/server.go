@@ -33,7 +33,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcli"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -60,7 +59,6 @@ type Server struct {
 	ruskConn      *grpc.ClientConn
 	readerFactory *peer.ReaderFactory
 	kadPeer       *kadcast.Peer
-	kadGrpc       *kadcli.Peer
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
@@ -84,19 +82,11 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 	return chainProcess, nil
 }
 
-func (s *Server) launchKadcastPeer(p *peer.MessageProcessor) {
-	kcfg := cfg.Get().Kadcast
-	// launch kadcast peer services and join network defined by bootstrappers
-	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, nil, p, kcfg.Raptor)
-	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
-	s.kadPeer = kadPeer
-}
-
-func (s *Server) launchKadcliPeer(p *peer.MessageProcessor, g *protocol.Gossip, ruskConn *grpc.ClientConn) {
+func (s *Server) launchKadcastPeer(p *peer.MessageProcessor, g *protocol.Gossip, ruskConn *grpc.ClientConn) {
 	// launch kadcast client
-	kadPeer := kadcli.NewCliPeer(s.eventBus, p, g)
+	kadPeer := kadcast.NewKadcastPeer(s.eventBus, p, g)
 	kadPeer.Launch(ruskConn)
-	s.kadGrpc = kadPeer
+	s.kadPeer = kadPeer
 }
 
 func getPassword(prompt string) (string, error) {
@@ -278,12 +268,7 @@ func Setup() *Server {
 	// Setting up and launch kadcast peer
 	kcfg := cfg.Get().Kadcast
 	if kcfg.Enabled {
-		switch kcfg.UseGrpc {
-		case true:
-			srv.launchKadcliPeer(processor, gossip, ruskConn)
-		case false:
-			srv.launchKadcastPeer(processor)
-		}
+		srv.launchKadcastPeer(processor, gossip, ruskConn)
 	}
 
 	// Start serving from the gRPC server
@@ -320,13 +305,9 @@ func (s *Server) Close() {
 	s.grpcServer.GracefulStop()
 	_ = s.ruskConn.Close()
 
-	// kadcast native
+	// kadcast grpc
 	if s.kadPeer != nil {
 		s.kadPeer.Close()
-	}
-	// kadcast grpc
-	if s.kadGrpc != nil {
-		s.kadGrpc.Close()
 	}
 }
 

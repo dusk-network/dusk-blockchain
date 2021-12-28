@@ -86,28 +86,7 @@ address="monitor.dusk.network:1337"
 
 # Kadcast peer settings
 [kadcast]
-
-# By enabling it, node will join an experimental kadcast network
-# In addition, topics.Block and topics.Tx will be propagated in kadcast network
-# NB: The messages propagated in kadcast are not propagated in gossip
 enabled=false
-
-# Use the gRPC interface instead of the native implementation
-usegrpc=true
-
-# [native] Enable/Disable RC-UDP transport
-raptor=true
-
-# [native] Both listeners (UDP and TCP) are binding on this local addr
-# NB The addr should be reachable from outside
-address="127.0.0.1:7100"
-
-# [native] Maximum delegates per bucket
-maxDelegatesNum=3
-
-# [native] List of bootstarpping nodes
-bootstrappers=["voucher.dusk.network:9090","voucher.dusk.network:9091","voucher.dusk.network:9092"]
-
 
 [database]
 # Backend storage used to store chain
