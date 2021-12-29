@@ -16,6 +16,8 @@ import (
 	"os"
 	"time"
 
+	"strconv"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
@@ -85,7 +87,12 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 func (s *Server) launchKadcastPeer(p *peer.MessageProcessor, g *protocol.Gossip, ruskConn *grpc.ClientConn) {
 	// launch kadcast client
 	kadPeer := kadcast.NewKadcastPeer(s.eventBus, p, g)
-	kadPeer.Launch(ruskConn)
+
+	// TODO: This to be removed once Rusk state service is fully integrated.
+	addr := "127.0.0.1:" + strconv.Itoa(cfg.Get().Kadcast.GrpcPort)
+	_, conn := client.CreateNetworkClient(context.TODO(), addr)
+
+	kadPeer.Launch(conn)
 	s.kadPeer = kadPeer
 }
 
