@@ -62,18 +62,6 @@ type networkConfiguration struct {
 
 type kadcastConfiguration struct {
 	Enabled bool
-	Network string
-
-	// IP nature.
-	Address string
-
-	// A set of network addresses of bootstrapping nodes.
-	Bootstrappers []string
-
-	// Kadcast protocol configs.
-	MaxDelegatesNum byte
-
-	Raptor bool
 }
 
 type monitorConfiguration struct {

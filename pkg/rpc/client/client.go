@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/hashset"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/hashset" // temp
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	logger "github.com/sirupsen/logrus"
@@ -75,6 +75,16 @@ func CreateStakeClient(ctx context.Context, address string) (rusk.StakeServiceCl
 	}
 
 	return rusk.NewStakeServiceClient(conn), conn
+}
+
+// CreateNetworkClient creates a client for the Kadcast network layer.
+func CreateNetworkClient(ctx context.Context, address string) (rusk.NetworkClient, *grpc.ClientConn) {
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return rusk.NewNetworkClient(conn), conn
 }
 
 type (

@@ -82,17 +82,10 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 	return chainProcess, nil
 }
 
-func (s *Server) launchKadcastPeer(p *peer.MessageProcessor) {
-	kcfg := cfg.Get().Kadcast
-
-	if !kcfg.Enabled {
-		log.Warn("Kadcast service is disabled")
-		return
-	}
-
-	kadPeer := kadcast.NewPeer(s.eventBus, s.gossip, nil, p, kcfg.Raptor)
-	// Launch kadcast peer services and join network defined by bootstrappers
-	kadPeer.Launch(kcfg.Address, kcfg.Bootstrappers, kcfg.MaxDelegatesNum)
+func (s *Server) launchKadcastPeer(p *peer.MessageProcessor, g *protocol.Gossip, ruskConn *grpc.ClientConn) {
+	// launch kadcast client
+	kadPeer := kadcast.NewKadcastPeer(s.eventBus, p, g)
+	kadPeer.Launch(ruskConn)
 	s.kadPeer = kadPeer
 }
 
@@ -273,7 +266,10 @@ func Setup() *Server {
 	_ = stakeautomaton.New(eventBus, rpcBus, grpcServer)
 
 	// Setting up and launch kadcast peer
-	srv.launchKadcastPeer(processor)
+	kcfg := cfg.Get().Kadcast
+	if kcfg.Enabled {
+		srv.launchKadcastPeer(processor, gossip, ruskConn)
+	}
 
 	// Start serving from the gRPC server
 	go func() {
@@ -309,6 +305,7 @@ func (s *Server) Close() {
 	s.grpcServer.GracefulStop()
 	_ = s.ruskConn.Close()
 
+	// kadcast grpc
 	if s.kadPeer != nil {
 		s.kadPeer.Close()
 	}
