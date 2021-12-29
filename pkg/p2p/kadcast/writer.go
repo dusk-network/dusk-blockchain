@@ -17,8 +17,9 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
-// Writer abstracts all of the logic and fields needed to write messages to
-// other network nodes.
+// Writer is a proxy between EventBus and Kadcast service. It subscribes for
+// both topics.Kadcast and topics.KadcastPoint, compiles a valid wire frame and
+// propagates the message to Kadcast service.
 type Writer struct {
 	subscriber eventbus.Subscriber
 	gossip     *protocol.Gossip
@@ -28,26 +29,21 @@ type Writer struct {
 
 	client rusk.NetworkClient
 
-	context context.Context
-	stop    context.CancelFunc
+	ctx context.Context
 }
 
-// NewWriter returns a Writer. It will still need to be initialized by
-// subscribing to the gossip topic with a stream handler, and by running the WriteLoop
-// in a goroutine.
-func NewWriter(s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient) *Writer {
-	ctx, stop := context.WithCancel(context.TODO())
+// NewWriter returns a Writer.
+func NewWriter(ctx context.Context, s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient) *Writer {
 	return &Writer{
 		subscriber: s,
 		gossip:     g,
 		client:     rusk,
-		context:    ctx,
-		stop:       stop,
+		ctx:        ctx,
 	}
 }
 
-// Serve subscribes to eventbus Kadcast messages and injects the writer.
-func (w *Writer) Serve() {
+// Subscribe subscribes to eventbus Kadcast messages.
+func (w *Writer) Subscribe() {
 	// Kadcast subs
 	l1 := eventbus.NewStreamListener(w)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, l1)
@@ -57,7 +53,7 @@ func (w *Writer) Serve() {
 }
 
 // Write sends a message through the Kadcast gRPC interface.
-// Note: Assumes the message is properly encoded (no pre-processing done here).
+// Depending on the value of header field, Send or Broadcast is called.
 func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
 	// check header
 	if len(header) == 0 {
@@ -102,7 +98,7 @@ func (w *Writer) writeToAll(data, header []byte, _ byte) error {
 		Message:       b.Bytes(),
 	}
 	// broadcast message
-	if _, err := w.client.Broadcast(w.context, m); err != nil {
+	if _, err := w.client.Broadcast(w.ctx, m); err != nil {
 		log.WithError(err).Warn("failed to broadcast message")
 		return err
 	}
@@ -129,16 +125,20 @@ func (w *Writer) writeToPoint(data, header []byte, _ byte) error {
 		Message:       b.Bytes(),
 	}
 	// send message
-	if _, err := w.client.Send(w.context, m); err != nil {
+	if _, err := w.client.Send(w.ctx, m); err != nil {
 		log.WithError(err).Warn("failed to broadcast message")
 		return err
 	}
 	return nil
 }
 
-// Close unsubscribes from eventbus events and cancels any remaining writes.
+// Close implements Writer interface.
 func (w *Writer) Close() error {
-	w.stop()
+	return nil
+}
+
+// Unsubscribe unsubscribes from eventbus events and cancels any remaining writes.
+func (w *Writer) Unsubscribe() error {
 	w.subscriber.Unsubscribe(topics.Kadcast, w.kadcastSubscription)
 	w.subscriber.Unsubscribe(topics.KadcastPoint, w.kadcastPointSubscription)
 	return nil

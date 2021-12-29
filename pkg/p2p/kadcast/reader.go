@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"io"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
@@ -20,60 +19,56 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-// Reader abstracts all of the logic and fields needed to receive messages from
-// other network nodes.
+// Reader is a proxy between Kadcast grpc service and Message Processor. It
+// receives a wire message and ,if it's valid, redirects it to Message Processor.
+// In addition, it turns any response message from Processor into
+// topics.KadcastPoint EventBus message.
 type Reader struct {
 	publisher eventbus.Publisher
 	processor *peer.MessageProcessor
 	gossip    *protocol.Gossip
 
 	client rusk.NetworkClient
-	stop   context.CancelFunc
+
+	ctx context.Context
 }
 
-// NewReader makes a new kadcast reader that handles TCP packets of broadcasting.
-func NewReader(publisher eventbus.Publisher, g *protocol.Gossip, p *peer.MessageProcessor, rusk rusk.NetworkClient) *Reader {
+// NewReader makes a new Kadcast reader.
+func NewReader(ctx context.Context, publisher eventbus.Publisher, g *protocol.Gossip, p *peer.MessageProcessor, rusk rusk.NetworkClient) *Reader {
 	return &Reader{
 		publisher: publisher,
 		processor: p,
 		gossip:    g,
 		client:    rusk,
+		ctx:       ctx,
 	}
 }
 
 // Listen starts accepting and processing stream data.
 func (r *Reader) Listen() {
 	// create stream handler
-	stream, err := r.client.Listen(context.Background(), &rusk.Null{})
+	stream, err := r.client.Listen(r.ctx, &rusk.Null{})
 	if err != nil {
 		log.WithError(err).Fatal("open stream error")
 		return
 	}
 
-	// create a context
-	ctx, cancel := context.WithCancel(context.Background())
-	r.stop = cancel
-
 	// listen for messages
 	go func() {
 		for {
-			select {
-			case <-ctx.Done():
+			// receive a message
+			msg, err := stream.Recv()
+			if err != nil {
+				reportStreamErr(err)
 				return
-			default:
-				// receive a message
-				msg, err := stream.Recv()
-				if err == io.EOF {
-					log.Warnln("reader reached EOF")
-					return
-				} else if err != nil {
-					log.WithError(err).Fatal("receive error")
-				}
-				// Message received
-				go r.processMessage(msg)
 			}
+
+			// Message received
+			go r.processMessage(msg)
 		}
 	}()
 }
@@ -103,32 +98,42 @@ func (r *Reader) processMessage(msg *rusk.Message) {
 	}
 
 	// collect (process) the message
-	go func() {
-		respBufs, err := r.processor.Collect(msg.Metadata.SrcAddress, m, nil, protocol.FullNode, []byte{byte(msg.Metadata.KadcastHeight)})
-		if err != nil {
-			var topic string
-			if len(m) > 0 {
-				topic = topics.Topic(m[0]).String()
-			}
-			// log error
-			log.WithField("cs", hex.EncodeToString(cs)).
-				WithField("topic", topic).
-				WithError(err).Error("failed to process message")
-			return
+	respBufs, err := r.processor.Collect(msg.Metadata.SrcAddress, m, nil, protocol.FullNode, []byte{byte(msg.Metadata.KadcastHeight)})
+	if err != nil {
+		var topic string
+		if len(m) > 0 {
+			topic = topics.Topic(m[0]).String()
 		}
-		// any response message is translated into Kadcast Point-to-Point wire message
-		// in other words, any bufs item is sent back to the sender node (remotePeer)
-		for i := 0; i < len(respBufs); i++ {
-			log.WithField("r_addr", msg.Metadata.SrcAddress).Trace("send point-to-point message")
-			// send Kadcast point-to-point message with source address as destination
-			msg := message.NewWithHeader(topics.KadcastPoint, respBufs[i], []byte(msg.Metadata.SrcAddress))
-			r.publisher.Publish(topics.KadcastPoint, msg)
-		}
-	}()
+		// log error
+		log.WithField("cs", hex.EncodeToString(cs)).
+			WithField("topic", topic).
+			WithError(err).Error("failed to process message")
+		return
+	}
+	// any response message is translated into Kadcast Point-to-Point wire message
+	// in other words, any bufs item is sent back to the sender node (remotePeer)
+	for i := 0; i < len(respBufs); i++ {
+		log.WithField("r_addr", msg.Metadata.SrcAddress).Trace("send point-to-point message")
+		// send Kadcast point-to-point message with source address as destination
+		msg := message.NewWithHeader(topics.KadcastPoint, respBufs[i], []byte(msg.Metadata.SrcAddress))
+		r.publisher.Publish(topics.KadcastPoint, msg)
+	}
 }
 
-// Close closes reader TCP listener.
-func (r *Reader) Close() error {
-	r.stop()
-	return nil
+func reportStreamErr(err error) {
+	m := "stream terminated"
+
+	s, ok := status.FromError(err)
+	if ok {
+		switch s.Code() {
+		case codes.Canceled:
+			// canceling
+			log.Info(m + " gracefully")
+		default:
+			log.WithField("code", s.Code()).WithError(err).Warn(m)
+		}
+		return
+	}
+
+	log.WithError(err).Error(m)
 }

@@ -67,7 +67,7 @@ func TestListenStreamReader(t *testing.T) {
 	ruskc := rusk.NewNetworkClient(grpcConn)
 
 	// create our kadcli (gRPC) Reader
-	r := NewReader(eb, g, p, ruskc)
+	r := NewReader(context.Background(), eb, g, p, ruskc)
 
 	// subscribe to gRPC stream
 	go r.Listen()
@@ -102,8 +102,8 @@ func TestBroadcastWriter(t *testing.T) {
 	cli := NewMockNetworkClient(rcvChan)
 
 	// create our kadcli Writer
-	w := NewWriter(eb, g, cli)
-	w.Serve()
+	w := NewWriter(context.Background(), eb, g, cli)
+	w.Subscribe()
 
 	// create a mock message
 	buf, err := createBlockMessage()
