@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -41,6 +42,9 @@ var (
 
 	// REQUIRE_SESSION is a flag to set the GRPC session.
 	REQUIRE_SESSION = os.Getenv("REQUIRE_SESSION")
+
+	// RUSK_EXE_PATH path to rusk executable
+	RUSK_EXE_PATH = os.Getenv("RUSK_PATH")
 )
 
 const yes = "true"
@@ -150,7 +154,7 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	initProfiles()
 
-	_, utilsExec, seederExec, err := n.getExec()
+	_, _, seederExec, err := n.getExec()
 	if err != nil {
 		return err
 	}
@@ -164,15 +168,6 @@ func (n *Network) Bootstrap(workspace string) error {
 		} else {
 			// If path not provided, then it's assumed that the seeder is already running.
 			log.Warnf("Seeder path not provided. Please, ensure dusk-seeder is already running")
-		}
-	}
-
-	if MOCK_ADDRESS != "" {
-		// Run mock process
-		if bbErr := n.start(workspace, utilsExec, "mock",
-			"--grpcmockhost", MOCK_ADDRESS,
-		); bbErr != nil {
-			return bbErr
 		}
 	}
 
@@ -268,6 +263,15 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 			// Optional "--cpuprofile", nodeDir+"/mockrusk_cpu.prof",
 		); startErr != nil {
 			return startErr
+		}
+	}
+
+	// Run Network service (Kadcast server)
+	if n.NetworkType == KadcastNetwork {
+		cfg := node.Cfg.Kadcast
+		// NB. Both Rusk Mock and Rusk executable are in use until we fully integrate Rusk State service.
+		if err := n.startRusk(nodeDir, cfg.BootstrapAddr, cfg.Address, cfg.GrpcPort); err != nil {
+			return err
 		}
 	}
 
@@ -387,4 +391,19 @@ func getEnv(envVarName string) (string, error) {
 	}
 
 	return execPath, nil
+}
+
+func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPublicAddr string, grpcPort int) error {
+	if err := n.start(nodeDir, RUSK_EXE_PATH,
+		"--ipc_method", "tcp_ip",
+		"-p", strconv.Itoa(grpcPort),
+		"--kadcast_public_address", kadcastPublicAddr,
+		"--kadcast_bootstrap", bootstrapNodes[0],
+		"--kadcast_bootstrap", bootstrapNodes[1],
+		"--log-level", "trace",
+	); err != nil {
+		return err
+	}
+
+	return nil
 }
