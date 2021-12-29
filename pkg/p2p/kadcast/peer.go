@@ -7,6 +7,8 @@
 package kadcast
 
 import (
+	"context"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -15,7 +17,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-var log = logger.WithFields(logger.Fields{"process": "kadcli"})
+var log = logger.WithFields(logger.Fields{"process": "kadcast"})
 
 // Peer is a wrapper for both kadcast grpc sides.
 type Peer struct {
@@ -27,11 +29,21 @@ type Peer struct {
 	// processors
 	w *Writer
 	r *Reader
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // NewKadcastPeer returns a new kadcast (gRPC interface) peer instance.
 func NewKadcastPeer(eventBus *eventbus.EventBus, processor *peer.MessageProcessor, gossip *protocol.Gossip) *Peer {
-	return &Peer{eventBus: eventBus, processor: processor, gossip: gossip}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Peer{
+		eventBus:  eventBus,
+		processor: processor,
+		gossip:    gossip,
+		cancel:    cancel,
+		ctx:       ctx,
+	}
 }
 
 // Launch starts kadcast peer reader and writers, binds them to the event buss,
@@ -40,21 +52,21 @@ func (p *Peer) Launch(conn *grpc.ClientConn) {
 	// gRPC rusk client
 	ruskc := rusk.NewNetworkClient(conn)
 	// a writer for Kadcast messages
-	p.w = NewWriter(p.eventBus, p.gossip, ruskc)
-	go p.w.Serve()
+	p.w = NewWriter(p.ctx, p.eventBus, p.gossip, ruskc)
+	p.w.Subscribe()
 	// a reader for Kadcast messages
-	p.r = NewReader(p.eventBus, p.gossip, p.processor, ruskc)
+	p.r = NewReader(p.ctx, p.eventBus, p.gossip, p.processor, ruskc)
 	go p.r.Listen()
 }
 
 // Close terminates kadcast peer instance.
 func (p *Peer) Close() {
+	if p.ctx != nil {
+		p.cancel()
+	}
+
 	// close writer
 	if p.w != nil {
-		_ = p.w.Close()
-	}
-	// close reader
-	if p.r != nil {
-		_ = p.r.Close()
+		_ = p.w.Unsubscribe()
 	}
 }
