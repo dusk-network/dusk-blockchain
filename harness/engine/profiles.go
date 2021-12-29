@@ -66,7 +66,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("timeout.timeoutdial", 5)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
-	viper.Set("logger.level", "debug")
+	viper.Set("logger.level", "trace")
 	viper.Set("logger.format", "json")
 
 	viper.Set("gql.address", node.Cfg.Gql.Address)
@@ -130,25 +130,22 @@ func Profile2(index int, node *DuskNode, walletPath string) {
 // Profile3 builds dusk.toml with kadcast enabled and gossip disabled.
 func Profile3(index int, node *DuskNode, walletPath string) {
 	Profile1(index, node, walletPath)
-	viper.Set("kadcast.enabled", true)
 
 	basePortNumber := 10000
 	laddr := getOutboundAddr(basePortNumber + index)
 
-	viper.Set("kadcast.address", laddr)
-	viper.Set("kadcast.maxDelegatesNum", 1)
-	viper.Set("kadcast.raptor", true)
-
-	bootstrappers := make([]string, 4)
-
+	bootstrappers := make([]string, 2)
 	bootstrappers[0] = getOutboundAddr(basePortNumber)
 	bootstrappers[1] = getOutboundAddr(basePortNumber + 1)
-	bootstrappers[2] = getOutboundAddr(basePortNumber + 2)
-	bootstrappers[3] = getOutboundAddr(basePortNumber + 3)
-	viper.Set("kadcast.bootstrappers", bootstrappers)
+
+	viper.Set("kadcast.enabled", true)
+	viper.Set("kadcast.address", laddr)
+	viper.Set("kadcast.grpcport", 3*basePortNumber+index)
+	viper.Set("kadcast.bootstrapAddr", bootstrappers)
 }
 
 func getOutboundAddr(port int) string {
+	return "127.0.0.1:" + strconv.Itoa(port)
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
