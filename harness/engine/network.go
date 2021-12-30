@@ -43,7 +43,7 @@ var (
 	// REQUIRE_SESSION is a flag to set the GRPC session.
 	REQUIRE_SESSION = os.Getenv("REQUIRE_SESSION")
 
-	// RUSK_EXE_PATH path to rusk executable
+	// RUSK_EXE_PATH path to rusk executable.
 	RUSK_EXE_PATH = os.Getenv("RUSK_PATH")
 )
 
@@ -270,7 +270,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	if n.NetworkType == KadcastNetwork {
 		cfg := node.Cfg.Kadcast
 		// NB. Both Rusk Mock and Rusk executable are in use until we fully integrate Rusk State service.
-		if err := n.startRusk(nodeDir, cfg.BootstrapAddr, cfg.Address, cfg.GrpcPort); err != nil {
+		if err := n.startRusk(nodeDir, cfg.BootstrapAddr, cfg.Address, cfg.GrpcHost, cfg.GrpcPort); err != nil {
 			return err
 		}
 	}
@@ -393,14 +393,15 @@ func getEnv(envVarName string) (string, error) {
 	return execPath, nil
 }
 
-func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPublicAddr string, grpcPort int) error {
+func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPublicAddr string, grpcHost string, grpcPort int) error {
 	if err := n.start(nodeDir, RUSK_EXE_PATH,
 		"--ipc_method", "tcp_ip",
-		"-p", strconv.Itoa(grpcPort),
+		"--host", grpcHost,
+		"--port", strconv.Itoa(grpcPort),
 		"--kadcast_public_address", kadcastPublicAddr,
 		"--kadcast_bootstrap", bootstrapNodes[0],
 		"--kadcast_bootstrap", bootstrapNodes[1],
-		"--log-level", "trace",
+		"--log-level", "info",
 	); err != nil {
 		return err
 	}

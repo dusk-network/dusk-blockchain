@@ -66,6 +66,7 @@ func (p *Peer) Launch() {
 	// a reader for Kadcast messages
 	readerClient, rConn := createNetworkClient(p.ctx, addr)
 	p.r = NewReader(p.ctx, p.eventBus, p.gossip, p.processor, readerClient)
+
 	go p.r.Listen()
 
 	p.rConn = rConn
@@ -84,11 +85,11 @@ func (p *Peer) Close() {
 	}
 
 	if p.rConn != nil {
-		p.rConn.Close()
+		_ = p.rConn.Close()
 	}
 
 	if p.wConn != nil {
-		p.wConn.Close()
+		_ = p.wConn.Close()
 	}
 
 	log.Info("peer closed")

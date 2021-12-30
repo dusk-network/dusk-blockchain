@@ -7,6 +7,7 @@
 package engine
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"strconv"
@@ -66,7 +67,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("timeout.timeoutdial", 5)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
-	viper.Set("logger.level", "trace")
+	viper.Set("logger.level", "info")
 	viper.Set("logger.format", "json")
 
 	viper.Set("gql.address", node.Cfg.Gql.Address)
@@ -131,21 +132,24 @@ func Profile2(index int, node *DuskNode, walletPath string) {
 func Profile3(index int, node *DuskNode, walletPath string) {
 	Profile1(index, node, walletPath)
 
-	basePortNumber := 10000
-	laddr := getOutboundAddr(basePortNumber + index)
+	const (
+		basePortNumber = 10000
+		baseAddr       = "127.0.0.1"
+	)
 
 	bootstrappers := make([]string, 2)
-	bootstrappers[0] = getOutboundAddr(basePortNumber)
-	bootstrappers[1] = getOutboundAddr(basePortNumber + 1)
+	bootstrappers[0] = fmt.Sprintf("%s:%d", baseAddr, basePortNumber)
+	bootstrappers[1] = fmt.Sprintf("%s:%d", baseAddr, basePortNumber+1)
 
 	viper.Set("kadcast.enabled", true)
-	viper.Set("kadcast.address", laddr)
+	viper.Set("kadcast.address", fmt.Sprintf("%s:%d", baseAddr, basePortNumber+index))
+	viper.Set("kadcast.grpchost", baseAddr)
 	viper.Set("kadcast.grpcport", 3*basePortNumber+index)
 	viper.Set("kadcast.bootstrapAddr", bootstrappers)
 }
 
+//nolint
 func getOutboundAddr(port int) string {
-	return "127.0.0.1:" + strconv.Itoa(port)
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
