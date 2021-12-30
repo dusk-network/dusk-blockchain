@@ -8,7 +8,9 @@ package kadcast
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -30,6 +32,8 @@ type Peer struct {
 	w *Writer
 	r *Reader
 
+	rConn, wConn *grpc.ClientConn
+
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -48,15 +52,24 @@ func NewKadcastPeer(eventBus *eventbus.EventBus, processor *peer.MessageProcesso
 
 // Launch starts kadcast peer reader and writers, binds them to the event buss,
 // and establishes connection to rusk network server.
-func (p *Peer) Launch(conn *grpc.ClientConn) {
+func (p *Peer) Launch() {
 	// gRPC rusk client
-	ruskc := rusk.NewNetworkClient(conn)
+	cfg := config.Get().Kadcast
+	addr := fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort)
+	log.WithField("grpc_addr", addr).Info("launch peer connections")
+
 	// a writer for Kadcast messages
-	p.w = NewWriter(p.ctx, p.eventBus, p.gossip, ruskc)
+	writerClient, wConn := createNetworkClient(p.ctx, addr)
+	p.w = NewWriter(p.ctx, p.eventBus, p.gossip, writerClient)
 	p.w.Subscribe()
+
 	// a reader for Kadcast messages
-	p.r = NewReader(p.ctx, p.eventBus, p.gossip, p.processor, ruskc)
+	readerClient, rConn := createNetworkClient(p.ctx, addr)
+	p.r = NewReader(p.ctx, p.eventBus, p.gossip, p.processor, readerClient)
 	go p.r.Listen()
+
+	p.rConn = rConn
+	p.wConn = wConn
 }
 
 // Close terminates kadcast peer instance.
@@ -69,4 +82,24 @@ func (p *Peer) Close() {
 	if p.w != nil {
 		_ = p.w.Unsubscribe()
 	}
+
+	if p.rConn != nil {
+		p.rConn.Close()
+	}
+
+	if p.wConn != nil {
+		p.wConn.Close()
+	}
+
+	log.Info("peer closed")
+}
+
+// createNetworkClient creates a client for the Kadcast network layer.
+func createNetworkClient(ctx context.Context, address string) (rusk.NetworkClient, *grpc.ClientConn) {
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return rusk.NewNetworkClient(conn), conn
 }
