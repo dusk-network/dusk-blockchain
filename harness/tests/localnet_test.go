@@ -276,60 +276,58 @@ func TestMeasureNetworkTPS(t *testing.T) {
 
 	// Recent results on 2021-04-14:
 	/*
-			 	"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=393 height=8
-				"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=770 height=9
-				"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=1147 height=10
-				"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=1524 height=11
-				"Measured TPS 75.40 (377/5)" average_block_time=5 cumulative_txs_count=1901 height=12
-				"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=2278 height=13
-				"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=2655 height=14
-				"Measured TPS 75.40 (377/5)" average_block_time=5 cumulative_txs_count=3032 height=15
-				"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=3409 height=16
+		 	"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=393 height=8
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=770 height=9
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=1147 height=10
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=1524 height=11
+			"Measured TPS 75.40 (377/5)" average_block_time=5 cumulative_txs_count=1901 height=12
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=2278 height=13
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=2655 height=14
+			"Measured TPS 75.40 (377/5)" average_block_time=5 cumulative_txs_count=3032 height=15
+			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=3409 height=16
 
-
-		defaultLocktime := uint64(100000)
-		amount := wallet.DUSK * 10000
-
-		// Send a bunch of Stake transactions
-		// All nodes are Provisioners
-
-
-		for i := uint(0); i < uint(localNet.Size()); i++ {
-			time.Sleep(100 * time.Millisecond)
-			logrus.Infof("Node %d sending a Stake transaction", i)
-
-			if _, err := localNet.SendStakeCmd(i, amount, defaultLocktime); err != nil {
-				logrus.Error(err.Error())
-			}
-		}
-
-		// Wait until first two blocks are accepted
-		localNet.WaitUntil(t, 0, 2, 2*time.Minute, 5*time.Second)
-
-		// Transaction Load test.
-		// Each of the nodes in the network starts sending transfer txs up to batchSize
-		batchSizeEnv, _ := os.LookupEnv("DUSK_TX_BATCH_SIZE")
-		batchSize, _ := strconv.Atoi(batchSizeEnv)
-
-		if batchSize == 0 {
-			batchSize = 300
-		}
-
-		for i := uint(0); i < uint(localNet.Size()); i++ {
-			logrus.WithField("node_id", i).WithField("batch_size", batchSize).
-				Info("start sending transfer txs ...")
-
-			// Start concurrently flooding the network with batch of Transfer transactions
-			go func(ind uint) {
-				if err := localNet.BatchSendTransferTx(t, ind, uint(batchSize), 100, 10, time.Minute); err != nil {
-					logrus.Error(err)
-				}
-
-				logrus.WithField("node_id", ind).WithField("batch_size", batchSize).
-					Info("batch of transfer txs completed")
-			}(i)
-		}
 	*/
+	defaultLocktime := uint64(100000)
+	amount := wallet.DUSK * 10000
+
+	// Send a bunch of Stake transactions
+	// All nodes are Provisioners
+
+	for i := uint(0); i < uint(localNet.Size()); i++ {
+		time.Sleep(100 * time.Millisecond)
+		logrus.Infof("Node %d sending a Stake transaction", i)
+
+		if _, err := localNet.SendStakeCmd(i, amount, defaultLocktime); err != nil {
+			logrus.Error(err.Error())
+		}
+	}
+
+	// Wait until first two blocks are accepted
+	localNet.WaitUntil(t, 0, 2, 2*time.Minute, 5*time.Second)
+
+	// Transaction Load test.
+	// Each of the nodes in the network starts sending transfer txs up to batchSize
+	batchSizeEnv, _ := os.LookupEnv("DUSK_TX_BATCH_SIZE")
+	batchSize, _ := strconv.Atoi(batchSizeEnv)
+
+	if batchSize == 0 {
+		batchSize = 300
+	}
+
+	for i := uint(0); i < uint(localNet.Size()); i++ {
+		logrus.WithField("node_id", i).WithField("batch_size", batchSize).
+			Info("start sending transfer txs ...")
+
+		// Start concurrently flooding the network with batch of Transfer transactions
+		go func(ind uint) {
+			if err := localNet.BatchSendTransferTx(t, ind, uint(batchSize), 100, 10, time.Minute); err != nil {
+				logrus.Error(err)
+			}
+
+			logrus.WithField("node_id", ind).WithField("batch_size", batchSize).
+				Info("batch of transfer txs completed")
+		}(i)
+	}
 
 	// Start monitoring TPS metric of the network
 	localNet.MonitorTPS(4 * time.Second)
