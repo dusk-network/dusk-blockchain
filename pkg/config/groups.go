@@ -61,6 +61,12 @@ type networkConfiguration struct {
 }
 
 type kadcastConfiguration struct {
+	BootstrapAddr []string
+	Address       string
+
+	GrpcHost string
+	GrpcPort int
+
 	Enabled bool
 }
 

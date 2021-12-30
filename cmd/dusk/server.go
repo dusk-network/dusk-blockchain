@@ -82,10 +82,10 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 	return chainProcess, nil
 }
 
-func (s *Server) launchKadcastPeer(p *peer.MessageProcessor, g *protocol.Gossip, ruskConn *grpc.ClientConn) {
+func (s *Server) launchKadcastPeer(p *peer.MessageProcessor, g *protocol.Gossip) {
 	// launch kadcast client
 	kadPeer := kadcast.NewKadcastPeer(s.eventBus, p, g)
-	kadPeer.Launch(ruskConn)
+	kadPeer.Launch()
 	s.kadPeer = kadPeer
 }
 
@@ -268,7 +268,7 @@ func Setup() *Server {
 	// Setting up and launch kadcast peer
 	kcfg := cfg.Get().Kadcast
 	if kcfg.Enabled {
-		srv.launchKadcastPeer(processor, gossip, ruskConn)
+		srv.launchKadcastPeer(processor, gossip)
 	}
 
 	// Start serving from the gRPC server

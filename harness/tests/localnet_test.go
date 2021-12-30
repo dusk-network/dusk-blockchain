@@ -285,13 +285,14 @@ func TestMeasureNetworkTPS(t *testing.T) {
 			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=2655 height=14
 			"Measured TPS 75.40 (377/5)" average_block_time=5 cumulative_txs_count=3032 height=15
 			"Measured TPS 62.83 (377/6)" average_block_time=5 cumulative_txs_count=3409 height=16
-	*/
 
+	*/
 	defaultLocktime := uint64(100000)
 	amount := wallet.DUSK * 10000
 
 	// Send a bunch of Stake transactions
 	// All nodes are Provisioners
+
 	for i := uint(0); i < uint(localNet.Size()); i++ {
 		time.Sleep(100 * time.Millisecond)
 		logrus.Infof("Node %d sending a Stake transaction", i)
