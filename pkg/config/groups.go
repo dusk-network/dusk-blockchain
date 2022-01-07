@@ -60,14 +60,18 @@ type networkConfiguration struct {
 	ServiceFlag uint8
 }
 
+type clientConfiguration struct {
+	Network     string
+	Address     string
+	DialTimeout int
+}
+
 type kadcastConfiguration struct {
-	BootstrapAddr []string
+	Enabled       bool
 	Address       string
+	BootstrapAddr []string
 
-	GrpcHost string
-	GrpcPort int
-
-	Enabled bool
+	Grpc clientConfiguration
 }
 
 type monitorConfiguration struct {

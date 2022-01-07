@@ -8,7 +8,7 @@ package kadcast
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
@@ -55,16 +55,18 @@ func NewKadcastPeer(eventBus *eventbus.EventBus, processor *peer.MessageProcesso
 func (p *Peer) Launch() {
 	// gRPC rusk client
 	cfg := config.Get().Kadcast
-	addr := fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort)
-	log.WithField("grpc_addr", addr).Info("launch peer connections")
+
+	log.WithField("grpc_addr", cfg.Grpc.Address).
+		WithField("grpc_network", cfg.Grpc.Network).
+		Info("launch peer connections")
 
 	// a writer for Kadcast messages
-	writerClient, wConn := createNetworkClient(p.ctx, addr)
+	writerClient, wConn := createNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
 	p.w = NewWriter(p.ctx, p.eventBus, p.gossip, writerClient)
 	p.w.Subscribe()
 
 	// a reader for Kadcast messages
-	readerClient, rConn := createNetworkClient(p.ctx, addr)
+	readerClient, rConn := createNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
 	p.r = NewReader(p.ctx, p.eventBus, p.gossip, p.processor, readerClient)
 
 	go p.r.Listen()
@@ -96,8 +98,22 @@ func (p *Peer) Close() {
 }
 
 // createNetworkClient creates a client for the Kadcast network layer.
-func createNetworkClient(ctx context.Context, address string) (rusk.NetworkClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+func createNetworkClient(ctx context.Context, network, address string, dialTimeout int) (rusk.NetworkClient, *grpc.ClientConn) {
+	var prefix string
+
+	switch network {
+	case "tcp":
+		prefix = ""
+	case "unix":
+		prefix = "unix://"
+	default:
+		panic("unsupported network " + network)
+	}
+
+	dialCtx, cancel := context.WithTimeout(ctx, time.Duration(dialTimeout)*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(dialCtx, prefix+address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Panic(err)
 	}

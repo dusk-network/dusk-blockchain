@@ -86,7 +86,15 @@ address="monitor.dusk.network:1337"
 
 # Kadcast peer settings
 [kadcast]
+# if disabled, gossip protocol is active
 enabled=false
+
+# grpc client connection config
+[kadcast.grpc]
+network="tcp"
+address="127.0.0.1:8585"
+# Number of seconds to wait for client conn establishment
+dialTimeout = 10
 
 [database]
 # Backend storage used to store chain

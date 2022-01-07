@@ -143,9 +143,11 @@ func Profile3(index int, node *DuskNode, walletPath string) {
 
 	viper.Set("kadcast.enabled", true)
 	viper.Set("kadcast.address", fmt.Sprintf("%s:%d", baseAddr, basePortNumber+index))
-	viper.Set("kadcast.grpchost", baseAddr)
-	viper.Set("kadcast.grpcport", 3*basePortNumber+index)
 	viper.Set("kadcast.bootstrapAddr", bootstrappers)
+
+	viper.Set("kadcast.grpc.Network", "tcp")
+	viper.Set("kadcast.grpc.Address", fmt.Sprintf("%s:%d", baseAddr, 3*basePortNumber+index))
+	viper.Set("kadcast.grpc.DialTimeout", 10)
 }
 
 //nolint
