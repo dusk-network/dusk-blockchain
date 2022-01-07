@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -227,6 +228,7 @@ func (n *Network) Teardown() {
 }
 
 // StartNode locally.
+//nolint
 func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	blockchainExec, utilsExec, _, err := n.getExec()
 	if err != nil {
@@ -269,8 +271,29 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	// Run Network service (Kadcast server)
 	if n.NetworkType == KadcastNetwork {
 		cfg := node.Cfg.Kadcast
+
+		var host string
+		var port int
+
+		switch cfg.Grpc.Network {
+		case "tcp":
+			addr, err := net.ResolveTCPAddr("tcp", cfg.Grpc.Address)
+			if err != nil {
+				panic(err)
+			}
+
+			port = addr.Port
+			host = addr.IP.String()
+
+		case "unix":
+			// TODO: Unix socket should be default IPC between dusk and rusk services.
+			// Fix this once rusk supports it
+		default:
+			panic("unsupported network type")
+		}
+
 		// NB. Both Rusk Mock and Rusk executable are in use until we fully integrate Rusk State service.
-		if err := n.startRusk(nodeDir, cfg.BootstrapAddr, cfg.Address, cfg.GrpcHost, cfg.GrpcPort); err != nil {
+		if err := n.startRusk(nodeDir, cfg.BootstrapAddr, cfg.Address, host, port); err != nil {
 			return err
 		}
 	}
