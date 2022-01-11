@@ -30,7 +30,7 @@ var (
 	localNetSizeStr = os.Getenv("DUSK_NETWORK_SIZE")
 	localNetSize    = 10
 
-	// tomlProfile could be 'default' or 'kadcast'.
+	// tomlProfile could be 'default', 'kadcast', kadcast_uds.
 	tomlProfile = os.Getenv("DUSK_NETWORK_PROFILE")
 )
 
@@ -73,6 +73,8 @@ func TestMain(m *testing.M) {
 			localNet.NetworkType = engine.GossipNetwork
 		}
 	case "kadcast":
+		fallthrough
+	case "kadcast_uds":
 		{
 			localNet.NetworkType = engine.KadcastNetwork
 		}

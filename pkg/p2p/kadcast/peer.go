@@ -113,7 +113,7 @@ func createNetworkClient(ctx context.Context, network, address string, dialTimeo
 	dialCtx, cancel := context.WithTimeout(ctx, time.Duration(dialTimeout)*time.Second)
 	defer cancel()
 
-	conn, err := grpc.DialContext(dialCtx, prefix+address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(dialCtx, prefix+address, grpc.WithInsecure(), grpc.WithAuthority("dummy"), grpc.WithBlock())
 	if err != nil {
 		log.Panic(err)
 	}

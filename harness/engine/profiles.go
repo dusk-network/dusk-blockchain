@@ -150,6 +150,28 @@ func Profile3(index int, node *DuskNode, walletPath string) {
 	viper.Set("kadcast.grpc.DialTimeout", 10)
 }
 
+// Profile4 builds dusk.toml with kadcast enabled over unix socket.
+func Profile4(index int, node *DuskNode, walletPath string) {
+	Profile1(index, node, walletPath)
+
+	const (
+		basePortNumber = 10000
+		baseAddr       = "127.0.0.1"
+	)
+
+	bootstrappers := make([]string, 2)
+	bootstrappers[0] = fmt.Sprintf("%s:%d", baseAddr, basePortNumber)
+	bootstrappers[1] = fmt.Sprintf("%s:%d", baseAddr, basePortNumber+1)
+
+	viper.Set("kadcast.enabled", true)
+	viper.Set("kadcast.address", fmt.Sprintf("%s:%d", baseAddr, basePortNumber+index))
+	viper.Set("kadcast.bootstrapAddr", bootstrappers)
+
+	viper.Set("kadcast.grpc.Network", "unix")
+	viper.Set("kadcast.grpc.Address", node.Dir+"/rusk-service.sock")
+	viper.Set("kadcast.grpc.DialTimeout", 10)
+}
+
 //nolint
 func getOutboundAddr(port int) string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
@@ -170,4 +192,5 @@ func initProfiles() {
 	profileList["default"] = Profile1
 	profileList["defaultWithLite"] = Profile2
 	profileList["kadcast"] = Profile3
+	profileList["kadcast_uds"] = Profile4
 }
