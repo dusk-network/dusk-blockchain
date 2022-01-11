@@ -28,6 +28,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	msgChanSize = 1000
+)
+
 var lg = log.WithField("process", "consensus")
 
 // ErrMaxStepsReached is triggered when the consensus loop reaches the maximum
@@ -52,6 +56,8 @@ type Consensus struct {
 	agreementChan     chan message.Message
 	aggrAgreementChan chan message.Message
 	eventChan         chan message.Message
+
+	listeners []eventbus.Listener
 }
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
@@ -78,20 +84,24 @@ func CreateInitialStep(e *consensus.Emitter, consensusTimeOut time.Duration, bg 
 // are now replaced with context cancellation and direct function call operated
 // by the chain component.
 func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
-	// TODO: channel size should be configurable
-	agreementChan := make(chan message.Message, 1000)
-	eventChan := make(chan message.Message, 1000)
-	aggrAgreementChan := make(chan message.Message, 1000)
+	listeners := make([]eventbus.Listener, 0)
+
+	agreementChan := make(chan message.Message, msgChanSize)
+	eventChan := make(chan message.Message, msgChanSize)
+	aggrAgreementChan := make(chan message.Message, msgChanSize)
 
 	// subscribe agreement phase to message.Agreement
 	aChan := eventbus.NewChanListener(agreementChan)
 	e.EventBus.Subscribe(topics.Agreement, aChan)
+	listeners = append(listeners, aChan)
 	// subscribe agreement phase to message.AggrAgreement
 	aggrAgChan := eventbus.NewChanListener(aggrAgreementChan)
 	e.EventBus.Subscribe(topics.AggrAgreement, aggrAgChan)
+	listeners = append(listeners, aggrAgChan)
 
 	// subscribe topics to eventChan
 	evSub := eventbus.NewChanListener(eventChan)
+	listeners = append(listeners, evSub)
 
 	e.EventBus.AddDefaultTopic(topics.Reduction, topics.NewBlock)
 	e.EventBus.SubscribeDefault(evSub)
@@ -105,6 +115,7 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 		agreementChan:     agreementChan,
 		eventChan:         eventChan,
 		aggrAgreementChan: aggrAgreementChan,
+		listeners:         listeners,
 	}
 
 	return c
@@ -123,8 +134,12 @@ func (c *Consensus) CreateStateMachine(db database.DB, consensusTimeOut time.Dur
 // loop (acting step-wise).
 // TODO: consider stopping the phase loop with a Done phase, instead of nil.
 func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.Controller, round consensus.RoundUpdate) consensus.Results {
-	// Ensure the eventQueue is emptied when the round is finished.
-	defer c.eventQueue.Clear(round.Round)
+	defer c.teardown(round)
+
+	// Allow listeners to report warnings
+	for _, l := range c.listeners {
+		l.SetLogLevel(log.InfoLevel)
+	}
 
 	// we create two context cancelation from the same parent context. This way
 	// we can let the agreement interrupt the stateMachine's loop cycle.
@@ -210,6 +225,17 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	// - we reached the maximum amount of steps (~213) and the consensus should
 	// halt. In this case, cancel() will take care of stopping the Agreement
 	// loop
+}
+
+func (c *Consensus) teardown(round consensus.RoundUpdate) {
+	// Ensure the eventQueue is emptied when the round is finished.
+	c.eventQueue.Clear(round.Round)
+
+	// If consensus is suspended due to out-of-sync, no goroutine reads chanListeners.
+	// By disabling listeners logging, we avoid logs being flooded with pointless warnings.
+	for _, l := range c.listeners {
+		l.SetLogLevel(log.ErrorLevel)
+	}
 }
 
 var steps = []string{"selection", "reduction1", "reduction2"} // nolint
