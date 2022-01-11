@@ -11,7 +11,9 @@ import (
 	"errors"
 	"math/big"
 	"sync"
+	"sync/atomic"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -20,10 +22,22 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/hashset"
 )
 
+var (
+	// ErrMsgChanFull underlying queue fails to accept new message due to full buffer.
+	ErrMsgChanFull = errors.New("message channel buffer is full")
+
+	// ErrRingBufferClosed underlying ring buffer is closed.
+	ErrRingBufferClosed = errors.New("ringbuffer is closed")
+)
+
 // Listener publishes a byte array that subscribers of the EventBus can use.
 type Listener interface {
 	// Notify a listener of a new message.
 	Notify(message.Message) error
+
+	// Update Listeners log level. From verbose to silent.
+	SetLogLevel(logrus.Level)
+
 	// Close the listener.
 	Close()
 }
@@ -59,6 +73,10 @@ func NewSafeCallbackListener(callback func(message.Message)) Listener {
 // NewCallbackListener creates a callback based dispatcher.
 func NewCallbackListener(callback func(message.Message)) Listener {
 	return &CallbackListener{callback, false}
+}
+
+// SetLogLevel empty implementation.
+func (c *CallbackListener) SetLogLevel(logrus.Level) {
 }
 
 // Close as part of the Listener method.
@@ -114,12 +132,15 @@ func (s *StreamListener) Notify(m message.Message) error {
 		}
 
 		if !s.ringbuffer.Put(e) {
-			err := errors.New("ringbuffer is closed")
-			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("ringbuffer closed")
+			logEB.WithField("queue", "ringbuffer").WithError(ErrRingBufferClosed).Warnln("ringbuffer closed")
 		}
 	}()
 
 	return nil
+}
+
+// SetLogLevel empty implementation.
+func (s *StreamListener) SetLogLevel(logrus.Level) {
 }
 
 // Close the internal ringbuffer.
@@ -145,45 +166,60 @@ func Consume(elems []ring.Elem, w ring.Writer) bool {
 type ChanListener struct {
 	messageChannel chan<- message.Message
 	safe           bool
+	logLevel       uint32
 }
 
 // NewChanListener creates a channel based dispatcher. Although the message is
 // passed by value, this is not enough to enforce thread-safety when the
 // listener tries to read/change slices or arrays carried by the message.
 func NewChanListener(msgChan chan<- message.Message) Listener {
-	return &ChanListener{msgChan, false}
+	return &ChanListener{msgChan, false, uint32(logrus.GetLevel())}
 }
 
 // NewSafeChanListener creates a channel based dispatcher which is thread-safe.
 func NewSafeChanListener(msgChan chan<- message.Message) Listener {
-	return &ChanListener{msgChan, true}
+	return &ChanListener{msgChan, true, uint32(logrus.GetLevel())}
 }
 
 // Notify sends a message to the internal dispatcher channel. It forwards the
 // message if the listener is unsafe. Otherwise, it forwards a message clone.
 func (c *ChanListener) Notify(m message.Message) error {
 	if !c.safe {
-		return forward(c.messageChannel, m)
+		return c.forward(m)
 	}
 
 	clone, err := message.Clone(m)
 	if err != nil {
-		log.WithError(err).Error("ChanListener, failed to clone message")
+		logEB.WithError(err).Error("ChanListener, failed to clone message")
 		return err
 	}
 
-	return forward(c.messageChannel, clone)
+	return c.forward(clone)
 }
 
 // forward avoids code duplication in the ChanListener method.
-func forward(msgChan chan<- message.Message, msg message.Message) error {
+func (c *ChanListener) forward(msg message.Message) error {
 	select {
-	case msgChan <- msg:
+	case c.messageChannel <- msg:
 	default:
-		return errors.New("message channel buffer is full")
+		v := atomic.LoadUint32(&c.logLevel)
+		if log.Level(v) >= logrus.WarnLevel {
+			logEB.
+				WithError(ErrMsgChanFull).
+				WithField("topic", msg.Category().String()).
+				WithField("type", "chanListener").
+				Warnln("failed to notify")
+		}
+
+		return ErrMsgChanFull
 	}
 
 	return nil
+}
+
+// SetLogLevel updates log level.
+func (c *ChanListener) SetLogLevel(lv logrus.Level) {
+	atomic.StoreUint32(&c.logLevel, uint32(lv))
 }
 
 // Close has no effect.
@@ -223,9 +259,6 @@ func (m *multiListener) Forward(topic topics.Topic, msg message.Message) (errorL
 
 	for _, dispatcher := range m.dispatchers {
 		if err := dispatcher.Notify(msg); err != nil {
-			logEB.WithError(err).WithField("type", "multilistener").WithField("topic", topic.String()).
-				Warnln("notifying subscriber failed")
-
 			errorList = append(errorList, err)
 		}
 	}
