@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+	"golang.org/x/time/rate"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -55,6 +56,8 @@ type Mempool struct {
 	// verified txs to be included in next block.
 	verified Pool
 
+	pendingPropagation chan TxDesc
+
 	// the collector to listen for new accepted blocks.
 	acceptedBlockChan <-chan block.Block
 
@@ -65,6 +68,8 @@ type Mempool struct {
 
 	// the magic function that knows best what is valid chain Tx.
 	verifier transactions.UnconfirmedTxProber
+
+	limiter *rate.Limiter
 }
 
 // checkTx is responsible to determine if a tx is valid or not.
@@ -103,6 +108,19 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
+	// Enable rate limiter from config
+	fromConfig := config.Get().Mempool.PropagateTimeout
+
+	var limiter *rate.Limiter
+	if len(fromConfig) > 0 {
+		timeout, err := time.ParseDuration(config.Get().Mempool.PropagateTimeout)
+		if err != nil {
+			log.WithError(err).Fatal("could not parse mempool propagation timeout")
+		}
+
+		limiter = rate.NewLimiter(rate.Every(timeout), 1)
+	}
+
 	m := &Mempool{
 		eventBus:                eventBus,
 		latestBlockTimestamp:    math.MinInt32,
@@ -111,6 +129,8 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
 		sendTxChan:              sendTxChan,
 		verifier:                verifier,
+		limiter:                 limiter,
+		pendingPropagation:      make(chan TxDesc, 1000),
 	}
 
 	// Setting the pool where to cache verified transactions.
@@ -126,42 +146,80 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 	return m
 }
 
-// Run spawns the mempool lifecycle routine. The whole mempool cycle is around
-// getting input from the outside world (from input channels) and provide the
-// actual list of the verified txs (onto output channel).
-//
-// All operations are always executed in a single go-routine so no
-// protection-by-mutex needed.
+// Run spawns the mempool lifecycle routines.
 func (m *Mempool) Run(ctx context.Context) {
-	go func() {
-		ticker := time.NewTicker(idleTime)
-		defer ticker.Stop()
+	// Main Loop
+	go m.Loop(ctx)
 
-		for {
-			select {
-			// rpcbus methods.
-			case r := <-m.sendTxChan:
-				go handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
-			case r := <-m.getMempoolTxsChan:
-				handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
-			case r := <-m.getMempoolTxsBySizeChan:
-				handleRequest(r, m.processGetMempoolTxsBySizeRequest, "GetMempoolTxsBySize")
-			case b := <-m.acceptedBlockChan:
-				m.onBlock(b)
-			case <-ticker.C:
-				m.onIdle()
-			// Mempool terminating.
-			case <-ctx.Done():
-				// m.eventBus.Unsubscribe(topics.Tx, m.txSubscriberID)
-				return
-			}
-
-			ticker.Reset(idleTime)
-		}
-	}()
+	// Loop to drain pendingPropagation and try to propagate transaction
+	go m.propagateLoop(ctx)
 }
 
-// ProcessTx handles a submitted tx from any source (rpcBus or eventBus).
+// Loop listens for GetMempoolTxs request and topics.AcceptedBlock events.
+func (m *Mempool) Loop(ctx context.Context) {
+	ticker := time.NewTicker(idleTime)
+	defer ticker.Stop()
+
+	for {
+		select {
+		// rpcbus methods.
+		case r := <-m.sendTxChan:
+			// TODO: This should be deleted once new wallet is integrated
+			go handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
+		case r := <-m.getMempoolTxsChan:
+			handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
+		case r := <-m.getMempoolTxsBySizeChan:
+			handleRequest(r, m.processGetMempoolTxsBySizeRequest, "GetMempoolTxsBySize")
+		case b := <-m.acceptedBlockChan:
+			m.onBlock(b)
+		case <-ticker.C:
+			m.onIdle()
+		case <-ctx.Done():
+			// Mempool terminating
+			return
+		}
+
+		ticker.Reset(idleTime)
+	}
+}
+
+func (m *Mempool) propagateLoop(ctx context.Context) {
+	for {
+		select {
+		case t := <-m.pendingPropagation:
+			// Ensure we propagate at proper rate
+			if m.limiter != nil {
+				if err := m.limiter.Wait(ctx); err != nil {
+					log.WithError(err).Error("failed to limit rate")
+				}
+			}
+
+			txid, err := t.tx.CalculateHash()
+			if err != nil {
+				log.WithError(err).Error("failed to calc hash")
+				continue
+			}
+
+			if config.Get().Kadcast.Enabled {
+				// Broadcast ful transaction data in kadcast
+				err = m.kadcastTx(t)
+			} else {
+				// Advertise the transaction hash to gossip network via "Inventory Vectors"
+				err = m.advertiseTx(txid)
+			}
+
+			if err != nil {
+				log.WithField("txid", hex.EncodeToString(txid)).WithError(err).Error("failed to propagate")
+			}
+
+		// Mempool terminating
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// ProcessTx processes a Transaction wire message.
 func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buffer, error) {
 	maxSizeBytes := config.Get().Mempool.MaxSizeMB * 1000 * 1000
 	if m.verified.Size() > maxSizeBytes {
@@ -176,7 +234,10 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 		h = msg.Header()[0]
 	}
 
-	t := TxDesc{tx: msg.Payload().(transactions.ContractCall), received: time.Now(), size: uint(len(msg.Id())), kadHeight: h}
+	t := TxDesc{tx: msg.Payload().(transactions.ContractCall),
+		received:  time.Now(),
+		size:      uint(len(msg.Id())),
+		kadHeight: h}
 
 	start := time.Now()
 	txid, err := m.processTx(t)
@@ -234,31 +295,12 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 		return txid, fmt.Errorf("store err - %v", err)
 	}
 
-	// try to (re)propagate transaction in both gossip and kadcast networks
-	m.propagateTx(t, txid)
+	// queue transaction for (re)propagation
+	go func() {
+		m.pendingPropagation <- t
+	}()
 
 	return txid, nil
-}
-
-// propagateTx (re)-propagate tx in gossip or kadcast network but not in both.
-func (m *Mempool) propagateTx(t TxDesc, txid []byte) {
-	if config.Get().Kadcast.Enabled {
-		// Kadcast complete transaction data
-		if err := m.kadcastTx(t); err != nil {
-			log.
-				WithError(err).
-				WithField("txid", txid).
-				Error("kadcast propagation failed")
-		}
-	} else {
-		// Advertise the transaction hash to gossip network via "Inventory Vectors"
-		if err := m.advertiseTx(txid); err != nil {
-			log.
-				WithError(err).
-				WithField("txid", txid).
-				Error("gossip propagation failed")
-		}
-	}
 }
 
 func (m *Mempool) onBlock(b block.Block) {
