@@ -569,8 +569,8 @@ func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSiz
 	for i := uint(0); i < batchSize; i++ {
 		req := pb.TransferRequest{Amount: amount, Address: pubKey, Fee: fee}
 
-		clientDeadline := time.Now().Add(timeout)
-		ctx, cancel := context.WithDeadline(context.Background(), clientDeadline)
+		//clientDeadline := time.Now().Add(timeout)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
 		_, err := client.Transfer(ctx, &req)
 		if err != nil {
