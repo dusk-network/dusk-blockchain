@@ -91,6 +91,9 @@ func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
 	log.Infof("create instance")
 
+	l := log.WithField("backend_type", config.Get().Mempool.PoolType).
+		WithField("max_size_mb", config.Get().Mempool.MaxSizeMB)
+
 	getMempoolTxsChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(topics.GetMempoolTxs, getMempoolTxsChan); err != nil {
 		log.WithError(err).Error("failed to register topics.GetMempoolTxs")
@@ -109,17 +112,25 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
 	// Enable rate limiter from config
-	fromConfig := config.Get().Mempool.PropagateTimeout
+	cfg := config.Get().Mempool
 
 	var limiter *rate.Limiter
 
-	if len(fromConfig) > 0 {
-		timeout, err := time.ParseDuration(config.Get().Mempool.PropagateTimeout)
+	if len(cfg.PropagateTimeout) > 0 {
+		timeout, err := time.ParseDuration(cfg.PropagateTimeout)
 		if err != nil {
 			log.WithError(err).Fatal("could not parse mempool propagation timeout")
 		}
 
-		limiter = rate.NewLimiter(rate.Every(timeout), 1)
+		burst := cfg.PropagateBurst
+		if burst == 0 {
+			burst = 1
+		}
+
+		limiter = rate.NewLimiter(rate.Every(timeout), int(burst))
+
+		l = l.WithField("propagate_timeout", cfg.PropagateTimeout).
+			WithField("propagate_burst", burst)
 	}
 
 	m := &Mempool{
@@ -137,13 +148,6 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 	// Setting the pool where to cache verified transactions.
 	// The pool is normally a Hashmap
 	m.verified = m.newPool()
-
-	l := log.WithField("backend_type", config.Get().Mempool.PoolType).
-		WithField("max_size_mb", config.Get().Mempool.MaxSizeMB)
-
-	if len(fromConfig) > 0 {
-		l = l.WithField("propagate_timeout", fromConfig)
-	}
 
 	l.Info("running")
 

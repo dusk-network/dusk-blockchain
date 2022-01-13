@@ -174,6 +174,7 @@ type mempoolConfiguration struct {
 	PreallocTxs      uint32
 	MaxInvItems      uint32
 	PropagateTimeout string
+	PropagateBurst   uint32
 }
 
 type consensusConfiguration struct {

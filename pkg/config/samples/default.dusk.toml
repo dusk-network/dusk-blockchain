@@ -119,8 +119,9 @@ preallocTxs = 100
 # Max number of items to respond with on topics.Mempool request
 # To disable topics.Mempool handling, set it to 0
 maxInvItems = 10000
-# Back pressure timeout on transaction propagation
+# Back pressure on transaction propagation
 propagateTimeout = "100ms"
+propagateBurst = 1
 
 # gRPC API service
 [rpc]

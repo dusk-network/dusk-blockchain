@@ -110,6 +110,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("mempool.preallocTxs", "100")
 	viper.Set("mempool.maxInvItems", "10000")
 	viper.Set("mempool.propagateTimeout", "100ms")
+	viper.Set("mempool.propagateBurst", 1)
 
 	viper.Set("consensus.defaultlocktime", 1000)
 	viper.Set("consensus.defaultoffset", 10)
