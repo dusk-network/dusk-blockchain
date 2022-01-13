@@ -112,6 +112,7 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 	fromConfig := config.Get().Mempool.PropagateTimeout
 
 	var limiter *rate.Limiter
+
 	if len(fromConfig) > 0 {
 		timeout, err := time.ParseDuration(config.Get().Mempool.PropagateTimeout)
 		if err != nil {
@@ -137,7 +138,14 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 	// The pool is normally a Hashmap
 	m.verified = m.newPool()
 
-	log.WithField("type", config.Get().Mempool.PoolType).Info("running")
+	l := log.WithField("backend_type", config.Get().Mempool.PoolType).
+		WithField("max_size_mb", config.Get().Mempool.MaxSizeMB)
+
+	if len(fromConfig) > 0 {
+		l = l.WithField("propagate_timeout", fromConfig)
+	}
+
+	l.Info("running")
 
 	if srv != nil {
 		node.RegisterMempoolServer(srv, m)
@@ -164,7 +172,7 @@ func (m *Mempool) Loop(ctx context.Context) {
 		select {
 		// rpcbus methods.
 		case r := <-m.sendTxChan:
-			// TODO: This should be deleted once new wallet is integrated
+			// TODO: This handler should be deleted once new wallet is integrated
 			go handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
 		case r := <-m.getMempoolTxsChan:
 			handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
@@ -234,10 +242,12 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 		h = msg.Header()[0]
 	}
 
-	t := TxDesc{tx: msg.Payload().(transactions.ContractCall),
+	t := TxDesc{
+		tx:        msg.Payload().(transactions.ContractCall),
 		received:  time.Now(),
 		size:      uint(len(msg.Id())),
-		kadHeight: h}
+		kadHeight: h,
+	}
 
 	start := time.Now()
 	txid, err := m.processTx(t)
