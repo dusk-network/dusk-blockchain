@@ -305,31 +305,33 @@ func TestMeasureNetworkTPS(t *testing.T) {
 	}
 
 	// Wait until first two blocks are accepted
-	localNet.WaitUntil(t, 0, 2, 2*time.Minute, 5*time.Second)
+	go func() {
+		localNet.WaitUntil(t, 0, 30, 5*time.Minute, 5*time.Second)
 
-	// Transaction Load test.
-	// Each of the nodes in the network starts sending transfer txs up to batchSize
-	batchSizeEnv, _ := os.LookupEnv("DUSK_TX_BATCH_SIZE")
-	batchSize, _ := strconv.Atoi(batchSizeEnv)
+		// Transaction Load test.
+		// Each of the nodes in the network starts sending transfer txs up to batchSize
+		batchSizeEnv, _ := os.LookupEnv("DUSK_TX_BATCH_SIZE")
+		batchSize, _ := strconv.Atoi(batchSizeEnv)
 
-	if batchSize == 0 {
-		batchSize = 300
-	}
+		if batchSize == 0 {
+			batchSize = 300
+		}
 
-	for i := uint(0); i < uint(localNet.Size()); i++ {
-		logrus.WithField("node_id", i).WithField("batch_size", batchSize).
-			Info("start sending transfer txs ...")
+		for i := uint(0); i < uint(localNet.Size()); i++ {
+			logrus.WithField("node_id", i).WithField("batch_size", batchSize).
+				Info("start sending transfer txs ...")
 
-		// Start concurrently flooding the network with batch of Transfer transactions
-		go func(ind uint) {
-			if err := localNet.BatchSendTransferTx(t, ind, uint(batchSize), 100, 10, time.Minute); err != nil {
-				logrus.Error(err)
-			}
+			// Start concurrently flooding the network with batch of Transfer transactions
+			go func(ind uint) {
+				if err := localNet.BatchSendTransferTx(t, ind, uint(batchSize), 100, 10, 10*time.Minute); err != nil {
+					logrus.Error(err)
+				}
 
-			logrus.WithField("node_id", ind).WithField("batch_size", batchSize).
-				Info("batch of transfer txs completed")
-		}(i)
-	}
+				logrus.WithField("node_id", ind).WithField("batch_size", batchSize).
+					Info("batch of transfer txs completed")
+			}(i)
+		}
+	}()
 
 	// Start monitoring TPS metric of the network
 	localNet.MonitorTPS(4 * time.Second)
