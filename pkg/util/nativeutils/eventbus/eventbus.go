@@ -36,3 +36,8 @@ func New() *EventBus {
 		defaultListener: newMultiListener(),
 	}
 }
+
+func (e *EventBus) Close() {
+	e.listeners.Close()
+	e.defaultListener.Close()
+}

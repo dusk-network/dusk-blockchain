@@ -306,3 +306,14 @@ func (m *multiListener) Delete(id uint32) bool {
 
 	return false
 }
+
+func (m *multiListener) Close() {
+	m.Lock()
+	defer m.Unlock()
+
+	for _, h := range m.dispatchers {
+		h.Close()
+	}
+
+	m.dispatchers = nil
+}

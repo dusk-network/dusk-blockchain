@@ -83,3 +83,16 @@ func (h *listenerMap) Delete(key topics.Topic, id uint32) bool {
 	h.lock.Unlock()
 	return found
 }
+
+func (h *listenerMap) Close() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	for _, listeners := range h.listeners {
+		for _, listener := range listeners {
+			listener.Close()
+		}
+	}
+
+	h.listeners = nil
+}
