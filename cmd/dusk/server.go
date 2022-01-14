@@ -51,14 +51,23 @@ const voucherRetryTime = 15 * time.Second
 
 // Server is the main process of the node.
 type Server struct {
-	eventBus      *eventbus.EventBus
-	rpcBus        *rpcbus.RPCBus
-	c             *chain.Chain
-	gossip        *protocol.Gossip
-	grpcServer    *grpc.Server
+	eventBus *eventbus.EventBus
+	rpcBus   *rpcbus.RPCBus
+	c        *chain.Chain
+	gossip   *protocol.Gossip
+
+	grpcServer *grpc.Server
+	gqlServer  *gql.Server
+
 	ruskConn      *grpc.ClientConn
 	readerFactory *peer.ReaderFactory
 	kadPeer       *kadcast.Peer
+
+	dbDriver database.Driver
+
+	// Parent context to all long-lived goroutines triggered by any subsystem.
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // LaunchChain instantiates a chain.Loader, does the wire up to create a Chain
@@ -82,9 +91,9 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 	return chainProcess, nil
 }
 
-func (s *Server) launchKadcastPeer(p *peer.MessageProcessor, g *protocol.Gossip) {
+func (s *Server) launchKadcastPeer(ctx context.Context, p *peer.MessageProcessor, g *protocol.Gossip) {
 	// launch kadcast client
-	kadPeer := kadcast.NewKadcastPeer(s.eventBus, p, g)
+	kadPeer := kadcast.NewKadcastPeer(ctx, s.eventBus, p, g)
 	kadPeer.Launch()
 	s.kadPeer = kadPeer
 }
@@ -117,7 +126,7 @@ func readPassword(prompt string) ([]byte, error) {
 func Setup() *Server {
 	var pw string
 
-	ctx := context.Background()
+	parentCtx, parentCancel := context.WithCancel(context.Background())
 	_, err := os.Stat(cfg.Get().Wallet.File)
 
 	switch {
@@ -162,14 +171,14 @@ func Setup() *Server {
 	eventBus := eventbus.New()
 	rpcBus := rpcbus.New()
 
-	_, db := heavy.CreateDBConnection()
+	driver, db := heavy.CreateDBConnection()
 
 	processor := peer.NewMessageProcessor(eventBus)
 	registerPeerServices(processor, db, eventBus, rpcBus)
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	gctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Get().RPC.Rusk.ConnectionTimeout)*time.Millisecond)
+	gctx, cancel := context.WithTimeout(parentCtx, time.Duration(cfg.Get().RPC.Rusk.ConnectionTimeout)*time.Millisecond)
 	defer cancel()
 
 	proxy, ruskConn := setupGRPCClients(gctx)
@@ -187,7 +196,7 @@ func Setup() *Server {
 	}
 
 	m := mempool.NewMempool(eventBus, rpcBus, proxy.Prober(), grpcServer)
-	m.Run(ctx)
+	m.Run(parentCtx)
 	processor.Register(topics.Tx, m.ProcessTx)
 
 	// Instantiate API server
@@ -213,7 +222,7 @@ func Setup() *Server {
 	cl := loop.New(e, &w.PublicKey)
 	processor.Register(topics.Candidate, cl.ProcessCandidate)
 
-	c, err := LaunchChain(ctx, cl, proxy, eventBus, rpcBus, grpcServer, db)
+	c, err := LaunchChain(parentCtx, cl, proxy, eventBus, rpcBus, grpcServer, db)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -221,12 +230,15 @@ func Setup() *Server {
 	processor.Register(topics.Block, c.ProcessBlockFromNetwork)
 
 	// Instantiate GraphQL server
+	var gqlServer *gql.Server
+
 	if cfg.Get().Gql.Enabled {
-		if gqlServer, e := gql.NewHTTPServer(eventBus, rpcBus); e != nil {
-			log.Errorf("GraphQL http server error: %v", e)
+		var e error
+		if gqlServer, e = gql.NewHTTPServer(eventBus, rpcBus); e != nil {
+			log.WithError(e).Error("graphq server failed to run")
 		} else {
-			if e := gqlServer.Start(); e != nil {
-				log.Errorf("GraphQL failed to start: %v", e)
+			if e = gqlServer.Start(parentCtx); e != nil {
+				log.WithError(e).Error("graphq server failed to run")
 			}
 		}
 	}
@@ -252,9 +264,13 @@ func Setup() *Server {
 		rpcBus:        rpcBus,
 		c:             c,
 		gossip:        gossip,
+		gqlServer:     gqlServer,
 		grpcServer:    grpcServer,
 		ruskConn:      ruskConn,
 		readerFactory: readerFactory,
+		dbDriver:      driver,
+		ctx:           parentCtx,
+		cancel:        parentCancel,
 	}
 
 	// Setting up the transactor component
@@ -268,7 +284,7 @@ func Setup() *Server {
 	// Setting up and launch kadcast peer
 	kcfg := cfg.Get().Kadcast
 	if kcfg.Enabled {
-		srv.launchKadcastPeer(processor, gossip)
+		srv.launchKadcastPeer(parentCtx, processor, gossip)
 	}
 
 	// Start serving from the gRPC server
@@ -299,16 +315,36 @@ func Setup() *Server {
 
 // Close the chain and the connections created through the RPC bus.
 func (s *Server) Close() {
-	// TODO: disconnect peers
-	// _ = s.c.Close(cfg.Get().Database.Driver)
-	s.rpcBus.Close()
-	s.grpcServer.GracefulStop()
+	// Cancel all goroutines long-lived loops
+	s.cancel()
+
+	// Close graphql server.
+	if s.gqlServer != nil {
+		if err := s.gqlServer.Close(); err != nil {
+			log.WithError(err).Warn("failed to close gql server")
+		}
+	}
+
+	if s.grpcServer != nil {
+		s.grpcServer.GracefulStop()
+	}
+
+	// Close Rusk client connection
 	_ = s.ruskConn.Close()
 
-	// kadcast grpc
+	// kadcast client grpc
 	if s.kadPeer != nil {
 		s.kadPeer.Close()
 	}
+
+	if s.dbDriver != nil {
+		if err := s.dbDriver.Close(); err != nil {
+			log.WithError(err).Warn("failed to close db driver")
+		}
+	}
+
+	s.rpcBus.Close()
+	s.eventBus.Close()
 }
 
 func connectToSeeders(connector *peer.Connector, seeders []string) error {

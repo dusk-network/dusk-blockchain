@@ -187,7 +187,7 @@ func (m *Mempool) Loop(ctx context.Context) {
 		case <-ticker.C:
 			m.onIdle()
 		case <-ctx.Done():
-			// Mempool terminating
+			log.Info("main_loop terminated")
 			return
 		}
 
@@ -226,6 +226,7 @@ func (m *Mempool) propagateLoop(ctx context.Context) {
 
 		// Mempool terminating
 		case <-ctx.Done():
+			log.Info("propagate_loop terminated")
 			return
 		}
 	}
