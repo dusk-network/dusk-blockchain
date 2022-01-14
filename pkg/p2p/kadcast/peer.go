@@ -39,8 +39,8 @@ type Peer struct {
 }
 
 // NewKadcastPeer returns a new kadcast (gRPC interface) peer instance.
-func NewKadcastPeer(eventBus *eventbus.EventBus, processor *peer.MessageProcessor, gossip *protocol.Gossip) *Peer {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewKadcastPeer(pCtx context.Context, eventBus *eventbus.EventBus, processor *peer.MessageProcessor, gossip *protocol.Gossip) *Peer {
+	ctx, cancel := context.WithCancel(pCtx)
 	return &Peer{
 		eventBus:  eventBus,
 		processor: processor,

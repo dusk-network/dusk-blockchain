@@ -121,16 +121,19 @@ func (r *Reader) processMessage(msg *rusk.Message) {
 }
 
 func reportStreamErr(err error) {
-	m := "stream terminated"
+	m := "listener_loop terminated"
 
 	s, ok := status.FromError(err)
 	if ok {
 		switch s.Code() {
 		case codes.Canceled:
 			// canceling
-			log.Info(m + " gracefully")
+			log.Info(m)
+
 		default:
-			log.WithField("code", s.Code()).WithError(err).Warn(m)
+			log.
+				WithField("code", s.Code()).
+				WithError(err).Warn(m)
 		}
 		return
 	}

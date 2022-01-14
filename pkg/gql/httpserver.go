@@ -71,7 +71,7 @@ func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server,
 }
 
 // Start the GraphQL HTTP Server and begin listening on specified port.
-func (s *Server) Start() error {
+func (s *Server) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	s.httpServer = &http.Server{
 		Handler:     mux,
@@ -91,7 +91,8 @@ func (s *Server) Start() error {
 	}
 
 	// Set up HTTP Server over TCP
-	l, err := net.Listen(conf.Network, conf.Address)
+	lc := net.ListenConfig{}
+	l, err := lc.Listen(ctx, conf.Network, conf.Address)
 	if err != nil {
 		return err
 	}
@@ -213,8 +214,8 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 	return nil
 }
 
-// Stop the server.
-func (s *Server) Stop() error {
+// Close closes the server.
+func (s *Server) Close() error {
 	atomic.StoreUint32(&s.started, 0)
 
 	// Close pool of notification brokers
@@ -228,6 +229,8 @@ func (s *Server) Stop() error {
 		log.WithError(err).Warn("error shutting down")
 		return err
 	}
+
+	log.Info("service terminated")
 
 	return nil
 }

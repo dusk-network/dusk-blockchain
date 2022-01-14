@@ -59,7 +59,7 @@ func TestMultiClient(t *testing.T) {
 	s, eb, err := createServer(srvAddr, brokersNum, maxAllowedClients/brokersNum, enableTLS)
 	assert.NoError(err)
 
-	defer s.Stop()
+	defer s.Close()
 
 	// Set up a list of ws clients
 	resp := make(chan string, clientsNum)
@@ -159,7 +159,7 @@ func createServer(addr string, brokerNum, clientsPerBroker uint, enableTLS bool)
 		return nil, nil, err
 	}
 
-	return s, eb, s.Start()
+	return s, eb, s.Start(context.Background())
 }
 
 func publishRandBlock(eb *eventbus.EventBus, assert *assert.Assertions) {
