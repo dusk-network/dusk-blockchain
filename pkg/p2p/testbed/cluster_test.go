@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"io"
 	"os/exec"
+	"os"
 	"strconv"
 	"sync"
 
@@ -25,6 +26,7 @@ import (
 type testNode struct {
 	kadcastPort int
 	grpcPort    int
+	grpcAddress string
 
 	exe *exec.Cmd
 
@@ -32,11 +34,23 @@ type testNode struct {
 	message []byte
 }
 
-func newNode(exePath string, bootstrapNodes []string, kadcastPort, grpcPort int) (*testNode, error) {
+func NewRemotelNode(grpcAddress string, grpcPort int) (*testNode, error) {
+	n := &testNode{
+		kadcastPort: 0,
+		grpcPort:    grpcPort,
+		message:     make([]byte, 0),
+		grpcAddress: grpcAddress,
+	}
+
+	return n, nil
+}
+
+func NewLocalNode(exePath string, bootstrapNodes []string, kadcastPort, grpcPort int) (*testNode, error) {
 	n := &testNode{
 		kadcastPort: kadcastPort,
 		grpcPort:    grpcPort,
 		message:     make([]byte, 0),
+		grpcAddress: "127.0.0.1",
 	}
 
 	cmd := exec.Command(exePath,
@@ -44,6 +58,7 @@ func newNode(exePath string, bootstrapNodes []string, kadcastPort, grpcPort int)
 		"tcp_ip",
 		"-p",
 		strconv.Itoa(grpcPort),
+		"--kadcast_autobroadcast",
 		"--kadcast_public_address",
 		NetworkAddr+":"+strconv.Itoa(kadcastPort),
 		"--kadcast_bootstrap",
@@ -51,6 +66,8 @@ func newNode(exePath string, bootstrapNodes []string, kadcastPort, grpcPort int)
 		"--kadcast_bootstrap",
 		bootstrapNodes[1],
 	)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
@@ -84,7 +101,7 @@ func (t *testNode) Kill() {
 
 // Broadcast sends broadcast grpc call from this node.
 func (t *testNode) Broadcast(ctx context.Context, payload []byte) error {
-	addr := NetworkAddr + ":" + strconv.Itoa(t.grpcPort)
+	addr := t.grpcAddress + ":" + strconv.Itoa(t.grpcPort)
 	conn, _ := createNetworkClient(ctx, addr)
 
 	m := &rusk.BroadcastMessage{
@@ -106,7 +123,7 @@ func (t *testNode) Broadcast(ctx context.Context, payload []byte) error {
 func createNetworkClient(ctx context.Context, address string) (rusk.NetworkClient, *grpc.ClientConn) {
 	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Panic(err)
+		log.WithField("addr", address).Panic(err)
 	}
 
 	return rusk.NewNetworkClient(conn), conn
@@ -114,7 +131,7 @@ func createNetworkClient(ctx context.Context, address string) (rusk.NetworkClien
 
 // Listen creates a client connection and accepts stream messages.
 func (t *testNode) Listen(ctx context.Context) {
-	addr := NetworkAddr + ":" + strconv.Itoa(t.grpcPort)
+	addr := t.grpcAddress + ":" + strconv.Itoa(t.grpcPort)
 	conn, _ := createNetworkClient(ctx, addr)
 
 	// create stream handler
@@ -124,7 +141,7 @@ func (t *testNode) Listen(ctx context.Context) {
 		return
 	}
 
-	log.WithField("kadcast_port", t.kadcastPort).Info("Listening")
+	log.WithField("kadcast_port", t.kadcastPort).WithField("grpcAddress", t.grpcAddress).WithField("grpcPort", t.grpcPort).Info("Listening")
 
 	// accept  stream messages
 	for {
@@ -141,9 +158,9 @@ func (t *testNode) Listen(ctx context.Context) {
 
 		// Message received
 		log.WithField("kadcast_port", t.kadcastPort).
-			WithField("payload", hex.EncodeToString(msg.Message)).
+			WithField("payload", len(msg.Message)).
 			WithField("height", msg.Metadata.KadcastHeight).
-			Trace("received msg")
+			Info("received msg")
 
 		t.mu.Lock()
 		t.message = make([]byte, len(msg.Message))

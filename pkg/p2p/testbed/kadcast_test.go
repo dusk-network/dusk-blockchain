@@ -12,6 +12,7 @@ package testbed
 import (
 	"bytes"
 	"context"
+	"encoding/csv"
 	"os"
 	"strconv"
 	"testing"
@@ -25,6 +26,7 @@ var (
 	clusterSize      = os.Getenv("CLUSTER_SIZE")
 	dummyPayloadSize = os.Getenv("MSG_SIZE")
 	ruskExecutable   = os.Getenv("RUSK_PATH")
+	ruskCsvPath      = os.Getenv("CLUSTER_CSV")
 
 	NetworkAddr    = "127.0.0.1"
 	bootstrapNodes = []string{NetworkAddr + ":20000", NetworkAddr + ":20001"}
@@ -47,7 +49,7 @@ func bootstrapCluster(ctx context.Context, t *testing.T) []*testNode {
 	cluster := make([]*testNode, 0)
 
 	for i := 0; i < size; i++ {
-		n, err := newNode(ruskExecutable, bootstrapNodes, baseKadcastPort+i, baseGRPCPort+i)
+		n, err := NewLocalNode(ruskExecutable, bootstrapNodes, baseKadcastPort+i, baseGRPCPort+i)
 		if err != nil {
 			t.Error(err)
 		}
@@ -71,6 +73,62 @@ func bootstrapCluster(ctx context.Context, t *testing.T) []*testNode {
 	return cluster
 }
 
+func connectToRemoteCluster(ctx context.Context, t *testing.T) []*testNode {
+
+	log.WithField("size", clusterSize).
+		WithField("rusk", ruskExecutable).
+		Info("Bootstrap cluster")
+
+	f, err := os.Open(ruskCsvPath)
+	if err != nil {
+		log.Fatal("Unable to read input file "+ruskCsvPath, err)
+	}
+	defer f.Close()
+
+	csvReader := csv.NewReader(f)
+	records, err := csvReader.ReadAll()
+	if err != nil {
+		log.Fatal("Unable to parse file as CSV for "+ruskCsvPath, err)
+	}
+	cluster := make([]*testNode, 0)
+	for _, v := range records {
+		log.WithField("deb", v).Info("before")
+		if (v[1]=="ip_addr") {
+			continue;
+		}
+		if (len(v)<3) {
+			continue;
+		}
+		if (v[2]=="") {
+			continue;
+		}
+		log.WithField("address", v[1]).WithField("len",len(v)).Info("creating")
+		n, err := NewRemotelNode(v[1], 8585)
+		if err != nil {
+			t.Error(err)
+		}
+		go n.Listen(ctx)
+
+		cluster = append(cluster, n)
+
+	}
+
+	time.Sleep(5 * time.Second)
+
+	return cluster
+}
+
+func connectToCluster(ctx context.Context, t *testing.T) []*testNode {
+
+	if ruskCsvPath == "" {
+		return bootstrapCluster(ctx, t)
+	} else {
+		return connectToRemoteCluster(ctx, t)
+
+	}
+
+}
+
 func assertBroadcastMsgReceived(t *testing.T, cluster []*testNode, sender int, d time.Duration) {
 	// Node 0 broadcast a message of dummyPayloadSize
 	msgSize, err := strconv.Atoi(dummyPayloadSize)
@@ -91,7 +149,7 @@ func assertBroadcastMsgReceived(t *testing.T, cluster []*testNode, sender int, d
 
 		msg := tn.GetMessage()
 		if !bytes.Equal(msg, blob) {
-			t.Errorf("not equal at node %d, recv_msg_len: %d", tn.kadcastPort, len(msg))
+			t.Errorf("not equal at node %d, addr (%s) recv_msg_len: %d", tn.kadcastPort, tn.grpcAddress, len(msg))
 		}
 	}
 }
@@ -100,7 +158,7 @@ func TestCluster(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Setup network
-	cluster := bootstrapCluster(ctx, t)
+	cluster := connectToCluster(ctx, t)
 
 	// Broadcast a message from node_0
 	assertBroadcastMsgReceived(t, cluster, 0, 10*time.Second)
