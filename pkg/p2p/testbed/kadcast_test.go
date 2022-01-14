@@ -118,18 +118,18 @@ func connectToRemoteCluster(ctx context.Context, t *testing.T) []*testNode {
 	return cluster
 }
 
-func connectToCluster(ctx context.Context, t *testing.T) []*testNode {
+func connectToCluster(ctx context.Context, t *testing.T) ([]*testNode, bool){
 
 	if ruskCsvPath == "" {
-		return bootstrapCluster(ctx, t)
+		return bootstrapCluster(ctx, t), false
 	} else {
-		return connectToRemoteCluster(ctx, t)
+		return connectToRemoteCluster(ctx, t), true
 
 	}
 
 }
 
-func assertBroadcastMsgReceived(t *testing.T, cluster []*testNode, sender int, d time.Duration) {
+func assertBroadcastMsgReceived(t *testing.T, cluster []*testNode, sender int, d time.Duration, is_remote bool) {
 	// Node 0 broadcast a message of dummyPayloadSize
 	msgSize, err := strconv.Atoi(dummyPayloadSize)
 	if err != nil {
@@ -139,6 +139,9 @@ func assertBroadcastMsgReceived(t *testing.T, cluster []*testNode, sender int, d
 	blob, _ := crypto.RandEntropy(uint32(msgSize))
 	cluster[sender].Broadcast(context.Background(), blob)
 
+	if is_remote {
+		blob = blob[:1000]
+	}
 	// Ensure the entire network received the message, except the initiator
 	time.Sleep(d)
 
@@ -158,10 +161,10 @@ func TestCluster(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Setup network
-	cluster := connectToCluster(ctx, t)
+	cluster, is_remote := connectToCluster(ctx, t)
 
 	// Broadcast a message from node_0
-	assertBroadcastMsgReceived(t, cluster, 0, 10*time.Second)
+	assertBroadcastMsgReceived(t, cluster, 0, 5*time.Second, is_remote)
 
 	// teardown
 	cancel()
