@@ -37,6 +37,7 @@ func New() *EventBus {
 	}
 }
 
+// Close closes all topic listeners.
 func (e *EventBus) Close() {
 	e.listeners.Close()
 	e.defaultListener.Close()

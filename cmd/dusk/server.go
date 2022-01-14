@@ -231,6 +231,7 @@ func Setup() *Server {
 
 	// Instantiate GraphQL server
 	var gqlServer *gql.Server
+
 	if cfg.Get().Gql.Enabled {
 		var e error
 		if gqlServer, e = gql.NewHTTPServer(eventBus, rpcBus); e != nil {
@@ -319,11 +320,16 @@ func (s *Server) Close() {
 
 	// Close graphql server.
 	if s.gqlServer != nil {
-		s.gqlServer.Close()
+		if err := s.gqlServer.Close(); err != nil {
+			log.WithError(err).Warn("failed to close gql server")
+		}
 	}
 
-	s.rpcBus.Close()
-	s.grpcServer.GracefulStop()
+	if s.grpcServer != nil {
+		s.grpcServer.GracefulStop()
+	}
+
+	// Close Rusk client connection
 	_ = s.ruskConn.Close()
 
 	// kadcast client grpc
@@ -332,9 +338,13 @@ func (s *Server) Close() {
 	}
 
 	if s.dbDriver != nil {
-		s.dbDriver.Close()
+		if err := s.dbDriver.Close(); err != nil {
+			log.WithError(err).Warn("failed to close db driver")
+		}
 	}
 
+	s.rpcBus.Close()
+	s.eventBus.Close()
 }
 
 func connectToSeeders(connector *peer.Connector, seeders []string) error {

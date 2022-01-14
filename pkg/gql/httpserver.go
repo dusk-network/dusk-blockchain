@@ -92,6 +92,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Set up HTTP Server over TCP
 	lc := net.ListenConfig{}
+
 	l, err := lc.Listen(ctx, conf.Network, conf.Address)
 	if err != nil {
 		return err
@@ -226,7 +227,6 @@ func (s *Server) Close() error {
 	defer cancel()
 
 	if err := s.httpServer.Shutdown(dialCtx); err != nil {
-		log.WithError(err).Warn("error shutting down")
 		return err
 	}
 
