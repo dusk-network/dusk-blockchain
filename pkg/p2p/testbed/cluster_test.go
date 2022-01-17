@@ -13,8 +13,8 @@ import (
 	"context"
 	"encoding/hex"
 	"io"
-	"os/exec"
 	"os"
+	"os/exec"
 	"strconv"
 	"sync"
 
@@ -160,6 +160,8 @@ func (t *testNode) Listen(ctx context.Context) {
 		log.WithField("kadcast_port", t.kadcastPort).
 			WithField("payload", len(msg.Message)).
 			WithField("height", msg.Metadata.KadcastHeight).
+			WithField("grpcAddress", t.grpcAddress).
+			WithField("from", msg.Metadata.SrcAddress).
 			Info("received msg")
 
 		t.mu.Lock()
