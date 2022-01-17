@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"golang.org/x/crypto/blake2b"
 
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	log "github.com/sirupsen/logrus"
@@ -93,16 +94,16 @@ func connectToRemoteCluster(ctx context.Context, t *testing.T) []*testNode {
 	cluster := make([]*testNode, 0)
 	for _, v := range records {
 		log.WithField("deb", v).Info("before")
-		if (v[1]=="ip_addr") {
-			continue;
+		if v[1] == "ip_addr" {
+			continue
 		}
-		if (len(v)<3) {
-			continue;
+		if len(v) < 3 {
+			continue
 		}
-		if (v[2]=="") {
-			continue;
+		if v[2] == "" {
+			continue
 		}
-		log.WithField("address", v[1]).WithField("len",len(v)).Info("creating")
+		log.WithField("address", v[1]).WithField("len", len(v)).Info("creating")
 		n, err := NewRemotelNode(v[1], 8585)
 		if err != nil {
 			t.Error(err)
@@ -118,18 +119,18 @@ func connectToRemoteCluster(ctx context.Context, t *testing.T) []*testNode {
 	return cluster
 }
 
-func connectToCluster(ctx context.Context, t *testing.T) []*testNode {
+func connectToCluster(ctx context.Context, t *testing.T) ([]*testNode, bool) {
 
 	if ruskCsvPath == "" {
-		return bootstrapCluster(ctx, t)
+		return bootstrapCluster(ctx, t), false
 	} else {
-		return connectToRemoteCluster(ctx, t)
+		return connectToRemoteCluster(ctx, t), true
 
 	}
 
 }
 
-func assertBroadcastMsgReceived(t *testing.T, cluster []*testNode, sender int, d time.Duration) {
+func assertBroadcastMsgReceived(t *testing.T, cluster []*testNode, sender int, d time.Duration, is_remote bool) {
 	// Node 0 broadcast a message of dummyPayloadSize
 	msgSize, err := strconv.Atoi(dummyPayloadSize)
 	if err != nil {
@@ -139,6 +140,11 @@ func assertBroadcastMsgReceived(t *testing.T, cluster []*testNode, sender int, d
 	blob, _ := crypto.RandEntropy(uint32(msgSize))
 	cluster[sender].Broadcast(context.Background(), blob)
 
+	if is_remote {
+		hash := blake2b.Sum256(blob)
+		blob = hash[:32]
+	}
+	
 	// Ensure the entire network received the message, except the initiator
 	time.Sleep(d)
 
@@ -158,10 +164,10 @@ func TestCluster(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Setup network
-	cluster := connectToCluster(ctx, t)
+	cluster, is_remote := connectToCluster(ctx, t)
 
 	// Broadcast a message from node_0
-	assertBroadcastMsgReceived(t, cluster, 0, 10*time.Second)
+	assertBroadcastMsgReceived(t, cluster, 0, 15*time.Second, is_remote)
 
 	// teardown
 	cancel()
