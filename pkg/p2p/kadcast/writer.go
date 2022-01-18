@@ -17,6 +17,11 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
+const (
+	// MaxWriterQueueSize max number of messages queued for broadcasting.
+	MaxWriterQueueSize = 1000
+)
+
 // Writer is a proxy between EventBus and Kadcast service. It subscribes for
 // both topics.Kadcast and topics.KadcastPoint, compiles a valid wire frame and
 // propagates the message to Kadcast service.
@@ -44,9 +49,25 @@ func NewWriter(ctx context.Context, s eventbus.Subscriber, g *protocol.Gossip, r
 
 // Subscribe subscribes to eventbus Kadcast messages.
 func (w *Writer) Subscribe() {
+	mapper := func(t topics.Topic) byte {
+		const (
+			High = byte(1)
+			Low  = byte(0)
+		)
+
+		switch t {
+		case topics.NewBlock, topics.Candidate, topics.GetCandidate,
+			topics.Reduction, topics.AggrAgreement, topics.Agreement:
+			return High
+		default:
+			return Low
+		}
+	}
+
 	// Kadcast subs
-	l1 := eventbus.NewStreamListener(w)
+	l1 := eventbus.NewStreamListenerWithParams(w, MaxWriterQueueSize, mapper)
 	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, l1)
+
 	// KadcastPoint subs
 	l2 := eventbus.NewStreamListener(w)
 	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l2)
@@ -55,26 +76,25 @@ func (w *Writer) Subscribe() {
 // Write sends a message through the Kadcast gRPC interface.
 // Depending on the value of header field, Send or Broadcast is called.
 func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
-	// check header
-	if len(header) == 0 {
-		return 0, errors.New("empty message header")
+	var err error
+
+	switch {
+	case len(header) > 1:
+		// point-to-point messaging
+		err = w.writeToPoint(data, header, priority)
+	case len(header) == 1:
+		// broadcast messaging
+		err = w.writeToAll(data, header, priority)
+	default:
+		err = errors.New("empty message header")
 	}
-	// send
-	go func() {
-		var err error
-		// send a p2p message
-		if len(header) > 1 {
-			err = w.writeToPoint(data, header, priority)
-		}
-		// broadcast a message
-		if len(header) == 1 {
-			err = w.writeToAll(data, header, priority)
-		}
-		// log errors
-		if err != nil {
-			log.WithError(err).Warn("write failed")
-		}
-	}()
+
+	// log errors but not return them.
+	// A returned error here is treated as unrecoverable err.
+	if err != nil {
+		log.WithError(err).Warn("write failed")
+	}
+
 	return 0, nil
 }
 
