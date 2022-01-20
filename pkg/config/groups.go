@@ -169,12 +169,19 @@ type performanceConfiguration struct {
 }
 
 type mempoolConfiguration struct {
-	MaxSizeMB        uint32
-	PoolType         string
-	PreallocTxs      uint32
-	MaxInvItems      uint32
+	MaxSizeMB uint32
+	PoolType  string
+
+	MaxInvItems uint32
+
 	PropagateTimeout string
 	PropagateBurst   uint32
+
+	// diskpool config
+	DiskPoolDir string
+
+	// Hashmap config
+	HashMapPreallocTxs uint32
 }
 
 type consensusConfiguration struct {

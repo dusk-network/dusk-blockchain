@@ -112,16 +112,19 @@ store = "walletDB"
 [mempool]
 # Max size of memory of the accepted txs to keep
 maxSizeMB = 100
-# Possible values: "hashmap", "syncpool", "memcached" 
+# Possible values: "hashmap", "diskpool"
 poolType = "hashmap"
-# number of txs slots to allocate on each reseting mempool
-preallocTxs = 100
+# number of txs slots to allocate on each reseting hashmap mempool
+hashmapPreallocTxs = 100
 # Max number of items to respond with on topics.Mempool request
 # To disable topics.Mempool handling, set it to 0
 maxInvItems = 10000
 # Back pressure on transaction propagation
 propagateTimeout = "100ms"
 propagateBurst = 1
+
+# backend storage path applicable for diskpool type
+diskpoolDir = "mempool.db"
 
 # gRPC API service
 [rpc]
