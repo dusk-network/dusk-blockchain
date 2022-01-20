@@ -8,13 +8,17 @@ package mempool
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/tidwall/buntdb"
+)
+
+const (
+	feePrefix       = "fi:"
+	itemsCountPerTx = 2
 )
 
 type (
@@ -78,7 +82,7 @@ func (m *buntdbPool) Put(t TxDesc) error {
 			return err
 		}
 
-		feeKey := fmt.Sprintf("fi:%s", key.String())
+		feeKey := feePrefix + key.String()
 		_, fee := t.tx.Values()
 
 		_, _, err = tx.Set(feeKey, strconv.FormatInt(int64(fee), 10), nil)
@@ -161,6 +165,11 @@ func (m *buntdbPool) Delete(txID []byte) {
 			return err
 		}
 
+		_, _ = t.Delete(feePrefix + key.String())
+		if err != nil {
+			return err
+		}
+
 		return err
 	})
 }
@@ -200,8 +209,14 @@ func (m *buntdbPool) Size() uint32 {
 
 // Len returns the number of tx entries.
 func (m *buntdbPool) Len() int {
-	// TODO:
-	return 0
+	var len int
+
+	_ = m.db.View(func(tx *buntdb.Tx) error {
+		len, _ = tx.Len()
+		return nil
+	})
+
+	return len / itemsCountPerTx
 }
 
 // RangeSort iterates through all tx entries sorted by Fee
@@ -209,9 +224,9 @@ func (m *buntdbPool) Len() int {
 func (m *buntdbPool) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error {
 	return m.db.View(func(tx *buntdb.Tx) error {
 		// Iterate keys sorted by fee.
-		// For each key, get marshaled tx
+		// For each key, get marshaled tx data
 		err := tx.Descend("fee_index", func(feeKey, fee string) bool {
-			txid := feeKey[3:]
+			txid := feeKey[len(feePrefix):]
 
 			// Get full transaction data
 			value, err := tx.Get(txid)

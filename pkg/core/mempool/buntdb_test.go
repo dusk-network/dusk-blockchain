@@ -48,6 +48,8 @@ func TestBuntStoreGet(t *testing.T) {
 		mockTxs = append(mockTxs, td)
 	}
 
+	assert.True(pool.Len() == 10)
+
 	// Get a random tx from the pool
 	for _, td := range mockTxs {
 		hash, err := td.tx.CalculateHash()
