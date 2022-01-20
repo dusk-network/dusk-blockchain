@@ -30,6 +30,8 @@ type TxDesc struct {
 
 // Pool represents a transaction pool of the verified txs only.
 type Pool interface {
+	// Create instantiates the underlying data storage.
+	Create(path string) error
 	// Put sets the value for the given key. It overwrites any previous value
 	// for that key.
 	Put(t TxDesc) error

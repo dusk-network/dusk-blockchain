@@ -364,17 +364,29 @@ func (m *Mempool) onIdle() {
 }
 
 func (m *Mempool) newPool() Pool {
-	preallocTxs := config.Get().Mempool.PreallocTxs
+	cfg := config.Get().Mempool
 
 	var p Pool
 
-	switch config.Get().Mempool.PoolType {
+	switch cfg.PoolType {
 	case "hashmap":
-		p = &HashMap{lock: &sync.RWMutex{}, Capacity: preallocTxs}
-	case "syncpool":
-		log.Panic("syncpool not supported")
+		p = &HashMap{lock: &sync.RWMutex{},
+			Capacity: cfg.HashMapPreallocTxs}
+	case "diskpool":
+		// TODO: size/ len
+		// TODO: test
+		// TODO: LoadFromFIle, remove accepted txs
+		// TODO: Close and Sync
+		p = &buntdbPool{}
 	default:
-		p = &HashMap{lock: &sync.RWMutex{}, Capacity: preallocTxs}
+		p = &HashMap{
+			lock:     &sync.RWMutex{},
+			Capacity: cfg.HashMapPreallocTxs,
+		}
+	}
+
+	if err := p.Create(cfg.DiskPoolDir); err != nil {
+		log.WithField("pool", cfg.PoolType).WithError(err).Fatal("failed to create pool")
 	}
 
 	return p

@@ -38,16 +38,18 @@ type (
 	}
 )
 
+func (m *HashMap) Create(path string) error {
+	m.data = make(map[txHash]TxDesc, m.Capacity)
+	m.sorted = make([]keyFee, 0, m.Capacity)
+
+	return nil
+}
+
 // Put sets the value for the given key. It overwrites any previous value
 // for that key.
 func (m *HashMap) Put(t TxDesc) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-
-	if m.data == nil {
-		m.data = make(map[txHash]TxDesc, m.Capacity)
-		m.sorted = make([]keyFee, 0, m.Capacity)
-	}
 
 	// store tx
 	txID, err := t.tx.CalculateHash()
