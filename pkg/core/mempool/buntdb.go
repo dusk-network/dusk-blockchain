@@ -271,15 +271,15 @@ func (m *buntdbPool) FilterByType(filterType transactions.TxType) []transactions
 }
 
 func (m buntdbPool) Close() {
-	m.db.Close()
+	if err := m.db.Close(); err != nil {
+		log.WithError(err).Warn("buntdb close with error")
+	}
 }
 
 func marshalTxDesc(r *bytes.Buffer, p *TxDesc) error {
 	if err := encoding.WriteUint32LE(r, uint32(p.size)); err != nil {
 		return err
 	}
-
-	// TODO: new file
 
 	if err := encoding.WriteUint64LE(r, uint64(p.received.Unix())); err != nil {
 		return err

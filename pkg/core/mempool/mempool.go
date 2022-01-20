@@ -23,6 +23,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -35,7 +36,11 @@ import (
 
 var log = logger.WithFields(logger.Fields{"process": "mempool"})
 
-const idleTime = 20 * time.Second
+const (
+	idleTime        = 20 * time.Second
+	backendHashmap  = "hashmap"
+	backendDiskpool = "diskpool"
+)
 
 var (
 	// ErrCoinbaseTxNotAllowed coinbase tx must be built by block generator only.
@@ -88,7 +93,7 @@ func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 }
 
 // NewMempool instantiates and initializes node mempool.
-func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
+func NewMempool(db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
 	log.Infof("create instance")
 
 	l := log.WithField("backend_type", config.Get().Mempool.PoolType).
@@ -148,6 +153,9 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 	// Setting the pool where to cache verified transactions.
 	// The pool is normally a Hashmap
 	m.verified = m.newPool()
+
+	// Perform cleanup as background process.
+	go cleanupAcceptedTxs(m.verified, db)
 
 	l.Info("running")
 
@@ -214,7 +222,7 @@ func (m *Mempool) propagateLoop(ctx context.Context) {
 			}
 
 			if config.Get().Kadcast.Enabled {
-				// Broadcast ful transaction data in kadcast
+				// Broadcast full transaction data in kadcast
 				err = m.kadcastTx(t)
 			} else {
 				// Advertise the transaction hash to gossip network via "Inventory Vectors"
@@ -330,8 +338,7 @@ func (m *Mempool) onBlock(b block.Block) {
 // Instead of doing a full DB scan, here we rely on the latest accepted block to
 // update.
 //
-// The passed block is supposed to be the last one accepted. That said, it must
-// contain a valid TxRoot.
+// The passed block is supposed to be the last one accepted.
 func (m *Mempool) removeAccepted(b block.Block) {
 	if m.verified.Len() == 0 {
 		// No txs accepted then no cleanup needed
@@ -355,9 +362,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 	l.Info("processing_block_completed")
 }
 
-// TODO: Get rid of stuck/expired transactions
-// TODO: Check periodically the oldest txs if somehow were accepted into the
-// blockchain but were not removed from mempool verified list.
+// TODO: Get rid of stuck/expired transactions.
 func (m *Mempool) onIdle() {
 	log.
 		WithField("mempool_alloc_size_kB", int64(m.verified.Size())/1000).
@@ -370,15 +375,13 @@ func (m *Mempool) newPool() Pool {
 	var p Pool
 
 	switch cfg.PoolType {
-	case "hashmap":
-		p = &HashMap{lock: &sync.RWMutex{},
-			Capacity: cfg.HashMapPreallocTxs}
-	case "diskpool":
-		// TODO: size/ len
-		// TODO: test
-		// TODO: LoadFromFIle, remove accepted txs
-		// TODO: Close and Sync
-		p = &buntdbPool{}
+	case backendHashmap:
+		p = &HashMap{
+			lock:     &sync.RWMutex{},
+			Capacity: cfg.HashMapPreallocTxs,
+		}
+	case backendDiskpool:
+		p = new(buntdbPool)
 	default:
 		p = &HashMap{
 			lock:     &sync.RWMutex{},
@@ -579,7 +582,6 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 		log.Panic(err)
 	}
 
-	// TODO: interface - marshaling should done after the Gossip, not before
 	packet := message.New(topics.Inv, *buf)
 	errList := m.eventBus.Publish(topics.Gossip, packet)
 
@@ -634,4 +636,37 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}
 	}
 
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
+}
+
+// cleanupAcceptedTxs discards any transactions that were accepted into
+// blockchain while node was offline.
+func cleanupAcceptedTxs(pool Pool, db database.DB) {
+	if db == nil {
+		return
+	}
+
+	deleteList := make([]txHash, 0)
+
+	_ = pool.Range(func(k txHash, t TxDesc) error {
+		_ = db.View(func(t database.Transaction) error {
+			// TODO: FetchBlockTxByHash should be replaced with FetchTxExists
+			_, _, _, err := t.FetchBlockTxByHash(k[:])
+			if err == nil {
+				// transaction already accepted.
+				deleteList = append(deleteList, k)
+			}
+
+			return nil
+		})
+
+		return nil
+	})
+
+	for _, txhash := range deleteList {
+		pool.Delete(txhash[:])
+	}
+
+	if len(deleteList) > 0 {
+		log.WithField("len", len(deleteList)).Info("clean up redundant transactions")
+	}
 }

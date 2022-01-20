@@ -38,6 +38,7 @@ type (
 	}
 )
 
+// Create instantiates hashmap and sort index.
 func (m *HashMap) Create(path string) error {
 	m.data = make(map[txHash]TxDesc, m.Capacity)
 	m.sorted = make([]keyFee, 0, m.Capacity)
