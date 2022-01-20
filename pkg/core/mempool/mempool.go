@@ -187,6 +187,7 @@ func (m *Mempool) Loop(ctx context.Context) {
 		case <-ticker.C:
 			m.onIdle()
 		case <-ctx.Done():
+			m.OnClose()
 			log.Info("main_loop terminated")
 			return
 		}
@@ -606,6 +607,13 @@ func (m *Mempool) kadcastTx(t TxDesc) error {
 
 	m.eventBus.Publish(topics.Kadcast, msg)
 	return nil
+}
+
+// OnClose performs mempool cleanup procedure. It's called on canceling mempool
+// context.
+func (m *Mempool) OnClose() {
+	// Closing diskpool backend commits changes to file and close it.
+	m.verified.Close()
 }
 
 func toHex(id []byte) string {

@@ -226,3 +226,7 @@ func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error {
 
 	return nil
 }
+
+// Close empty implementation of Pool.Close.
+func (m *HashMap) Close() {
+}

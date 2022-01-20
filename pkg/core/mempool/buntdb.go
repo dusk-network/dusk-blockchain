@@ -258,16 +258,20 @@ func (m *buntdbPool) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error 
 }
 
 // Clone the entire pool.
-func (m buntdbPool) Clone() []transactions.ContractCall {
+func (m *buntdbPool) Clone() []transactions.ContractCall {
 	// Not in use
 	return nil
 }
 
 // FilterByType returns all transactions for a specific type that are
 // currently in the HashMap.
-func (m buntdbPool) FilterByType(filterType transactions.TxType) []transactions.ContractCall {
+func (m *buntdbPool) FilterByType(filterType transactions.TxType) []transactions.ContractCall {
 	// Not in use.
 	return nil
+}
+
+func (m buntdbPool) Close() {
+	m.db.Close()
 }
 
 func marshalTxDesc(r *bytes.Buffer, p *TxDesc) error {
