@@ -59,6 +59,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
+        toolchain: nightly-2021-10-28
     - run: rustup component add rustfmt
     - run: rustup target add wasm32-unknown-unknown
     - name: Cache Cargo home
