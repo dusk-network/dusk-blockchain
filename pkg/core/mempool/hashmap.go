@@ -154,7 +154,7 @@ func (m *HashMap) Get(txID []byte) transactions.ContractCall {
 }
 
 // Delete a key in the hashmap.
-func (m *HashMap) Delete(txID []byte) {
+func (m *HashMap) Delete(txID []byte) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -164,7 +164,7 @@ func (m *HashMap) Delete(txID []byte) {
 
 	tx, ok := m.data[k]
 	if !ok {
-		return
+		return ErrNotFound
 	}
 
 	m.txsSize -= uint32(tx.size)
@@ -177,6 +177,8 @@ func (m *HashMap) Delete(txID []byte) {
 			m.sorted = append(m.sorted[:i], m.sorted[i+1:]...)
 		}
 	}
+
+	return nil
 }
 
 // Size of the txs.

@@ -9,6 +9,7 @@ package mempool
 import (
 	"bytes"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -21,11 +22,19 @@ const (
 	itemsCountPerTx = 2
 )
 
+const (
+	needFullTx uint = iota
+	needTxSizeOnly
+)
+
 type (
 	// buntdbPool implements Pool interface to provide an in-memory transactions storage
 	// with EverySecond sync policy.
 	buntdbPool struct {
 		db *buntdb.DB
+
+		// Cumulative size of all added transactions
+		cumulativeTxsSize uint32
 	}
 )
 
@@ -43,7 +52,12 @@ func (m *buntdbPool) Create(path string) error {
 		return err
 	}
 
+	// Fast and safer sync policy.
+	// In addition, syncing is done on closing mempool.
 	config.SyncPolicy = buntdb.EverySecond
+
+	// Auto-shrink should be always enabled
+	config.AutoShrinkDisabled = false
 
 	if err := db.SetConfig(config); err != nil {
 		_ = db.Close()
@@ -90,7 +104,8 @@ func (m *buntdbPool) Put(t TxDesc) error {
 			return err
 		}
 
-		return err
+		atomic.AddUint32(&m.cumulativeTxsSize, uint32(t.size))
+		return nil
 	})
 
 	return err
@@ -119,6 +134,12 @@ func (m *buntdbPool) Contains(txID []byte) bool {
 
 // Get returns a tx for a given txID if it exists.
 func (m *buntdbPool) Get(txID []byte) transactions.ContractCall {
+	t, _ := m.getTxDesc(txID, needFullTx)
+	return t.tx
+}
+
+// getTxDesc returns a tx for a given txID if it exists.
+func (m *buntdbPool) getTxDesc(txID []byte, need uint) (TxDesc, error) {
 	var (
 		key    bytes.Buffer
 		value  string
@@ -137,21 +158,21 @@ func (m *buntdbPool) Get(txID []byte) transactions.ContractCall {
 		return err
 	})
 	if err != nil {
-		return nil
+		return TxDesc{}, err
 	}
 
 	buf := bytes.NewBufferString(value)
 
-	txdesc, err = unmarshalTxDesc(buf)
+	txdesc, err = unmarshalTxDesc(buf, need)
 	if err != nil {
-		return nil
+		return TxDesc{}, err
 	}
 
-	return txdesc.tx
+	return txdesc, nil
 }
 
 // Delete a transaction by id.
-func (m *buntdbPool) Delete(txID []byte) {
+func (m *buntdbPool) Delete(txID []byte) error {
 	var (
 		key bytes.Buffer
 		err error
@@ -159,8 +180,17 @@ func (m *buntdbPool) Delete(txID []byte) {
 
 	key.Write(txID)
 
+	// For the purpose of deleting a transaction we need to recalculate cumulativeTxsSize.
+	// getTxDesc is called with needTxSizeOnly to ensure we read tx size only but not entire tx.
+	desc, err := m.getTxDesc(txID, needTxSizeOnly)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	size := int(desc.size)
+
 	err = m.db.Update(func(t *buntdb.Tx) error {
-		_, _ = t.Delete(key.String())
+		_, err = t.Delete(key.String())
 		if err != nil {
 			return err
 		}
@@ -170,8 +200,12 @@ func (m *buntdbPool) Delete(txID []byte) {
 			return err
 		}
 
+		// substract deleted tx size
+		atomic.AddUint32(&m.cumulativeTxsSize, ^uint32(size-1))
 		return err
 	})
+
+	return err
 }
 
 // Range iterates through all tx entries ordered by transaction ids.
@@ -180,7 +214,7 @@ func (m *buntdbPool) Range(fn func(k txHash, t TxDesc) error) error {
 		err := tx.Ascend("", func(key, value string) bool {
 			buf := bytes.NewBufferString(value)
 
-			txdesc, err := unmarshalTxDesc(buf)
+			txdesc, err := unmarshalTxDesc(buf, needFullTx)
 			if err != nil {
 				panic(err)
 			}
@@ -203,8 +237,7 @@ func (m *buntdbPool) Range(fn func(k txHash, t TxDesc) error) error {
 
 // Size of the txs.
 func (m *buntdbPool) Size() uint32 {
-	// TODO:
-	return 0
+	return atomic.LoadUint32(&m.cumulativeTxsSize)
 }
 
 // Len returns the number of tx entries.
@@ -237,7 +270,7 @@ func (m *buntdbPool) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error 
 			// unmarshal
 			buf := bytes.NewBufferString(value)
 
-			txdesc, err := unmarshalTxDesc(buf)
+			txdesc, err := unmarshalTxDesc(buf, needFullTx)
 			if err != nil {
 				panic(err)
 			}
@@ -296,10 +329,16 @@ func marshalTxDesc(r *bytes.Buffer, p *TxDesc) error {
 	return nil
 }
 
-func unmarshalTxDesc(r *bytes.Buffer) (TxDesc, error) {
+func unmarshalTxDesc(r *bytes.Buffer, need uint) (TxDesc, error) {
 	var size uint32
 	if err := encoding.ReadUint32LE(r, &size); err != nil {
 		return TxDesc{}, err
+	}
+
+	if need == needTxSizeOnly {
+		return TxDesc{
+			size: uint(size),
+		}, nil
 	}
 
 	var received uint64

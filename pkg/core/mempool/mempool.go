@@ -341,7 +341,7 @@ func (m *Mempool) onBlock(b block.Block) {
 // The passed block is supposed to be the last one accepted.
 func (m *Mempool) removeAccepted(b block.Block) {
 	if m.verified.Len() == 0 {
-		// No txs accepted then no cleanup needed
+		// Empty pool then no need for cleanup
 		return
 	}
 
@@ -356,7 +356,7 @@ func (m *Mempool) removeAccepted(b block.Block) {
 			log.WithError(err).Panic("could not calculate tx hash")
 		}
 
-		m.verified.Delete(hash)
+		_ = m.verified.Delete(hash)
 	}
 
 	l.Info("processing_block_completed")
@@ -662,8 +662,13 @@ func cleanupAcceptedTxs(pool Pool, db database.DB) {
 		return nil
 	})
 
+	// BuntDB does not currently support deleting a key while in the process of
+	// iterating. As a workaround you'll need to delete keys following the
+	// completion of the iterator.
 	for _, txhash := range deleteList {
-		pool.Delete(txhash[:])
+		if err := pool.Delete(txhash[:]); err != nil {
+			log.WithError(err).WithField("txid", hex.EncodeToString(txhash[:])).Warn("could not delete tx")
+		}
 	}
 
 	if len(deleteList) > 0 {

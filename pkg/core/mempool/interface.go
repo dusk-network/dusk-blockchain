@@ -7,9 +7,14 @@
 package mempool
 
 import (
+	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+)
+
+var (
+	ErrNotFound = errors.New("not found")
 )
 
 type txHash [32]byte
@@ -40,7 +45,7 @@ type Pool interface {
 	// Contains returns true if the given key is in the pool.
 	Contains(key []byte) bool
 	// Delete a key in the pool.
-	Delete(key []byte)
+	Delete(key []byte) error
 	// Clone the entire pool.
 	Clone() []transactions.ContractCall
 
