@@ -19,8 +19,8 @@ test-harness: ## Run harness tests
 	@go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable
 test-harness-ci: build
 	MOCK_ADDRESS=127.0.0.1:8080 DUSK_NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" make test-harness
-test-harness-ci-kadcast: stop build
-	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=20 DUSK_NETWORK_PROFILE=kadcast DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
+test-harness-ci-kadcast: stop build rusk
+	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=20 DUSK_NETWORK_PROFILE=kadcast_uds DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" RUSK_PATH=${PWD}/bin/rusk \
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestSendStakeTransaction -args -enable
 test-harness-alive: stop build
 	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
@@ -69,6 +69,12 @@ mockrusk: build
 	./bin/utils mockrusk --rusknetwork=tcp --ruskaddress=127.0.0.1:10000 \
 	--walletstore=/tmp/localnet-137601832/node-9003/walletDB/ \
 	--walletfile=./harness/data/wallet-9000.dat
+rusk: 
+	rm -rf rusk_co
+	git clone https://github.com/dusk-network/rusk rusk_co \
+	&& cd rusk_co \
+	&& cargo build --release -p rusk
+	mv rusk_co/target/release/rusk bin/rusk
 devnet: stop
 	./devnet.sh
 netcollector: build
@@ -132,3 +138,4 @@ wallet-windows: install-tools
 	#xgo --go=latest --targets=windows/amd64 -out=./bin/wallet ./cmd/wallet #407
 	#xgo --go=latest --targets=windows/386 -out=./bin/wallet ./cmd/wallet #407
 ########################################################################################
+.PHONY: rusk
