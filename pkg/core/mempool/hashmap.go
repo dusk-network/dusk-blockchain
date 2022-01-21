@@ -164,7 +164,7 @@ func (m *HashMap) Delete(txID []byte) error {
 
 	tx, ok := m.data[k]
 	if !ok {
-		return ErrNotFound
+		return errNotFound
 	}
 
 	m.txsSize -= uint32(tx.size)

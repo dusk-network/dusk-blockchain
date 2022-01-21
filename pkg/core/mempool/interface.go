@@ -13,9 +13,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
-var (
-	ErrNotFound = errors.New("not found")
-)
+var errNotFound = errors.New("not found")
 
 type txHash [32]byte
 

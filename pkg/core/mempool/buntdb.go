@@ -184,7 +184,7 @@ func (m *buntdbPool) Delete(txID []byte) error {
 	// getTxDesc is called with needTxSizeOnly to ensure we read tx size only but not entire tx.
 	desc, err := m.getTxDesc(txID, needTxSizeOnly)
 	if err != nil {
-		return ErrNotFound
+		return errNotFound
 	}
 
 	size := int(desc.size)
@@ -195,12 +195,12 @@ func (m *buntdbPool) Delete(txID []byte) error {
 			return err
 		}
 
-		_, _ = t.Delete(feePrefix + key.String())
+		_, err = t.Delete(feePrefix + key.String())
 		if err != nil {
 			return err
 		}
 
-		// substract deleted tx size
+		// subtract deleted tx size
 		atomic.AddUint32(&m.cumulativeTxsSize, ^uint32(size-1))
 		return err
 	})
