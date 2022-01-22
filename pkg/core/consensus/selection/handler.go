@@ -56,12 +56,7 @@ func (b *Handler) VerifySignature(scr message.NewBlock) error {
 		return err
 	}
 
-	// we make a copy of the signature because the crypto package apparently mutates the byte array when
-	// Compressing/Decompressing a point
-	// see https://github.com/dusk-network/dusk-crypto/issues/16
-	sig := make([]byte, len(scr.SignedHash))
-	copy(sig, scr.SignedHash)
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, packet.Bytes())
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, scr.SignedHash, packet.Bytes())
 }
 
 // Committee returns a VotingCommittee for a given round and step.

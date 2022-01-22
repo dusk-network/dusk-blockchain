@@ -62,13 +62,8 @@ func (b *Handler) VerifySignature(red message.Reduction) error {
 	if err := header.MarshalSignableVote(packet, hdr); err != nil {
 		return err
 	}
-
-	// we make a copy of the signature because the crypto package apparently mutates the byte array when
-	// Compressing/Decompressing a point
-	// see https://github.com/dusk-network/dusk-crypto/issues/16
-	sig := make([]byte, len(red.SignedHash))
-	copy(sig, red.SignedHash)
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, packet.Bytes())
+	
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, red.SignedHash, packet.Bytes())
 }
 
 // Quorum returns the amount of committee votes to reach a quorum.
