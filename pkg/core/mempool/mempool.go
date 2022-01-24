@@ -246,7 +246,7 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 	maxSizeBytes := config.Get().Mempool.MaxSizeMB * 1000 * 1000
 	if m.verified.Size() > maxSizeBytes {
 		log.WithField("max_size_mb", maxSizeBytes).
-			WithField("current_size", m.verified.Size()).
+			WithField("alloc_size", m.verified.Size()/1000).
 			Warn("mempool is full, dropping transaction")
 		return nil, errors.New("mempool is full, dropping transaction")
 	}
@@ -347,8 +347,8 @@ func (m *Mempool) removeAccepted(b block.Block) {
 
 	l := log.WithField("blk_height", b.Header.Height).
 		WithField("blk_txs_count", len(b.Txs)).
-		WithField("mem_alloc_size_kB", int64(m.verified.Size())/1000).
-		WithField("mem_txs_count", m.verified.Len())
+		WithField("alloc_size", int64(m.verified.Size())/1000).
+		WithField("txs_count", m.verified.Len())
 
 	for _, tx := range b.Txs {
 		hash, err := tx.CalculateHash()
@@ -365,8 +365,8 @@ func (m *Mempool) removeAccepted(b block.Block) {
 // TODO: Get rid of stuck/expired transactions.
 func (m *Mempool) onIdle() {
 	log.
-		WithField("mempool_alloc_size_kB", int64(m.verified.Size())/1000).
-		WithField("mempool_txs_count", m.verified.Len()).Info("process_on_idle")
+		WithField("alloc_size", int64(m.verified.Size())/1000).
+		WithField("txs_count", m.verified.Len()).Info("process_on_idle")
 }
 
 func (m *Mempool) newPool() Pool {
