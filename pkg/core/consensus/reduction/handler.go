@@ -62,7 +62,7 @@ func (b *Handler) VerifySignature(red message.Reduction) error {
 	if err := header.MarshalSignableVote(packet, hdr); err != nil {
 		return err
 	}
-	
+
 	return msg.VerifyBLSSignature(hdr.PubKeyBLS, red.SignedHash, packet.Bytes())
 }
 
