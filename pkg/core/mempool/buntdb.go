@@ -19,6 +19,7 @@ import (
 
 const (
 	feePrefix       = "fi:"
+	feeIndex        = "fee_index"
 	itemsCountPerTx = 2
 )
 
@@ -64,9 +65,10 @@ func (m *buntdbPool) Create(path string) error {
 		return err
 	}
 
-	// Create index for sorting txids by fee
-	if err := db.CreateIndex("fee_index", "fi:*", buntdb.IndexInt); err != nil {
-		return err
+	m.db = db
+
+	if err := m.createIndices(); err != nil {
+		log.WithError(err).Warn("could not create indices")
 	}
 
 	// Sum cumulative trasactions size
@@ -86,9 +88,7 @@ func (m *buntdbPool) Create(path string) error {
 		return err
 	})
 
-	m.db = db
 	atomic.StoreUint32(&m.cumulativeTxsSize, cumulativeTxsSize)
-
 	return nil
 }
 
@@ -277,7 +277,7 @@ func (m *buntdbPool) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error 
 	return m.db.View(func(tx *buntdb.Tx) error {
 		// Iterate keys sorted by fee.
 		// For each key, get marshaled tx data
-		err := tx.Descend("fee_index", func(feeKey, fee string) bool {
+		err := tx.Descend(feeIndex, func(feeKey, fee string) bool {
 			txid := feeKey[len(feePrefix):]
 
 			// Get full transaction data
@@ -319,6 +319,34 @@ func (m *buntdbPool) Clone() []transactions.ContractCall {
 // currently in the HashMap.
 func (m *buntdbPool) FilterByType(filterType transactions.TxType) []transactions.ContractCall {
 	// Not in use.
+	return nil
+}
+
+func (m *buntdbPool) createIndices() error {
+	var found bool
+	// Create index for sorting txids by fee
+	indexList, err := m.db.Indexes()
+	if err != nil {
+		return err
+	}
+
+	for _, name := range indexList {
+		if name != feeIndex {
+			continue
+		}
+
+		found = true
+		break
+	}
+
+	if !found {
+		pattern := feePrefix + "*"
+		// An error will occur if an index with the same name already exists.
+		if err := m.db.CreateIndex(feeIndex, pattern, buntdb.IndexInt); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
