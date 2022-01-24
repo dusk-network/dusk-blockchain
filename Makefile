@@ -73,6 +73,7 @@ rusk:
 	rm -rf rusk_co
 	git clone https://github.com/dusk-network/rusk rusk_co \
 	&& cd rusk_co \
+	&& make wasm \
 	&& cargo build --release -p rusk
 	mv rusk_co/target/release/rusk bin/rusk
 devnet: stop

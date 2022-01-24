@@ -178,13 +178,7 @@ func verifyWhole(a message.Agreement) error {
 		return err
 	}
 
-	// we make a copy of the signature because the crypto package apparently mutates the byte array when
-	// Compressing/Decompressing a point
-	// see https://github.com/dusk-network/dusk-crypto/issues/16
-	sig := make([]byte, len(a.Signature()))
-	copy(sig, a.Signature())
-
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, sig, r.Bytes())
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, a.Signature(), r.Bytes())
 }
 
 // AggregatePks reconstructs an aggregated BLS public key from a subcommittee.
