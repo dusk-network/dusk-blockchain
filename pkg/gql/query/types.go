@@ -83,6 +83,9 @@ var Transaction = graphql.NewObject(
 			"blockhash": &graphql.Field{
 				Type: Hex,
 			},
+			"blocktimestamp": &graphql.Field{
+				Type: UnixTimestamp,
+			},
 			"output": &graphql.Field{
 				Type: graphql.NewList(Output),
 			},

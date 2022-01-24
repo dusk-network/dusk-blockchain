@@ -195,7 +195,7 @@ func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 			}
 
 			for _, tx := range fetched {
-				d, err := newQueryTx(tx, b.Header.Hash)
+				d, err := newQueryTx(tx, b.Header.Hash, b.Header.Timestamp)
 				if err == nil {
 					txs = append(txs, d)
 				}

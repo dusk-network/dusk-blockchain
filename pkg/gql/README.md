@@ -141,7 +141,7 @@ NB: The examples from below represent only query structures. To send a query as 
   }
   ```
 
-* Fetch data of a single \(accepted\) transaction
+* Fetch all data of a single \(accepted\) transaction
 
 ```graphql
 {
@@ -149,9 +149,18 @@ NB: The examples from below represent only query structures. To send a query as 
       txid
       txtype
       blockhash
+      blocktimestamp
       gaslimit
       gasprice
       feepaid
+
+      output {
+        pubkey
+      }
+
+      input {
+        keyimage
+      }
   }
 }
 ```
