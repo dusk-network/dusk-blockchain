@@ -69,7 +69,26 @@ func (m *buntdbPool) Create(path string) error {
 		return err
 	}
 
+	// Sum cumulative trasactions size
+	cumulativeTxsSize := uint32(0)
+	_ = db.View(func(tx *buntdb.Tx) error {
+		err := tx.Ascend("", func(key, value string) bool {
+			buf := bytes.NewBufferString(value)
+
+			txd, err := unmarshalTxDesc(buf, needTxSizeOnly)
+			if err != nil {
+				panic(err)
+			}
+
+			cumulativeTxsSize += uint32(txd.size)
+			return true // continue iteration
+		})
+		return err
+	})
+
 	m.db = db
+	atomic.StoreUint32(&m.cumulativeTxsSize, cumulativeTxsSize)
+
 	return nil
 }
 
