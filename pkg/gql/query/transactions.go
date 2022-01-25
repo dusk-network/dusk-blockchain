@@ -47,8 +47,9 @@ type (
 		FeePaid  uint64
 
 		// Non-StandardTx data fields.
-		BlockHash []byte
-		Size      int
+		BlockHash      []byte
+		BlockTimestamp int64 `json:"blocktimestamp"` // Block timestamp
+		Size           int
 	}
 )
 
@@ -56,7 +57,7 @@ type transactions struct{}
 
 // newQueryTx constructs query tx data from core tx and block hash.
 //nolint
-func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
+func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryTx, error) {
 	txID, err := tx.CalculateHash()
 	if err != nil {
 		return queryTx{}, err
@@ -85,6 +86,7 @@ func newQueryTx(tx core.ContractCall, blockHash []byte) (queryTx, error) {
 	_, qd.FeePaid = tx.Values()
 
 	qd.BlockHash = blockHash
+	qd.BlockTimestamp = timestamp
 
 	// Populate marshaling size
 	buf := new(bytes.Buffer)
@@ -169,7 +171,12 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]que
 				return err
 			}
 
-			d, err := newQueryTx(tx, hash)
+			header, err := t.FetchBlockHeader(hash)
+			if err != nil {
+				return err
+			}
+
+			d, err := newQueryTx(tx, header.Hash, header.Timestamp)
 			if err == nil {
 				txs = append(txs, d)
 			}
@@ -216,8 +223,13 @@ func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error)
 				return err
 			}
 
+			header, err := t.FetchBlockHeader(hash)
+			if err != nil {
+				return err
+			}
+
 			for _, tx := range blockTxs {
-				d, err := newQueryTx(tx, hash)
+				d, err := newQueryTx(tx, header.Hash, header.Timestamp)
 				if err == nil {
 					txs = append(txs, d)
 				}
