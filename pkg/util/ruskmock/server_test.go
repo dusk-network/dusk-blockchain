@@ -124,7 +124,7 @@ func TestAcceptRequest(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	resp, err := c.Accept(ctx, &rusk.AcceptRequest{
+	resp, err := c.Accept(ctx, &rusk.ExecuteStateTransitionRequest{
 		Txs:         []*rusk.Transaction{tx},
 		BlockHeight: 1,
 	})

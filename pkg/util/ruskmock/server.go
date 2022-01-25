@@ -183,7 +183,7 @@ func (s *Server) ExecuteStateTransition(ctx context.Context, req *rusk.ExecuteSt
 }
 
 // Accept implements a mock Finalize.
-func (s *Server) Accept(ctx context.Context, req *rusk.AcceptRequest) (*rusk.AcceptResponse, error) {
+func (s *Server) Accept(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
 	log.WithField("height", s.height).Infoln("call received to ExecuteStateTransition")
 	defer log.Infoln("finished call to ExecuteStateTransition")
 
@@ -194,16 +194,15 @@ func (s *Server) Accept(ctx context.Context, req *rusk.AcceptRequest) (*rusk.Acc
 		return nil, err
 	}
 
-	return &rusk.AcceptResponse{
+	return &rusk.ExecuteStateTransitionResponse{
 		Success:   s.cfg.PassStateTransition,
 		StateRoot: make([]byte, 32),
 	}, nil
 }
 
 // Finalize implements a mock Finalize.
-func (s *Server) Finalize(ctx context.Context, req *rusk.FinalizeRequest) (*rusk.FinalizeResponse, error) {
+func (s *Server) Finalize(ctx context.Context, req *rusk.ExecuteStateTransitionRequest) (*rusk.ExecuteStateTransitionResponse, error) {
 	log.WithField("height", s.height).
-		WithField("state_root", util.StringifyBytes(req.StateRoot)).
 		Infoln("call received to ExecuteStateTransition")
 
 	defer log.Infoln("finished call to ExecuteStateTransition")
@@ -215,7 +214,7 @@ func (s *Server) Finalize(ctx context.Context, req *rusk.FinalizeRequest) (*rusk
 		return nil, err
 	}
 
-	return &rusk.FinalizeResponse{
+	return &rusk.ExecuteStateTransitionResponse{
 		Success:   true,
 		StateRoot: make([]byte, 32),
 	}, nil
@@ -236,22 +235,12 @@ func (s *Server) GetProvisioners(ctx context.Context, req *rusk.GetProvisionersR
 	}, nil
 }
 
-// GetEphemeralStateRoot returns the current set of provisioners.
-func (s *Server) GetEphemeralStateRoot(ctx context.Context, req *rusk.GetEphemeralStateRootRequest) (*rusk.GetEphemeralStateRootResponse, error) {
-	log.Infoln("call received to GetEphemeralStateRoot")
-	defer log.Infoln("finished call to GetEphemeralStateRoot")
+// GetStateRoot returns the current set of provisioners.
+func (s *Server) GetStateRoot(ctx context.Context, req *rusk.GetStateRootRequest) (*rusk.GetStateRootResponse, error) {
+	log.Infoln("call received to GetStateRoot")
+	defer log.Infoln("finished call to GetStateRoot")
 
-	return &rusk.GetEphemeralStateRootResponse{
-		StateRoot: make([]byte, 32),
-	}, nil
-}
-
-// GetFinalizedStateRoot returns the current set of provisioners.
-func (s *Server) GetFinalizedStateRoot(ctx context.Context, req *rusk.GetFinalizedStateRootRequest) (*rusk.GetFinalizedStateRootResponse, error) {
-	log.Infoln("call received to GetFinalizedStateRoot")
-	defer log.Infoln("finished call to GetFinalizedStateRoot")
-
-	return &rusk.GetFinalizedStateRootResponse{
+	return &rusk.GetStateRootResponse{
 		StateRoot: make([]byte, 32),
 	}, nil
 }
@@ -264,6 +253,38 @@ func (s *Server) Echo(ctx context.Context, req *rusk.EchoRequest) (*rusk.EchoRes
 	return &rusk.EchoResponse{
 		Message: "echo",
 	}, nil
+}
+
+// GetNotesOwnedBy impl.
+func (s *Server) GetNotesOwnedBy(ctx context.Context, req *rusk.GetNotesOwnedByRequest) (*rusk.GetNotesOwnedByResponse, error) {
+	log.Infoln("call received to GetNotesOwnedBy")
+	defer log.Infoln("finished call to GetNotesOwnedBy")
+
+	return &rusk.GetNotesOwnedByResponse{}, nil
+}
+
+// GetAnchor impl.
+func (s *Server) GetAnchor(ctx context.Context, req *rusk.GetAnchorRequest) (*rusk.GetAnchorResponse, error) {
+	log.Infoln("call received to GetAnchor")
+	defer log.Infoln("finished call to GetAnchor")
+
+	return &rusk.GetAnchorResponse{}, nil
+}
+
+// GetOpening impl.
+func (s *Server) GetOpening(ctx context.Context, req *rusk.GetOpeningRequest) (*rusk.GetOpeningResponse, error) {
+	log.Infoln("call received to GetOpening")
+	defer log.Infoln("finished call to GetOpening")
+
+	return &rusk.GetOpeningResponse{}, nil
+}
+
+// GetStake impl.
+func (s *Server) GetStake(ctx context.Context, req *rusk.GetStakeRequest) (*rusk.GetStakeResponse, error) {
+	log.Infoln("call received to GetStake")
+	defer log.Infoln("finished call to GetStake")
+
+	return &rusk.GetStakeResponse{}, nil
 }
 
 func (s *Server) addConsensusNodes(txs []*rusk.Transaction, startHeight uint64) error {
