@@ -195,7 +195,7 @@ func Setup() *Server {
 		log.Panic(err)
 	}
 
-	m := mempool.NewMempool(eventBus, rpcBus, proxy.Prober(), grpcServer)
+	m := mempool.NewMempool(db, eventBus, rpcBus, proxy.Prober(), grpcServer)
 	m.Run(parentCtx)
 	processor.Register(topics.Tx, m.ProcessTx)
 

@@ -23,6 +23,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -35,7 +36,11 @@ import (
 
 var log = logger.WithFields(logger.Fields{"process": "mempool"})
 
-const idleTime = 20 * time.Second
+const (
+	idleTime        = 20 * time.Second
+	backendHashmap  = "hashmap"
+	backendDiskpool = "diskpool"
+)
 
 var (
 	// ErrCoinbaseTxNotAllowed coinbase tx must be built by block generator only.
@@ -88,7 +93,7 @@ func (m *Mempool) checkTx(tx transactions.ContractCall) error {
 }
 
 // NewMempool instantiates and initializes node mempool.
-func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
+func NewMempool(db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
 	log.Infof("create instance")
 
 	l := log.WithField("backend_type", config.Get().Mempool.PoolType).
@@ -149,6 +154,9 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier tra
 	// The pool is normally a Hashmap
 	m.verified = m.newPool()
 
+	// Perform cleanup as background process.
+	go cleanupAcceptedTxs(m.verified, db)
+
 	l.Info("running")
 
 	if srv != nil {
@@ -187,6 +195,7 @@ func (m *Mempool) Loop(ctx context.Context) {
 		case <-ticker.C:
 			m.onIdle()
 		case <-ctx.Done():
+			m.OnClose()
 			log.Info("main_loop terminated")
 			return
 		}
@@ -213,7 +222,7 @@ func (m *Mempool) propagateLoop(ctx context.Context) {
 			}
 
 			if config.Get().Kadcast.Enabled {
-				// Broadcast ful transaction data in kadcast
+				// Broadcast full transaction data in kadcast
 				err = m.kadcastTx(t)
 			} else {
 				// Advertise the transaction hash to gossip network via "Inventory Vectors"
@@ -237,7 +246,7 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 	maxSizeBytes := config.Get().Mempool.MaxSizeMB * 1000 * 1000
 	if m.verified.Size() > maxSizeBytes {
 		log.WithField("max_size_mb", maxSizeBytes).
-			WithField("current_size", m.verified.Size()).
+			WithField("alloc_size", m.verified.Size()/1000).
 			Warn("mempool is full, dropping transaction")
 		return nil, errors.New("mempool is full, dropping transaction")
 	}
@@ -329,18 +338,17 @@ func (m *Mempool) onBlock(b block.Block) {
 // Instead of doing a full DB scan, here we rely on the latest accepted block to
 // update.
 //
-// The passed block is supposed to be the last one accepted. That said, it must
-// contain a valid TxRoot.
+// The passed block is supposed to be the last one accepted.
 func (m *Mempool) removeAccepted(b block.Block) {
 	if m.verified.Len() == 0 {
-		// No txs accepted then no cleanup needed
+		// Empty pool then no need for cleanup
 		return
 	}
 
 	l := log.WithField("blk_height", b.Header.Height).
 		WithField("blk_txs_count", len(b.Txs)).
-		WithField("mem_alloc_size_kB", int64(m.verified.Size())/1000).
-		WithField("mem_txs_count", m.verified.Len())
+		WithField("alloc_size", int64(m.verified.Size())/1000).
+		WithField("txs_count", m.verified.Len())
 
 	for _, tx := range b.Txs {
 		hash, err := tx.CalculateHash()
@@ -348,33 +356,41 @@ func (m *Mempool) removeAccepted(b block.Block) {
 			log.WithError(err).Panic("could not calculate tx hash")
 		}
 
-		m.verified.Delete(hash)
+		_ = m.verified.Delete(hash)
 	}
 
 	l.Info("processing_block_completed")
 }
 
-// TODO: Get rid of stuck/expired transactions
-// TODO: Check periodically the oldest txs if somehow were accepted into the
-// blockchain but were not removed from mempool verified list.
+// TODO: Get rid of stuck/expired transactions.
 func (m *Mempool) onIdle() {
 	log.
-		WithField("mempool_alloc_size_kB", int64(m.verified.Size())/1000).
-		WithField("mempool_txs_count", m.verified.Len()).Info("process_on_idle")
+		WithField("alloc_size", int64(m.verified.Size())/1000).
+		WithField("txs_count", m.verified.Len()).Info("process_on_idle")
 }
 
 func (m *Mempool) newPool() Pool {
-	preallocTxs := config.Get().Mempool.PreallocTxs
+	cfg := config.Get().Mempool
 
 	var p Pool
 
-	switch config.Get().Mempool.PoolType {
-	case "hashmap":
-		p = &HashMap{lock: &sync.RWMutex{}, Capacity: preallocTxs}
-	case "syncpool":
-		log.Panic("syncpool not supported")
+	switch cfg.PoolType {
+	case backendHashmap:
+		p = &HashMap{
+			lock:     &sync.RWMutex{},
+			Capacity: cfg.HashMapPreallocTxs,
+		}
+	case backendDiskpool:
+		p = new(buntdbPool)
 	default:
-		p = &HashMap{lock: &sync.RWMutex{}, Capacity: preallocTxs}
+		p = &HashMap{
+			lock:     &sync.RWMutex{},
+			Capacity: cfg.HashMapPreallocTxs,
+		}
+	}
+
+	if err := p.Create(cfg.DiskPoolDir); err != nil {
+		log.WithField("pool", cfg.PoolType).WithError(err).Fatal("failed to create pool")
 	}
 
 	return p
@@ -566,7 +582,6 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 		log.Panic(err)
 	}
 
-	// TODO: interface - marshaling should done after the Gossip, not before
 	packet := message.New(topics.Inv, *buf)
 	errList := m.eventBus.Publish(topics.Gossip, packet)
 
@@ -596,6 +611,13 @@ func (m *Mempool) kadcastTx(t TxDesc) error {
 	return nil
 }
 
+// OnClose performs mempool cleanup procedure. It's called on canceling mempool
+// context.
+func (m *Mempool) OnClose() {
+	// Closing diskpool backend commits changes to file and close it.
+	m.verified.Close()
+}
+
 func toHex(id []byte) string {
 	enc := hex.EncodeToString(id[:])
 	return enc
@@ -614,4 +636,42 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}
 	}
 
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
+}
+
+// cleanupAcceptedTxs discards any transactions that were accepted into
+// blockchain while node was offline.
+func cleanupAcceptedTxs(pool Pool, db database.DB) {
+	if db == nil {
+		return
+	}
+
+	deleteList := make([]txHash, 0)
+
+	_ = pool.Range(func(k txHash, t TxDesc) error {
+		_ = db.View(func(t database.Transaction) error {
+			// TODO: FetchBlockTxByHash should be replaced with FetchTxExists
+			_, _, _, err := t.FetchBlockTxByHash(k[:])
+			if err == nil {
+				// transaction already accepted.
+				deleteList = append(deleteList, k)
+			}
+
+			return nil
+		})
+
+		return nil
+	})
+
+	// BuntDB does not currently support deleting a key while in the process of
+	// iterating. As a workaround you'll need to delete keys following the
+	// completion of the iterator.
+	for _, txhash := range deleteList {
+		if err := pool.Delete(txhash[:]); err != nil {
+			log.WithError(err).WithField("txid", hex.EncodeToString(txhash[:])).Warn("could not delete tx")
+		}
+	}
+
+	if len(deleteList) > 0 {
+		log.WithField("len", len(deleteList)).Info("clean up redundant transactions")
+	}
 }

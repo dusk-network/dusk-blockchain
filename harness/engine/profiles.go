@@ -106,8 +106,13 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("network.seeder.addresses", []string{"127.0.0.1:8081"})
 	viper.Set("network.port", strconv.Itoa(7100+index))
 	viper.Set("mempool.maxSizeMB", "100")
-	viper.Set("mempool.poolType", "hashmap")
-	viper.Set("mempool.preallocTxs", "100")
+
+	// viper.Set("mempool.poolType", "hashmap")
+	// viper.Set("mempool.preallocTxs", "100")
+
+	viper.Set("mempool.poolType", "diskpool")
+	viper.Set("mempool.diskpoolDir", node.Dir+"/mempool.db")
+
 	viper.Set("mempool.maxInvItems", "10000")
 	viper.Set("mempool.propagateTimeout", "100ms")
 	viper.Set("mempool.propagateBurst", 1)

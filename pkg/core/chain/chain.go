@@ -286,10 +286,12 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) error {
 		provisionersCount   int
 
 		fields = logger.Fields{
-			"event":  "accept_block",
-			"height": blk.Header.Height,
-			"hash":   util.StringifyBytes(blk.Header.Hash),
-			"curr_h": c.tip.Header.Height,
+			"event":      "accept_block",
+			"height":     blk.Header.Height,
+			"hash":       util.StringifyBytes(blk.Header.Hash),
+			"curr_h":     c.tip.Header.Height,
+			"block_time": blk.Header.Timestamp - tipBlk.Header.Timestamp,
+			"txs_count":  len(blk.Txs),
 		}
 
 		l = log.WithFields(fields)

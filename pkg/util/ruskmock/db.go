@@ -50,15 +50,13 @@ func NewBuntStore(path string, durability Level) (*BuntStore, error) {
 		return nil, err
 	}
 
-	// Disable the AutoShrink. Shrinking should only be manually
-	// handled following a log compaction.
 	var config buntdb.Config
 	if err := db.ReadConfig(&config); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
 
-	config.AutoShrinkDisabled = true
+	config.AutoShrinkDisabled = false
 
 	switch durability {
 	case Low:

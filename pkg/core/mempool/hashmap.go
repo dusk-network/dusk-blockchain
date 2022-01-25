@@ -38,16 +38,19 @@ type (
 	}
 )
 
+// Create instantiates hashmap and sort index.
+func (m *HashMap) Create(path string) error {
+	m.data = make(map[txHash]TxDesc, m.Capacity)
+	m.sorted = make([]keyFee, 0, m.Capacity)
+
+	return nil
+}
+
 // Put sets the value for the given key. It overwrites any previous value
 // for that key.
 func (m *HashMap) Put(t TxDesc) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-
-	if m.data == nil {
-		m.data = make(map[txHash]TxDesc, m.Capacity)
-		m.sorted = make([]keyFee, 0, m.Capacity)
-	}
 
 	// store tx
 	txID, err := t.tx.CalculateHash()
@@ -151,7 +154,7 @@ func (m *HashMap) Get(txID []byte) transactions.ContractCall {
 }
 
 // Delete a key in the hashmap.
-func (m *HashMap) Delete(txID []byte) {
+func (m *HashMap) Delete(txID []byte) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -161,7 +164,7 @@ func (m *HashMap) Delete(txID []byte) {
 
 	tx, ok := m.data[k]
 	if !ok {
-		return
+		return errNotFound
 	}
 
 	m.txsSize -= uint32(tx.size)
@@ -174,6 +177,8 @@ func (m *HashMap) Delete(txID []byte) {
 			m.sorted = append(m.sorted[:i], m.sorted[i+1:]...)
 		}
 	}
+
+	return nil
 }
 
 // Size of the txs.
@@ -223,4 +228,8 @@ func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error {
 	}
 
 	return nil
+}
+
+// Close empty implementation of Pool.Close.
+func (m *HashMap) Close() {
 }

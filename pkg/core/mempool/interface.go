@@ -7,10 +7,13 @@
 package mempool
 
 import (
+	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
+
+var errNotFound = errors.New("not found")
 
 type txHash [32]byte
 
@@ -30,6 +33,8 @@ type TxDesc struct {
 
 // Pool represents a transaction pool of the verified txs only.
 type Pool interface {
+	// Create instantiates the underlying data storage.
+	Create(path string) error
 	// Put sets the value for the given key. It overwrites any previous value
 	// for that key.
 	Put(t TxDesc) error
@@ -38,7 +43,7 @@ type Pool interface {
 	// Contains returns true if the given key is in the pool.
 	Contains(key []byte) bool
 	// Delete a key in the pool.
-	Delete(key []byte)
+	Delete(key []byte) error
 	// Clone the entire pool.
 	Clone() []transactions.ContractCall
 
@@ -56,4 +61,7 @@ type Pool interface {
 	// RangeSort iterates through all tx entries sorted by Fee
 	// in a descending order.
 	RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error
+
+	// Close closes backend.
+	Close()
 }

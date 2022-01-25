@@ -50,7 +50,7 @@ func startMempoolTestWithLatency(ctx context.Context, latency time.Duration) (*M
 
 	rpcBus := rpcbus.New()
 	v := &transactions.MockProxy{}
-	m := NewMempool(bus, rpcBus, v.ProberWithParams(latency), nil)
+	m := NewMempool(nil, bus, rpcBus, v.ProberWithParams(latency), nil)
 
 	m.Run(ctx)
 	return m, bus, rpcBus, streamer
