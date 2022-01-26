@@ -29,9 +29,9 @@ import (
 var lg = log.WithField("process", "consensus").WithField("actor", "candidate_generator")
 
 var (
-	ErrEmptyStateHash       = errors.New("empty state hash")
-	ErrEmptyTxsList         = errors.New("empty list of transactions")
-	ErrDistributeTxNotFound = errors.New("distribute tx not found")
+	errEmptyStateHash       = errors.New("empty state hash")
+	errEmptyTxsList         = errors.New("empty list of transactions")
+	errDistributeTxNotFound = errors.New("distribute tx not found")
 )
 
 // MaxTxSetSize defines the maximum amount of transactions.
@@ -117,22 +117,22 @@ func (bg *generator) Generate(seed []byte, keys [][]byte, r consensus.RoundUpdat
 }
 
 func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCall, round uint64) ([]transactions.ContractCall, []byte, error) {
-	txs, stateHash, err := bg.executeFn(context.Background(), txs, round)
+	txs, stateHash, err := bg.executeFn(ctx, txs, round)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if len(txs) == 0 {
-		return nil, nil, ErrEmptyTxsList
+		return nil, nil, errEmptyTxsList
 	}
 
 	// Ensure last item from returned txs is the Distribute tx
 	if txs[len(txs)-1].Type() != transactions.Distribute {
-		return nil, nil, ErrDistributeTxNotFound
+		return nil, nil, errDistributeTxNotFound
 	}
 
 	if len(stateHash) == 0 {
-		return nil, nil, ErrEmptyStateHash
+		return nil, nil, errEmptyStateHash
 	}
 
 	return txs, stateHash, nil

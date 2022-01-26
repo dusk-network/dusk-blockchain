@@ -35,7 +35,7 @@ const (
 	KadcastInitialHeight byte = 128
 
 	// Block Gas limit
-	// TODO: TBD
+	// TODO: TBD.
 	BlockGasLimit = 10 * DUSK
 )
 

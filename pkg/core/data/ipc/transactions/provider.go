@@ -104,10 +104,6 @@ func (v *verifier) CalculateBalance(ctx context.Context, b []byte, calls []Contr
 	return 0, nil
 }
 
-type provider struct {
-	*proxy
-}
-
 type executor struct {
 	*proxy
 }
