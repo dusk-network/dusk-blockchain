@@ -206,6 +206,9 @@ accumulatorWorkers = 4
 
 # Information for the node to send consensus transactions with
 [consensus]
+# Path to a file that stores Consensus Keys / BLS public and secret keys
+# if file does not exist, it will be created at startup.
+keysfile = "/path/consensus.keys"
 # default amount of blocks to lock the consensus transaction up for
 defaultlocktime = 250000
 # default amount, in whole units of DUSK, to send for consensus transactions.
