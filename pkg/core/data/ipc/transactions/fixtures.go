@@ -56,23 +56,18 @@ func (p *PermissiveExecutor) GetProvisioners(ctx context.Context) (user.Provisio
 	return *p.P, nil
 }
 
-// GetFinalizedStateRoot ...
-func (p *PermissiveExecutor) GetFinalizedStateRoot(ctx context.Context) ([]byte, error) {
-	return make([]byte, 32), nil
-}
-
-// GetEphemeralStateRoot ...
-func (p *PermissiveExecutor) GetEphemeralStateRoot(ctx context.Context) ([]byte, error) {
+// GetStateRoot ...
+func (p *PermissiveExecutor) GetStateRoot(ctx context.Context) ([]byte, error) {
 	return make([]byte, 32), nil
 }
 
 // Accept ...
-func (p *PermissiveExecutor) Accept(context.Context, []ContractCall, []byte, uint64) (user.Provisioners, []byte, error) {
+func (p *PermissiveExecutor) Accept(context.Context, []ContractCall, []byte, uint64, uint64) (user.Provisioners, []byte, error) {
 	return *p.P, make([]byte, 32), nil
 }
 
 // Finalize ...
-func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, uint64) (user.Provisioners, []byte, error) {
+func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, uint64, uint64) (user.Provisioners, []byte, error) {
 	return *p.P, make([]byte, 32), nil
 }
 

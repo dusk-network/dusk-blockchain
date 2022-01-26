@@ -307,14 +307,22 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) error {
 	switch blk.Header.Certificate.Step {
 	case 3:
 		// Finalized block. first iteration consensus agreement.
-		provisionersUpdated, respStateHash, err = c.proxy.Executor().Finalize(c.ctx, blk.Txs, tipBlk.Header.StateHash, blk.Header.Height)
+		provisionersUpdated, respStateHash, err = c.proxy.Executor().Finalize(c.ctx,
+			blk.Txs,
+			tipBlk.Header.StateHash,
+			blk.Header.Height,
+			config.BlockGasLimit)
 		if err != nil {
 			l.WithError(err).Error("Error in executing the state transition")
 			return err
 		}
 	default:
 		// Tentative block. non-first iteration consensus agreement.
-		provisionersUpdated, respStateHash, err = c.proxy.Executor().Accept(c.ctx, blk.Txs, tipBlk.Header.StateHash, blk.Header.Height)
+		provisionersUpdated, respStateHash, err = c.proxy.Executor().Accept(c.ctx,
+			blk.Txs,
+			tipBlk.Header.StateHash,
+			blk.Header.Height,
+			config.BlockGasLimit)
 		if err != nil {
 			l.WithError(err).Error("Error in executing the state transition")
 			return err
@@ -343,7 +351,7 @@ func (c *Chain) sanityCheckStateHash() error {
 	// Ensure that both (co-deployed) services node and rusk are on the same
 	// state. If not, we should trigger a recovery procedure so both are
 	// always synced up.
-	ruskStateHash, err := c.proxy.Executor().GetEphemeralStateRoot(c.ctx)
+	ruskStateHash, err := c.proxy.Executor().GetStateRoot(c.ctx)
 	if err != nil {
 		return err
 	}

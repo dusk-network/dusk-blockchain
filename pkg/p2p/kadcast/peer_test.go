@@ -208,6 +208,12 @@ func (n *MockNetworkServer) Send(ctx context.Context, msg *rusk.SendMessage) (*r
 	return res, errors.New("not implemented")
 }
 
+// Propagate is just here to satisfy the interface. Not used.
+func (n *MockNetworkServer) Propagate(ctx context.Context, msg *rusk.PropagateMessage) (*rusk.Null, error) {
+	res := &rusk.Null{}
+	return res, errors.New("not implemented")
+}
+
 // NewRuskMock creates a Rusk Network server mock for tests.
 func NewRuskMock(gossip *protocol.Gossip, errChan chan error) (*grpc.Server, error) {
 	// create listener
@@ -264,6 +270,12 @@ func (c *MockNetworkClient) Listen(ctx context.Context, in *rusk.Null, opts ...g
 
 // Send is just here to satisfy the interface. Not used.
 func (c *MockNetworkClient) Send(ctx context.Context, in *rusk.SendMessage, opts ...grpc.CallOption) (*rusk.Null, error) {
+	res := &rusk.Null{}
+	return res, errors.New("not implemented")
+}
+
+// Propagate is just here to satisfy the interface. Not used.
+func (c *MockNetworkClient) Propagate(ctx context.Context, in *rusk.PropagateMessage, opts ...grpc.CallOption) (*rusk.Null, error) {
 	res := &rusk.Null{}
 	return res, errors.New("not implemented")
 }
