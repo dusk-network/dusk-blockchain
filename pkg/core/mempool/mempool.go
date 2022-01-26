@@ -273,6 +273,7 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 			WithField("txtype", t.tx.Type()).
 			WithField("txsize", t.size).
 			WithField("duration", elapsed.Microseconds()).
+			WithField("kad_h", h).
 			Error("failed to accept transaction")
 	} else {
 		log.WithField("txid", toHex(txid)).
