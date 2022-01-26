@@ -110,8 +110,13 @@ func (w *Writer) writeToAll(data, header []byte, _ byte) error {
 	if err := w.gossip.Process(b); err != nil {
 		return err
 	}
+
 	// extract kadcast height
 	height := uint32(header[0])
+	if height == 0 {
+		return nil
+	}
+
 	// prepare message
 	m := &rusk.BroadcastMessage{
 		KadcastHeight: height,
