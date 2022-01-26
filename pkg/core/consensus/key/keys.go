@@ -92,7 +92,7 @@ func (w *Keys) Save(password, path string) error {
 	return nil
 }
 
-// saveEncrypted saves a []byte to a .dat file.
+// saveEncrypted saves a []byte to a file.
 func saveEncrypted(text []byte, password string, file string) error {
 	digest := sha3.Sum256([]byte(password))
 
