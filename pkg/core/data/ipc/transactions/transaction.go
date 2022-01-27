@@ -46,6 +46,10 @@ type Transaction struct {
 	Version uint32 `json:"version"`
 	TxType  `json:"type"`
 	Payload *TransactionPayload `json:"payload"`
+
+	// Extended
+	Hash     [32]byte
+	FeeValue Fee
 }
 
 // NewTransaction returns a new empty Transaction struct.
@@ -59,11 +63,21 @@ func NewTransaction() *Transaction {
 // the message safe to publish to multiple subscribers.
 func (t Transaction) Copy() payload.Safe {
 	return &Transaction{
-		Version: t.Version,
-		TxType:  t.TxType,
-		Payload: t.Payload.Copy(),
-		// TODO: copy meta
+		Version:  t.Version,
+		TxType:   t.TxType,
+		Payload:  t.Payload.Copy(),
+		Hash:     t.Hash,
+		FeeValue: t.FeeValue,
 	}
+}
+
+func (t Transaction) Fee() (uint64, error) {
+	return t.FeeValue.GasLimit, nil
+}
+
+// CalculateHash
+func (t Transaction) CalculateHash() ([]byte, error) {
+	return t.Hash[:], nil
 }
 
 // MTransaction copies the Transaction structure into the Rusk equivalent.
@@ -100,7 +114,19 @@ func MarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 		return err
 	}
 
-	return MarshalTransactionPayload(r, f.Payload)
+	if err := MarshalTransactionPayload(r, f.Payload); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, f.Hash[:]); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64LE(r, f.FeeValue.GasLimit); err != nil {
+		return err
+	}
+
+	return encoding.WriteUint64LE(r, f.FeeValue.GasPrice)
 }
 
 // UnmarshalTransaction reads a Transaction struct from a bytes.Buffer.
@@ -115,7 +141,26 @@ func UnmarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 	}
 
 	f.TxType = TxType(t)
-	return UnmarshalTransactionPayload(r, f.Payload)
+	if err := UnmarshalTransactionPayload(r, f.Payload); err != nil {
+		return err
+	}
+
+	b := make([]byte, 32)
+	if err := encoding.Read256(r, b); err != nil {
+		return err
+	}
+
+	copy(f.Hash[:], b)
+
+	if err := encoding.ReadUint64LE(r, &f.FeeValue.GasLimit); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint64LE(r, &f.FeeValue.GasPrice); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ContractCall is the transaction that embodies the execution parameter for a
@@ -129,6 +174,8 @@ type ContractCall interface {
 
 	// Type indicates the transaction.
 	Type() TxType
+
+	Fee() (uint64, error)
 }
 
 // Marshal a Contractcall to a bytes.Buffer.
@@ -156,22 +203,39 @@ func (t Transaction) StandardTx() *TransactionPayload {
 	return t.Payload
 }
 
-// CalculateHash
-func (t Transaction) CalculateHash() ([]byte, error) {
-	return nil, errors.New("not computed")
-}
-
 // Type returns the transaction type.
 func (t Transaction) Type() TxType {
 	return t.TxType
 }
 
 // Equal checks equality between two transactions.
-// TODO: implement.
 func Equal(t, other ContractCall) bool {
 	if t.Type() != other.Type() {
 		return false
 	}
 
 	return t.StandardTx().Equal(other.StandardTx())
+}
+
+// Extend recreate transaction with optional fields initialized.
+func Extend(t ContractCall, f Fee, hash []byte) (ContractCall, error) {
+	switch t := t.(type) {
+	case *Transaction:
+		n := &Transaction{
+			Version: t.Version,
+			TxType:  t.TxType,
+			Payload: t.Payload.Copy(),
+		}
+
+		n.FeeValue = f
+
+		if len(hash) != len(n.Hash) {
+			return nil, errors.New("invalid length")
+		}
+
+		copy(n.Hash[:], hash)
+		return n, nil
+	default:
+		return nil, errors.New("unrecognized type of ContractCall")
+	}
 }
