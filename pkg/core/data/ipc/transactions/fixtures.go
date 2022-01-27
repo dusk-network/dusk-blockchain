@@ -463,10 +463,6 @@ func MockObfuscatedOutput(blindingFactor []byte) *Note {
 	}
 }
 
-func mockObfuscatedOutput(blindingFactor []byte) *Note {
-	return MockObfuscatedOutput(blindingFactor)
-}
-
 // MockCrossover returns a mocked Crossover struct.
 func MockCrossover(randomized bool) *Crossover {
 	valueCommBytes := make([]byte, 32)
@@ -488,21 +484,9 @@ func MockCrossover(randomized bool) *Crossover {
 
 // MockFee returns a mocked Fee struct.
 func MockFee(randomized bool) *Fee {
-	rBytes := make([]byte, 32)
-	if randomized {
-		rBytes = Rand32Bytes()
-	}
-
-	pkRBytes := make([]byte, 32)
-	if randomized {
-		pkRBytes = Rand32Bytes()
-	}
-
 	return &Fee{
 		GasLimit: 50000,
 		GasPrice: 100,
-		R:        rBytes,
-		PkR:      pkRBytes,
 	}
 }
 

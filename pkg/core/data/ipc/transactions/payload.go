@@ -37,12 +37,12 @@ func (t *TransactionPayload) Copy() *TransactionPayload {
 
 // MarshalTransactionPayload writes the TransactionPayload struct into a bytes.Buffer.
 func MarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
-	return encoding.WriteVarBytes(r, f.Data)
+	return encoding.WriteVarBytesUint32(r, f.Data)
 }
 
 // UnmarshalTransactionPayload reads a TransactionPayload struct from a bytes.Buffer.
 func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
-	return encoding.ReadVarBytes(r, &f.Data)
+	return encoding.ReadVarBytesUint32LE(r, &f.Data)
 }
 
 // Equal returns whether or not two TransactionPayloads are equal.
