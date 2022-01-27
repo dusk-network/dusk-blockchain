@@ -12,7 +12,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
-	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -63,6 +62,7 @@ func (t Transaction) Copy() payload.Safe {
 		Version: t.Version,
 		TxType:  t.TxType,
 		Payload: t.Payload.Copy(),
+		// TODO: copy meta
 	}
 }
 
@@ -129,14 +129,6 @@ type ContractCall interface {
 
 	// Type indicates the transaction.
 	Type() TxType
-
-	// Obfuscated returns true if the TransactionOutputs consists of Obfuscated
-	// Notes, false if they are transparent.
-	Obfuscated() bool
-
-	// Values returns a tuple where the first element is the sum of all transparent
-	// outputs' note values and the second is the fee.
-	Values() (amount uint64, fee uint64)
 }
 
 // Marshal a Contractcall to a bytes.Buffer.
@@ -164,33 +156,14 @@ func (t Transaction) StandardTx() *TransactionPayload {
 	return t.Payload
 }
 
-// CalculateHash returns the SHA3-256 hash digest of the transaction.
-// TODO: this needs to correspond with how rusk hashes transactions.
+// CalculateHash
 func (t Transaction) CalculateHash() ([]byte, error) {
-	b := new(bytes.Buffer)
-	if err := Marshal(b, &t); err != nil {
-		return nil, err
-	}
-
-	return hash.Sha3256(b.Bytes())
+	return nil, errors.New("not computed")
 }
 
 // Type returns the transaction type.
 func (t Transaction) Type() TxType {
 	return t.TxType
-}
-
-// Obfuscated returns whether or not the outputs of this transaction
-// are obfuscated.
-// TODO: implement.
-func (t Transaction) Obfuscated() bool {
-	return true
-}
-
-// Values returns the amount and fee spent in this transaction.
-// TODO: add amount calculation.
-func (t Transaction) Values() (amount uint64, fee uint64) {
-	return 0, t.Payload.Fee.GasLimit * t.Payload.Fee.GasPrice
 }
 
 // Equal checks equality between two transactions.
