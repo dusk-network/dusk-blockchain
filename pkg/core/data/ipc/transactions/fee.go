@@ -16,32 +16,19 @@ import (
 type Fee struct {
 	GasLimit uint64 `json:"gas_limit"`
 	GasPrice uint64 `json:"gas_price"`
-	R        []byte `json:"r"`
-	PkR      []byte `json:"pk_r"`
 }
 
 // NewFee returns a new empty Fee struct.
 func NewFee() *Fee {
-	return &Fee{
-		R:   make([]byte, 32),
-		PkR: make([]byte, 32),
-	}
+	return &Fee{}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (f *Fee) Copy() *Fee {
-	r := make([]byte, len(f.R))
-	pkR := make([]byte, len(f.PkR))
-
-	copy(r, f.R)
-	copy(pkR, f.PkR)
-
 	return &Fee{
 		GasLimit: f.GasLimit,
 		GasPrice: f.GasPrice,
-		R:        r,
-		PkR:      pkR,
 	}
 }
 
@@ -55,11 +42,7 @@ func MarshalFee(r *bytes.Buffer, f *Fee) error {
 		return err
 	}
 
-	if err := encoding.Write256(r, f.R); err != nil {
-		return err
-	}
-
-	return encoding.Write256(r, f.PkR)
+	return nil
 }
 
 // UnmarshalFee reads a Fee struct from a bytes.Buffer.
@@ -72,11 +55,7 @@ func UnmarshalFee(r *bytes.Buffer, f *Fee) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, f.R); err != nil {
-		return err
-	}
-
-	return encoding.Read256(r, f.PkR)
+	return nil
 }
 
 // Equal returns whether or not two Fees are equal.
@@ -89,9 +68,5 @@ func (f *Fee) Equal(other *Fee) bool {
 		return false
 	}
 
-	if !bytes.Equal(f.R, other.R) {
-		return false
-	}
-
-	return bytes.Equal(f.PkR, other.PkR)
+	return true
 }
