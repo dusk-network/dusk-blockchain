@@ -219,7 +219,7 @@ func RandDistributeTx(reward uint64, provisionerNr int) *Transaction {
 	// _, pk := RandKeys()
 	tx := RandTx()
 	// set the output to 0
-	tx.Payload.Notes[0].Commitment = make([]byte, 32)
+	tx.Payload.Data = make([]byte, 32)
 	buf := new(bytes.Buffer)
 	// if err := encoding.WriteVarInt(buf, uint64(provisionerNr)); err != nil {
 	// 	panic(err)
@@ -235,8 +235,6 @@ func RandDistributeTx(reward uint64, provisionerNr int) *Transaction {
 		panic(err)
 	}
 
-	tx.Payload.CallData = buf.Bytes()
-	tx.Payload.Nullifiers = make([][]byte, 0)
 	tx.TxType = Distribute
 
 	return tx
@@ -279,7 +277,7 @@ func MockStakeTx(expiration uint64, blsKey []byte, randomized bool) *Transaction
 		panic(err)
 	}
 
-	stx.Payload.CallData = buf.Bytes()
+	stx.Payload.Data = buf.Bytes()
 	stx.TxType = Stake
 
 	return stx
@@ -330,7 +328,7 @@ func MockBidTx(expiration uint64, edPk, seed []byte, randomized bool) *Transacti
 		panic(err)
 	}
 
-	stx.Payload.CallData = buf.Bytes()
+	stx.Payload.Data = buf.Bytes()
 	stx.TxType = Bid
 
 	return stx
@@ -369,7 +367,7 @@ func MockDeterministicBid(expiration uint64, edPk, seed []byte) *Transaction {
 		panic(err)
 	}
 
-	stx.Payload.CallData = buf.Bytes()
+	stx.Payload.Data = buf.Bytes()
 	stx.TxType = Bid
 
 	return stx
@@ -380,25 +378,9 @@ func MockDeterministicBid(expiration uint64, edPk, seed []byte) *Transaction {
 /**************************/
 
 func mockRuskTx(obfuscated bool, blindingFactor []byte, randomized bool) *rusk.Transaction {
-	anchorBytes := make([]byte, 32)
-	if randomized {
-		anchorBytes = Rand32Bytes()
-	}
-
-	nullifierBytes := make([]byte, 32)
-	if randomized {
-		nullifierBytes = Rand32Bytes()
-	}
-
 	if obfuscated {
 		pl := &TransactionPayload{
-			Anchor:        anchorBytes,
-			Nullifiers:    [][]byte{nullifierBytes},
-			Notes:         []*Note{mockObfuscatedOutput(blindingFactor)},
-			Fee:           MockFee(randomized),
-			Crossover:     MockCrossover(randomized),
-			SpendingProof: []byte{0xaa, 0xbb},
-			CallData:      make([]byte, 0),
+			Data: make([]byte, 0),
 		}
 
 		buf := new(bytes.Buffer)
@@ -414,13 +396,7 @@ func mockRuskTx(obfuscated bool, blindingFactor []byte, randomized bool) *rusk.T
 	}
 
 	pl := &TransactionPayload{
-		Anchor:        anchorBytes,
-		Nullifiers:    [][]byte{Rand32Bytes()},
-		Notes:         []*Note{mockTransparentOutput(blindingFactor)},
-		Fee:           MockFee(randomized),
-		Crossover:     MockCrossover(randomized),
-		SpendingProof: []byte{0xab, 0xbc},
-		CallData:      make([]byte, 0),
+		Data: make([]byte, 0),
 	}
 
 	buf := new(bytes.Buffer)
@@ -438,13 +414,7 @@ func mockRuskTx(obfuscated bool, blindingFactor []byte, randomized bool) *rusk.T
 // RuskTx is the mock of a ContractCallTx.
 func RuskTx() *rusk.Transaction {
 	pl := &TransactionPayload{
-		Anchor:        make([]byte, 32),
-		Nullifiers:    [][]byte{Rand32Bytes()},
-		Notes:         []*Note{mockTransparentOutput(Rand32Bytes())},
-		Fee:           MockFee(false),
-		Crossover:     MockCrossover(false),
-		SpendingProof: []byte{0xaa, 0xbb},
-		CallData:      make([]byte, 0),
+		Data: make([]byte, 0),
 	}
 
 	buf := new(bytes.Buffer)
@@ -542,29 +512,16 @@ func MockFee(randomized bool) *Fee {
 
 // IsMockInvalid checks whether a ContractCall mock is invalid or not.
 func IsMockInvalid(cc ContractCall) bool {
-	return bytes.Equal(cc.StandardTx().SpendingProof, []byte("INVALID"))
+	return false
 }
 
 // Invalidate a transaction by marking its Proof field as "INVALID".
 func Invalidate(cc ContractCall) {
-	cc.StandardTx().SpendingProof = []byte("INVALID")
 }
 
 // MockInvalidTx creates an invalid transaction.
 func MockInvalidTx() *Transaction {
 	tx := NewTransaction()
-	input := Rand32Bytes()
-	output := mockTransparentOutput(Rand32Bytes())
-
-	// // changing the NoteType to obfuscated with transparent value makes this
-	// // transaction invalid
-	// output.Note.NoteType = 1
-
-	// fee := MockTransparentOutput(RandUint64(), nil)
-	// tx.Payload.Fee = &fee
-	tx.Payload.Notes = []*Note{output}
-	tx.Payload.Nullifiers = [][]byte{input}
-	tx.Payload.SpendingProof = []byte("INVALID")
 
 	return tx
 }
