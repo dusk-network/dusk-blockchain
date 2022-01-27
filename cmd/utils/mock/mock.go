@@ -9,12 +9,7 @@ package mock
 import (
 	"fmt"
 	"net"
-	"os"
-	"os/signal"
-	"runtime/pprof"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -32,45 +27,6 @@ func RunMock(grpcMockHost string) error {
 	if err := s.Serve(lis); err != nil {
 		return fmt.Errorf("server exited with error: %v", err)
 	}
-
-	return nil
-}
-
-// RunRUSKMock will run a RUSK mock.
-func RunRUSKMock(ruskNetwork, ruskAddress, walletStore, walletFile, cpuprofile string) error {
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
-
-	// Enable CPU Profile
-	if cpuprofile != "" {
-		f, err := os.Create(cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatal(err)
-		}
-
-		defer pprof.StopCPUProfile()
-	}
-
-	r := new(config.Registry)
-
-	r.Wallet.File = walletFile
-	r.Wallet.Store = walletStore
-
-	// Start the mock RUSK server
-	srv, err := ruskmock.New(nil, *r)
-	if err != nil {
-		return err
-	}
-
-	if err := srv.Serve(ruskNetwork, ruskAddress); err != nil {
-		return err
-	}
-
-	<-interrupt
 
 	return nil
 }
