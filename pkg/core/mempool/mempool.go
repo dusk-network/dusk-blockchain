@@ -77,21 +77,6 @@ type Mempool struct {
 	limiter *rate.Limiter
 }
 
-// checkTx is responsible to determine if a tx is valid or not.
-// Among the other checks, the underlying verifier also checks double spending.
-func (m *Mempool) checkTx(tx transactions.ContractCall) error {
-	ctx, cancel := context.WithTimeout(context.Background(),
-		time.Duration(config.Get().RPC.Rusk.ContractTimeout)*time.Millisecond)
-	defer cancel()
-
-	// check if external verifyTx is provided
-	if err := m.verifier.VerifyTransaction(ctx, tx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // NewMempool instantiates and initializes node mempool.
 func NewMempool(db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
 	log.Infof("create instance")
@@ -182,10 +167,6 @@ func (m *Mempool) Loop(ctx context.Context) {
 
 	for {
 		select {
-		// rpcbus methods.
-		case r := <-m.sendTxChan:
-			// TODO: This handler should be deleted once new wallet is integrated
-			go handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
 		case r := <-m.getMempoolTxsChan:
 			handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
 		case r := <-m.getMempoolTxsBySizeChan:
@@ -288,28 +269,34 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 // processTx ensures all transaction rules are satisfied before adding the tx
 // into the verified pool.
 func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
+	// TODO: use parent context
+	_, cancel := context.WithTimeout(context.Background(),
+		time.Duration(config.Get().RPC.Rusk.ContractTimeout)*time.Millisecond)
+	defer cancel()
+
+	var fee transactions.Fee
+	var hash []byte
+	var err error
+	//if err := m.verifier.Preverify(ctx, tx); err != nil {
+	//	return err
+	//}
+
+	t.tx, err = transactions.Extend(t.tx, fee, hash)
+	if err != nil {
+		return nil, fmt.Errorf("could not extend: %s", err.Error())
+	}
+
 	txid, err := t.tx.CalculateHash()
 	if err != nil {
 		return txid, fmt.Errorf("hash err: %s", err.Error())
 	}
 
-	log.WithField("txid", txid).
-		Trace("ensuring transaction rules satisfied")
-
-	if t.tx.Type() == transactions.Distribute {
-		// coinbase tx should be built by block generator only
-		return txid, ErrCoinbaseTxNotAllowed
-	}
-
-	// expect it is not already a verified tx
+	// ensure it's not already added
 	if m.verified.Contains(txid) {
 		return txid, ErrAlreadyExists
 	}
 
-	// execute tx verification procedure
-	if err := m.checkTx(t.tx); err != nil {
-		return txid, fmt.Errorf("verification err - %v", err)
-	}
+	// TODO: Check if tx was already added in blockchain
 
 	// if consumer's verification passes, mark it as verified
 	t.verified = time.Now()
@@ -551,19 +538,6 @@ func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{
 	}
 
 	return txs, err
-}
-
-// processSendMempoolTxRequest utilizes rpcbus to allow submitting a tx to mempool with.
-func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, error) {
-	tx := r.Params.(transactions.ContractCall)
-
-	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
-		return nil, err
-	}
-
-	t := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len()), kadHeight: config.KadcastInitialHeight}
-	return m.processTx(t)
 }
 
 // Send Inventory message to all peers.
