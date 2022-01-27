@@ -116,7 +116,10 @@ func (m *buntdbPool) Put(t TxDesc) error {
 		}
 
 		feeKey := feePrefix + key.String()
-		_, fee := t.tx.Values()
+		fee, err := t.tx.Fee()
+		if err != nil {
+			panic(err)
+		}
 
 		_, _, err = tx.Set(feeKey, strconv.FormatInt(int64(fee), 10), nil)
 		if err != nil {
