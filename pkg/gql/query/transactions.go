@@ -68,22 +68,21 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 	qd.TxType = tx.Type()
 
 	qd.Outputs = make([]queryOutput, 0)
-	for _, output := range tx.StandardTx().Notes {
-		if IsNil(output) {
-			continue
-		}
-
-		qd.Outputs = append(qd.Outputs, queryOutput{output.PkR})
-	}
+	//for _, output := range tx.StandardTx().Notes {
+	//	if IsNil(output) {
+	//		continue
+	//	}
+	//
+	//	qd.Outputs = append(qd.Outputs, queryOutput{output.PkR})
+	//}
 
 	qd.Inputs = make([]queryInput, 0)
-	for _, input := range tx.StandardTx().Nullifiers {
-		qd.Inputs = append(qd.Inputs, queryInput{input})
-	}
+	//for _, input := range tx.StandardTx().Nullifiers {
+	//	qd.Inputs = append(qd.Inputs, queryInput{input})
+	//}
 
-	qd.GasLimit = tx.StandardTx().Fee.GasLimit
-	qd.GasPrice = tx.StandardTx().Fee.GasPrice
-	_, qd.FeePaid = tx.Values()
+	//qd.GasLimit = tx.StandardTx().Fee.GasLimit
+	//qd.GasPrice = tx.StandardTx().Fee.GasPrice
 
 	qd.BlockHash = blockHash
 	qd.BlockTimestamp = timestamp
