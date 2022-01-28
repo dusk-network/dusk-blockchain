@@ -57,9 +57,9 @@ var (
 )
 
 var (
-	bid1 = core.MockDeterministicBid(100000, make([]byte, 32), make([]byte, 32))
-	bid2 = core.MockDeterministicBid(1239013, make([]byte, 32), make([]byte, 32))
-	bid3 = core.MockDeterministicBid(100002, make([]byte, 32), make([]byte, 32))
+	bid1 = core.RandTx()
+	bid2 = core.RandTx()
+	bid3 = core.RandTx()
 )
 
 var (

@@ -24,21 +24,10 @@ const (
 	Tx TxType = iota
 	// Distribute indicates the coinbase and reward distribution contract call.
 	Distribute
-	// WithdrawFees indicates the Provisioners' withdraw contract call.
-	WithdrawFees
-	// Bid transaction propagated by the Block Generator.
-	Bid
-	// Stake transaction propagated by the Provisioners.
+	// Transfer transaction id.
+	Transfer
+	// Stake transaction id.
 	Stake
-	// Slash transaction propagated by the consensus to punish the Committee
-	// members when they turn byzantine.
-	Slash
-	// WithdrawStake transaction propagated by the Provisioners to withdraw
-	// their stake.
-	WithdrawStake
-	// WithdrawBid transaction propagated by the Block Generator to withdraw
-	// their bids.
-	WithdrawBid
 )
 
 // Transaction is a Phoenix transaction.
@@ -71,11 +60,12 @@ func (t Transaction) Copy() payload.Safe {
 	}
 }
 
-func (t Transaction) Fee() (uint64, error) {
-	return t.FeeValue.GasLimit, nil
+// Fee returns GasLimit.
+func (t Transaction) Fee() uint64 {
+	return t.FeeValue.GasLimit
 }
 
-// CalculateHash
+// CalculateHash returns hash of transaction, if set.
 func (t Transaction) CalculateHash() ([]byte, error) {
 	return t.Hash[:], nil
 }
@@ -152,14 +142,19 @@ func UnmarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 
 	copy(f.Hash[:], b)
 
-	if err := encoding.ReadUint64LE(r, &f.FeeValue.GasLimit); err != nil {
+	var gaslimit uint64
+	if err := encoding.ReadUint64LE(r, &gaslimit); err != nil {
 		return err
 	}
 
-	if err := encoding.ReadUint64LE(r, &f.FeeValue.GasPrice); err != nil {
+	f.FeeValue.GasLimit = gaslimit
+
+	var gasPrice uint64
+	if err := encoding.ReadUint64LE(r, &gasPrice); err != nil {
 		return err
 	}
 
+	f.FeeValue.GasPrice = gasPrice
 	return nil
 }
 
@@ -175,7 +170,7 @@ type ContractCall interface {
 	// Type indicates the transaction.
 	Type() TxType
 
-	Fee() (uint64, error)
+	Fee() uint64
 }
 
 // Marshal a Contractcall to a bytes.Buffer.

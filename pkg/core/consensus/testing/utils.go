@@ -31,7 +31,7 @@ func catchGetMempoolTxsBySize(assert *assert.Assertions, rb *rpcbus.RPCBus) {
 		for {
 			r := <-c
 			r.RespChan <- rpcbus.Response{
-				Resp: make([]transactions.ContractCall, 0),
+				Resp: []transactions.ContractCall{transactions.RandTx()},
 				Err:  nil,
 			}
 		}

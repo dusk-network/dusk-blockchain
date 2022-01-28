@@ -19,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -35,6 +36,8 @@ func TestMain(m *testing.M) {
 	r.Mempool.MaxSizeMB = 1
 	r.Mempool.PoolType = "hashmap"
 	r.Mempool.MaxInvItems = 10000
+	r.Database.Driver = lite.DriverName
+	r.General.Network = "testnet"
 	config.Mock(&r)
 
 	code := m.Run()
@@ -47,10 +50,11 @@ func startMempoolTest(ctx context.Context) (*Mempool, *eventbus.EventBus, *rpcbu
 
 func startMempoolTestWithLatency(ctx context.Context, latency time.Duration) (*Mempool, *eventbus.EventBus, *rpcbus.RPCBus, *eventbus.GossipStreamer) {
 	bus, streamer := eventbus.CreateGossipStreamer()
+	_, db := lite.CreateDBConnection()
 
 	rpcBus := rpcbus.New()
 	v := &transactions.MockProxy{}
-	m := NewMempool(nil, bus, rpcBus, v.ProberWithParams(latency), nil)
+	m := NewMempool(db, bus, rpcBus, v.ProberWithParams(latency), nil)
 
 	m.Run(ctx)
 	return m, bus, rpcBus, streamer
@@ -95,16 +99,6 @@ func TestProcessPendingTxs(t *testing.T) {
 		// Publish valid tx
 		_, errList := m.ProcessTx("", message.New(topics.Tx, cc[i]))
 		assert.Empty(t, errList)
-
-		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
-		invalid := transactions.RandContractCall()
-		transactions.Invalidate(invalid)
-		_, errList = m.ProcessTx("", message.New(topics.Tx, invalid))
-		assert.NotEmpty(t, errList)
-
-		// Publish a duplicated tx
-		_, errList = m.ProcessTx("", message.New(topics.Tx, invalid))
-		assert.NotEmpty(t, errList)
 	}
 
 	assert.Equal(t, m.verified.Len(), 5)
@@ -158,19 +152,6 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 
 			wg.Done()
 		}(txs[from:to])
-	}
-
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		// Publish invalid txs
-		go func() {
-			for j := 0; j <= 5; j++ {
-				tx := transactions.MockInvalidTx()
-				_, errList := m.ProcessTx("", message.New(topics.Tx, tx))
-				assert.NotEmpty(t, errList)
-			}
-			wg.Done()
-		}()
 	}
 
 	wg.Wait()
@@ -235,64 +216,6 @@ func TestRemoveAccepted(t *testing.T) {
 			assert.True(m.verified.Contains(hash))
 		}
 	}
-}
-
-func TestCoinbaseTxsNotAllowed(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	m, _, rb, _ := startMempoolTest(ctx)
-
-	// Publish a set of valid txs and a Coinbase one
-	txs := transactions.RandContractCalls(5, 0, true)
-
-	for _, tx := range txs {
-		_, errList := m.ProcessTx("", message.New(topics.Tx, tx))
-
-		if tx.Type() == transactions.Distribute {
-			assert.NotEmpty(t, errList)
-		}
-	}
-
-	// Assert that all non-coinbase txs have been verified
-	resp, err := rb.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
-	assert.NoError(t, err)
-
-	memTxs := resp.([]transactions.ContractCall)
-	for _, tx := range memTxs {
-		assert.False(t, tx.Type() == transactions.Distribute)
-	}
-}
-
-func TestSendMempoolTx(t *testing.T) {
-	assert := assert.New(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	m, _, rb, _ := startMempoolTest(ctx)
-	txs := transactions.RandContractCalls(4, 0, false)
-
-	var totalSize uint32
-
-	for _, tx := range txs {
-		buf := new(bytes.Buffer)
-		assert.NoError(transactions.Marshal(buf, tx))
-
-		totalSize += uint32(buf.Len())
-
-		resp, err := rb.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 0)
-		assert.NoError(err)
-
-		txidBytes := resp.([]byte)
-
-		txid, err := tx.CalculateHash()
-		assert.Nil(err)
-
-		assert.Equal(txidBytes, txid)
-	}
-
-	assert.Equal(m.verified.Size(), totalSize)
 }
 
 func BenchmarkProcessTx_0(b *testing.B) {

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,6 +18,9 @@ import (
 func TestEquality(t *testing.T) {
 	cfg, err := genesis.GetPresetConfig("devnet")
 	assert.NoError(t, err)
+
+	cfg.Transactions = make([]transactions.ContractCall, 0)
+	cfg.Transactions = append(cfg.Transactions, transactions.RandTx())
 
 	b1 := genesis.Generate(cfg)
 	b2 := genesis.Generate(cfg)

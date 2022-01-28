@@ -9,11 +9,18 @@ package genesis
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
 // Generate a genesis block. The constitution of the block depends on the passed
 // config.
 func Generate(c Config) *block.Block {
+	// TODO: Populate this with real txs data from Rusk Transfer and Stake Contract
+	if c.Transactions == nil {
+		c.Transactions = make([]transactions.ContractCall, 0)
+		c.Transactions = append(c.Transactions, transactions.MockTx())
+	}
+
 	h := &block.Header{
 		Version:       0,
 		Timestamp:     c.timestamp,
@@ -27,7 +34,7 @@ func Generate(c Config) *block.Block {
 
 	b := &block.Block{
 		Header: h,
-		Txs:    c.genesisTransactions,
+		Txs:    c.Transactions,
 	}
 
 	// Set root and hash, since they have changed because of the adding of txs.

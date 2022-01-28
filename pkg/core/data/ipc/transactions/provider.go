@@ -80,6 +80,7 @@ type verifier struct {
 // Preverify verifies a contract call transaction.
 func (v *verifier) Preverify(ctx context.Context, call ContractCall) ([]byte, Fee, error) {
 	vstr := new(rusk.PreverifyRequest)
+
 	tx := new(rusk.Transaction)
 	if err := MTransaction(tx, call.(*Transaction)); err != nil {
 		return nil, Fee{}, err
@@ -98,11 +99,6 @@ func (v *verifier) Preverify(ctx context.Context, call ContractCall) ([]byte, Fe
 	return res.TxHash,
 		Fee{GasLimit: res.Fee.GasLimit, GasPrice: res.Fee.GasPrice},
 		nil
-}
-
-// TODO: implement.
-func (v *verifier) CalculateBalance(ctx context.Context, b []byte, calls []ContractCall) (uint64, error) {
-	return 0, nil
 }
 
 type executor struct {

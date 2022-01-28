@@ -34,7 +34,7 @@ func ReadVarBytes(r *bytes.Buffer, b *[]byte) error {
 	return nil
 }
 
-// ReadVarBytes will read a CompactSize int denoting the length, then
+// ReadVarBytesUint32LE will read a CompactSize int denoting the length, then
 // proceeds to read that amount of bytes from r into b.
 func ReadVarBytesUint32LE(r *bytes.Buffer, b *[]byte) error {
 	var c uint32
