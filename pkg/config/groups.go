@@ -185,6 +185,10 @@ type mempoolConfiguration struct {
 }
 
 type consensusConfiguration struct {
+	// Path to a file that stores Consensus Keys / BLS public and secret keys
+	// if file does not exist, it will be created at startup.
+	KeysFile string
+
 	DefaultLockTime uint64
 	DefaultAmount   uint64
 	// ConsensusTimeOut is the time out for consensus step timers.

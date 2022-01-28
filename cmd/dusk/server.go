@@ -17,7 +17,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	consensuskey "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -134,11 +133,15 @@ func Setup() *Server {
 		}
 	}
 
+	keys, err := loadConsensusKeys()
+	if err != nil {
+		log.WithError(err).Fatal("could not load consensus keys")
+	}
+
 	e := &consensus.Emitter{
-		EventBus: eventBus,
-		RPCBus:   rpcBus,
-		// TODO: consensus keys
-		Keys:        consensuskey.Keys{},
+		EventBus:    eventBus,
+		RPCBus:      rpcBus,
+		Keys:        keys,
 		TimerLength: cfg.ConsensusTimeOut,
 	}
 
