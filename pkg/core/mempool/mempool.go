@@ -147,10 +147,6 @@ func NewMempool(db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCB
 
 	l.Info("running")
 
-	if srv != nil {
-		node.RegisterMempoolServer(srv, m)
-	}
-
 	return m
 }
 
@@ -272,17 +268,18 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 // processTx ensures all transaction rules are satisfied before adding the tx
 // into the verified pool.
 func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
-	// TODO: use parent context
-	_, cancel := context.WithTimeout(context.Background(),
+	ctx, cancel := context.WithTimeout(context.Background(),
 		time.Duration(config.Get().RPC.Rusk.ContractTimeout)*time.Millisecond)
 	defer cancel()
 
 	var fee transactions.Fee
 	var hash []byte
 	var err error
-	//if err := m.verifier.Preverify(ctx, tx); err != nil {
-	//	return err
-	//}
+
+	if hash, fee, err = m.verifier.Preverify(ctx, t.tx); err != nil {
+		cancel()
+		return nil, err
+	}
 
 	t.tx, err = transactions.Extend(t.tx, fee, hash)
 	if err != nil {
@@ -502,19 +499,6 @@ func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.S
 	}
 
 	return resp, nil
-}
-
-// GetUnconfirmedBalance will return the amount of DUSK that is in the mempool
-// for a given key.
-func (m Mempool) GetUnconfirmedBalance(ctx context.Context, req *node.GetUnconfirmedBalanceRequest) (*node.BalanceResponse, error) {
-	txs := m.verified.Clone()
-
-	balance, err := m.verifier.CalculateBalance(ctx, req.Vk, txs)
-	if err != nil {
-		return nil, err
-	}
-
-	return &node.BalanceResponse{LockedBalance: balance}, nil
 }
 
 // processGetMempoolTxsBySizeRequest returns a subset of verified mempool txs which
