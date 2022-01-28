@@ -7,7 +7,6 @@
 package query
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"time"
@@ -69,14 +68,14 @@ func newQueryBlock(b *block.Block) queryBlock {
 	feesPaid := uint64(0)
 
 	for _, tx := range b.Txs {
-		_, fee := tx.Values()
+		fee, _ := tx.Fee()
 		feesPaid += fee
 
 		if tx.Type() == core.Distribute {
 			// TODO: this should align with the actual distribute tx structure
 			// once that is finalized.
-			r := binary.LittleEndian.Uint64(tx.StandardTx().CallData)
-			reward += r
+			//r := binary.LittleEndian.Uint64(tx.StandardTx().CallData)
+			//reward += r
 		}
 	}
 
