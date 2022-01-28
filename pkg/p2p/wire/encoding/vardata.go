@@ -48,7 +48,7 @@ func ReadVarBytesUint32LE(r *bytes.Buffer, b *[]byte) error {
 		return errors.New("attempting to decode data which is too large")
 	}
 
-	*b = make([]byte, r.Len())
+	*b = make([]byte, c)
 	if _, err := r.Read(*b); err != nil {
 		return err
 	}
