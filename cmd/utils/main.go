@@ -86,34 +86,6 @@ var (
 		Value: "127.0.0.1:9191",
 	}
 
-	ruskNetworkFlag = cli.StringFlag{
-		Name:  "rusknetwork",
-		Usage: "Dusk RUSK network , eg: --rusknetwork=tcp",
-		Value: "tcp",
-	}
-
-	ruskAddressFlag = cli.StringFlag{
-		Name:  "ruskaddress",
-		Usage: "Dusk hostname , eg: --hostname=127.0.0.1:10000",
-		Value: "127.0.0.1:10000",
-	}
-
-	walletStoreFlag = cli.StringFlag{
-		Name:  "walletstore",
-		Usage: "Dusk hostname , eg: --walletstore=/tmp/localnet-137601832/node-9003/walletDB/",
-		Value: "/tmp/localnet-137601832/node-9003/walletDB/",
-	}
-	walletFileFlag = cli.StringFlag{
-		Name:  "walletfile",
-		Usage: "Dusk hostname , eg: --walletfile=./data/wallet-9000.dat",
-		Value: "./devnet-wallets/wallet0.dat",
-	}
-
-	configFileFlag = cli.StringFlag{
-		Name:  "configfile",
-		Usage: "dusk.toml configuration file",
-	}
-
 	configNameFlag = cli.StringFlag{
 		Name:  "configname",
 		Usage: "Config ID from dusk.toml, eg: logger.level",
@@ -130,11 +102,6 @@ var (
 		Name:  "delay",
 		Usage: "Set delay between sending of transactions in ms",
 		Value: 0,
-	}
-
-	cpuProfileFlag = cli.StringFlag{
-		Name:  "cpuprofile",
-		Usage: "cpu.prof output profiling file",
 	}
 
 	sendStakeTimeoutFlag = cli.IntFlag{

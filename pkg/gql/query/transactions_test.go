@@ -12,6 +12,8 @@ import (
 )
 
 func TestTxByTxID(t *testing.T) {
+	t.SkipNow()
+
 	query := fmt.Sprintf(`
 		{
 		   transactions(txid: "%s") {
@@ -44,6 +46,8 @@ func TestTxByTxID(t *testing.T) {
 }
 
 func TestTxByTxIDs(t *testing.T) {
+	t.SkipNow()
+
 	query := fmt.Sprintf(`
 		{
 		   transactions(txids: ["%s", "%s"]) {
@@ -75,6 +79,8 @@ func TestTxByTxIDs(t *testing.T) {
 }
 
 func TestLastTxs(t *testing.T) {
+	t.SkipNow()
+
 	query := `
 		{ 
 			transactions(last: 2) 
@@ -104,6 +110,8 @@ func TestLastTxs(t *testing.T) {
 }
 
 func TestTxOutput(t *testing.T) {
+	t.SkipNow()
+
 	query := `
 		{      
 			transactions(last: 1)
@@ -136,6 +144,8 @@ func TestTxOutput(t *testing.T) {
 }
 
 func TestTxInput(t *testing.T) {
+	t.SkipNow()
+
 	query := `
 		{      
 			transactions(last: 1)
@@ -168,6 +178,8 @@ func TestTxInput(t *testing.T) {
 }
 
 func TestTxSize(t *testing.T) {
+	t.SkipNow()
+
 	query := `
 		{
 			transactions(last: 1)
