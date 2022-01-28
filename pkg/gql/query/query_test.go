@@ -68,6 +68,7 @@ var (
 	bid3HashB, _ = bid3.CalculateHash()
 )
 
+//nolint
 var (
 	bid1Hash = hex.EncodeToString(bid1HashB)
 	bid2Hash = hex.EncodeToString(bid2HashB)
