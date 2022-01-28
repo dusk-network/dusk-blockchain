@@ -11,7 +11,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
-	"errors"
 	"math/big"
 	"time"
 
@@ -81,20 +80,8 @@ type mockVerifier struct {
 	verifyTransactionLatency time.Duration
 }
 
-func (v *mockVerifier) VerifyTransaction(ctx context.Context, cc ContractCall) error {
-	if IsMockInvalid(cc) {
-		return errors.New("invalid transaction")
-	}
-
-	if v.verifyTransactionLatency > 0 {
-		time.Sleep(v.verifyTransactionLatency)
-	}
-
-	return nil
-}
-
-func (v *mockVerifier) CalculateBalance(ctx context.Context, vkBytes []byte, txs []ContractCall) (uint64, error) {
-	return uint64(0), nil
+func (v *mockVerifier) Preverify(context.Context, ContractCall) ([]byte, Fee, error) {
+	return nil, Fee{}, nil
 }
 
 // Prober returns a UnconfirmedTxProber that is capable of checking invalid mocked up transactions.

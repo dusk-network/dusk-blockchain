@@ -76,13 +76,12 @@ func (t TxRecord) View() TxView {
 	}
 
 	view := TxView{
-		TxMeta:     t.TxMeta,
-		Type:       t.Transaction.Type(),
-		Hash:       h,
-		Obfuscated: t.Transaction.Obfuscated(),
+		TxMeta: t.TxMeta,
+		Type:   t.Transaction.Type(),
+		Hash:   h,
 	}
 
-	view.Amount, view.Fee = t.Transaction.Values()
+	view.Fee, _ = t.Transaction.Fee()
 
 	// switch tx := t.Transaction.(type) {
 	// case *transactions.BidTransaction:

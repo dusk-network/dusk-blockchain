@@ -18,11 +18,7 @@ import (
 // UnconfirmedTxProber performs verification of contract calls (transactions).
 type UnconfirmedTxProber interface {
 	// VerifyTransaction verifies a contract call transaction.
-	VerifyTransaction(context.Context, ContractCall) error
-	// CalculateBalance for transactions on demand. This functionality is used
-	// primarily by the mempool which can order RUSK to calculate balance for
-	// transactions even if they are unconfirmed.
-	CalculateBalance(context.Context, []byte, []ContractCall) (uint64, error)
+	Preverify(context.Context, ContractCall) ([]byte, Fee, error)
 }
 
 // Executor encapsulate the Global State operations.
@@ -81,22 +77,27 @@ type verifier struct {
 	*proxy
 }
 
-// VerifyTransaction verifies a contract call transaction.
-func (v *verifier) VerifyTransaction(ctx context.Context, cc ContractCall) error {
-	/*
-		ccTx, err := EncodeContractCall(cc)
-		if err != nil {
-			return err
-		}
+// Preverify verifies a contract call transaction.
+func (v *verifier) Preverify(ctx context.Context, call ContractCall) ([]byte, Fee, error) {
+	vstr := new(rusk.PreverifyRequest)
+	tx := new(rusk.Transaction)
+	if err := MTransaction(tx, call.(*Transaction)); err != nil {
+		return nil, Fee{}, err
+	}
 
-		if res, err := v.client.VerifyTransaction(ctx, ccTx); err != nil {
-			return err
-		} else if !res.Verified {
-			return errors.New("verification failed")
-		}
+	vstr.Tx = tx
 
-	*/
-	return nil
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(v.txTimeout))
+	defer cancel()
+
+	res, err := v.stateClient.Preverify(ctx, vstr)
+	if err != nil {
+		return nil, Fee{}, err
+	}
+
+	return res.TxHash,
+		Fee{GasLimit: res.Fee.GasLimit, GasPrice: res.Fee.GasPrice},
+		nil
 }
 
 // TODO: implement.
@@ -142,7 +143,7 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 
 // Finalize proxy call performs both Finalize and GetProvisioners grpc calls.
 func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64, blockGasLiit uint64) (user.Provisioners, []byte, error) {
-	vstr := new(rusk.ExecuteStateTransitionRequest)
+	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
 	vstr.BlockGasLimit = blockGasLiit
@@ -162,10 +163,6 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 	res, err := e.stateClient.Finalize(ctx, vstr)
 	if err != nil {
 		return user.Provisioners{}, nil, err
-	}
-
-	if !res.Success {
-		return user.Provisioners{}, nil, errors.New("unsuccessful finalize call")
 	}
 
 	provisioners := user.NewProvisioners()
@@ -189,7 +186,7 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 
 // Accept proxy call performs both Accept and GetProvisioners grpc calls.
 func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height, blockGasLimit uint64) (user.Provisioners, []byte, error) {
-	vstr := new(rusk.ExecuteStateTransitionRequest)
+	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
 	vstr.BlockGasLimit = blockGasLimit
@@ -209,10 +206,6 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 	res, err := e.stateClient.Accept(ctx, vstr)
 	if err != nil {
 		return user.Provisioners{}, nil, err
-	}
-
-	if !res.Success {
-		return user.Provisioners{}, nil, errors.New("unsuccessful finalize call")
 	}
 
 	provisioners := user.NewProvisioners()
