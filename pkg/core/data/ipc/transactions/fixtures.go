@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
@@ -46,7 +45,13 @@ func (p *PermissiveExecutor) VerifyStateTransition(context.Context, []ContractCa
 // ExecuteStateTransition ...
 func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, blockGasLimit uint64, blockHeight uint64) ([]ContractCall, []byte, error) {
 	time.Sleep(stateTransitionDelay)
-	return cc, make([]byte, 32), nil
+
+	result := cc
+	if len(cc) == 0 {
+		result = []ContractCall{RandTx()}
+	}
+
+	return result, make([]byte, 32), nil
 }
 
 // GetProvisioners ...
@@ -80,8 +85,9 @@ type mockVerifier struct {
 	verifyTransactionLatency time.Duration
 }
 
-func (v *mockVerifier) Preverify(context.Context, ContractCall) ([]byte, Fee, error) {
-	return nil, Fee{}, nil
+func (v *mockVerifier) Preverify(ctx context.Context, tx ContractCall) ([]byte, Fee, error) {
+	hash, _ := tx.CalculateHash()
+	return hash, Fee{GasLimit: 10, GasPrice: 12}, nil
 }
 
 // Prober returns a UnconfirmedTxProber that is capable of checking invalid mocked up transactions.
@@ -103,16 +109,7 @@ func (m MockProxy) Executor() Executor { return m.E }
 
 // RandContractCall returns a random ContractCall.
 func RandContractCall() ContractCall {
-	switch RandTxType() {
-	case Stake:
-		return RandStakeTx(0)
-	case Bid:
-		return RandBidTx(0)
-	case Tx:
-		return RandTx()
-	default:
-		return RandTx()
-	}
+	return RandTx()
 }
 
 // RandContractCalls creates random but syntactically valid amount of
@@ -134,25 +131,6 @@ func RandContractCalls(amount, invalid int, includeCoinbase bool) []ContractCall
 		cc[i] = RandContractCall()
 	}
 
-	for i := 0; i < invalid; {
-		// Pick a random tx within the set and invalidate it until we reach the
-		// invalid amount.
-		idx, err := rand.Int(rand.Reader, big.NewInt(int64(amount)))
-		if err != nil {
-			panic(err)
-		}
-
-		if !IsMockInvalid(cc[idx.Int64()]) {
-			Invalidate(cc[idx.Int64()])
-			i++
-		}
-	}
-
-	if includeCoinbase {
-		coinbase := RandDistributeTx(RandUint64(), 30)
-		return append([]ContractCall{coinbase}, cc...)
-	}
-
 	return cc
 }
 
@@ -160,230 +138,50 @@ func RandContractCalls(amount, invalid int, includeCoinbase bool) []ContractCall
 /**** TX ****/
 /************/
 
-// RandTx returns a random transaction. The randomization includes the amount,
-// the fee, the blinding factor and whether the transaction is obfuscated or
-// otherwise.
+// RandTx mocks a transaction.
 func RandTx() *Transaction {
-	bf := make([]byte, 32)
-	if _, err := rand.Read(bf); err != nil {
-		panic(err)
+	tx := &Transaction{
+		Payload: &TransactionPayload{
+			Data: Rand32Bytes(),
+		},
+
+		TxType:   1,
+		Version:  2,
+		FeeValue: Fee{GasLimit: 10, GasPrice: 99},
 	}
 
-	return MockTx(RandBool(), bf, true)
+	b := Rand32Bytes()
+	copy(tx.Hash[:], b)
+
+	return tx
 }
 
-// MockTx mocks a transfer transaction. For simplicity it includes a single
-// output with the amount specified. The blinding factor can be left to nil if
-// the test is not interested in Transaction equality/differentiation.
-// Otherwise it can be used to identify/differentiate the transaction.
-func MockTx(obfuscated bool, blindingFactor []byte, randomized bool) *Transaction {
-	ccTx := NewTransaction()
-	rtx := mockRuskTx(obfuscated, blindingFactor, randomized)
+// RandTx mocks a transaction.
+func MockTx() *Transaction {
+	tx := &Transaction{
+		Payload: &TransactionPayload{
+			Data: make([]byte, 100),
+		},
 
-	if err := UTransaction(rtx, ccTx); err != nil {
-		panic(err)
+		TxType:   1,
+		Version:  2,
+		FeeValue: Fee{GasLimit: 10, GasPrice: 99},
 	}
 
-	return ccTx
+	return tx
 }
 
 /****************/
 /** DISTRIBUTE **/
 /****************/
 
-// RandDistributeTx creates a random distribute transaction.
-func RandDistributeTx(reward uint64, provisionerNr int) *Transaction {
-	rew := reward
-	if reward == uint64(0) {
-		rew = RandUint64()
-	}
-
-	ps := make([][]byte, provisionerNr)
-	for i := 0; i < provisionerNr; i++ {
-		ps[i] = Rand32Bytes()
-	}
-
-	// _, pk := RandKeys()
-	tx := RandTx()
-	// set the output to 0
-	tx.Payload.Data = make([]byte, 32)
-	buf := new(bytes.Buffer)
-	// if err := encoding.WriteVarInt(buf, uint64(provisionerNr)); err != nil {
-	// 	panic(err)
-	// }
-
-	// for _, pk := range ps {
-	// 	if err := encoding.Write256(buf, pk); err != nil {
-	// 		panic(err)
-	// 	}
-	// }
-
-	if err := encoding.WriteUint64LE(buf, rew); err != nil {
-		panic(err)
-	}
-
-	tx.TxType = Distribute
-
-	return tx
-}
-
-/************/
-/** STAKE **/
-/************/
-
-// RandStakeTx creates a random stake transaction. If the expiration
-// is <1, then it is randomly set.
-func RandStakeTx(expiration uint64) *Transaction {
-	if expiration < 1 {
-		expiration = RandUint64()
-	}
-
-	blsKey := make([]byte, 96)
-	if _, err := rand.Read(blsKey); err != nil {
-		panic(err)
-	}
-
-	return MockStakeTx(expiration, blsKey, true)
-}
-
-// MockStakeTx creates a StakeTransaction.
-func MockStakeTx(expiration uint64, blsKey []byte, randomized bool) *Transaction {
-	stx := NewTransaction()
-	rtx := mockRuskTx(false, Rand32Bytes(), randomized)
-
-	if err := UTransaction(rtx, stx); err != nil {
-		panic(err)
-	}
-
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, expiration); err != nil {
-		panic(err)
-	}
-
-	if err := encoding.WriteVarBytes(buf, blsKey); err != nil {
-		panic(err)
-	}
-
-	stx.Payload.Data = buf.Bytes()
-	stx.TxType = Stake
-
-	return stx
-}
-
-/*********/
-/** BID **/
-/*********/
-
-// RandBidTx creates a random bid transaction. If the expiration
-// is <1, then it is randomly set.
-func RandBidTx(expiration uint64) *Transaction {
-	if expiration < 1 {
-		expiration = RandUint64()
-	}
-
-	return MockBidTx(expiration, Rand32Bytes(), Rand32Bytes(), true)
-}
-
-// MockBidTx creates a BidTransaction.
-func MockBidTx(expiration uint64, edPk, seed []byte, randomized bool) *Transaction {
-	stx := NewTransaction()
-
-	// Amount is set directly in the underlying ContractCallTx.
-	rtx := mockRuskTx(true, Rand32Bytes(), randomized)
-	if err := UTransaction(rtx, stx); err != nil {
-		panic(err)
-	}
-
-	buf := new(bytes.Buffer)
-
-	// M, Commitment, R
-	for i := 0; i < 3; i++ {
-		if err := encoding.Write256(buf, Rand32Bytes()); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := encoding.Write256(buf, edPk); err != nil {
-		panic(err)
-	}
-
-	if err := encoding.Write256(buf, seed); err != nil {
-		panic(err)
-	}
-
-	if err := encoding.WriteUint64LE(buf, expiration); err != nil {
-		panic(err)
-	}
-
-	stx.Payload.Data = buf.Bytes()
-	stx.TxType = Bid
-
-	return stx
-}
-
-// MockDeterministicBid creates a deterministic bid, where none of the fields
-// are subject to randomness. This creates predictability in the output of the
-// hash calculation, and is useful for testing purposes.
-func MockDeterministicBid(expiration uint64, edPk, seed []byte) *Transaction {
-	stx := NewTransaction()
-
-	// amount is set directly in the underlying ContractCallTx
-	rtx := mockRuskTx(true, make([]byte, 32), false)
-	if err := UTransaction(rtx, stx); err != nil {
-		panic(err)
-	}
-
-	buf := new(bytes.Buffer)
-
-	// M, Commitment, R
-	for i := 0; i < 3; i++ {
-		if err := encoding.Write256(buf, make([]byte, 32)); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := encoding.Write256(buf, edPk); err != nil {
-		panic(err)
-	}
-
-	if err := encoding.Write256(buf, seed); err != nil {
-		panic(err)
-	}
-
-	if err := encoding.WriteUint64LE(buf, expiration); err != nil {
-		panic(err)
-	}
-
-	stx.Payload.Data = buf.Bytes()
-	stx.TxType = Bid
-
-	return stx
-}
-
 /**************************/
 /** Transfer Transaction **/
 /**************************/
 
-func mockRuskTx(obfuscated bool, blindingFactor []byte, randomized bool) *rusk.Transaction {
-	if obfuscated {
-		pl := &TransactionPayload{
-			Data: make([]byte, 0),
-		}
-
-		buf := new(bytes.Buffer)
-		if err := MarshalTransactionPayload(buf, pl); err != nil {
-			// There's no way a mocked transaction payload should fail to
-			// marshal.
-			panic(err)
-		}
-
-		return &rusk.Transaction{
-			Payload: buf.Bytes(),
-		}
-	}
-
+func mockRuskTx(randomized bool) *rusk.Transaction {
 	pl := &TransactionPayload{
-		Data: make([]byte, 0),
+		Data: Rand32Bytes(),
 	}
 
 	buf := new(bytes.Buffer)
