@@ -204,18 +204,11 @@ func (bg *generator) ConstructBlockTxs(keys [][]byte) ([]transactions.ContractCa
 
 	timeoutGetMempoolTXsBySize := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXsBySize) * time.Second
 	resp, err := bg.RPCBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), timeoutGetMempoolTXsBySize)
-	// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
-	// already accepted in the chain.
 	if err != nil {
 		return nil, err
 	}
 
 	txs = append(txs, resp.([]transactions.ContractCall)...)
-
-	// Construct and append coinbase Tx to reward the generator
-	// XXX: this needs to be adjusted
-	coinbaseTx := transactions.RandDistributeTx(config.GeneratorReward, len(keys))
-	txs = append(txs, coinbaseTx)
 
 	return txs, nil
 }
