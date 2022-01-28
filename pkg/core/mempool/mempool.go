@@ -45,10 +45,10 @@ const (
 var (
 	// ErrCoinbaseTxNotAllowed coinbase tx must be built by block generator only.
 	ErrCoinbaseTxNotAllowed = errors.New("coinbase tx not allowed")
-	// ErrAlreadyExists transaction with same txid already exists in.
+	// ErrAlreadyExists transaction with the same txid already exists in mempool.
 	ErrAlreadyExists = errors.New("already exists")
-	// ErrDoubleSpending transaction uses outputs spent in other mempool txs.
-	ErrDoubleSpending = errors.New("double-spending in mempool")
+	// ErrAlreadyExistsInBlockchain transaction with the same txid already exists in blockchain.
+	ErrAlreadyExistsInBlockchain = errors.New("already exists in blockchain")
 )
 
 // Mempool is a storage for the chain transactions that are valid according to the
@@ -75,6 +75,8 @@ type Mempool struct {
 	verifier transactions.UnconfirmedTxProber
 
 	limiter *rate.Limiter
+
+	db database.DB
 }
 
 // NewMempool instantiates and initializes node mempool.
@@ -133,6 +135,7 @@ func NewMempool(db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCB
 		verifier:                verifier,
 		limiter:                 limiter,
 		pendingPropagation:      make(chan TxDesc, 1000),
+		db:                      db,
 	}
 
 	// Setting the pool where to cache verified transactions.
@@ -291,27 +294,37 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 		return txid, fmt.Errorf("hash err: %s", err.Error())
 	}
 
-	// ensure it's not already added
+	// ensure transaction does not exist in mempool
 	if m.verified.Contains(txid) {
 		return txid, ErrAlreadyExists
 	}
 
-	// TODO: Check if tx was already added in blockchain
+	// ensure transaction does not exist in blockchain
+	err = m.db.View(func(t database.Transaction) error {
+		_, _, _, err := t.FetchBlockTxByHash(txid)
+		return err
+	})
 
-	// if consumer's verification passes, mark it as verified
-	t.verified = time.Now()
+	switch err {
+	case database.ErrTxNotFound:
+		t.verified = time.Now()
 
-	// we've got a valid transaction pushed
-	if err := m.verified.Put(t); err != nil {
-		return txid, fmt.Errorf("store err - %v", err)
+		// store transaction in mempool
+		if err := m.verified.Put(t); err != nil {
+			return txid, fmt.Errorf("store err - %v", err)
+		}
+
+		// queue transaction for (re)propagation
+		go func() {
+			m.pendingPropagation <- t
+		}()
+
+		return txid, nil
+	case nil:
+		return txid, ErrAlreadyExistsInBlockchain
+	default:
+		return txid, err
 	}
-
-	// queue transaction for (re)propagation
-	go func() {
-		m.pendingPropagation <- t
-	}()
-
-	return txid, nil
 }
 
 func (m *Mempool) onBlock(b block.Block) {
