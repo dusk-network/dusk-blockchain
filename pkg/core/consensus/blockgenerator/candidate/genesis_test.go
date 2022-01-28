@@ -81,6 +81,8 @@ func provideMempoolTxs(rpcBus *rpcbus.RPCBus) {
 
 	go func() {
 		r := <-c
-		r.RespChan <- rpcbus.NewResponse([]transactions.ContractCall{}, nil)
+		txs := make([]transactions.ContractCall, 1)
+		txs[0] = transactions.RandTx()
+		r.RespChan <- rpcbus.NewResponse(txs, nil)
 	}()
 }
