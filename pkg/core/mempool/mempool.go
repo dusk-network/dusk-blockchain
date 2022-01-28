@@ -29,7 +29,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -277,7 +276,6 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	var err error
 
 	if hash, fee, err = m.verifier.Preverify(ctx, t.tx); err != nil {
-		cancel()
 		return nil, err
 	}
 
@@ -424,81 +422,6 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 	}
 
 	return outputTxs, err
-}
-
-// uType translates the node.TxType into transactions.TxType.
-func uType(t node.TxType) (transactions.TxType, error) {
-	switch t {
-	case node.TxType_STANDARD:
-		return transactions.Tx, nil
-	case node.TxType_DISTRIBUTE:
-		return transactions.Distribute, nil
-	case node.TxType_BID:
-		return transactions.Bid, nil
-	case node.TxType_STAKE:
-		return transactions.Stake, nil
-	case node.TxType_WITHDRAWFEES:
-		return transactions.WithdrawFees, nil
-	case node.TxType_WITHDRAWSTAKE:
-		return transactions.WithdrawStake, nil
-	case node.TxType_WITHDRAWBID:
-		return transactions.WithdrawBid, nil
-	case node.TxType_SLASH:
-		return transactions.Slash, nil
-	default:
-		return transactions.Tx, errors.New("unknown transaction type")
-	}
-}
-
-// SelectTx will return a view of the mempool, with optional filters applied.
-func (m Mempool) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {
-	txs := make([]transactions.ContractCall, 0)
-
-	switch {
-	case len(req.Id) == 64:
-		// If we want a tx with a certain ID, we can simply look it up
-		// directly
-		hash, err := hex.DecodeString(req.Id)
-		if err != nil {
-			return nil, err
-		}
-
-		tx := m.verified.Get(hash)
-		if tx == nil {
-			return nil, errors.New("tx not found")
-		}
-
-		txs = append(txs, tx)
-	case len(req.Types) > 0:
-		for _, t := range req.Types {
-			trType, err := uType(t)
-			if err != nil {
-				// most likely an unsupported type. We just ignore it
-				continue
-			}
-
-			txs = append(txs, m.verified.FilterByType(trType)...)
-		}
-	default:
-		txs = m.verified.Clone()
-	}
-
-	resp := &node.SelectResponse{Result: make([]*node.Tx, len(txs))}
-
-	for i, tx := range txs {
-		txid, err := tx.CalculateHash()
-		if err != nil {
-			return nil, err
-		}
-
-		resp.Result[i] = &node.Tx{
-			Type: node.TxType(tx.Type()),
-			Id:   hex.EncodeToString(txid),
-			// LockTime: tx.LockTime(),
-		}
-	}
-
-	return resp, nil
 }
 
 // processGetMempoolTxsBySizeRequest returns a subset of verified mempool txs which
