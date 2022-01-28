@@ -97,6 +97,7 @@ func (m *buntdbPool) Create(path string) error {
 // fi:transacton_id -> transaction fee value
 func (m *buntdbPool) Put(t TxDesc) error {
 	var key, value bytes.Buffer
+	var err error
 
 	txID, err := t.tx.CalculateHash()
 	if err != nil {
@@ -110,16 +111,12 @@ func (m *buntdbPool) Put(t TxDesc) error {
 	}
 
 	err = m.db.Update(func(tx *buntdb.Tx) error {
-		_, _, err = tx.Set(key.String(), value.String(), nil)
-		if err != nil {
+		if _, _, err = tx.Set(key.String(), value.String(), nil); err != nil {
 			return err
 		}
 
 		feeKey := feePrefix + key.String()
-		fee, err := t.tx.Fee()
-		if err != nil {
-			panic(err)
-		}
+		fee := t.tx.Fee()
 
 		_, _, err = tx.Set(feeKey, strconv.FormatInt(int64(fee), 10), nil)
 		if err != nil {

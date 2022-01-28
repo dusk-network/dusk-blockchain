@@ -18,7 +18,7 @@ type Config struct {
 	timestamp int64
 	seed      []byte
 
-	genesisTransactions []transactions.ContractCall
+	Transactions []transactions.ContractCall
 }
 
 // NewConfig will construct a new genesis config. This function does sanity checks
@@ -30,9 +30,9 @@ func NewConfig(timestamp int64, seed []byte, txs []transactions.ContractCall) (C
 	}
 
 	c := Config{
-		timestamp:           timestamp,
-		seed:                seed,
-		genesisTransactions: txs,
+		timestamp:    timestamp,
+		seed:         seed,
+		Transactions: txs,
 	}
 
 	return c, nil

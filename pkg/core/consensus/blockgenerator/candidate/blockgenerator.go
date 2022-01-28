@@ -30,13 +30,8 @@ var lg = log.WithField("process", "consensus").WithField("actor", "candidate_gen
 
 var (
 	errEmptyStateHash       = errors.New("empty state hash")
-	errEmptyTxsList         = errors.New("empty list of transactions")
 	errDistributeTxNotFound = errors.New("distribute tx not found")
 )
-
-// MaxTxSetSize defines the maximum amount of transactions.
-// It is TBD along with block size and processing.MaxFrameSize.
-const MaxTxSetSize = 825000
 
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
@@ -47,14 +42,21 @@ type Generator interface {
 type generator struct {
 	*consensus.Emitter
 
-	executeFn consensus.ExecuteTxsFunc
+	callTimeout time.Duration
+	executeFn   consensus.ExecuteTxsFunc
 }
 
 // New creates a new block generator.
 func New(e *consensus.Emitter, executeFn consensus.ExecuteTxsFunc) Generator {
+	ct := config.Get().Timeout.TimeoutGetMempoolTXsBySize
+	if ct == 0 {
+		ct = 5
+	}
+
 	return &generator{
-		Emitter:   e,
-		executeFn: executeFn,
+		Emitter:     e,
+		executeFn:   executeFn,
+		callTimeout: time.Duration(ct) * time.Second,
 	}
 }
 
@@ -191,12 +193,11 @@ func (bg *generator) FetchMempoolTxs(keys [][]byte) ([]transactions.ContractCall
 	// Retrieve and append the verified transactions from Mempool
 	// Max transaction size param
 	param := new(bytes.Buffer)
-	if err := encoding.WriteUint32LE(param, uint32(MaxTxSetSize)); err != nil {
+	if err := encoding.WriteUint32LE(param, config.MaxTxSetSize); err != nil {
 		return nil, err
 	}
 
-	timeoutGetMempoolTXsBySize := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXsBySize) * time.Second
-	resp, err := bg.RPCBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), timeoutGetMempoolTXsBySize)
+	resp, err := bg.RPCBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), bg.callTimeout)
 	if err != nil {
 		return nil, err
 	}

@@ -81,7 +81,7 @@ func (t TxRecord) View() TxView {
 		Hash:   h,
 	}
 
-	view.Fee, _ = t.Transaction.Fee()
+	view.Fee = t.Transaction.Fee()
 
 	// switch tx := t.Transaction.(type) {
 	// case *transactions.BidTransaction:

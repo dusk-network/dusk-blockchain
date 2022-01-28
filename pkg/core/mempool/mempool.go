@@ -296,7 +296,7 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 
 	// ensure transaction does not exist in blockchain
 	err = m.db.View(func(t database.Transaction) error {
-		_, _, _, err := t.FetchBlockTxByHash(txid)
+		_, _, _, err = t.FetchBlockTxByHash(txid)
 		return err
 	})
 
@@ -305,7 +305,7 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 		t.verified = time.Now()
 
 		// store transaction in mempool
-		if err := m.verified.Put(t); err != nil {
+		if err = m.verified.Put(t); err != nil {
 			return txid, fmt.Errorf("store err - %v", err)
 		}
 

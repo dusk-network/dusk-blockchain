@@ -156,7 +156,7 @@ func RandTx() *Transaction {
 	return tx
 }
 
-// RandTx mocks a transaction.
+// MockTx mocks a transaction.
 func MockTx() *Transaction {
 	tx := &Transaction{
 		Payload: &TransactionPayload{
@@ -179,23 +179,6 @@ func MockTx() *Transaction {
 /** Transfer Transaction **/
 /**************************/
 
-func mockRuskTx(randomized bool) *rusk.Transaction {
-	pl := &TransactionPayload{
-		Data: Rand32Bytes(),
-	}
-
-	buf := new(bytes.Buffer)
-	if err := MarshalTransactionPayload(buf, pl); err != nil {
-		// There's no way a mocked transaction payload should fail to
-		// marshal.
-		panic(err)
-	}
-
-	return &rusk.Transaction{
-		Payload: buf.Bytes(),
-	}
-}
-
 // RuskTx is the mock of a ContractCallTx.
 func RuskTx() *rusk.Transaction {
 	pl := &TransactionPayload{
@@ -217,10 +200,6 @@ func RuskTx() *rusk.Transaction {
 /**************************/
 /** TX OUTPUTS AND NOTES **/
 /**************************/
-
-func mockTransparentOutput(blindingFactor []byte) *Note {
-	return MockTransparentNote(blindingFactor)
-}
 
 // MockTransparentNote is a transparent note.
 func MockTransparentNote(blindingFactor []byte) *Note {
