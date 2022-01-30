@@ -255,7 +255,8 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 
 	for _, tx := range res.Txs {
 		trans := NewTransaction()
-		if err := UTransaction(tx, trans); err != nil {
+		copy(trans.Hash[:], tx.TxHash)
+		if err := UTransaction(tx.Tx, trans); err != nil {
 			return nil, nil, err
 		}
 
