@@ -39,7 +39,7 @@ var log = logger.WithFields(logger.Fields{"process": "grpc_c"})
 // the client. For this reason, we do not set a timeout at this stage.
 func CreateStateClient(ctx context.Context, address string) (rusk.StateClient, *grpc.ClientConn) {
 	// FIXME: create TLS channel here
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -49,7 +49,7 @@ func CreateStateClient(ctx context.Context, address string) (rusk.StateClient, *
 
 // CreateKeysClient creates a client for the Keys service.
 func CreateKeysClient(ctx context.Context, address string) (rusk.KeysClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -59,7 +59,7 @@ func CreateKeysClient(ctx context.Context, address string) (rusk.KeysClient, *gr
 
 // CreateTransferClient creates a client for the Transfer service.
 func CreateTransferClient(ctx context.Context, address string) (rusk.TransferClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -69,7 +69,7 @@ func CreateTransferClient(ctx context.Context, address string) (rusk.TransferCli
 
 // CreateStakeClient creates a client for the Stake service.
 func CreateStakeClient(ctx context.Context, address string) (rusk.StakeServiceClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -79,7 +79,7 @@ func CreateStakeClient(ctx context.Context, address string) (rusk.StakeServiceCl
 
 // CreateNetworkClient creates a client for the Kadcast network layer.
 func CreateNetworkClient(ctx context.Context, address string) (rusk.NetworkClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		log.Panic(err)
 	}

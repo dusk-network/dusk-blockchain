@@ -90,7 +90,7 @@ func sendQuery(ctx context.Context, query, addr string, result interface{}) erro
 }
 
 func createStateClient(ctx context.Context, address string) (rusk.StateClient, *grpc.ClientConn, error) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		return nil, nil, err
 	}
