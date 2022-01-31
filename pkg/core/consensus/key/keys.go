@@ -7,6 +7,7 @@
 package key
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -17,7 +18,7 @@ import (
 	"os"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
-	"golang.org/x/crypto/sha3"
+	"lukechampine.com/blake3"
 )
 
 // ErrAlreadyExists file already exists.
@@ -94,29 +95,19 @@ func (w *Keys) Save(password, path string) error {
 
 // saveEncrypted saves a []byte to a file.
 func saveEncrypted(text []byte, password string, file string) error {
-	digest := sha3.Sum256([]byte(password))
+	digest := blake3.Sum256([]byte(password))
 
-	c, err := aes.NewCipher(digest[:])
+	enc, err := AesCBCEncrypt(text, digest[:])
 	if err != nil {
 		return err
 	}
 
-	gcm, err := cipher.NewGCM(c)
-	if err != nil {
-		return err
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(file, gcm.Seal(nonce, nonce, text, nil), 0o600)
+	return ioutil.WriteFile(file, enc, 0o600)
 }
 
 // fetchEncrypted load encrypted from file.
 func fetchEncrypted(password string, file string) ([]byte, error) {
-	digest := sha3.Sum256([]byte(password))
+	digest := blake3.Sum256([]byte(password))
 
 	ciphertext, err := ioutil.ReadFile(file) //nolint
 	if err != nil {
@@ -127,17 +118,60 @@ func fetchEncrypted(password string, file string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	
+	blockSize := c.BlockSize()
+	iv := ciphertext[:blockSize]
+	ciphertext = ciphertext[blockSize:]
 
-	gcm, err := cipher.NewGCM(c)
+	// CBC mode always works in whole blocks.
+	if len(ciphertext)%blockSize != 0 {
+		panic("ciphertext is not a multiple of the block size")
+	}
+
+	mode := cipher.NewCBCDecrypter(c, iv)
+
+	// CryptBlocks can work in-place if the two arguments are the same.
+	mode.CryptBlocks(ciphertext, ciphertext)
+	// Unfill
+	ciphertext = PKCS7UnPadding(ciphertext)
+	return ciphertext, nil
+}
+
+func PKCS7UnPadding(origData []byte) []byte {
+	length := len(origData)
+	unpadding := int(origData[length-1])
+	return origData[:(length - unpadding)]
+}
+
+// Use PKCS7 to fill, IOS is also 7
+func PKCS7Padding(ciphertext []byte, blockSize int) []byte {
+	padding := blockSize - len(ciphertext)%blockSize
+	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
+	return append(ciphertext, padtext...)
+}
+
+//aes encryption, filling the 16 bits of the key key, 24, 32 respectively corresponding to AES-128, AES-192, or AES-256.
+func AesCBCEncrypt(rawData, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	nonceSize := gcm.NonceSize()
-	if len(ciphertext) < nonceSize {
-		return nil, err
+	//fill the original
+	blockSize := block.BlockSize()
+	rawData = PKCS7Padding(rawData, blockSize)
+	// Initial vector IV must be unique, but does not need to be kept secret
+	cipherText := make([]byte, blockSize+len(rawData))
+	//block size 16
+	iv := cipherText[:blockSize]
+
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		panic(err)
 	}
 
-	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	return gcm.Open(nil, nonce, ciphertext, nil)
+	//block size and initial vector size must be the same
+	mode := cipher.NewCBCEncrypter(block, iv)
+	mode.CryptBlocks(cipherText[blockSize:], rawData)
+
+	return cipherText, nil
 }
