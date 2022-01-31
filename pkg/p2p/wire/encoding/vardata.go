@@ -10,7 +10,7 @@ package encoding
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 )
 
 // ReadVarBytes will read a CompactSize int denoting the length, then
@@ -24,7 +24,7 @@ func ReadVarBytes(r *bytes.Buffer, b *[]byte) error {
 	// We reject reading any data that has a length greater than
 	// math.MaxInt32, to avoid out of memory errors.
 	if c > uint64(r.Len()) {
-		return errors.New("attempting to decode data which is too large")
+		return fmt.Errorf("attempting to decode data which is too large %d", c)
 	}
 
 	*b = make([]byte, c)
@@ -45,7 +45,7 @@ func ReadVarBytesUint32LE(r *bytes.Buffer, b *[]byte) error {
 	// We reject reading any data that has a length greater than
 	// math.MaxInt32, to avoid out of memory errors.
 	if c > uint32(r.Len()) {
-		return errors.New("attempting to decode data which is too large")
+		return fmt.Errorf("attempting to decode data which is too large %d", c)
 	}
 
 	*b = make([]byte, c)

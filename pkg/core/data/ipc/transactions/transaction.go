@@ -23,9 +23,9 @@ const (
 	// Tx indicates the phoenix transaction type.
 	Tx TxType = iota
 	// Distribute indicates the coinbase and reward distribution contract call.
-	Distribute
+	Distribute = 0
 	// Transfer transaction id.
-	Transfer
+	Transfer = 1
 	// Stake transaction id.
 	Stake
 )
@@ -75,12 +75,7 @@ func MTransaction(r *rusk.Transaction, f *Transaction) error {
 	r.Version = f.Version
 	r.Type = uint32(f.TxType)
 
-	buf := new(bytes.Buffer)
-	if err := MarshalTransactionPayload(buf, f.Payload); err != nil {
-		return err
-	}
-
-	r.Payload = buf.Bytes()
+	r.Payload = f.Payload.Data
 	return nil
 }
 
@@ -89,9 +84,9 @@ func UTransaction(r *rusk.Transaction, f *Transaction) error {
 	f.Version = r.Version
 	f.TxType = TxType(r.Type)
 	f.Payload = NewTransactionPayload()
+	f.Payload.Data = r.Payload
 
-	buf := bytes.NewBuffer(r.Payload)
-	return UnmarshalTransactionPayload(buf, f.Payload)
+	return nil
 }
 
 // MarshalTransaction writes the Transaction struct into a bytes.Buffer.

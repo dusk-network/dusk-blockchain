@@ -13,6 +13,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -118,7 +119,7 @@ func fetchEncrypted(password string, file string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	blockSize := c.BlockSize()
 	iv := ciphertext[:blockSize]
 	ciphertext = ciphertext[blockSize:]
@@ -133,21 +134,35 @@ func fetchEncrypted(password string, file string) ([]byte, error) {
 	// CryptBlocks can work in-place if the two arguments are the same.
 	mode.CryptBlocks(ciphertext, ciphertext)
 	// Unfill
-	ciphertext = PKCS7UnPadding(ciphertext)
-	return ciphertext, nil
+	ciphertext, err = PKCS7UnPadding(ciphertext, blockSize)
+	return ciphertext, err
 }
 
-func PKCS7UnPadding(origData []byte) []byte {
-	length := len(origData)
-	unpadding := int(origData[length-1])
-	return origData[:(length - unpadding)]
+func PKCS7UnPadding(data []byte, blockSize int) ([]byte, error) {
+	length := len(data)
+	if length == 0 {
+		return nil, errors.New("pkcs7: Data is empty")
+	}
+	if length%blockSize != 0 {
+		return nil, errors.New("pkcs7: Data is not block-aligned")
+	}
+	padLen := int(data[length-1])
+	ref := bytes.Repeat([]byte{byte(padLen)}, padLen)
+	if padLen > blockSize || padLen == 0 || !bytes.HasSuffix(data, ref) {
+		return nil, errors.New("pkcs7: Invalid padding")
+	}
+	return data[:length-padLen], nil
 }
 
-// Use PKCS7 to fill, IOS is also 7
-func PKCS7Padding(ciphertext []byte, blockSize int) []byte {
-	padding := blockSize - len(ciphertext)%blockSize
-	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(ciphertext, padtext...)
+// pkcs7pad add pkcs7 padding
+func PKCS7Padding(data []byte, blockSize int) ([]byte, error) {
+	if blockSize < 0 || blockSize > 256 {
+		return nil, fmt.Errorf("pkcs7: Invalid block size %d", blockSize)
+	} else {
+		padLen := blockSize - len(data)%blockSize
+		padding := bytes.Repeat([]byte{byte(padLen)}, padLen)
+		return append(data, padding...), nil
+	}
 }
 
 //aes encryption, filling the 16 bits of the key key, 24, 32 respectively corresponding to AES-128, AES-192, or AES-256.
@@ -159,7 +174,11 @@ func AesCBCEncrypt(rawData, key []byte) ([]byte, error) {
 
 	//fill the original
 	blockSize := block.BlockSize()
-	rawData = PKCS7Padding(rawData, blockSize)
+	rawData, err = PKCS7Padding(rawData, blockSize)
+	if err != nil {
+		panic(err)
+	}
+	
 	// Initial vector IV must be unique, but does not need to be kept secret
 	cipherText := make([]byte, blockSize+len(rawData))
 	//block size 16
