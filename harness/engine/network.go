@@ -245,7 +245,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	// Load wallet path as walletX.dat are hard-coded for now
 	// Later they could be generated on the fly per each test execution
 	walletsPath, _ := os.Getwd()
-	walletsPath += "/../../devnet-wallets/"
+	walletsPath += "/../../consensus-keys/"
 
 	// Generate node default config file
 	tomlFilePath, tomlErr := n.generateConfig(i, walletsPath)
