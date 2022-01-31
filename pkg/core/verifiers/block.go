@@ -105,22 +105,21 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 // CheckMultiCoinbases returns an error if there is more than one coinbase transaction
 // in the list or if there are none.
 func CheckMultiCoinbases(txs []transactions.ContractCall) error {
-	var seen bool
+	seen := 0
 
 	for _, tx := range txs {
 		if tx.Type() != transactions.Distribute {
 			continue
 		}
-
-		if seen {
+		seen+=1
+		if seen>2 {
 			return errors.New("multiple coinbase transactions present")
 		}
 
-		seen = true
 	}
 
-	if !seen {
-		return errors.New("no coinbase transactions in the list")
+	if seen<2 {
+		return errors.New("not enough coinbase transactions in the list")
 	}
 	return nil
 }
