@@ -13,17 +13,14 @@ import (
 // A single point of constants definition.
 const (
 	// DUSK is one whole unit of DUSK.
-	DUSK = uint64(10000000000)
+	DUSK = uint64(1_000_000)
 
-	// GeneratorReward is the amount of Block generator default reward.
-	// TODO: TBD.
-	GeneratorReward = 50 * DUSK
+	// Default Block Gas limit.
+	BlockGasLimit = 1000 * DUSK
 
-	MinFee = uint64(100)
-
-	// MaxLockTime is the maximum amount of time a consensus transaction (stake, bid)
-	// can be locked up for.
-	MaxLockTime = uint64(250000)
+	// MaxTxSetSize defines the maximum amount of transactions.
+	// It is TBD along with block size and processing.MaxFrameSize.
+	MaxTxSetSize = 825000
 
 	// Maximum number of blocks to be requested/delivered on a single syncing session with a peer.
 	MaxInvBlocks = 500
@@ -33,10 +30,6 @@ const (
 
 	// KadcastInitialHeight sets the default initial height for Kadcast broadcast algorithm.
 	KadcastInitialHeight byte = 128
-
-	// Block Gas limit
-	// TODO: TBD.
-	BlockGasLimit = 10 * DUSK
 )
 
 // KadcastInitHeader is used as default initial kadcast message header.

@@ -207,7 +207,7 @@ func (n *Network) closeGRPCConnections() {
 
 		c := grpcC
 		go func(cli GrpcClient) {
-			cli.GracefulClose(grpc.WithInsecure())
+			cli.GracefulClose(grpc.WithInsecure(), grpc.WithAuthority("dummy"))
 			wg.Done()
 		}(c)
 	}

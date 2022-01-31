@@ -175,7 +175,7 @@ func Profile4(index int, node *DuskNode, walletPath string) {
 	viper.Set("kadcast.bootstrapAddr", bootstrappers)
 
 	viper.Set("kadcast.grpc.Network", "unix")
-	viper.Set("kadcast.grpc.Address", node.Dir+"/rusk-service.sock")
+	viper.Set("kadcast.grpc.Address", node.Dir+"/rusk-grpc.sock")
 	viper.Set("kadcast.grpc.DialTimeout", 10)
 }
 

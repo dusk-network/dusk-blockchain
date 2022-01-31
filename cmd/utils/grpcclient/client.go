@@ -27,6 +27,7 @@ func (c *grpcClient) TryConnect(addr string) error {
 	dialOptions := make([]grpc.DialOption, 0)
 	dialOptions = append(dialOptions, grpc.WithBlock())
 	dialOptions = append(dialOptions, grpc.WithInsecure())
+	dialOptions = append(dialOptions, grpc.WithAuthority("dummy"))
 
 	// Init dial timeout
 	var dialCtx context.Context

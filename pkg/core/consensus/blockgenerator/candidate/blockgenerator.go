@@ -30,13 +30,8 @@ var lg = log.WithField("process", "consensus").WithField("actor", "candidate_gen
 
 var (
 	errEmptyStateHash       = errors.New("empty state hash")
-	errEmptyTxsList         = errors.New("empty list of transactions")
 	errDistributeTxNotFound = errors.New("distribute tx not found")
 )
-
-// MaxTxSetSize defines the maximum amount of transactions.
-// It is TBD along with block size and processing.MaxFrameSize.
-const MaxTxSetSize = 825000
 
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
@@ -47,14 +42,21 @@ type Generator interface {
 type generator struct {
 	*consensus.Emitter
 
-	executeFn consensus.ExecuteTxsFunc
+	callTimeout time.Duration
+	executeFn   consensus.ExecuteTxsFunc
 }
 
 // New creates a new block generator.
 func New(e *consensus.Emitter, executeFn consensus.ExecuteTxsFunc) Generator {
+	ct := config.Get().Timeout.TimeoutGetMempoolTXsBySize
+	if ct == 0 {
+		ct = 5
+	}
+
 	return &generator{
-		Emitter:   e,
-		executeFn: executeFn,
+		Emitter:     e,
+		executeFn:   executeFn,
+		callTimeout: time.Duration(ct) * time.Second,
 	}
 }
 
@@ -122,10 +124,6 @@ func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCal
 		return nil, nil, err
 	}
 
-	if len(txs) == 0 {
-		return nil, nil, errEmptyTxsList
-	}
-
 	// Ensure last item from returned txs is the Distribute tx
 	if txs[len(txs)-1].Type() != transactions.Distribute {
 		return nil, nil, errDistributeTxNotFound
@@ -141,7 +139,7 @@ func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCal
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
 func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
-	txs, err := bg.ConstructBlockTxs(keys)
+	txs, err := bg.FetchMempoolTxs(keys)
 	if err != nil {
 		return nil, err
 	}
@@ -190,34 +188,21 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 	return candidateBlock, nil
 }
 
-// ConstructBlockTxs will fetch all valid transactions from the mempool, append a coinbase
-// transaction, and return them all.
-func (bg *generator) ConstructBlockTxs(keys [][]byte) ([]transactions.ContractCall, error) {
-	txs := make([]transactions.ContractCall, 0)
-
+// FetchMempoolTxs will fetch all valid transactions from the mempool.
+func (bg *generator) FetchMempoolTxs(keys [][]byte) ([]transactions.ContractCall, error) {
 	// Retrieve and append the verified transactions from Mempool
 	// Max transaction size param
 	param := new(bytes.Buffer)
-	if err := encoding.WriteUint32LE(param, uint32(MaxTxSetSize)); err != nil {
+	if err := encoding.WriteUint32LE(param, config.MaxTxSetSize); err != nil {
 		return nil, err
 	}
 
-	timeoutGetMempoolTXsBySize := time.Duration(config.Get().Timeout.TimeoutGetMempoolTXsBySize) * time.Second
-	resp, err := bg.RPCBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), timeoutGetMempoolTXsBySize)
-	// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
-	// already accepted in the chain.
+	resp, err := bg.RPCBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), bg.callTimeout)
 	if err != nil {
 		return nil, err
 	}
 
-	txs = append(txs, resp.([]transactions.ContractCall)...)
-
-	// Construct and append coinbase Tx to reward the generator
-	// XXX: this needs to be adjusted
-	coinbaseTx := transactions.RandDistributeTx(config.GeneratorReward, len(keys))
-	txs = append(txs, coinbaseTx)
-
-	return txs, nil
+	return resp.([]transactions.ContractCall), nil
 }
 
 func (bg *generator) sign(seed []byte) ([]byte, error) {

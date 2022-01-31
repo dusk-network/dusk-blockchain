@@ -134,6 +134,8 @@ func TestBlocksByHashes(t *testing.T) {
 }
 
 func TestBlocksTxs(t *testing.T) {
+	t.SkipNow()
+
 	query := `
 		{
 		  blocks(height: -1) {
@@ -210,6 +212,8 @@ func TestLastBlocks(t *testing.T) {
 }
 
 func TestBlocksTxsQuery(t *testing.T) {
+	t.SkipNow()
+
 	query := `
 		{ 
 			blocks(last: 1)   

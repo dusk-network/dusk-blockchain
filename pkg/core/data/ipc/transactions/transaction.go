@@ -12,7 +12,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
-	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -25,21 +24,10 @@ const (
 	Tx TxType = iota
 	// Distribute indicates the coinbase and reward distribution contract call.
 	Distribute
-	// WithdrawFees indicates the Provisioners' withdraw contract call.
-	WithdrawFees
-	// Bid transaction propagated by the Block Generator.
-	Bid
-	// Stake transaction propagated by the Provisioners.
+	// Transfer transaction id.
+	Transfer
+	// Stake transaction id.
 	Stake
-	// Slash transaction propagated by the consensus to punish the Committee
-	// members when they turn byzantine.
-	Slash
-	// WithdrawStake transaction propagated by the Provisioners to withdraw
-	// their stake.
-	WithdrawStake
-	// WithdrawBid transaction propagated by the Block Generator to withdraw
-	// their bids.
-	WithdrawBid
 )
 
 // Transaction is a Phoenix transaction.
@@ -47,6 +35,10 @@ type Transaction struct {
 	Version uint32 `json:"version"`
 	TxType  `json:"type"`
 	Payload *TransactionPayload `json:"payload"`
+
+	// Extended
+	Hash     [32]byte
+	FeeValue Fee
 }
 
 // NewTransaction returns a new empty Transaction struct.
@@ -60,10 +52,22 @@ func NewTransaction() *Transaction {
 // the message safe to publish to multiple subscribers.
 func (t Transaction) Copy() payload.Safe {
 	return &Transaction{
-		Version: t.Version,
-		TxType:  t.TxType,
-		Payload: t.Payload.Copy(),
+		Version:  t.Version,
+		TxType:   t.TxType,
+		Payload:  t.Payload.Copy(),
+		Hash:     t.Hash,
+		FeeValue: t.FeeValue,
 	}
+}
+
+// Fee returns GasLimit.
+func (t Transaction) Fee() uint64 {
+	return t.FeeValue.GasLimit
+}
+
+// CalculateHash returns hash of transaction, if set.
+func (t Transaction) CalculateHash() ([]byte, error) {
+	return t.Hash[:], nil
 }
 
 // MTransaction copies the Transaction structure into the Rusk equivalent.
@@ -100,7 +104,19 @@ func MarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 		return err
 	}
 
-	return MarshalTransactionPayload(r, f.Payload)
+	if err := MarshalTransactionPayload(r, f.Payload); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, f.Hash[:]); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64LE(r, f.FeeValue.GasLimit); err != nil {
+		return err
+	}
+
+	return encoding.WriteUint64LE(r, f.FeeValue.GasPrice)
 }
 
 // UnmarshalTransaction reads a Transaction struct from a bytes.Buffer.
@@ -115,7 +131,31 @@ func UnmarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 	}
 
 	f.TxType = TxType(t)
-	return UnmarshalTransactionPayload(r, f.Payload)
+	if err := UnmarshalTransactionPayload(r, f.Payload); err != nil {
+		return err
+	}
+
+	b := make([]byte, 32)
+	if err := encoding.Read256(r, b); err != nil {
+		return err
+	}
+
+	copy(f.Hash[:], b)
+
+	var gaslimit uint64
+	if err := encoding.ReadUint64LE(r, &gaslimit); err != nil {
+		return err
+	}
+
+	f.FeeValue.GasLimit = gaslimit
+
+	var gasPrice uint64
+	if err := encoding.ReadUint64LE(r, &gasPrice); err != nil {
+		return err
+	}
+
+	f.FeeValue.GasPrice = gasPrice
+	return nil
 }
 
 // ContractCall is the transaction that embodies the execution parameter for a
@@ -130,13 +170,7 @@ type ContractCall interface {
 	// Type indicates the transaction.
 	Type() TxType
 
-	// Obfuscated returns true if the TransactionOutputs consists of Obfuscated
-	// Notes, false if they are transparent.
-	Obfuscated() bool
-
-	// Values returns a tuple where the first element is the sum of all transparent
-	// outputs' note values and the second is the fee.
-	Values() (amount uint64, fee uint64)
+	Fee() uint64
 }
 
 // Marshal a Contractcall to a bytes.Buffer.
@@ -164,41 +198,39 @@ func (t Transaction) StandardTx() *TransactionPayload {
 	return t.Payload
 }
 
-// CalculateHash returns the SHA3-256 hash digest of the transaction.
-// TODO: this needs to correspond with how rusk hashes transactions.
-func (t Transaction) CalculateHash() ([]byte, error) {
-	b := new(bytes.Buffer)
-	if err := Marshal(b, &t); err != nil {
-		return nil, err
-	}
-
-	return hash.Sha3256(b.Bytes())
-}
-
 // Type returns the transaction type.
 func (t Transaction) Type() TxType {
 	return t.TxType
 }
 
-// Obfuscated returns whether or not the outputs of this transaction
-// are obfuscated.
-// TODO: implement.
-func (t Transaction) Obfuscated() bool {
-	return true
-}
-
-// Values returns the amount and fee spent in this transaction.
-// TODO: add amount calculation.
-func (t Transaction) Values() (amount uint64, fee uint64) {
-	return 0, t.Payload.Fee.GasLimit * t.Payload.Fee.GasPrice
-}
-
 // Equal checks equality between two transactions.
-// TODO: implement.
 func Equal(t, other ContractCall) bool {
 	if t.Type() != other.Type() {
 		return false
 	}
 
 	return t.StandardTx().Equal(other.StandardTx())
+}
+
+// Extend recreate transaction with optional fields initialized.
+func Extend(t ContractCall, f Fee, hash []byte) (ContractCall, error) {
+	switch t := t.(type) {
+	case *Transaction:
+		n := &Transaction{
+			Version: t.Version,
+			TxType:  t.TxType,
+			Payload: t.Payload.Copy(),
+		}
+
+		n.FeeValue = f
+
+		if len(hash) != len(n.Hash) {
+			return nil, errors.New("invalid length")
+		}
+
+		copy(n.Hash[:], hash)
+		return n, nil
+	default:
+		return nil, errors.New("unrecognized type of ContractCall")
+	}
 }
