@@ -125,9 +125,9 @@ func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCal
 	}
 
 	// Ensure last item from returned txs is the Distribute tx
-	//if txs[len(txs)-1].Type() != transactions.Distribute {
-	//	return nil, nil, errDistributeTxNotFound
-	//}
+	if txs[len(txs)-1].Type() != transactions.Distribute {
+		return nil, nil, errDistributeTxNotFound
+	}
 
 	if len(stateHash) == 0 {
 		return nil, nil, errEmptyStateHash
