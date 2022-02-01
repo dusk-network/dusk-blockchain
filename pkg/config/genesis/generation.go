@@ -24,10 +24,9 @@ func Generate(c Config) *block.Block {
 		c.Transactions = append(c.Transactions, transactions.MockTx())
 	}
 
-	//replace this with the output of "rusk make state"
+	// replace this with the output of "rusk make state"
 
-	state_root:= make([]byte, 32)
-
+	state_root := make([]byte, 32)
 
 	state_root_str := os.Getenv("RUSK_STATE_ROOT")
 	if len(state_root_str) > 0 {

@@ -49,7 +49,6 @@ func TestEncryptedKeysFromFile(t *testing.T) {
 	k2, err := NewFromFile(password, path)
 	assert.NotNil(t, k2)
 	assert.Nil(t, err)
-
 }
 
 func TestEncryptedKeys(t *testing.T) {
