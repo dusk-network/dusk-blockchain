@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"os"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
@@ -22,6 +23,10 @@ import (
 )
 
 func TestGenerateGenesis(t *testing.T) {
+	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
+		t.Skip()
+	}
+	
 	rpcBus := rpcbus.New()
 
 	provideMempoolTxs(rpcBus)
@@ -56,6 +61,10 @@ func TestGenerateGenesis(t *testing.T) {
 // t.Logf("genesis: %s", genesisHex)
 
 func TestGenesisBlock(t *testing.T) {
+	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
+		t.Skip()
+	}
+
 	// read the hard-coded genesis blob for testnet
 	b := genesis.Decode()
 

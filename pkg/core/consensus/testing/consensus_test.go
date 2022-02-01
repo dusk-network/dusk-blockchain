@@ -8,6 +8,7 @@ package testing
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -28,6 +29,10 @@ import (
 // from the test case, and allows us to focus solely on consensus flow
 // and possible corner cases.
 func TestConsensus(t *testing.T) {
+	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
+		t.Skip()
+	}
+	
 	assert := assert.New(t)
 
 	logrus.SetLevel(logrus.DebugLevel)
