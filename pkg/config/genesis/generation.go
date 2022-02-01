@@ -7,6 +7,9 @@
 package genesis
 
 import (
+	"encoding/hex"
+	"os"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -21,15 +24,30 @@ func Generate(c Config) *block.Block {
 		c.Transactions = append(c.Transactions, transactions.MockTx())
 	}
 
+	//replace this with the output of "rusk make state"
+
+	state_root:= make([]byte, 32)
+
+
+	state_root_str := os.Getenv("RUSK_STATE_ROOT")
+	if len(state_root_str) > 0 {
+		state_root_parsed, err := hex.DecodeString(state_root_str)
+		if err != nil {
+			panic(err)
+		} else {
+			state_root = state_root_parsed
+		}
+	}
+
 	h := &block.Header{
 		Version:       0,
 		Timestamp:     c.timestamp,
 		Height:        0,
-		PrevBlockHash: make([]byte, 32),
+		PrevBlockHash: state_root,
 		TxRoot:        nil,
 		Seed:          c.seed,
 		Certificate:   block.EmptyCertificate(),
-		StateHash:     make([]byte, 32),
+		StateHash:     state_root,
 	}
 
 	b := &block.Block{
