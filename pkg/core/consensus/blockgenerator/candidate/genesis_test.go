@@ -26,7 +26,7 @@ func TestGenerateGenesis(t *testing.T) {
 	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
 		t.Skip()
 	}
-	
+
 	rpcBus := rpcbus.New()
 
 	provideMempoolTxs(rpcBus)

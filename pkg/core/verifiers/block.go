@@ -111,14 +111,14 @@ func CheckMultiCoinbases(txs []transactions.ContractCall) error {
 		if tx.Type() != transactions.Distribute {
 			continue
 		}
-		seen+=1
-		if seen>2 {
+		seen++
+
+		if seen > 2 {
 			return errors.New("multiple coinbase transactions present")
 		}
-
 	}
 
-	if seen<2 {
+	if seen < 2 {
 		return errors.New("not enough coinbase transactions in the list")
 	}
 	return nil

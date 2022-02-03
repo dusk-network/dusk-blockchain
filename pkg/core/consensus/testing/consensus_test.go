@@ -32,7 +32,7 @@ func TestConsensus(t *testing.T) {
 	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
 		t.Skip()
 	}
-	
+
 	assert := assert.New(t)
 
 	logrus.SetLevel(logrus.DebugLevel)

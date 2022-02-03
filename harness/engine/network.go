@@ -342,10 +342,8 @@ func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, erro
 }
 
 // Start an OS process with TMPDIR=nodeDir, manageable by the network.
+//nolint
 func (n *Network) start(nodeDir string, name string, arg ...string) error {
-
-
-
 
 	envWithNoRusk := os.Environ()
 	// Find and remove the SHARED RUSK_PROFILE_PATH
@@ -376,9 +374,9 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 	if err != nil {
 		log.Panic(err)
 	}
-	// targetKeys := filepath.Join(extProfilePath, ".rusk", "keys")
-	// newKeys := filepath.Join(nodeDir, ".rusk", "keys")
-	// os.Symlink(targetKeys, newKeys)
+	targetKeys := filepath.Join(extProfilePath, ".rusk", "keys")
+	newKeys := filepath.Join(nodeDir, ".rusk", "keys")
+	os.Symlink(targetKeys, newKeys)
 
 	//nolint:gosec
 	cmd = exec.Command(name, arg...)

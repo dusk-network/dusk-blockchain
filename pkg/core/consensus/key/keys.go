@@ -138,57 +138,63 @@ func fetchEncrypted(password string, file string) ([]byte, error) {
 	return ciphertext, err
 }
 
+// PKCS7UnPadding strips pkcs7 padding.
 func PKCS7UnPadding(data []byte, blockSize int) ([]byte, error) {
 	length := len(data)
 	if length == 0 {
 		return nil, errors.New("pkcs7: Data is empty")
 	}
+
 	if length%blockSize != 0 {
 		return nil, errors.New("pkcs7: Data is not block-aligned")
 	}
+
 	padLen := int(data[length-1])
 	ref := bytes.Repeat([]byte{byte(padLen)}, padLen)
+
 	if padLen > blockSize || padLen == 0 || !bytes.HasSuffix(data, ref) {
 		return nil, errors.New("pkcs7: Invalid padding")
 	}
 	return data[:length-padLen], nil
 }
 
-// pkcs7pad add pkcs7 padding
+// PKCS7Padding add pkcs7 padding.
 func PKCS7Padding(data []byte, blockSize int) ([]byte, error) {
 	if blockSize < 0 || blockSize > 256 {
 		return nil, fmt.Errorf("pkcs7: Invalid block size %d", blockSize)
-	} else {
-		padLen := blockSize - len(data)%blockSize
-		padding := bytes.Repeat([]byte{byte(padLen)}, padLen)
-		return append(data, padding...), nil
 	}
+
+	padLen := blockSize - len(data)%blockSize
+	padding := bytes.Repeat([]byte{byte(padLen)}, padLen)
+
+	return append(data, padding...), nil
 }
 
-//aes encryption, filling the 16 bits of the key key, 24, 32 respectively corresponding to AES-128, AES-192, or AES-256.
+// AesCBCEncrypt aes encryption, filling the 16 bits of the key key, 24, 32 respectively corresponding to AES-128, AES-192, or AES-256.
 func AesCBCEncrypt(rawData, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		panic(err)
 	}
 
-	//fill the original
+	// fill the original
 	blockSize := block.BlockSize()
+
 	rawData, err = PKCS7Padding(rawData, blockSize)
 	if err != nil {
 		panic(err)
 	}
-	
+
 	// Initial vector IV must be unique, but does not need to be kept secret
 	cipherText := make([]byte, blockSize+len(rawData))
-	//block size 16
+	// block size 16
 	iv := cipherText[:blockSize]
 
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		panic(err)
 	}
 
-	//block size and initial vector size must be the same
+	// block size and initial vector size must be the same
 	mode := cipher.NewCBCEncrypter(block, iv)
 	mode.CryptBlocks(cipherText[blockSize:], rawData)
 
