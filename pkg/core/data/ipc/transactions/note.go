@@ -8,13 +8,14 @@ package transactions
 
 import (
 	"bytes"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
-// Note types
+// Note types.
 const (
 	NoteTypeTransparent uint8 = 0
-	NoteTypeObfuscated        = 1
+	NoteTypeObfuscated  uint8 = 1
 )
 
 // Note represents a Phoenix note.

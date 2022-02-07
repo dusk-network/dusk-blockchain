@@ -9,32 +9,23 @@ package transactions
 import (
 	"bytes"
 	"encoding/binary"
+
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
-const size_BLS_SCALAR = 32
-
-const size_CONTRACTID = 32
-
-const capacity_MESSAGE = 2
-
-const size_CIPHER = capacity_MESSAGE + 1
-
-const size_CIPHER_BYTES = size_CIPHER * size_BLS_SCALAR
-
-const size_NOTE = 137 + size_CIPHER_BYTES
-
-const size_STEALTH_ADDRESS = 64
-
-const size_G1AFFINE = 48
-
-const size_COMMITMENT = size_G1AFFINE
-
-const size_PROOF_EVAL = 24 * size_BLS_SCALAR
-
-const size_PROOF = 15*size_COMMITMENT + size_PROOF_EVAL
+// const size_BLS_SCALAR = 32
+// const size_CONTRACTID = 32
+// const capacity_MESSAGE = 2
+// const size_CIPHER = capacity_MESSAGE + 1
+// const size_CIPHER_BYTES = size_CIPHER * size_BLS_SCALAR
+// const size_NOTE = 137 + size_CIPHER_BYTES
+// const size_STEALTH_ADDRESS = 64
+// const size_G1AFFINE = 48
+// const size_COMMITMENT = size_G1AFFINE
+// const size_PROOF_EVAL = 24 * size_BLS_SCALAR
+// const size_PROOF = 15*size_COMMITMENT + size_PROOF_EVAL
 
 // TransactionPayloadDecoded carries data for an execute transaction (type 1).
 type TransactionPayloadDecoded struct {
@@ -68,7 +59,9 @@ func (p *TransactionPayloadDecoded) Hash() ([]byte, error) {
 	}
 
 	for _, nullifier := range p.Nullifiers {
-		hash.Write(nullifier)
+		if _, err := hash.Write(nullifier); err != nil {
+			return nil, err
+		}
 	}
 
 	for _, note := range p.Notes {
@@ -76,28 +69,56 @@ func (p *TransactionPayloadDecoded) Hash() ([]byte, error) {
 		if err := MarshalNote(&buf, note); err != nil {
 			return nil, err
 		}
-		hash.Write(buf.Bytes())
+
+		if _, err := hash.Write(buf.Bytes()); err != nil {
+			return nil, err
+		}
 	}
 
-	hash.Write(p.Anchor)
+	if _, err := hash.Write(p.Anchor); err != nil {
+		return nil, err
+	}
 
 	leb := make([]byte, 8)
 
 	binary.LittleEndian.PutUint64(leb, p.Fee.GasLimit)
-	hash.Write(leb)
+
+	if _, err := hash.Write(leb); err != nil {
+		return nil, err
+	}
+
 	binary.LittleEndian.PutUint64(leb, p.Fee.GasPrice)
-	hash.Write(leb)
-	hash.Write(p.Fee.StealthAddr)
+
+	if _, err := hash.Write(leb); err != nil {
+		return nil, err
+	}
+
+	if _, err := hash.Write(p.Fee.StealthAddr); err != nil {
+		return nil, err
+	}
 
 	if p.Crossover != nil {
-		hash.Write(p.Crossover.ValueCommitment)
-		hash.Write(p.Crossover.Nonce)
-		hash.Write(p.Crossover.EncryptedData)
+		if _, err := hash.Write(p.Crossover.ValueCommitment); err != nil {
+			return nil, err
+		}
+
+		if _, err := hash.Write(p.Crossover.Nonce); err != nil {
+			return nil, err
+		}
+
+		if _, err := hash.Write(p.Crossover.EncryptedData); err != nil {
+			return nil, err
+		}
 	}
 
 	if p.Call != nil {
-		hash.Write(p.Call.ContractId)
-		hash.Write(p.Call.CallData)
+		if _, err := hash.Write(p.Call.ContractID); err != nil {
+			return nil, err
+		}
+
+		if _, err := hash.Write(p.Call.CallData); err != nil {
+			return nil, err
+		}
 	}
 
 	hashBytes := hash.Sum(nil)
