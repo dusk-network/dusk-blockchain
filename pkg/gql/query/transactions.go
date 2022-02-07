@@ -98,11 +98,6 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 	return qd, nil
 }
 
-// IsNil will check for nil in a output.
-func IsNil(output *core.Note) bool {
-	return output.PkR == nil
-}
-
 func (t transactions) getQuery() *graphql.Field {
 	return &graphql.Field{
 		Type: graphql.NewList(Transaction),
