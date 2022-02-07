@@ -203,13 +203,7 @@ func RuskTx() *rusk.Transaction {
 
 // MockTransparentNote is a transparent note.
 func MockTransparentNote(blindingFactor []byte) *Note {
-	return &Note{
-		Nonce:         make([]byte, 32),
-		PkR:           make([]byte, 32),
-		Commitment:    blindingFactor,
-		Randomness:    make([]byte, 32),
-		EncryptedData: make([]byte, 96),
-	}
+	return NewNote()
 }
 
 // MockObfuscatedOutput returns a Note with the amount hashed. To
@@ -217,14 +211,10 @@ func MockTransparentNote(blindingFactor []byte) *Note {
 // also be provided.
 // Despite the unsofisticated mocking, the hashing should be enough since the
 // node has no way to decode obfuscation as this is delegated to RUSK.
-func MockObfuscatedOutput(blindingFactor []byte) *Note {
-	return &Note{
-		Nonce:         make([]byte, 32),
-		PkR:           make([]byte, 32),
-		Commitment:    blindingFactor,
-		Randomness:    make([]byte, 32),
-		EncryptedData: make([]byte, 96),
-	}
+func MockObfuscatedOutput(valueCommitment []byte) *Note {
+	note := NewNote()
+	note.ValueCommitment = valueCommitment
+	return note
 }
 
 // MockCrossover returns a mocked Crossover struct.
@@ -240,9 +230,9 @@ func MockCrossover(randomized bool) *Crossover {
 	}
 
 	return &Crossover{
-		ValueComm:     valueCommBytes,
-		Nonce:         nonceBytes,
-		EncryptedData: make([]byte, 96),
+		ValueCommitment: valueCommBytes,
+		Nonce:           nonceBytes,
+		EncryptedData:   make([]byte, 96),
 	}
 }
 
