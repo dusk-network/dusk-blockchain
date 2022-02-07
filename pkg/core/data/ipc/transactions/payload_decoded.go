@@ -8,6 +8,8 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/binary"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
@@ -34,28 +36,74 @@ const size_PROOF_EVAL = 24 * size_BLS_SCALAR
 
 const size_PROOF = 15*size_COMMITMENT + size_PROOF_EVAL
 
-// TransactionPayloadDecoded carries the common data contained in all transaction types.
+// TransactionPayloadDecoded carries data for an execute transaction (type 1).
 type TransactionPayloadDecoded struct {
-	Anchor        []byte   `json:"anchor"`
-	Nullifiers    [][]byte `json:"nullifier"`
-	*Crossover    `json:"crossover"`
-	Notes         []*Note `json:"notes"`
-	*Fee          `json:"fee"`
-	SpendingProof []byte `json:"spending_proof"`
-	CallData      []byte `json:"call_data"`
+	Anchor     []byte     `json:"anchor"`
+	Nullifiers [][]byte   `json:"nullifier"`
+	Crossover  *Crossover `json:"crossover"`
+	Notes      []*Note    `json:"notes"`
+	Fee        *Fee       `json:"fee"`
+	SpendProof []byte     `json:"spend_proof"`
+	Call       *Call      `json:"call"`
 }
 
 // NewTransactionPayloadDecoded returns a new empty TransactionPayloadDecoded struct.
 func NewTransactionPayloadDecoded() *TransactionPayloadDecoded {
 	return &TransactionPayloadDecoded{
-		Anchor:        make([]byte, 32),
-		Nullifiers:    make([][]byte, 0),
-		Crossover:     NewCrossover(),
-		Notes:         make([]*Note, 0),
-		Fee:           NewFee(),
-		SpendingProof: make([]byte, 0),
-		CallData:      make([]byte, 0),
+		Nullifiers: make([][]byte, 0),
+		Notes:      make([]*Note, 0),
+		Anchor:     make([]byte, 32),
+		SpendProof: make([]byte, 1488),
+		Fee:        NewFee(),
+		Crossover:  nil,
+		Call:       nil,
 	}
+}
+
+// Hash the decoded payload in the same way as the transaction is hashed in `dusk-wallet-core`.
+func (p *TransactionPayloadDecoded) Hash() ([]byte, error) {
+	hash, err := blake2b.New(32, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, nullifier := range p.Nullifiers {
+		hash.Write(nullifier)
+	}
+
+	for _, note := range p.Notes {
+		var buf bytes.Buffer
+		if err := MarshalNote(&buf, note); err != nil {
+			return nil, err
+		}
+		hash.Write(buf.Bytes())
+	}
+
+	hash.Write(p.Anchor)
+
+	leb := make([]byte, 8)
+
+	binary.LittleEndian.PutUint64(leb, p.Fee.GasLimit)
+	hash.Write(leb)
+	binary.LittleEndian.PutUint64(leb, p.Fee.GasPrice)
+	hash.Write(leb)
+	hash.Write(p.Fee.StealthAddr)
+
+	if p.Crossover != nil {
+		hash.Write(p.Crossover.ValueCommitment)
+		hash.Write(p.Crossover.Nonce)
+		hash.Write(p.Crossover.EncryptedData)
+	}
+
+	if p.Call != nil {
+		hash.Write(p.Call.ContractId)
+		hash.Write(p.Call.CallData)
+	}
+
+	hashBytes := hash.Sum(nil)
+	hashBytes[31] &= 0xf // truncate in the same way as `rusk-abi`
+
+	return hashBytes, nil
 }
 
 // UnmarshalTransactionPayloadDecoded reads a TransactionPayloadDecoded struct from a bytes.Buffer.
@@ -81,12 +129,7 @@ func UnmarshalTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDe
 	f.Notes = make([]*Note, lenNotes)
 	for i := range f.Notes {
 		f.Notes[i] = NewNote()
-		// TODO: read new notes format
-		// if err := UnmarshalNote(r, f.Notes[i]); err != nil {
-		// 	return err
-		// }
-		noteBuffer := make([]byte, size_NOTE)
-		if _, err := r.Read(noteBuffer); err != nil {
+		if err := UnmarshalNote(r, f.Notes[i]); err != nil {
 			return err
 		}
 	}
@@ -99,13 +142,7 @@ func UnmarshalTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDe
 		return err
 	}
 
-	feeStealthAddress := make([]byte, size_STEALTH_ADDRESS)
-	if _, err := r.Read(feeStealthAddress); err != nil {
-		return err
-	}
-
-	f.SpendingProof = make([]byte, size_PROOF)
-	if _, err := r.Read(f.SpendingProof); err != nil {
+	if _, err := r.Read(f.SpendProof); err != nil {
 		return err
 	}
 
@@ -115,20 +152,20 @@ func UnmarshalTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDe
 	}
 
 	if crossoverFlag > 0 {
+		f.Crossover = NewCrossover()
 		if err := UnmarshalCrossover(r, f.Crossover); err != nil {
 			return err
 		}
 	}
 
-	var calldataFlag uint64
-	if err := encoding.ReadUint64LE(r, &calldataFlag); err != nil {
+	var callFlag uint64
+	if err := encoding.ReadUint64LE(r, &callFlag); err != nil {
 		return err
 	}
 
-	if calldataFlag > 0 {
-		// TODO: read f.CallData (there is no length prefix, just read the buffer until the end)
-		contractID := make([]byte, size_CONTRACTID)
-		if _, err := r.Read(contractID); err != nil {
+	if callFlag > 0 {
+		f.Call = NewCall()
+		if err := UnmarshalCall(r, f.Call); err != nil {
 			return err
 		}
 	}
