@@ -14,13 +14,18 @@ import (
 
 // Fee is a Phoenix fee note.
 type Fee struct {
-	GasLimit uint64 `json:"gas_limit"`
-	GasPrice uint64 `json:"gas_price"`
+	GasLimit    uint64 `json:"gas_limit"`
+	GasPrice    uint64 `json:"gas_price"`
+	StealthAddr []byte `json:"stealth_addr"`
 }
 
 // NewFee returns a new empty Fee struct.
 func NewFee() *Fee {
-	return &Fee{}
+	return &Fee{
+		GasLimit:    0,
+		GasPrice:    0,
+		StealthAddr: make([]byte, 64),
+	}
 }
 
 // Copy complies with message.Safe interface. It returns a deep copy of
@@ -55,10 +60,14 @@ func UnmarshalFee(r *bytes.Buffer, f *Fee) error {
 		return err
 	}
 
+	if err := encoding.Read512(r, f.StealthAddr); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// Equal returns whether or not two Fees are equal.
+// Equal returns if the two Fees are equal.
 func (f *Fee) Equal(other *Fee) bool {
 	if f.GasLimit != other.GasLimit {
 		return false
@@ -68,5 +77,5 @@ func (f *Fee) Equal(other *Fee) bool {
 		return false
 	}
 
-	return true
+	return bytes.Equal(f.StealthAddr, other.StealthAddr)
 }

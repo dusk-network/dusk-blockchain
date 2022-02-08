@@ -45,7 +45,18 @@ func UnmarshalTransactionPayload(r *bytes.Buffer, f *TransactionPayload) error {
 	return encoding.ReadVarBytesUint32LE(r, &f.Data)
 }
 
-// Equal returns whether or not two TransactionPayloads are equal.
+// Equal returns true when two TransactionPayloads are equal.
 func (t *TransactionPayload) Equal(other *TransactionPayload) bool {
 	return bytes.Equal(t.Data, other.Data)
+}
+
+// Decode returns a TransactionPayloadDecoded.
+func (t *TransactionPayload) Decode() (*TransactionPayloadDecoded, error) {
+	decoded := NewTransactionPayloadDecoded()
+
+	buffer := bytes.NewBuffer(t.Data)
+	if err := UnmarshalTransactionPayloadDecoded(buffer, decoded); err != nil {
+		return nil, err
+	}
+	return decoded, nil
 }

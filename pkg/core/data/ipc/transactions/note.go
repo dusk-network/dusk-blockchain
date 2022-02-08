@@ -12,61 +12,41 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
+// Note types.
+const (
+	NoteTypeTransparent uint8 = 0
+	NoteTypeObfuscated  uint8 = 1
+)
+
 // Note represents a Phoenix note.
 type Note struct {
-	Randomness    []byte `json:"randomness"`
-	PkR           []byte `json:"pk_r"`
-	Commitment    []byte `json:"commitment"`
-	Nonce         []byte `json:"nonce"`
-	EncryptedData []byte `json:"encrypted_data"`
+	Type            uint8  `json:"note_type"`
+	ValueCommitment []byte `json:"value_commitment"`
+	Nonce           []byte `json:"nonce"`
+	StealthAddress  []byte `json:"stealth_address"`
+	Pos             uint64 `json:"pos"`
+	EncryptedData   []byte `json:"encrypted_data"`
 }
 
 // NewNote returns a new empty Note struct.
 func NewNote() *Note {
 	return &Note{
-		Randomness:    make([]byte, 32),
-		PkR:           make([]byte, 32),
-		Commitment:    make([]byte, 32),
-		Nonce:         make([]byte, 32),
-		EncryptedData: make([]byte, 96),
-	}
-}
-
-// Copy complies with message.Safe interface. It returns a deep copy of
-// the message safe to publish to multiple subscribers.
-func (n *Note) Copy() *Note {
-	randomness := make([]byte, len(n.Randomness))
-	pkR := make([]byte, len(n.PkR))
-	commitment := make([]byte, len(n.Commitment))
-	nonce := make([]byte, len(n.Nonce))
-	encData := make([]byte, len(n.EncryptedData))
-
-	copy(randomness, n.Randomness)
-	copy(pkR, n.PkR)
-	copy(commitment, n.Commitment)
-	copy(nonce, n.Nonce)
-	copy(encData, n.EncryptedData)
-
-	return &Note{
-		Randomness:    randomness,
-		PkR:           pkR,
-		Commitment:    commitment,
-		Nonce:         nonce,
-		EncryptedData: encData,
+		Type:            NoteTypeTransparent,
+		ValueCommitment: make([]byte, 32),
+		Nonce:           make([]byte, 32),
+		StealthAddress:  make([]byte, 64),
+		Pos:             0,
+		EncryptedData:   make([]byte, 96),
 	}
 }
 
 // MarshalNote writes the Note struct into a bytes.Buffer.
 func MarshalNote(r *bytes.Buffer, f *Note) error {
-	if err := encoding.Write256(r, f.Randomness); err != nil {
+	if err := encoding.WriteUint8(r, f.Type); err != nil {
 		return err
 	}
 
-	if err := encoding.Write256(r, f.PkR); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(r, f.Commitment); err != nil {
+	if err := encoding.Write256(r, f.ValueCommitment); err != nil {
 		return err
 	}
 
@@ -74,20 +54,28 @@ func MarshalNote(r *bytes.Buffer, f *Note) error {
 		return err
 	}
 
-	return encoding.WriteVarBytes(r, f.EncryptedData)
+	if err := encoding.Write512(r, f.StealthAddress); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64LE(r, f.Pos); err != nil {
+		return err
+	}
+
+	if _, err := r.Write(f.EncryptedData); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // UnmarshalNote reads a Note struct from a bytes.Buffer.
-func UnmarshalNote(r *bytes.Buffer, f *Note) error {
-	if err := encoding.Read256(r, f.Randomness); err != nil {
+func UnmarshalNote(r *bytes.Buffer, f *Note) (err error) {
+	if err := encoding.ReadUint8(r, &f.Type); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, f.PkR); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, f.Commitment); err != nil {
+	if err := encoding.Read256(r, f.ValueCommitment); err != nil {
 		return err
 	}
 
@@ -95,26 +83,17 @@ func UnmarshalNote(r *bytes.Buffer, f *Note) error {
 		return err
 	}
 
-	return encoding.ReadVarBytes(r, &f.EncryptedData)
-}
-
-// Equal returns whether or not two Notes are equal.
-func (n *Note) Equal(other *Note) bool {
-	if !bytes.Equal(n.Randomness, other.Randomness) {
-		return false
+	if err := encoding.Read512(r, f.StealthAddress); err != nil {
+		return err
 	}
 
-	if !bytes.Equal(n.PkR, other.PkR) {
-		return false
+	if err := encoding.ReadUint64LE(r, &f.Pos); err != nil {
+		return err
 	}
 
-	if !bytes.Equal(n.Commitment, other.Commitment) {
-		return false
+	if _, err := r.Read(f.EncryptedData); err != nil {
+		return err
 	}
 
-	if !bytes.Equal(n.Nonce, other.Nonce) {
-		return false
-	}
-
-	return bytes.Equal(n.EncryptedData, other.EncryptedData)
+	return nil
 }
