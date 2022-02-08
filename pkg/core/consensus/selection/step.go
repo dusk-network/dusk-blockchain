@@ -113,14 +113,14 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		scr, err := p.g.GenerateCandidateMessage(ctx, r, step)
 		if err != nil {
 			lg.WithError(err).Errorln("candidate block generation failed")
-		}
+		} else {
+			if log.GetLevel() >= logrus.DebugLevel {
+				consensus.WithFields(r.Round, step, "candidate_generated",
+					scr.State().BlockHash, p.Keys.BLSPubKey, nil, nil, nil).Debug()
+			}
 
-		if log.GetLevel() >= logrus.DebugLevel {
-			consensus.WithFields(r.Round, step, "candidate_generated",
-				scr.State().BlockHash, p.Keys.BLSPubKey, nil, nil, nil).Debug()
+			evChan <- message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
 		}
-
-		evChan <- message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
 	}
 
 	for _, ev := range queue.GetEvents(r.Round, step) {
