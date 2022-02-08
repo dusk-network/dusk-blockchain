@@ -8,14 +8,15 @@ package transactions
 
 import (
 	"bytes"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"io/ioutil"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // Call represents a contract call.
 type Call struct {
-	// ContractId are 32 bytes representing the address of a contract. It is a valid BlsScalar.
-	ContractId []byte
+	// ContractID are 32 bytes representing the address of a contract. It is a valid BlsScalar.
+	ContractID []byte
 	// The data to call the contract with.
 	CallData []byte
 }
@@ -23,14 +24,14 @@ type Call struct {
 // NewCall returns a new empty Call struct.
 func NewCall() *Call {
 	return &Call{
-		ContractId: make([]byte, 32),
+		ContractID: make([]byte, 32),
 		CallData:   make([]byte, 0),
 	}
 }
 
 // UnmarshalCall reads a Call struct from a bytes.Buffer.
 func UnmarshalCall(r *bytes.Buffer, c *Call) error {
-	if err := encoding.Read256(r, c.ContractId); err != nil {
+	if err := encoding.Read256(r, c.ContractID); err != nil {
 		return err
 	}
 
