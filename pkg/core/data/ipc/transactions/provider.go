@@ -125,13 +125,9 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
-	res, err := e.stateClient.VerifyStateTransition(ctx, vstr)
+	_, err := e.stateClient.VerifyStateTransition(ctx, vstr)
 	if err != nil {
 		return err
-	}
-
-	if !res.Success {
-		return errors.New("verification failed")
 	}
 
 	return nil
