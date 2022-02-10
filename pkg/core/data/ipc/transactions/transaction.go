@@ -229,3 +229,14 @@ func Extend(t ContractCall, f Fee, hash []byte) (ContractCall, error) {
 		return nil, errors.New("unrecognized type of ContractCall")
 	}
 }
+
+// Decode returns a TransactionPayloadDecoded.
+func (t *Transaction) Decode() (*TransactionPayloadDecoded, error) {
+	decoded := NewTransactionPayloadDecoded()
+
+	buffer := bytes.NewBuffer(t.Payload.Data)
+	if err := UnmarshalTransactionPayloadDecoded(buffer, decoded, t.TxType); err != nil {
+		return nil, err
+	}
+	return decoded, nil
+}
