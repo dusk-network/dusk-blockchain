@@ -7,7 +7,6 @@
 package query
 
 import (
-	"bytes"
 	"encoding/hex"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -68,32 +67,30 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 	qd.TxType = tx.Type()
 
 	qd.Outputs = make([]queryOutput, 0)
-	//for _, output := range tx.StandardTx().Notes {
-	//	if IsNil(output) {
-	//		continue
-	//	}
-	//
-	//	qd.Outputs = append(qd.Outputs, queryOutput{output.PkR})
-	//}
+
+	decoded, err := tx.Decode()
+	if err != nil {
+		return queryTx{}, err
+	}
+
+	for _, note := range decoded.Notes {
+		qd.Outputs = append(qd.Outputs, queryOutput{note.StealthAddress})
+	}
 
 	qd.Inputs = make([]queryInput, 0)
-	//for _, input := range tx.StandardTx().Nullifiers {
-	//	qd.Inputs = append(qd.Inputs, queryInput{input})
-	//}
+	for _, input := range decoded.Nullifiers {
+		qd.Inputs = append(qd.Inputs, queryInput{input})
+	}
 
-	//qd.GasLimit = tx.StandardTx().Fee.GasLimit
-	//qd.GasPrice = tx.StandardTx().Fee.GasPrice
+	qd.GasLimit = decoded.Fee.GasLimit
+	qd.GasPrice = decoded.Fee.GasPrice
+	qd.FeePaid = tx.GasSpent()
 
 	qd.BlockHash = blockHash
 	qd.BlockTimestamp = timestamp
 
-	// Populate marshaling size
-	buf := new(bytes.Buffer)
-	if err := core.Marshal(buf, tx); err != nil {
-		return queryTx{}, err
-	}
-
-	qd.Size = buf.Len()
+	// Consider Transaction payload length as transaction size
+	qd.Size = len(tx.StandardTx().Data)
 
 	return qd, nil
 }

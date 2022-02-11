@@ -68,8 +68,16 @@ func newQueryBlock(b *block.Block) queryBlock {
 	feesPaid := uint64(0)
 
 	for _, tx := range b.Txs {
-		feesPaid += tx.Fee()
+		feesPaid += tx.GasSpent()
 	}
+
+	//TODO: Read reward
+	/*
+		if tx.Type() == core.Distribute {
+			distributeTx, _ := tx.Decode()
+
+		}
+	*/
 
 	qb.Header.Reward = reward
 	qb.Header.FeesPaid = feesPaid
