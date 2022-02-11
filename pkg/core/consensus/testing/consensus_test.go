@@ -8,6 +8,7 @@ package testing
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -15,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,9 +29,13 @@ import (
 // from the test case, and allows us to focus solely on consensus flow
 // and possible corner cases.
 func TestConsensus(t *testing.T) {
+	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
+		t.Skip()
+	}
+
 	assert := assert.New(t)
 
-	// logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetLevel(logrus.DebugLevel)
 
 	// Retrieve the amount of nodes to use for this test case.
 	numNodes := getNumNodes(assert)

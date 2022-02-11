@@ -8,6 +8,7 @@ package candidate_test
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -18,14 +19,17 @@ import (
 )
 
 func TestGenerate(t *testing.T) {
+	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
+		t.Skip()
+	}
+
 	hlp := candidate.NewHelper(50, time.Second)
 
 	fn := func(ctx context.Context, txs []transactions.ContractCall, h uint64) ([]transactions.ContractCall, []byte, error) {
-		return txs, make([]byte, 32), nil
+		return []transactions.ContractCall{transactions.RandTx()}, make([]byte, 32), nil
 	}
 
-	_, pubKey := transactions.MockKeys()
-	gen := candidate.New(hlp.Emitter, pubKey, fn)
+	gen := candidate.New(hlp.Emitter, fn)
 
 	ctx := context.Background()
 

@@ -10,20 +10,23 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"os"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateGenesis(t *testing.T) {
+	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
+		t.Skip()
+	}
+
 	rpcBus := rpcbus.New()
 
 	provideMempoolTxs(rpcBus)
@@ -33,17 +36,8 @@ func TestGenerateGenesis(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	pk := "61c36e407ac91f20174572eec95f692f5cff1c40bacd1b9f86c7fa7202e93bb6753c2f424caf3c9220876e8cfe0afdff7ffd7c984d5c7d95fa0b46cf3781d883"
-	pkBytes, err := hex.DecodeString(pk)
-	require.Nil(t, err)
-
-	publicKey := &keys.PublicKey{
-		AG: pkBytes[0:32],
-		BG: pkBytes[32:64],
-	}
-
 	// Generate a new genesis block with new wallet pubkey
-	genesisHex, err := GenerateGenesisBlock(&consensus.Emitter{RPCBus: rpcBus}, publicKey)
+	genesisHex, err := GenerateGenesisBlock(&consensus.Emitter{RPCBus: rpcBus})
 	if err != nil {
 		t.Fatalf("expecting valid genesis block: %s", err.Error())
 	}
@@ -67,8 +61,12 @@ func TestGenerateGenesis(t *testing.T) {
 // t.Logf("genesis: %s", genesisHex)
 
 func TestGenesisBlock(t *testing.T) {
+	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
+		t.Skip()
+	}
+
 	// read the hard-coded genesis blob for testnet
-	b := config.DecodeGenesis()
+	b := genesis.Decode()
 
 	// sanity checks
 	if b.Header.Height != 0 {
@@ -92,6 +90,8 @@ func provideMempoolTxs(rpcBus *rpcbus.RPCBus) {
 
 	go func() {
 		r := <-c
-		r.RespChan <- rpcbus.NewResponse([]transactions.ContractCall{}, nil)
+		txs := make([]transactions.ContractCall, 1)
+		txs[0] = transactions.RandTx()
+		r.RespChan <- rpcbus.NewResponse(txs, nil)
 	}()
 }

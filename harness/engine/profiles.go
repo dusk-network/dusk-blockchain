@@ -23,8 +23,8 @@ type Profiles map[string]func(index int, node *DuskNode, walletPath string)
 var profileList Profiles
 
 // Profile1 builds the default dusk.toml definition.
-func Profile1(index int, node *DuskNode, walletPath string) {
-	walletFileName := "wallet" + strconv.Itoa(index) + ".dat"
+func Profile1(index int, node *DuskNode, consensusKeysPath string) {
+	consensusKeysFileName := "node_" + strconv.Itoa(index) + ".keys"
 
 	viper.Reset()
 	viper.Set("general.network", "devnet")
@@ -67,7 +67,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("timeout.timeoutdial", 5)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
-	viper.Set("logger.level", "info")
+	viper.Set("logger.level", "trace")
 	viper.Set("logger.format", "json")
 
 	viper.Set("gql.address", node.Cfg.Gql.Address)
@@ -101,8 +101,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("rpc.rusk.connectiontimeout", 10000)
 	viper.Set("database.driver", heavy.DriverName)
 	viper.Set("database.dir", node.Dir+"/chain/")
-	viper.Set("wallet.store", node.Dir+"/walletDB/")
-	viper.Set("wallet.file", walletPath+"/"+walletFileName)
+
 	viper.Set("network.seeder.addresses", []string{"127.0.0.1:8081"})
 	viper.Set("network.port", strconv.Itoa(7100+index))
 	viper.Set("mempool.maxSizeMB", "100")
@@ -122,6 +121,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("consensus.defaultamount", 50)
 	viper.Set("consensus.consensustimeout", 5)
 	viper.Set("consensus.usecompressedkeys", false)
+	viper.Set("consensus.keysfile", consensusKeysPath+"/"+consensusKeysFileName)
 
 	viper.Set("api.enabled", false)
 	viper.Set("api.enabletls", false)
@@ -175,7 +175,7 @@ func Profile4(index int, node *DuskNode, walletPath string) {
 	viper.Set("kadcast.bootstrapAddr", bootstrappers)
 
 	viper.Set("kadcast.grpc.Network", "unix")
-	viper.Set("kadcast.grpc.Address", node.Dir+"/rusk-service.sock")
+	viper.Set("kadcast.grpc.Address", node.Dir+"/rusk-grpc.sock")
 	viper.Set("kadcast.grpc.DialTimeout", 10)
 }
 

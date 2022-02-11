@@ -121,7 +121,7 @@ func (t *testNode) Broadcast(ctx context.Context, payload []byte) error {
 }
 
 func createNetworkClient(ctx context.Context, address string) (rusk.NetworkClient, *grpc.ClientConn) {
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		log.WithField("addr", address).Panic(err)
 	}

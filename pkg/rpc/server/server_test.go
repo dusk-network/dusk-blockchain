@@ -65,6 +65,7 @@ func TestMain(m *testing.M) {
 	conn, err := grpc.Dial(
 		conf.Address,
 		grpc.WithInsecure(),
+		grpc.WithAuthority("dummy"),
 		grpc.WithContextDialer(getDialer("unix")),
 		grpc.WithUnaryInterceptor(interceptor.Unary()),
 	)

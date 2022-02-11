@@ -19,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -35,6 +36,8 @@ func TestMain(m *testing.M) {
 	r.Mempool.MaxSizeMB = 1
 	r.Mempool.PoolType = "hashmap"
 	r.Mempool.MaxInvItems = 10000
+	r.Database.Driver = lite.DriverName
+	r.General.Network = "testnet"
 	config.Mock(&r)
 
 	code := m.Run()
@@ -47,10 +50,11 @@ func startMempoolTest(ctx context.Context) (*Mempool, *eventbus.EventBus, *rpcbu
 
 func startMempoolTestWithLatency(ctx context.Context, latency time.Duration) (*Mempool, *eventbus.EventBus, *rpcbus.RPCBus, *eventbus.GossipStreamer) {
 	bus, streamer := eventbus.CreateGossipStreamer()
+	_, db := lite.CreateDBConnection()
 
 	rpcBus := rpcbus.New()
 	v := &transactions.MockProxy{}
-	m := NewMempool(nil, bus, rpcBus, v.ProberWithParams(latency), nil)
+	m := NewMempool(db, bus, rpcBus, v.ProberWithParams(latency), nil)
 
 	m.Run(ctx)
 	return m, bus, rpcBus, streamer
@@ -95,16 +99,6 @@ func TestProcessPendingTxs(t *testing.T) {
 		// Publish valid tx
 		_, errList := m.ProcessTx("", message.New(topics.Tx, cc[i]))
 		assert.Empty(t, errList)
-
-		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
-		invalid := transactions.RandContractCall()
-		transactions.Invalidate(invalid)
-		_, errList = m.ProcessTx("", message.New(topics.Tx, invalid))
-		assert.NotEmpty(t, errList)
-
-		// Publish a duplicated tx
-		_, errList = m.ProcessTx("", message.New(topics.Tx, invalid))
-		assert.NotEmpty(t, errList)
 	}
 
 	assert.Equal(t, m.verified.Len(), 5)
@@ -158,19 +152,6 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 
 			wg.Done()
 		}(txs[from:to])
-	}
-
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		// Publish invalid txs
-		go func() {
-			for j := 0; j <= 5; j++ {
-				tx := transactions.MockInvalidTx()
-				_, errList := m.ProcessTx("", message.New(topics.Tx, tx))
-				assert.NotEmpty(t, errList)
-			}
-			wg.Done()
-		}()
 	}
 
 	wg.Wait()
@@ -237,64 +218,6 @@ func TestRemoveAccepted(t *testing.T) {
 	}
 }
 
-func TestCoinbaseTxsNotAllowed(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	m, _, rb, _ := startMempoolTest(ctx)
-
-	// Publish a set of valid txs and a Coinbase one
-	txs := transactions.RandContractCalls(5, 0, true)
-
-	for _, tx := range txs {
-		_, errList := m.ProcessTx("", message.New(topics.Tx, tx))
-
-		if tx.Type() == transactions.Distribute {
-			assert.NotEmpty(t, errList)
-		}
-	}
-
-	// Assert that all non-coinbase txs have been verified
-	resp, err := rb.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
-	assert.NoError(t, err)
-
-	memTxs := resp.([]transactions.ContractCall)
-	for _, tx := range memTxs {
-		assert.False(t, tx.Type() == transactions.Distribute)
-	}
-}
-
-func TestSendMempoolTx(t *testing.T) {
-	assert := assert.New(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	m, _, rb, _ := startMempoolTest(ctx)
-	txs := transactions.RandContractCalls(4, 0, false)
-
-	var totalSize uint32
-
-	for _, tx := range txs {
-		buf := new(bytes.Buffer)
-		assert.NoError(transactions.Marshal(buf, tx))
-
-		totalSize += uint32(buf.Len())
-
-		resp, err := rb.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 0)
-		assert.NoError(err)
-
-		txidBytes := resp.([]byte)
-
-		txid, err := tx.CalculateHash()
-		assert.Nil(err)
-
-		assert.Equal(txidBytes, txid)
-	}
-
-	assert.Equal(m.verified.Size(), totalSize)
-}
-
 func BenchmarkProcessTx_0(b *testing.B) {
 	// Recent result
 	// BenchmarkProcessTx_0-8             50475             33671 ns/op
@@ -356,64 +279,3 @@ func benchmarkProcessTx(b *testing.B, batchCount int, verifyTransactionLatency t
 		b.Fatalf("not all txs accepted %d - %d", len(txs), m.verified.Len())
 	}
 }
-
-/*
-func TestMempoolView(t *testing.T) {
-	assert := assert.New(t)
-	c.reset()
-
-	numTxs := 12
-	txs := transactions.RandContractCalls(numTxs, 0, false)
-
-	for _, tx := range txs {
-		c.addTx(tx)
-		c.rpcBus.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 5*time.Second)
-	}
-
-	// First, let's just get the entire view
-	resp, err := c.m.SelectTx(context.Background(), &node.SelectRequest{})
-	assert.NoError(err)
-
-	// There should be 12 txs
-	assert.Equal(numTxs, len(resp.Result))
-
-	// Now, we single out one hash from the bunch
-	txid, _ := txs[7].CalculateHash()
-	hash := hex.EncodeToString(txid)
-	resp, err = c.m.SelectTx(context.Background(), &node.SelectRequest{Id: hash})
-	assert.NoError(err)
-
-	// Should give us info about said tx
-	assert.Equal(1, len(resp.Result))
-	// Checking that we got info about the Tx we actually requested
-	assert.True(strings.Contains(resp.Result[0].Id, hash))
-
-	// Let's test if the Select provides the right transactions
-	bids := make([]*transactions.BidTransaction, 0)
-	stakes := make([]*transactions.StakeTransaction, 0)
-	stds := make([]*transactions.Transaction, 0)
-	for i := 0; i < numTxs; i++ {
-		switch txs[i].Type() {
-		case transactions.Bid:
-			bids = append(bids, txs[i].(*transactions.BidTransaction))
-		case transactions.Stake:
-			stakes = append(stakes, txs[i].(*transactions.StakeTransaction))
-		case transactions.Tx:
-			stds = append(stds, txs[i].(*transactions.Transaction))
-		}
-	}
-
-	// check stakes
-	resp, err = c.m.SelectTx(context.Background(), &node.SelectRequest{Types: []node.TxType{node.TxType_STAKE}})
-	assert.NoError(err)
-	assert.Equal(len(stakes), len(resp.Result))
-	// check bids
-	resp, err = c.m.SelectTx(context.Background(), &node.SelectRequest{Types: []node.TxType{node.TxType_BID}})
-	assert.NoError(err)
-	assert.Equal(len(bids), len(resp.Result))
-	// check txs
-	resp, err = c.m.SelectTx(context.Background(), &node.SelectRequest{Types: []node.TxType{node.TxType_STANDARD}})
-	assert.NoError(err)
-	assert.Equal(len(stds), len(resp.Result))
-}
-*/

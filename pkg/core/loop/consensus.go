@@ -20,7 +20,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -48,8 +47,6 @@ type Consensus struct {
 	*consensus.Emitter
 	*candidate.Requestor
 
-	pubKey *keys.PublicKey
-
 	eventQueue *consensus.Queue
 	roundQueue *consensus.Queue
 
@@ -62,8 +59,8 @@ type Consensus struct {
 
 // CreateStateMachine creates and link the steps in the consensus. It is kept separated from
 // consensus.New so to ease mocking the consensus up when testing.
-func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, pubKey *keys.PublicKey, verifyFn consensus.CandidateVerificationFunc, executeFn consensus.ExecuteTxsFunc, requestor *candidate.Requestor) (consensus.Phase, consensus.Controller, error) {
-	generator := blockgenerator.New(e, pubKey, executeFn)
+func CreateStateMachine(e *consensus.Emitter, db database.DB, consensusTimeOut time.Duration, verifyFn consensus.CandidateVerificationFunc, executeFn consensus.ExecuteTxsFunc, requestor *candidate.Requestor) (consensus.Phase, consensus.Controller, error) {
+	generator := blockgenerator.New(e, executeFn)
 	selectionStep := CreateInitialStep(e, consensusTimeOut, generator, verifyFn, db, requestor)
 	agreementStep := agreement.New(e, db, requestor)
 	return selectionStep, agreementStep, nil
@@ -83,7 +80,7 @@ func CreateInitialStep(e *consensus.Emitter, consensusTimeOut time.Duration, bg 
 // New creates a new Consensus struct. The legacy StopConsensus and RoundUpdate
 // are now replaced with context cancellation and direct function call operated
 // by the chain component.
-func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
+func New(e *consensus.Emitter) *Consensus {
 	listeners := make([]eventbus.Listener, 0)
 
 	agreementChan := make(chan message.Message, msgChanSize)
@@ -109,7 +106,6 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 	c := &Consensus{
 		Emitter:           e,
 		Requestor:         candidate.NewRequestor(e.EventBus),
-		pubKey:            pubKey,
 		eventQueue:        consensus.NewQueue(),
 		roundQueue:        consensus.NewQueue(),
 		agreementChan:     agreementChan,
@@ -124,7 +120,7 @@ func New(e *consensus.Emitter, pubKey *keys.PublicKey) *Consensus {
 // CreateStateMachine uses Consensus parameters as a shorthand for the static
 // CreateStateMachine.
 func (c *Consensus) CreateStateMachine(db database.DB, consensusTimeOut time.Duration, verifyFn consensus.CandidateVerificationFunc, executeFn consensus.ExecuteTxsFunc) (consensus.Phase, consensus.Controller, error) {
-	return CreateStateMachine(c.Emitter, db, consensusTimeOut, c.pubKey.Copy(), verifyFn, executeFn, c.Requestor)
+	return CreateStateMachine(c.Emitter, db, consensusTimeOut, verifyFn, executeFn, c.Requestor)
 }
 
 //nolint:wsl

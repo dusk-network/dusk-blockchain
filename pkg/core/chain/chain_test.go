@@ -12,14 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -169,9 +168,8 @@ func TestAcceptBlock(t *testing.T) {
 }
 
 func createLoader(db database.DB) *DBLoader {
-	genesis := config.DecodeGenesis()
 	// genesis := helper.RandomBlock(0, 12)
-	return NewDBLoader(db, genesis)
+	return NewDBLoader(db, genesis.Decode())
 }
 
 func TestFetchTip(t *testing.T) {
@@ -282,10 +280,6 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 	}
 
 	BLSKeys := key.NewRandKeys()
-	pk := keys.PublicKey{
-		AG: make([]byte, 32),
-		BG: make([]byte, 32),
-	}
 
 	e := &consensus.Emitter{
 		EventBus:    eb,
@@ -293,7 +287,8 @@ func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Ch
 		Keys:        BLSKeys,
 		TimerLength: 5 * time.Second,
 	}
-	l := loop.New(e, &pk)
+
+	l := loop.New(e)
 
 	c, err := New(context.Background(), db, eb, rpc, loader, &MockVerifier{}, nil, proxy, l)
 	assert.NoError(t, err)

@@ -9,7 +9,6 @@ package blockgenerator
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator/candidate"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 )
 
 type candidateGenerator = candidate.Generator
@@ -24,9 +23,9 @@ type BlockGenerator interface {
 }
 
 // New creates a new BlockGenerator.
-func New(e *consensus.Emitter, genPubKey *keys.PublicKey, f consensus.ExecuteTxsFunc) BlockGenerator {
+func New(e *consensus.Emitter, f consensus.ExecuteTxsFunc) BlockGenerator {
 	return &blockGenerator{
-		candidateGenerator: candidate.New(e, genPubKey, f),
+		candidateGenerator: candidate.New(e, f),
 	}
 }
 

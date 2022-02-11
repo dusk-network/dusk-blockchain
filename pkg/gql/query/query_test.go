@@ -57,9 +57,9 @@ var (
 )
 
 var (
-	bid1 = core.MockDeterministicBid(100000, make([]byte, 32), make([]byte, 32))
-	bid2 = core.MockDeterministicBid(1239013, make([]byte, 32), make([]byte, 32))
-	bid3 = core.MockDeterministicBid(100002, make([]byte, 32), make([]byte, 32))
+	bid1 = core.RandTx()
+	bid2 = core.RandTx()
+	bid3 = core.RandTx()
 )
 
 var (
@@ -68,6 +68,7 @@ var (
 	bid3HashB, _ = bid3.CalculateHash()
 )
 
+//nolint
 var (
 	bid1Hash = hex.EncodeToString(bid1HashB)
 	bid2Hash = hex.EncodeToString(bid2HashB)

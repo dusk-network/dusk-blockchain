@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
@@ -98,5 +98,5 @@ func TestEncodeDecodeHeader(t *testing.T) {
 }
 
 func TestDecodeLegacyGenesis(t *testing.T) { //nolint
-	config.DecodeGenesis()
+	genesis.Decode()
 }

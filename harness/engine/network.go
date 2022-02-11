@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -207,7 +208,7 @@ func (n *Network) closeGRPCConnections() {
 
 		c := grpcC
 		go func(cli GrpcClient) {
-			cli.GracefulClose(grpc.WithInsecure())
+			cli.GracefulClose(grpc.WithInsecure(), grpc.WithAuthority("dummy"))
 			wg.Done()
 		}(c)
 	}
@@ -245,7 +246,7 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	// Load wallet path as walletX.dat are hard-coded for now
 	// Later they could be generated on the fly per each test execution
 	walletsPath, _ := os.Getwd()
-	walletsPath += "/../../devnet-wallets/"
+	walletsPath += "/../../consensus-keys/"
 
 	// Generate node default config file
 	tomlFilePath, tomlErr := n.generateConfig(i, walletsPath)
@@ -341,11 +342,45 @@ func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, erro
 }
 
 // Start an OS process with TMPDIR=nodeDir, manageable by the network.
+//nolint
 func (n *Network) start(nodeDir string, name string, arg ...string) error {
+
+	envWithNoRusk := os.Environ()
+	// Find and remove the SHARED RUSK_PROFILE_PATH
+	for i, v := range envWithNoRusk {
+		if strings.HasPrefix(v, "RUSK_PROFILE_PATH") {
+			envWithNoRusk = append(envWithNoRusk[:i], envWithNoRusk[i+1:]...)
+			break
+		}
+	}
+
+	// CREATE THE RUSK STATE for the local rusk
+	stateExec := name + "-recovery-state"
+	cmd := exec.Command(stateExec, "-w")
+	cmd.Env = append(envWithNoRusk, "TMPDIR="+nodeDir, "RUSK_PROFILE_PATH="+nodeDir)
+	cmd.Start()
+	cmd.Wait()
+
+	// LINK THE ORIGINAL CRS
+	extProfilePath, err := getEnv("RUSK_PROFILE_PATH")
+	if err != nil {
+		log.Panic(err)
+	}
+	targetCrs := filepath.Join(extProfilePath, ".rusk", "dev.crs")
+	newCrs := filepath.Join(nodeDir, ".rusk", "dev.crs")
+	os.Symlink(targetCrs, newCrs)
+
+	// LINK THE ORIGINAL keys
+	if err != nil {
+		log.Panic(err)
+	}
+	targetKeys := filepath.Join(extProfilePath, ".rusk", "keys")
+	newKeys := filepath.Join(nodeDir, ".rusk", "keys")
+	os.Symlink(targetKeys, newKeys)
+
 	//nolint:gosec
-	cmd := exec.Command(name, arg...)
-	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
+	cmd = exec.Command(name, arg...)
+	cmd.Env = append(envWithNoRusk, "TMPDIR="+nodeDir, "RUSK_PROFILE_PATH="+nodeDir)
 
 	// Redirect both STDOUT and STDERR to separate files
 	if len(nodeDir) > 0 {

@@ -11,7 +11,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/ruskmock"
 	"github.com/machinebox/graphql"
 )
 
@@ -21,9 +20,9 @@ type DuskNode struct {
 	ConfigProfileID string
 
 	// Fields represents a dusk-blockchain instance.
-	Cfg        config.Registry
-	Gql        *graphql.Client
-	Srv        *ruskmock.Server
+	Cfg config.Registry
+	Gql *graphql.Client
+
 	GRPCClient *client.NodeClient
 
 	// Dusk-blockchain node directory.

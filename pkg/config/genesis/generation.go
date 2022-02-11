@@ -7,88 +7,51 @@
 package genesis
 
 import (
-	"bytes"
-	"encoding/binary"
+	"encoding/hex"
+	"os"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // Generate a genesis block. The constitution of the block depends on the passed
 // config.
 func Generate(c Config) *block.Block {
+	// TODO: Populate this with real txs data from Rusk Transfer and Stake Contract
+	if c.Transactions == nil {
+		c.Transactions = make([]transactions.ContractCall, 0)
+		c.Transactions = append(c.Transactions, transactions.MockTx())
+	}
+
+	// replace this with the output of "rusk make state"
+
+	state_root := make([]byte, 32)
+
+	state_root_str := os.Getenv("RUSK_STATE_ROOT")
+	if len(state_root_str) > 0 {
+		state_root_parsed, err := hex.DecodeString(state_root_str)
+		if err != nil {
+			panic(err)
+		} else {
+			state_root = state_root_parsed
+		}
+	}
+
 	h := &block.Header{
 		Version:       0,
 		Timestamp:     c.timestamp,
 		Height:        0,
-		PrevBlockHash: make([]byte, 32),
+		PrevBlockHash: state_root,
 		TxRoot:        nil,
 		Seed:          c.seed,
 		Certificate:   block.EmptyCertificate(),
-		StateHash:     make([]byte, 32),
-	}
-
-	txs := make([]transactions.ContractCall, 0)
-
-	for i := uint(0); i < c.initialCommitteeSize; i++ {
-		buf := new(bytes.Buffer)
-		if err := encoding.WriteUint64LE(buf, 250000); err != nil {
-			panic(err)
-		}
-
-		if err := encoding.WriteVarBytes(buf, c.committeeMembers[i]); err != nil {
-			panic(err)
-		}
-
-		stake := transactions.NewTransaction()
-		stake.Payload.CallData = buf.Bytes()
-		amount := c.stakeValue * wallet.DUSK
-		amountBytes := make([]byte, 32)
-		binary.LittleEndian.PutUint64(amountBytes[0:8], amount)
-
-		stake.Payload.Notes = append(stake.Payload.Notes, &transactions.Note{
-			Randomness:    make([]byte, 32),
-			PkR:           c.initialParticipants[i].AG,
-			Commitment:    amountBytes,
-			Nonce:         make([]byte, 32),
-			EncryptedData: make([]byte, 96),
-		})
-
-		stake.TxType = transactions.Stake
-		txs = append(txs, stake)
-	}
-
-	for _, pk := range c.initialParticipants {
-		// Add 200 coinbase outputs
-		for i := uint(0); i < c.coinbaseAmount; i++ {
-			buf := new(bytes.Buffer)
-			if err := encoding.WriteUint64LE(buf, c.coinbaseValue*wallet.DUSK); err != nil {
-				panic(err)
-			}
-
-			amount := c.coinbaseValue * wallet.DUSK
-			amountBytes := make([]byte, 32)
-			binary.LittleEndian.PutUint64(amountBytes[0:8], amount)
-
-			coinbase := transactions.NewTransaction()
-			coinbase.Payload.CallData = buf.Bytes()
-			coinbase.Payload.Notes = append(coinbase.Payload.Notes, &transactions.Note{
-				Randomness:    make([]byte, 32),
-				PkR:           pk.AG,
-				Commitment:    amountBytes,
-				Nonce:         make([]byte, 32),
-				EncryptedData: make([]byte, 96),
-			})
-			coinbase.TxType = transactions.Distribute
-			txs = append(txs, coinbase)
-		}
+		StateHash:     state_root,
 	}
 
 	b := &block.Block{
 		Header: h,
-		Txs:    txs,
+		Txs:    c.Transactions,
 	}
 
 	// Set root and hash, since they have changed because of the adding of txs.
@@ -106,4 +69,14 @@ func Generate(c Config) *block.Block {
 
 	b.Header.Hash = hash
 	return b
+}
+
+// Decode marshals a genesis block into a buffer.
+func Decode() *block.Block {
+	cfg, err := GetPresetConfig(config.Get().General.Network)
+	if err != nil {
+		panic(err)
+	}
+
+	return Generate(cfg)
 }

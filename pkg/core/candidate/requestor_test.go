@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -29,13 +29,13 @@ func TestCandidateQueue(t *testing.T) {
 
 	// Getting a block when no request is made should not result in it being
 	// pushed to the candidateQueue
-	_, err := req.ProcessCandidate("", message.New(topics.Candidate, *config.DecodeGenesis()))
+	_, err := req.ProcessCandidate("", message.New(topics.Candidate, *genesis.Decode()))
 	assert.NoError(err)
 
 	assert.Empty(req.candidateQueue)
 
 	// Getting a block when requesting should make it end up in the queue
-	c := config.DecodeGenesis()
+	c := genesis.Decode()
 
 	req.setRequesting(true)
 
@@ -53,7 +53,7 @@ func TestRequestor(t *testing.T) {
 
 	req := NewRequestor(bus)
 
-	c := config.DecodeGenesis()
+	c := genesis.Decode()
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 

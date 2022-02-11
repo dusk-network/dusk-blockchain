@@ -35,7 +35,7 @@ func InitRPCClients(ctx context.Context, address string) *Client {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		log.Panic(err)
 	}

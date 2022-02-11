@@ -95,7 +95,7 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 	// returning the permanent connection
 	c := n.grpcClients[n.nodes[ind].Id]
 
-	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func (n *Network) SendStakeCmd(ind uint, amount, locktime uint64) ([]byte, error
 	// returning the permanent connection
 	c := n.grpcClients[n.nodes[ind].Id]
 
-	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +417,7 @@ func (n *Network) IsSynced(threshold uint64) (uint64, error) {
 func (n *Network) GetWalletAddress(ind uint) (string, []byte, error) {
 	c := n.grpcClients[n.nodes[ind].Id]
 
-	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		return "", nil, err
 	}
@@ -440,7 +440,7 @@ func (n *Network) GetWalletAddress(ind uint) (string, []byte, error) {
 func (n *Network) GetBalance(ind uint) (uint64, uint64, error) {
 	c := n.grpcClients[n.nodes[ind].Id]
 
-	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -503,7 +503,7 @@ func (n *Network) SendTransferTxCmd(senderNodeInd, recvNodeInd uint, amount, fee
 	// Send Transfer grpc command
 	c := n.grpcClients[n.nodes[senderNodeInd].Id]
 
-	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		return nil, err
 	}
@@ -552,7 +552,7 @@ func (n *Network) BatchSendTransferTx(t *testing.T, senderNodeInd uint, batchSiz
 	// Send Transfer grpc command
 	c := n.grpcClients[n.nodes[senderNodeInd].Id]
 
-	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
 	if err != nil {
 		return err
 	}

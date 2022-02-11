@@ -38,7 +38,8 @@ func TestSortedKeys(t *testing.T) {
 	prevVal = math.MaxUint64
 
 	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-		_, fee := t.tx.Values()
+		fee := t.tx.Fee()
+
 		if prevVal < fee {
 			return false, errors.New("keys not in a descending order")
 		}
@@ -56,8 +57,7 @@ func TestStableSortedKeys(t *testing.T) {
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
-		bf := transactions.RandBlind()
-		tx := transactions.MockTx(false, bf, true)
+		tx := transactions.RandTx()
 
 		td := TxDesc{tx: tx, received: time.Now()}
 		if err := pool.Put(td); err != nil {
@@ -93,8 +93,7 @@ func TestGet(t *testing.T) {
 	hashes := make([][]byte, txsCount)
 
 	for i := 0; i < txsCount; i++ {
-		bf := transactions.RandBlind()
-		tx := transactions.MockTx(false, bf, true)
+		tx := transactions.RandTx()
 		hash, _ := tx.CalculateHash()
 		hashes[i] = hash
 

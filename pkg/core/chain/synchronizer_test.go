@@ -9,7 +9,7 @@ package chain
 import (
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -55,7 +55,7 @@ func setupSynchronizerTest() (*synchronizer, chan consensus.Results) {
 	m := &mockChain{tipHeight: 0, catchBlockChan: c}
 	_, db := lite.CreateDBConnection()
 	// Give DB a genesis to avoid errors
-	genesis := config.DecodeGenesis()
+	genesis := genesis.Decode()
 
 	if err := db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(genesis)

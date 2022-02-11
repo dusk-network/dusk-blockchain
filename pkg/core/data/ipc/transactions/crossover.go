@@ -14,45 +14,31 @@ import (
 
 // Crossover is the crossover note used in a Phoenix transaction.
 type Crossover struct {
-	ValueComm     []byte `json:"value_comm"`
-	Nonce         []byte `json:"nonce"`
-	EncryptedData []byte `json:"encrypted_data"`
+	ValueCommitment []byte `json:"value_comm"`
+	Nonce           []byte `json:"nonce"`
+	EncryptedData   []byte `json:"encrypted_data"`
 }
 
 // NewCrossover returns a new empty Crossover struct.
 func NewCrossover() *Crossover {
 	return &Crossover{
-		ValueComm:     make([]byte, 32),
-		Nonce:         make([]byte, 32),
-		EncryptedData: make([]byte, 96),
-	}
-}
-
-// Copy complies with message.Safe interface. It returns a deep copy of
-// the message safe to publish to multiple subscribers.
-func (c *Crossover) Copy() *Crossover {
-	valueComm := make([]byte, len(c.ValueComm))
-	nonce := make([]byte, len(c.Nonce))
-	encData := make([]byte, len(c.EncryptedData))
-
-	copy(valueComm, c.ValueComm)
-	copy(nonce, c.Nonce)
-	copy(encData, c.EncryptedData)
-
-	return &Crossover{
-		ValueComm:     valueComm,
-		Nonce:         nonce,
-		EncryptedData: encData,
+		ValueCommitment: make([]byte, 32),
+		Nonce:           make([]byte, 32),
+		EncryptedData:   make([]byte, 96),
 	}
 }
 
 // MarshalCrossover writes the Crossover struct into a bytes.Buffer.
 func MarshalCrossover(r *bytes.Buffer, f *Crossover) error {
-	if err := encoding.Write256(r, f.ValueComm); err != nil {
+	if err := encoding.Write256(r, f.ValueCommitment); err != nil {
 		return err
 	}
 
 	if err := encoding.Write256(r, f.Nonce); err != nil {
+		return err
+	}
+
+	if _, err := r.Write(f.EncryptedData); err != nil {
 		return err
 	}
 
@@ -61,7 +47,7 @@ func MarshalCrossover(r *bytes.Buffer, f *Crossover) error {
 
 // UnmarshalCrossover reads a Crossover struct from a bytes.Buffer.
 func UnmarshalCrossover(r *bytes.Buffer, f *Crossover) error {
-	if err := encoding.Read256(r, f.ValueComm); err != nil {
+	if err := encoding.Read256(r, f.ValueCommitment); err != nil {
 		return err
 	}
 
@@ -69,18 +55,9 @@ func UnmarshalCrossover(r *bytes.Buffer, f *Crossover) error {
 		return err
 	}
 
-	return encoding.ReadVarBytes(r, &f.EncryptedData)
-}
-
-// Equal returns whether or not two Crossovers are equal.
-func (c *Crossover) Equal(other *Crossover) bool {
-	if !bytes.Equal(c.ValueComm, other.ValueComm) {
-		return false
+	if _, err := r.Read(f.EncryptedData); err != nil {
+		return err
 	}
 
-	if !bytes.Equal(c.Nonce, other.Nonce) {
-		return false
-	}
-
-	return bytes.Equal(c.EncryptedData, other.EncryptedData)
+	return nil
 }

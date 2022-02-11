@@ -7,66 +7,18 @@
 package transactions
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/keys"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
-
-// TxRequest is a convenient struct to group all parameters needed to create a
-// transaction.
-type TxRequest struct {
-	SK         keys.SecretKey
-	PK         keys.PublicKey
-	Amount     uint64
-	Fee        uint64
-	Obfuscated bool
-}
-
-// MakeTxRequest populates a TxRequest with all needed data
-// ContractCall. As such, it does not need the Public Key.
-func MakeTxRequest(sk keys.SecretKey, pk keys.PublicKey, amount uint64, fee uint64, isObfuscated bool) TxRequest {
-	return TxRequest{
-		SK:         sk,
-		PK:         pk,
-		Amount:     amount,
-		Fee:        fee,
-		Obfuscated: isObfuscated,
-	}
-}
 
 // UnconfirmedTxProber performs verification of contract calls (transactions).
 type UnconfirmedTxProber interface {
 	// VerifyTransaction verifies a contract call transaction.
-	VerifyTransaction(context.Context, ContractCall) error
-	// CalculateBalance for transactions on demand. This functionality is used
-	// primarily by the mempool which can order RUSK to calculate balance for
-	// transactions even if they are unconfirmed.
-	CalculateBalance(context.Context, []byte, []ContractCall) (uint64, error)
-}
-
-// Provider encapsulates the common Wallet and transaction operations.
-type Provider interface {
-	// NewStake creates a staking transaction.
-	NewStake(context.Context, []byte, uint64) (*Transaction, error)
-
-	// NewTransaction creates a new transaction using the user's PrivateKey
-	// It accepts the PublicKey of the recipient, a value, a fee and whether
-	// the transaction should be obfuscated or otherwise.
-	NewTransfer(context.Context, uint64, *keys.StealthAddress) (*Transaction, error)
-}
-
-// KeyMaster Encapsulates the Key creation and retrieval operations.
-type KeyMaster interface {
-	// GenerateKeys creates a SecretKey using a []byte as Seed.
-	GenerateKeys(context.Context, []byte) (keys.SecretKey, keys.PublicKey, keys.ViewKey, error)
-
-	// TODO: implement
-	// FullScanOwnedNotes(ViewKey) (OwnedNotesResponse)
+	Preverify(context.Context, ContractCall) ([]byte, Fee, error)
 }
 
 // Executor encapsulate the Global State operations.
@@ -92,31 +44,22 @@ type Executor interface {
 
 // Proxy toward the rusk client.
 type Proxy interface {
-	Provider() Provider
 	Prober() UnconfirmedTxProber
-	KeyMaster() KeyMaster
 	Executor() Executor
 }
 
 type proxy struct {
-	stateClient    rusk.StateClient
-	keysClient     rusk.KeysClient
-	transferClient rusk.TransferClient
-	stakeClient    rusk.StakeServiceClient
-	txTimeout      time.Duration
-	timeout        time.Duration
+	stateClient rusk.StateClient
+	txTimeout   time.Duration
+	timeout     time.Duration
 }
 
 // NewProxy creates a new Proxy.
-func NewProxy(stateClient rusk.StateClient, keysClient rusk.KeysClient, transferClient rusk.TransferClient,
-	stakeClient rusk.StakeServiceClient, txTimeout, defaultTimeout time.Duration) Proxy {
+func NewProxy(stateClient rusk.StateClient, txTimeout, defaultTimeout time.Duration) Proxy {
 	return &proxy{
-		stateClient:    stateClient,
-		keysClient:     keysClient,
-		transferClient: transferClient,
-		stakeClient:    stakeClient,
-		txTimeout:      txTimeout,
-		timeout:        defaultTimeout,
+		stateClient: stateClient,
+		txTimeout:   txTimeout,
+		timeout:     defaultTimeout,
 	}
 }
 
@@ -125,127 +68,37 @@ func (p *proxy) Prober() UnconfirmedTxProber {
 	return &verifier{p}
 }
 
-// KeyMaster returned by the Proxy.
-func (p *proxy) KeyMaster() KeyMaster {
-	return &keymaster{p}
-}
-
 // Executor returned by the Proxy.
 func (p *proxy) Executor() Executor {
 	return &executor{p}
-}
-
-// Provider returned by the Proxy.
-func (p *proxy) Provider() Provider {
-	return &provider{p}
 }
 
 type verifier struct {
 	*proxy
 }
 
-// VerifyTransaction verifies a contract call transaction.
-func (v *verifier) VerifyTransaction(ctx context.Context, cc ContractCall) error {
-	/*
-		ccTx, err := EncodeContractCall(cc)
-		if err != nil {
-			return err
-		}
+// Preverify verifies a contract call transaction.
+func (v *verifier) Preverify(ctx context.Context, call ContractCall) ([]byte, Fee, error) {
+	vstr := new(rusk.PreverifyRequest)
 
-		if res, err := v.client.VerifyTransaction(ctx, ccTx); err != nil {
-			return err
-		} else if !res.Verified {
-			return errors.New("verification failed")
-		}
+	tx := new(rusk.Transaction)
+	if err := MTransaction(tx, call.(*Transaction)); err != nil {
+		return nil, Fee{}, err
+	}
 
-	*/
-	return nil
-}
+	vstr.Tx = tx
 
-// TODO: implement.
-func (v *verifier) CalculateBalance(ctx context.Context, b []byte, calls []ContractCall) (uint64, error) {
-	return 0, nil
-}
-
-type provider struct {
-	*proxy
-}
-
-// NewStake creates a new transaction using the user's PrivateKey
-// It accepts the PublicKey of the recipient, a value, a fee and whether
-// the transaction should be obfuscated or otherwise.
-func (p *provider) NewStake(ctx context.Context, pubKeyBLS []byte, value uint64) (*Transaction, error) {
-	tr := new(rusk.StakeTransactionRequest)
-	tr.Value = value
-	tr.PublicKeyBls = pubKeyBLS
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(v.txTimeout))
 	defer cancel()
 
-	res, err := p.stakeClient.NewStake(ctx, tr)
+	res, err := v.stateClient.Preverify(ctx, vstr)
 	if err != nil {
-		return nil, err
+		return nil, Fee{}, err
 	}
 
-	trans := NewTransaction()
-	err = UTransaction(res, trans)
-	return trans, err
-}
-
-// NewTransfer creates a new transaction using the user's PrivateKey
-// It accepts the PublicKey of the recipient, a value, a fee and whether
-// the transaction should be obfuscated or otherwise.
-func (p *provider) NewTransfer(ctx context.Context, value uint64, sa *keys.StealthAddress) (*Transaction, error) {
-	tr := new(rusk.TransferTransactionRequest)
-	tr.Value = value
-
-	// XXX: In the schema, this is denoted as `bytes`, however, in the
-	// `BidTransactionRequest` it is denoted as a `StealthAddress`. This should be
-	// homogenized.
-	buf := new(bytes.Buffer)
-	if err := keys.MarshalStealthAddress(buf, sa); err != nil {
-		return nil, err
-	}
-
-	tr.Recipient = buf.Bytes()
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.txTimeout))
-	defer cancel()
-
-	res, err := p.transferClient.NewTransfer(ctx, tr)
-	if err != nil {
-		return nil, err
-	}
-
-	trans := NewTransaction()
-	err = UTransaction(res, trans)
-	return trans, err
-}
-
-type keymaster struct {
-	*proxy
-}
-
-// GenerateKeys creates a SecretKey using a []byte as Seed.
-func (k *keymaster) GenerateKeys(ctx context.Context, seed []byte) (keys.SecretKey, keys.PublicKey, keys.ViewKey, error) {
-	sk := keys.NewSecretKey()
-	pk := keys.NewPublicKey()
-	vk := keys.NewViewKey()
-	gskr := new(rusk.GenerateKeysRequest)
-
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(k.timeout))
-	defer cancel()
-
-	res, err := k.keysClient.GenerateKeys(ctx, gskr)
-	if err != nil {
-		return *sk, *pk, *vk, err
-	}
-
-	keys.USecretKey(res.Sk, sk)
-	keys.UPublicKey(res.Pk, pk)
-	keys.UViewKey(res.Vk, vk)
-
-	return *sk, *pk, *vk, nil
+	return res.TxHash,
+		Fee{GasLimit: res.Fee.GasLimit, GasPrice: res.Fee.GasPrice},
+		nil
 }
 
 type executor struct {
@@ -272,13 +125,9 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
-	res, err := e.stateClient.VerifyStateTransition(ctx, vstr)
+	_, err := e.stateClient.VerifyStateTransition(ctx, vstr)
 	if err != nil {
 		return err
-	}
-
-	if !res.Success {
-		return errors.New("verification failed")
 	}
 
 	return nil
@@ -286,7 +135,7 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 
 // Finalize proxy call performs both Finalize and GetProvisioners grpc calls.
 func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64, blockGasLiit uint64) (user.Provisioners, []byte, error) {
-	vstr := new(rusk.ExecuteStateTransitionRequest)
+	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
 	vstr.BlockGasLimit = blockGasLiit
@@ -306,10 +155,6 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 	res, err := e.stateClient.Finalize(ctx, vstr)
 	if err != nil {
 		return user.Provisioners{}, nil, err
-	}
-
-	if !res.Success {
-		return user.Provisioners{}, nil, errors.New("unsuccessful finalize call")
 	}
 
 	provisioners := user.NewProvisioners()
@@ -333,7 +178,7 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 
 // Accept proxy call performs both Accept and GetProvisioners grpc calls.
 func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height, blockGasLimit uint64) (user.Provisioners, []byte, error) {
-	vstr := new(rusk.ExecuteStateTransitionRequest)
+	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
 	vstr.BlockGasLimit = blockGasLimit
@@ -353,10 +198,6 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 	res, err := e.stateClient.Accept(ctx, vstr)
 	if err != nil {
 		return user.Provisioners{}, nil, err
-	}
-
-	if !res.Success {
-		return user.Provisioners{}, nil, errors.New("unsuccessful finalize call")
 	}
 
 	provisioners := user.NewProvisioners()
@@ -410,7 +251,9 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 
 	for _, tx := range res.Txs {
 		trans := NewTransaction()
-		if err := UTransaction(tx, trans); err != nil {
+		copy(trans.Hash[:], tx.GetTxHash())
+
+		if err := UTransaction(tx.Tx, trans); err != nil {
 			return nil, nil, err
 		}
 

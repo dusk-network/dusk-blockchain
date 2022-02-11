@@ -272,6 +272,10 @@ func TestFetchBlockHeader(test *testing.T) {
 }
 
 func TestFetchBlockTxs(test *testing.T) {
+	if _, present := os.LookupEnv("USE_OLDBLOCKS"); !present {
+		test.Skip()
+	}
+
 	test.Parallel()
 
 	// Verify all blocks transactions can be fetched by Header.Hash.

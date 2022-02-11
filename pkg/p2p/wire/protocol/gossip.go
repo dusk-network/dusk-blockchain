@@ -57,7 +57,7 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 	}
 
 	if magic != g.Magic {
-		return 0, errors.New("magic mismatch")
+		return 0, fmt.Errorf("magic mismatch, received %s expected %s", magic, g.Magic)
 	}
 
 	// Reserved field is the message timestamp in DevNet/TestNet
