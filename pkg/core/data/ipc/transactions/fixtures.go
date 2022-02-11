@@ -65,13 +65,13 @@ func (p *PermissiveExecutor) GetStateRoot(ctx context.Context) ([]byte, error) {
 }
 
 // Accept ...
-func (p *PermissiveExecutor) Accept(context.Context, []ContractCall, []byte, uint64, uint64) (user.Provisioners, []byte, error) {
-	return *p.P, make([]byte, 32), nil
+func (p *PermissiveExecutor) Accept(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+	return nil, *p.P, make([]byte, 32), nil
 }
 
 // Finalize ...
-func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, uint64, uint64) (user.Provisioners, []byte, error) {
-	return *p.P, make([]byte, 32), nil
+func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+	return nil, *p.P, make([]byte, 32), nil
 }
 
 // MockProxy mocks a proxy for ease of testing.
