@@ -84,6 +84,7 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 
 	qd.GasLimit = decoded.Fee.GasLimit
 	qd.GasPrice = decoded.Fee.GasPrice
+
 	qd.FeePaid = tx.GasSpent()
 
 	qd.BlockHash = blockHash
