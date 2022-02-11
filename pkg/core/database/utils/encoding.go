@@ -36,6 +36,11 @@ func EncodeBlockTx(tx transactions.ContractCall, txIndex uint32) ([]byte, error)
 		return nil, err
 	}
 
+	// Write tx gas spent as third field
+	if err := WriteUint64(buf, tx.GasSpent()); err != nil {
+		return nil, err
+	}
+
 	// Write transactions.ContractCall bytes
 	err := transactions.Marshal(buf, tx)
 	if err != nil {
@@ -73,8 +78,22 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Co
 		return nil, txIndex, e
 	}
 
-	err = transactions.Unmarshal(reader, tx)
-	return tx, txIndex, err
+	// Read gasSpent field
+	var gasSpent uint64
+	if e := ReadUint64(reader, &gasSpent); e != nil {
+		return nil, txIndex, e
+	}
+
+	if e := transactions.Unmarshal(reader, tx); e != nil {
+		return tx, txIndex, err
+	}
+
+	cc, err := transactions.UpdateGasSpent(tx, gasSpent)
+	if err != nil {
+		return tx, txIndex, err
+	}
+
+	return cc, txIndex, err
 }
 
 // WriteUint32 Tx utility to use a Tx byteOrder on internal encoding.
@@ -109,4 +128,18 @@ func WriteUint64(w io.Writer, value uint64) error {
 
 	_, err := w.Write(b[:])
 	return err
+}
+
+// ReadUint64 will read four bytes and convert them to a uint64 from the Tx
+// byteOrder. The result is put into v.
+func ReadUint64(r io.Reader, v *uint64) error {
+	var b [8]byte
+
+	n, err := r.Read(b[:])
+	if err != nil || n != len(b) {
+		return err
+	}
+
+	*v = byteOrder.Uint64(b[:])
+	return nil
 }

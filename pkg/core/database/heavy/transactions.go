@@ -310,15 +310,6 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.ContractCa
 		resultTxs[k] = v
 	}
 
-	// Let's ensure coinbase tx is here
-	if len(resultTxs) > 0 {
-		// NOTE: coinbase is the last tx in the block, with the upgrade to
-		// a VM-based tx layer
-		if resultTxs[len(resultTxs)-1].Type() != transactions.Distribute {
-			return resultTxs, errors.New("missing coinbase tx")
-		}
-	}
-
 	return resultTxs, nil
 }
 
