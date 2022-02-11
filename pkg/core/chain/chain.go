@@ -429,6 +429,7 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 
 	// 2. Perform State Transition to update Contract Storage with Tentative or Finalized state.
 	var b *block.Block
+
 	if b, err = c.runStateTransition(*c.tip, blk); err != nil {
 		l.WithError(err).Error("execute state transition failed")
 		return err

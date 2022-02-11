@@ -95,7 +95,7 @@ func TestBuntSortedKeys(tst *testing.T) {
 	prevVal = math.MaxUint64
 
 	pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-		fee := t.tx.Fee()
+		fee, _ := t.tx.Fee()
 
 		tst.Log(hex.EncodeToString(k[:]), "_", fee)
 

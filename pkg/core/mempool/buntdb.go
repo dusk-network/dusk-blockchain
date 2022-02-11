@@ -116,7 +116,13 @@ func (m *buntdbPool) Put(t TxDesc) error {
 		}
 
 		feeKey := feePrefix + key.String()
-		fee := t.tx.Fee()
+
+		var fee uint64
+
+		fee, err = t.tx.Fee()
+		if err != nil {
+			log.WithError(err).Warn("fee could not be read")
+		}
 
 		_, _, err = tx.Set(feeKey, strconv.FormatInt(int64(fee), 10), nil)
 		if err != nil {

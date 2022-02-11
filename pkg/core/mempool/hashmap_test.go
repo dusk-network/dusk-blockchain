@@ -38,7 +38,7 @@ func TestSortedKeys(t *testing.T) {
 	prevVal = math.MaxUint64
 
 	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-		fee := t.tx.Fee()
+		fee, _ := t.tx.Fee()
 
 		if prevVal < fee {
 			return false, errors.New("keys not in a descending order")
