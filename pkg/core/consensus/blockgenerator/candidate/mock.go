@@ -53,6 +53,13 @@ func (m *mock) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUp
 // Mock the candidate generator.
 func Mock(e *consensus.Emitter) Generator {
 	fn := func(ctx context.Context, txs []transactions.ContractCall, bh uint64) ([]transactions.ContractCall, []byte, error) {
+		if len(txs) == 0 {
+			// Function simulates Rusk ExecuteStateTransition.
+			// That said, it should always provide a Distribute transaction
+			txs = make([]transactions.ContractCall, 0)
+			txs = append(txs, transactions.MockDistributeTx())
+		}
+
 		return txs, make([]byte, 32), nil
 	}
 

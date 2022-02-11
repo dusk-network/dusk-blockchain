@@ -171,6 +171,20 @@ func MockTx() *Transaction {
 	return tx
 }
 
+// MockDistributeTx MockTx of type Distribute.
+func MockDistributeTx() *Transaction {
+	tx := &Transaction{
+		Payload: &TransactionPayload{
+			Data: make([]byte, 100),
+		},
+
+		TxType:  Distribute,
+		Version: 2,
+	}
+
+	return tx
+}
+
 /****************/
 /** DISTRIBUTE **/
 /****************/
