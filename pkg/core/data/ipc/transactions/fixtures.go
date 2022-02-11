@@ -169,6 +169,7 @@ func MockTx() *Transaction {
 	return tx
 }
 
+// MockTxWithParams mocks a transactions with specified params.
 func MockTxWithParams(txtype TxType, gasSpent uint64) ContractCall {
 	t := &Transaction{
 		TxType:        txtype,

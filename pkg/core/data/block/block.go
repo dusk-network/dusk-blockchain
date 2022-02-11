@@ -128,3 +128,33 @@ func (b Block) Tx(txid []byte) (transactions.ContractCall, error) {
 
 	return nil, errors.New("not found")
 }
+
+// TamperGasSpent tamper gas spent value of a transaction specified by txid.
+func (b *Block) TamperGasSpent(txid []byte, gasSpent uint64) error {
+	if b.Txs == nil {
+		return errors.New("not found")
+	}
+
+	for i, tx := range b.Txs {
+		h, err := tx.CalculateHash()
+		if err != nil {
+			continue
+		}
+
+		if !bytes.Equal(h, txid) {
+			continue
+		}
+
+		// Specified tx found.
+		updated, err := transactions.UpdateGasSpent(tx, gasSpent)
+		if err != nil {
+			return err
+		}
+
+		b.Txs[i] = updated
+
+		return nil
+	}
+
+	return errors.New("not found")
+}

@@ -343,8 +343,16 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 	}
 
 	// Tamper block transactions with ones return by Rusk service in order to persist GasSpent per transaction.
-	b := blk
-	b.Txs = txs
+	for _, tx := range txs {
+		h, err := tx.CalculateHash()
+		if err != nil {
+			log.WithError(err).Warn("could not read rusk tx hash")
+		}
+
+		if err := blk.TamperGasSpent(h, tx.GasSpent()); err != nil {
+			log.WithError(err).Warn("could not tamper gas spent")
+		}
+	}
 
 	// Update the provisioners.
 	// blk.Txs may bring new provisioners to the current state
@@ -355,7 +363,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 		WithField("state_hash", util.StringifyBytes(respStateHash)).
 		Info("state transition completed")
 
-	return &b, nil
+	return &blk, nil
 }
 
 // sanityCheckStateHash ensures most recent local statehash and rusk statehash are the same.
