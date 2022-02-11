@@ -141,11 +141,9 @@ func RandContractCalls(amount, invalid int, includeCoinbase bool) []ContractCall
 // RandTx mocks a transaction.
 func RandTx() *Transaction {
 	tx := &Transaction{
-		Payload: &TransactionPayload{
-			Data: Rand32Bytes(),
-		},
+		Payload: &TransactionPayload{},
 
-		TxType:   1,
+		TxType:   Distribute,
 		Version:  2,
 		FeeValue: Fee{GasLimit: 10, GasPrice: 99},
 	}
@@ -169,6 +167,18 @@ func MockTx() *Transaction {
 	}
 
 	return tx
+}
+
+func MockTxWithParams(txtype TxType, gasSpent uint64) ContractCall {
+	t := &Transaction{
+		TxType:        txtype,
+		GasSpentValue: gasSpent,
+	}
+
+	copy(t.Hash[:], Rand32Bytes())
+	t.Payload = NewTransactionPayload()
+
+	return t
 }
 
 // MockDistributeTx MockTx of type Distribute.

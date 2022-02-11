@@ -19,19 +19,6 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
-func newMockTx(txtype transactions.TxType, gasPrice, gasSpent uint64) transactions.ContractCall {
-	t := &transactions.Transaction{
-		TxType:        txtype,
-		GasSpentValue: gasSpent,
-		FeeValue:      transactions.Fee{GasPrice: gasPrice},
-	}
-
-	copy(t.Hash[:], transactions.Rand32Bytes())
-	t.Payload = transactions.NewTransactionPayload()
-
-	return t
-}
-
 func createTemp(pattern string) string {
 	f, _ := os.CreateTemp(os.TempDir(), pattern)
 	dbpath := f.Name()
@@ -54,7 +41,7 @@ func TestBuntStoreGet(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		td := TxDesc{
-			tx:       newMockTx(transactions.Transfer, uint64(i), 0),
+			tx:       transactions.MockTxWithParams(transactions.Transfer, 0),
 			received: time.Now(),
 		}
 
@@ -99,7 +86,7 @@ func TestBuntSortedKeys(tst *testing.T) {
 
 	// Generate 10 random txs
 	for i := 0; i < 10; i++ {
-		tx := newMockTx(transactions.Transfer, uint64(i), 0)
+		tx := transactions.MockTxWithParams(transactions.Transfer, 0)
 		td := TxDesc{tx: tx}
 		assert.NoError(pool.Put(td))
 	}

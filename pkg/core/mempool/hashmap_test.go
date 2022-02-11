@@ -27,7 +27,7 @@ func TestSortedKeys(t *testing.T) {
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
-		tx := transactions.RandTx()
+		tx := transactions.MockTxWithParams(transactions.Transfer, 0)
 		td := TxDesc{tx: tx}
 		assert.NoError(pool.Put(td))
 	}
@@ -57,7 +57,7 @@ func TestStableSortedKeys(t *testing.T) {
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
-		tx := transactions.RandTx()
+		tx := transactions.MockTxWithParams(transactions.Transfer, 0)
 
 		td := TxDesc{tx: tx, received: time.Now()}
 		if err := pool.Put(td); err != nil {
@@ -93,7 +93,7 @@ func TestGet(t *testing.T) {
 	hashes := make([][]byte, txsCount)
 
 	for i := 0; i < txsCount; i++ {
-		tx := transactions.RandTx()
+		tx := transactions.MockTxWithParams(transactions.Transfer, 0)
 		hash, _ := tx.CalculateHash()
 		hashes[i] = hash
 
