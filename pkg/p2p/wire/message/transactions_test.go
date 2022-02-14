@@ -119,6 +119,8 @@ func TestCoinbaseTransaction(t *testing.T) {
 	assert.Zero(decoded.Fee.GasLimit, "GasLimit should be 0")
 	assert.Zero(decoded.Fee.GasPrice, "GasPrice should be 0")
 	assert.Empty(decoded.Nullifiers, "Nullifiers should not be present")
+	assert.EqualValues(uint64(28113864), decoded.Notes[0].DecodeTxAmount())
+	assert.EqualValues(uint64(253024782), decoded.Notes[1].DecodeTxAmount())
 
 	hash, err := decoded.Hash(txdummy.TxType)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/sirupsen/logrus"
 )
 
 // Note types.
@@ -96,4 +97,20 @@ func UnmarshalNote(r *bytes.Buffer, f *Note) (err error) {
 	}
 
 	return nil
+}
+
+// DecodeTxAmount return the amount of the tx (if transparent).
+func (f *Note) DecodeTxAmount() uint64 {
+	if f.Type != NoteTypeTransparent {
+		logrus.Warn("Note is not transaprent")
+		return 0
+	}
+
+	var txAmount uint64
+	if err := encoding.ReadUint64LE(bytes.NewBuffer(f.EncryptedData), &txAmount); err != nil {
+		logrus.WithError(err).Warn("could not read EncryptedData")
+		return 0
+	}
+
+	return txAmount
 }
