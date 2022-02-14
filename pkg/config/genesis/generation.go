@@ -15,6 +15,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
+// DEFAULT_STATE_ROOT is the state root result of "rusk make state".
+const DEFAULT_STATE_ROOT string = "d1e06f5fbfe56890dc55e972444d7ac3465af5648a843fd9e7043ede2711259e"
+
 // Generate a genesis block. The constitution of the block depends on the passed
 // config.
 func Generate(c Config) *block.Block {
@@ -24,18 +27,17 @@ func Generate(c Config) *block.Block {
 		c.Transactions = append(c.Transactions, transactions.MockTx())
 	}
 
-	// replace this with the output of "rusk make state"
+	var state_root []byte
+	var err error
 
-	state_root := make([]byte, 32)
+	state_root_str := DEFAULT_STATE_ROOT
 
-	state_root_str := os.Getenv("RUSK_STATE_ROOT")
-	if len(state_root_str) > 0 {
-		state_root_parsed, err := hex.DecodeString(state_root_str)
-		if err != nil {
-			panic(err)
-		} else {
-			state_root = state_root_parsed
-		}
+	if state_root_override := os.Getenv("RUSK_STATE_ROOT"); len(state_root_override) > 0 {
+		state_root_str = state_root_override
+	}
+
+	if state_root, err = hex.DecodeString(state_root_str); err != nil {
+		panic(err)
 	}
 
 	h := &block.Header{
