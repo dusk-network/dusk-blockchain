@@ -37,7 +37,10 @@ type Transaction struct {
 	Payload *TransactionPayload `json:"payload"`
 
 	// Extended
-	Hash     [32]byte
+	Hash          [32]byte
+	GasSpentValue uint64
+
+	// TODO: Remove FeeValue as it's now read from decoded payload
 	FeeValue Fee
 }
 
@@ -51,18 +54,37 @@ func NewTransaction() *Transaction {
 // Copy complies with message.Safe interface. It returns a deep copy of
 // the message safe to publish to multiple subscribers.
 func (t Transaction) Copy() payload.Safe {
+	return t.deepCopy()
+}
+
+func (t Transaction) deepCopy() *Transaction {
 	return &Transaction{
-		Version:  t.Version,
-		TxType:   t.TxType,
-		Payload:  t.Payload.Copy(),
-		Hash:     t.Hash,
-		FeeValue: t.FeeValue,
+		Version:       t.Version,
+		TxType:        t.TxType,
+		Payload:       t.Payload.Copy(),
+		Hash:          t.Hash,
+		FeeValue:      t.FeeValue,
+		GasSpentValue: t.GasSpentValue,
 	}
 }
 
 // Fee returns GasLimit.
-func (t Transaction) Fee() uint64 {
-	return t.FeeValue.GasLimit
+func (t Transaction) Fee() (uint64, error) {
+	if t.Payload == nil {
+		return 0, errors.New("payload is nil")
+	}
+
+	decoded, err := t.Decode()
+	if err != nil {
+		return 0, err
+	}
+
+	return decoded.Fee.GasLimit, nil
+}
+
+// GasSpent returns gas spent on transaction execution.
+func (t Transaction) GasSpent() uint64 {
+	return t.GasSpentValue
 }
 
 // CalculateHash returns hash of transaction, if set.
@@ -161,11 +183,13 @@ type ContractCall interface {
 
 	// StandardTx returns the payload.
 	StandardTx() *TransactionPayload
+	Decode() (*TransactionPayloadDecoded, error)
 
 	// Type indicates the transaction.
 	Type() TxType
 
-	Fee() uint64
+	Fee() (uint64, error)
+	GasSpent() uint64
 }
 
 // Marshal a Contractcall to a bytes.Buffer.
@@ -207,31 +231,38 @@ func Equal(t, other ContractCall) bool {
 	return t.StandardTx().Equal(other.StandardTx())
 }
 
-// Extend recreate transaction with optional fields initialized.
-func Extend(t ContractCall, f Fee, hash []byte) (ContractCall, error) {
+// UpdateHash creates a deep copy of t and sets new hash value.
+func UpdateHash(t ContractCall, hash []byte) (ContractCall, error) {
 	switch t := t.(type) {
 	case *Transaction:
-		n := &Transaction{
-			Version: t.Version,
-			TxType:  t.TxType,
-			Payload: t.Payload.Copy(),
-		}
+		cpy := t.deepCopy()
 
-		n.FeeValue = f
-
-		if len(hash) != len(n.Hash) {
+		if len(hash) != len(cpy.Hash) {
 			return nil, errors.New("invalid length")
 		}
 
-		copy(n.Hash[:], hash)
-		return n, nil
+		copy(cpy.Hash[:], hash)
+		return cpy, nil
+	default:
+		return nil, errors.New("unrecognized type of ContractCall")
+	}
+}
+
+// UpdateGasSpent creates a deep copy of t and sets new gas spent value.
+func UpdateGasSpent(t ContractCall, gasSpent uint64) (ContractCall, error) {
+	switch t := t.(type) {
+	case *Transaction:
+		cpy := t.deepCopy()
+
+		cpy.GasSpentValue = gasSpent
+		return cpy, nil
 	default:
 		return nil, errors.New("unrecognized type of ContractCall")
 	}
 }
 
 // Decode returns a TransactionPayloadDecoded.
-func (t *Transaction) Decode() (*TransactionPayloadDecoded, error) {
+func (t Transaction) Decode() (*TransactionPayloadDecoded, error) {
 	decoded := NewTransactionPayloadDecoded()
 
 	buffer := bytes.NewBuffer(t.Payload.Data)

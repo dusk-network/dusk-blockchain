@@ -9,10 +9,10 @@ package txrecords
 import (
 	"bytes"
 	"encoding/binary"
-	"log"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/sirupsen/logrus"
 )
 
 // Direction is an enum which tells us whether a transaction is
@@ -72,7 +72,7 @@ func New(call transactions.ContractCall, height uint64, direction Direction) *Tx
 func (t TxRecord) View() TxView {
 	h, err := t.Transaction.CalculateHash()
 	if err != nil {
-		log.Panic(err)
+		logrus.Panic(err)
 	}
 
 	view := TxView{
@@ -81,7 +81,10 @@ func (t TxRecord) View() TxView {
 		Hash:   h,
 	}
 
-	view.Fee = t.Transaction.Fee()
+	view.Fee, err = t.Transaction.Fee()
+	if err != nil {
+		logrus.WithError(err).Warn("failed to decode fee")
+	}
 
 	// switch tx := t.Transaction.(type) {
 	// case *transactions.BidTransaction:

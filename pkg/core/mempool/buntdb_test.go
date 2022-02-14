@@ -36,12 +36,14 @@ func TestBuntStoreGet(t *testing.T) {
 	pool := buntdbPool{}
 	pool.Create(dbpath)
 
-	// Generate 10 random txs
+	// Generate 10 random txs LE 8 64
 	mockTxs := make([]TxDesc, 0)
 
 	for i := 0; i < 10; i++ {
-		tx := transactions.RandTx()
-		td := TxDesc{tx: tx, received: time.Now()}
+		td := TxDesc{
+			tx:       transactions.MockTxWithParams(transactions.Transfer, 0),
+			received: time.Now(),
+		}
 
 		assert.NoError(pool.Put(td))
 		mockTxs = append(mockTxs, td)
@@ -84,7 +86,7 @@ func TestBuntSortedKeys(tst *testing.T) {
 
 	// Generate 10 random txs
 	for i := 0; i < 10; i++ {
-		tx := transactions.RandTx()
+		tx := transactions.MockTxWithParams(transactions.Transfer, 0)
 		td := TxDesc{tx: tx}
 		assert.NoError(pool.Put(td))
 	}
@@ -95,7 +97,7 @@ func TestBuntSortedKeys(tst *testing.T) {
 	prevVal = math.MaxUint64
 
 	pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-		fee := t.tx.Fee()
+		fee, _ := t.tx.Fee()
 
 		tst.Log(hex.EncodeToString(k[:]), "_", fee)
 

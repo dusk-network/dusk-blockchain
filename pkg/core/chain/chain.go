@@ -9,6 +9,7 @@ package chain
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"sync"
 
@@ -278,7 +279,8 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 	return nil
 }
 
-func (c *Chain) runStateTransition(tipBlk, blk block.Block) error {
+// runStateTransition performs state transition and returns a block with gasSpent field populated for each tx.
+func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error) {
 	var (
 		respStateHash       []byte
 		provisionersUpdated user.Provisioners
@@ -298,52 +300,70 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) error {
 	)
 
 	if err = c.sanityCheckStateHash(); err != nil {
-		return err
+		return block.NewBlock(), err
 	}
 
 	provisionersCount = c.p.Set.Len()
 	l.WithField("prov", provisionersCount).Info("run state transition")
 
+	var txs []transactions.ContractCall
+
 	switch blk.Header.Certificate.Step {
 	case 3:
 		// Finalized block. first iteration consensus agreement.
-		provisionersUpdated, respStateHash, err = c.proxy.Executor().Finalize(c.ctx,
+		txs, provisionersUpdated, respStateHash, err = c.proxy.Executor().Finalize(c.ctx,
 			blk.Txs,
 			tipBlk.Header.StateHash,
 			blk.Header.Height,
 			config.BlockGasLimit)
 		if err != nil {
 			l.WithError(err).Error("Error in executing the state transition")
-			return err
+			return block.NewBlock(), err
 		}
 	default:
 		// Tentative block. non-first iteration consensus agreement.
-		provisionersUpdated, respStateHash, err = c.proxy.Executor().Accept(c.ctx,
+		txs, provisionersUpdated, respStateHash, err = c.proxy.Executor().Accept(c.ctx,
 			blk.Txs,
 			tipBlk.Header.StateHash,
 			blk.Header.Height,
 			config.BlockGasLimit)
 		if err != nil {
 			l.WithError(err).Error("Error in executing the state transition")
-			return err
+			return block.NewBlock(), err
 		}
 	}
 
 	// Sanity check to ensure accepted block state_hash is the same as the one Finalize/Accept returned.
 	if !bytes.Equal(respStateHash, blk.Header.StateHash) {
-		log.WithField("rusk", util.StringifyBytes(respStateHash)).WithField("node", util.StringifyBytes(blk.Header.StateHash)).WithError(errInvalidStateHash).Error("inconsistency with state_hash")
+		log.WithField("rusk", util.StringifyBytes(respStateHash)).
+			WithField("node", util.StringifyBytes(blk.Header.StateHash)).
+			WithError(errInvalidStateHash).Error("inconsistency with state_hash")
 
-		return errInvalidStateHash
+		return block.NewBlock(), errInvalidStateHash
+	}
+
+	// Tamper block transactions with ones return by Rusk service in order to persist GasSpent per transaction.
+	for _, tx := range txs {
+		h, err := tx.CalculateHash()
+		if err != nil {
+			log.WithError(err).Warn("could not read rusk tx hash")
+		}
+
+		if err := blk.TamperGasSpent(h, tx.GasSpent()); err != nil {
+			log.WithError(err).Warn("could not tamper gas spent")
+		}
 	}
 
 	// Update the provisioners.
 	// blk.Txs may bring new provisioners to the current state
 	c.p = &provisionersUpdated
 
-	l.WithField("prov", c.p.Set.Len()).WithField("added", c.p.Set.Len()-provisionersCount).WithField("state_hash", util.StringifyBytes(respStateHash)).
+	l.WithField("prov", c.p.Set.Len()).
+		WithField("added", c.p.Set.Len()-provisionersCount).
+		WithField("state_hash", util.StringifyBytes(respStateHash)).
 		Info("state transition completed")
 
-	return nil
+	return &blk, nil
 }
 
 // sanityCheckStateHash ensures most recent local statehash and rusk statehash are the same.
@@ -359,9 +379,9 @@ func (c *Chain) sanityCheckStateHash() error {
 	nodeStateHash := c.tip.Header.StateHash
 
 	if !bytes.Equal(nodeStateHash, ruskStateHash) || len(nodeStateHash) == 0 {
-		log.WithField("rusk", util.StringifyBytes(ruskStateHash)).
+		log.WithField("rusk", hex.EncodeToString(ruskStateHash)).
 			WithError(errInvalidStateHash).
-			WithField("node", util.StringifyBytes(nodeStateHash)).
+			WithField("node", hex.EncodeToString(nodeStateHash)).
 			Error("check state_hash failed")
 
 		return errInvalidStateHash
@@ -416,7 +436,9 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 	}
 
 	// 2. Perform State Transition to update Contract Storage with Tentative or Finalized state.
-	if err = c.runStateTransition(*c.tip, blk); err != nil {
+	var b *block.Block
+
+	if b, err = c.runStateTransition(*c.tip, blk); err != nil {
 		l.WithError(err).Error("execute state transition failed")
 		return err
 	}
@@ -424,7 +446,7 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 	// 3. Store the approved block and update in-memory chain tip
 	l.Debug("storing block")
 
-	if err := c.loader.Append(&blk); err != nil {
+	if err := c.loader.Append(b); err != nil {
 		l.WithError(err).Error("block storing failed")
 		return err
 	}

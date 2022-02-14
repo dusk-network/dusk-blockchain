@@ -7,6 +7,7 @@
 package query
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"time"
@@ -14,7 +15,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	core "github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/graphql-go/graphql"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -64,14 +67,27 @@ func newQueryBlock(b *block.Block) queryBlock {
 	qb.Header.Hash = b.Header.Hash
 	qb.Header.StateHash = b.Header.StateHash
 
-	reward := uint64(0)
+	reward := uint32(0)
 	feesPaid := uint64(0)
 
 	for _, tx := range b.Txs {
-		feesPaid += tx.Fee()
+		feesPaid += tx.GasSpent()
+
+		if tx.Type() == core.Distribute {
+			distribute, _ := tx.Decode()
+
+			for _, note := range distribute.Notes {
+				var r uint32
+				if err := encoding.ReadUint32LE(bytes.NewBuffer(note.ValueCommitment), &r); err != nil {
+					logrus.WithError(err).Warn("could not read value commitment")
+				}
+
+				reward += r
+			}
+		}
 	}
 
-	qb.Header.Reward = reward
+	qb.Header.Reward = uint64(reward)
 	qb.Header.FeesPaid = feesPaid
 
 	return qb

@@ -66,7 +66,7 @@ func TestTxAdvertising(t *testing.T) {
 
 	m, _, _, streamer := startMempoolTest(ctx)
 
-	tx := transactions.RandTx()
+	tx := transactions.MockTxWithParams(transactions.Transfer, 0)
 
 	go func() {
 		_, err := m.ProcessTx("", message.New(topics.Tx, tx))

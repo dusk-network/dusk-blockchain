@@ -272,15 +272,14 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 		time.Duration(config.Get().RPC.Rusk.ContractTimeout)*time.Millisecond)
 	defer cancel()
 
-	var fee transactions.Fee
 	var hash []byte
 	var err error
 
-	if hash, fee, err = m.verifier.Preverify(ctx, t.tx); err != nil {
+	if hash, _, err = m.verifier.Preverify(ctx, t.tx); err != nil {
 		return nil, err
 	}
 
-	t.tx, err = transactions.Extend(t.tx, fee, hash)
+	t.tx, err = transactions.UpdateHash(t.tx, hash)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend: %s", err.Error())
 	}

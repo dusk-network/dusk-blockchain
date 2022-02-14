@@ -65,13 +65,13 @@ func (p *PermissiveExecutor) GetStateRoot(ctx context.Context) ([]byte, error) {
 }
 
 // Accept ...
-func (p *PermissiveExecutor) Accept(context.Context, []ContractCall, []byte, uint64, uint64) (user.Provisioners, []byte, error) {
-	return *p.P, make([]byte, 32), nil
+func (p *PermissiveExecutor) Accept(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+	return nil, *p.P, make([]byte, 32), nil
 }
 
 // Finalize ...
-func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, uint64, uint64) (user.Provisioners, []byte, error) {
-	return *p.P, make([]byte, 32), nil
+func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+	return nil, *p.P, make([]byte, 32), nil
 }
 
 // MockProxy mocks a proxy for ease of testing.
@@ -141,11 +141,9 @@ func RandContractCalls(amount, invalid int, includeCoinbase bool) []ContractCall
 // RandTx mocks a transaction.
 func RandTx() *Transaction {
 	tx := &Transaction{
-		Payload: &TransactionPayload{
-			Data: Rand32Bytes(),
-		},
+		Payload: &TransactionPayload{},
 
-		TxType:   1,
+		TxType:   Distribute,
 		Version:  2,
 		FeeValue: Fee{GasLimit: 10, GasPrice: 99},
 	}
@@ -169,6 +167,19 @@ func MockTx() *Transaction {
 	}
 
 	return tx
+}
+
+// MockTxWithParams mocks a transactions with specified params.
+func MockTxWithParams(txtype TxType, gasSpent uint64) ContractCall {
+	t := &Transaction{
+		TxType:        txtype,
+		GasSpentValue: gasSpent,
+	}
+
+	copy(t.Hash[:], Rand32Bytes())
+	t.Payload = NewTransactionPayload()
+
+	return t
 }
 
 // MockDistributeTx MockTx of type Distribute.

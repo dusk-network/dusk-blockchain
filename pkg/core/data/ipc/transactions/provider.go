@@ -8,11 +8,13 @@ package transactions
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"github.com/sirupsen/logrus"
 )
 
 // UnconfirmedTxProber performs verification of contract calls (transactions).
@@ -30,10 +32,10 @@ type Executor interface {
 	ExecuteStateTransition(context.Context, []ContractCall, uint64, uint64) ([]ContractCall, []byte, error)
 
 	// Accept creates an ephemeral state transition.
-	Accept(context.Context, []ContractCall, []byte, uint64, uint64) (user.Provisioners, []byte, error)
+	Accept(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error)
 
 	// Finalize creates a finalized state transition.
-	Finalize(context.Context, []ContractCall, []byte, uint64, uint64) (user.Provisioners, []byte, error)
+	Finalize(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error)
 
 	// GetProvisioners returns the current set of provisioners.
 	GetProvisioners(ctx context.Context) (user.Provisioners, error)
@@ -134,7 +136,7 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 }
 
 // Finalize proxy call performs both Finalize and GetProvisioners grpc calls.
-func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64, blockGasLiit uint64) (user.Provisioners, []byte, error) {
+func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64, blockGasLiit uint64) ([]ContractCall, user.Provisioners, []byte, error) {
 	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
@@ -143,7 +145,7 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
 		if err := MTransaction(tx, call.(*Transaction)); err != nil {
-			return user.Provisioners{}, nil, err
+			return nil, user.Provisioners{}, nil, err
 		}
 
 		vstr.Txs[i] = tx
@@ -154,7 +156,7 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 
 	res, err := e.stateClient.Finalize(ctx, vstr)
 	if err != nil {
-		return user.Provisioners{}, nil, err
+		return nil, user.Provisioners{}, nil, err
 	}
 
 	provisioners := user.NewProvisioners()
@@ -162,7 +164,7 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 
 	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})
 	if err != nil {
-		return user.Provisioners{}, nil, err
+		return nil, user.Provisioners{}, nil, err
 	}
 
 	for i := range pres.Provisioners {
@@ -172,12 +174,17 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 		provisioners.Set.Insert(member.PublicKeyBLS)
 	}
 
+	resCalls, err := e.convertToContractCall(res.Txs)
+	if err != nil {
+		return nil, user.Provisioners{}, nil, err
+	}
+
 	provisioners.Members = memberMap
-	return *provisioners, res.StateRoot, nil
+	return resCalls, *provisioners, res.StateRoot, nil
 }
 
 // Accept proxy call performs both Accept and GetProvisioners grpc calls.
-func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height, blockGasLimit uint64) (user.Provisioners, []byte, error) {
+func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height, blockGasLimit uint64) ([]ContractCall, user.Provisioners, []byte, error) {
 	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
@@ -186,7 +193,7 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
 		if err := MTransaction(tx, call.(*Transaction)); err != nil {
-			return user.Provisioners{}, nil, err
+			return nil, user.Provisioners{}, nil, err
 		}
 
 		vstr.Txs[i] = tx
@@ -197,7 +204,7 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 
 	res, err := e.stateClient.Accept(ctx, vstr)
 	if err != nil {
-		return user.Provisioners{}, nil, err
+		return nil, user.Provisioners{}, nil, err
 	}
 
 	provisioners := user.NewProvisioners()
@@ -205,7 +212,7 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 
 	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})
 	if err != nil {
-		return user.Provisioners{}, nil, err
+		return nil, user.Provisioners{}, nil, err
 	}
 
 	for i := range pres.Provisioners {
@@ -215,8 +222,13 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 		provisioners.Set.Insert(member.PublicKeyBLS)
 	}
 
+	resCalls, err := e.convertToContractCall(res.Txs)
+	if err != nil {
+		return nil, user.Provisioners{}, nil, err
+	}
+
 	provisioners.Members = memberMap
-	return *provisioners, res.StateRoot, nil
+	return resCalls, *provisioners, res.StateRoot, nil
 }
 
 // ExecuteStateTransition proxy call performs a single grpc ExecuteStateTransition call.
@@ -247,20 +259,36 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 		return nil, nil, errors.New("unsuccessful state transition function execution")
 	}
 
-	validCalls := make([]ContractCall, 0)
-
-	for _, tx := range res.Txs {
-		trans := NewTransaction()
-		copy(trans.Hash[:], tx.GetTxHash())
-
-		if err := UTransaction(tx.Tx, trans); err != nil {
-			return nil, nil, err
-		}
-
-		validCalls = append(validCalls, trans)
+	resCalls, err := e.convertToContractCall(res.Txs)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return validCalls, res.StateRoot, nil
+	return resCalls, res.StateRoot, nil
+}
+
+// convertToContractCall converts a set of ExecutedTransaction transactions into set of ContractCall transactions.
+func (e *executor) convertToContractCall(txs []*rusk.ExecutedTransaction) ([]ContractCall, error) {
+	res := make([]ContractCall, 0)
+
+	for _, tx := range txs {
+		cc := NewTransaction()
+		copy(cc.Hash[:], tx.GetTxHash())
+		cc.GasSpentValue = tx.GetGasSpent()
+
+		logrus.WithField("txid", hex.EncodeToString(tx.GetTxHash())).
+			WithField("gas_spent", tx.GetGasSpent()).
+			WithField("txtype", tx.Tx.GetType()).
+			Trace("rusk transaction")
+
+		if err := UTransaction(tx.Tx, cc); err != nil {
+			return nil, err
+		}
+
+		res = append(res, cc)
+	}
+
+	return res, nil
 }
 
 // GetProvisioners see also Executor.GetProvisioners.
