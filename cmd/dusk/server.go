@@ -115,7 +115,7 @@ func Setup() *Server {
 
 	proxy, ruskConn := setupGRPCClients(gctx)
 
-	m := mempool.NewMempool(db, eventBus, rpcBus, proxy.Prober(), grpcServer)
+	m := mempool.NewMempool(db, eventBus, rpcBus, proxy.Prober())
 	m.Run(parentCtx)
 
 	processor.Register(topics.Tx, m.ProcessTx)

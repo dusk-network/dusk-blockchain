@@ -99,8 +99,8 @@ func MockMember(keys key.Keys) *user.Member {
 	}
 
 	member.Stakes = make([]user.Stake, 1)
-	member.Stakes[0].Amount = 500
-	member.Stakes[0].EndHeight = 10000
+	member.Stakes[0].Value = 500
+	member.Stakes[0].Eligibility = 1
 
 	return member
 }

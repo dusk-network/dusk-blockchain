@@ -26,9 +26,9 @@ func ProvisionersToRuskCommittee(p *user.Provisioners) []*rusk.Provisioner {
 
 		for j, s := range n.Stakes {
 			ruskProvisioners[i].Stakes[j] = new(rusk.Stake)
-			ruskProvisioners[i].Stakes[j].Amount = s.Amount
-			ruskProvisioners[i].Stakes[j].EndHeight = s.EndHeight
-			ruskProvisioners[i].Stakes[j].StartHeight = s.StartHeight
+			ruskProvisioners[i].Stakes[j].Value = s.Value
+			ruskProvisioners[i].Stakes[j].CreatedAt = s.CreatedAt
+			ruskProvisioners[i].Stakes[j].Eligibility = s.Eligibility
 		}
 
 		i++

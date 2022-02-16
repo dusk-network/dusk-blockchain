@@ -33,9 +33,9 @@ type (
 
 	// Stake represents the Provisioner's stake.
 	Stake struct {
-		Amount      uint64 `json:"amount"`
-		StartHeight uint64 `json:"start_height"`
-		EndHeight   uint64 `json:"end_height"`
+		Value       uint64 `json:"value"`
+		CreatedAt   uint64 `json:"created_at"`
+		Eligibility uint64 `json:"eligibility"`
 	}
 )
 
@@ -71,9 +71,9 @@ func (m *Member) Copy() *Member {
 
 	for i, s := range m.Stakes {
 		cpy.Stakes[i] = Stake{
-			Amount:      s.Amount,
-			StartHeight: s.StartHeight,
-			EndHeight:   s.EndHeight,
+			Value:       s.Value,
+			CreatedAt:   s.CreatedAt,
+			Eligibility: s.Eligibility,
 		}
 	}
 
@@ -81,24 +81,27 @@ func (m *Member) Copy() *Member {
 }
 
 // RemoveStake removes a Stake (most likely because it expired).
+// Note: At the moment there's a 1-to-1 relationship between provisioner
+// and stake. In the future this could potentially change.
+// See also github.com/dusk-network/rusk/issues/579.
 func (m *Member) RemoveStake(idx int) {
 	m.Stakes[idx] = m.Stakes[len(m.Stakes)-1]
 	m.Stakes = m.Stakes[:len(m.Stakes)-1]
 }
 
-// SubtractFromStake detracts an amount from the Stake of a Provisioner.
-func (m *Member) SubtractFromStake(amount uint64) uint64 {
+// SubtractFromStake detracts an amount `value` from the Stake of a Provisioner.
+func (m *Member) SubtractFromStake(value uint64) uint64 {
 	for i := 0; i < len(m.Stakes); i++ {
-		if m.Stakes[i].Amount > 0 {
-			if m.Stakes[i].Amount < amount {
-				subtracted := m.Stakes[i].Amount
-				m.Stakes[i].Amount = 0
+		if m.Stakes[i].Value > 0 {
+			if m.Stakes[i].Value < value {
+				subtracted := m.Stakes[i].Value
+				m.Stakes[i].Value = 0
 
 				return subtracted
 			}
 
-			m.Stakes[i].Amount -= amount
-			return amount
+			m.Stakes[i].Value -= value
+			return value
 		}
 	}
 
@@ -114,13 +117,13 @@ func NewProvisioners() *Provisioners {
 }
 
 // Add a Member to the Provisioners by using the bytes of a BLS public key.
-func (p *Provisioners) Add(pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
+func (p *Provisioners) Add(pubKeyBLS []byte, value, createdAt, eligibility uint64) error {
 	if len(pubKeyBLS) != 96 {
 		return fmt.Errorf("public key is %v bytes long instead of 96", len(pubKeyBLS))
 	}
 
 	i := string(pubKeyBLS)
-	stake := Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
+	stake := Stake{Value: value, CreatedAt: createdAt, Eligibility: eligibility}
 
 	// Check for duplicates
 	_, inserted := p.Set.IndexOf(pubKeyBLS)
@@ -163,7 +166,7 @@ func (p Provisioners) SubsetSizeAt(round uint64) int {
 
 	for _, member := range p.Members {
 		for _, stake := range member.Stakes {
-			if stake.StartHeight <= round && round <= stake.EndHeight {
+			if round >= stake.Eligibility {
 				size++
 				break
 			}
@@ -202,7 +205,7 @@ func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 
 	var totalStake uint64
 	for _, stake := range m.Stakes {
-		totalStake += stake.Amount
+		totalStake += stake.Value
 	}
 
 	return totalStake, nil
@@ -212,7 +215,7 @@ func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 func (p *Provisioners) TotalWeight() (totalWeight uint64) {
 	for _, member := range p.Members {
 		for _, stake := range member.Stakes {
-			totalWeight += stake.Amount
+			totalWeight += stake.Value
 		}
 	}
 
@@ -268,15 +271,15 @@ func marshalMember(r *bytes.Buffer, member Member) error {
 }
 
 func marshalStake(r *bytes.Buffer, stake Stake) error {
-	if err := encoding.WriteUint64LE(r, stake.Amount); err != nil {
+	if err := encoding.WriteUint64LE(r, stake.Value); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64LE(r, stake.StartHeight); err != nil {
+	if err := encoding.WriteUint64LE(r, stake.CreatedAt); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64LE(r, stake.EndHeight); err != nil {
+	if err := encoding.WriteUint64LE(r, stake.Eligibility); err != nil {
 		return err
 	}
 
@@ -341,15 +344,15 @@ func unmarshalMember(r *bytes.Buffer) (*Member, error) {
 
 func unmarshalStake(r *bytes.Buffer) (Stake, error) {
 	stake := Stake{}
-	if err := encoding.ReadUint64LE(r, &stake.Amount); err != nil {
+	if err := encoding.ReadUint64LE(r, &stake.Value); err != nil {
 		return Stake{}, err
 	}
 
-	if err := encoding.ReadUint64LE(r, &stake.StartHeight); err != nil {
+	if err := encoding.ReadUint64LE(r, &stake.CreatedAt); err != nil {
 		return Stake{}, err
 	}
 
-	if err := encoding.ReadUint64LE(r, &stake.EndHeight); err != nil {
+	if err := encoding.ReadUint64LE(r, &stake.Eligibility); err != nil {
 		return Stake{}, err
 	}
 
@@ -358,6 +361,6 @@ func unmarshalStake(r *bytes.Buffer) (Stake, error) {
 
 // Format implements fmt.Formatter interface.
 func (s Stake) Format(f fmt.State, c rune) {
-	r := fmt.Sprintf("Amount: %d, From: %d, To: %d", s.Amount, s.StartHeight, s.EndHeight)
+	r := fmt.Sprintf("Value: %d, CreatedAt: %d, Eligibility: %d", s.Value, s.CreatedAt, s.Eligibility)
 	_, _ = f.Write([]byte(r))
 }

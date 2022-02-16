@@ -214,6 +214,12 @@ func (n *MockNetworkServer) Propagate(ctx context.Context, msg *rusk.PropagateMe
 	return res, errors.New("not implemented")
 }
 
+// AliveNodes is just here to satisfy the interface. Not used.
+func (n *MockNetworkServer) AliveNodes(ctx context.Context, in *rusk.AliveNodesRequest) (*rusk.AliveNodesResponse, error) {
+	res := &rusk.AliveNodesResponse{}
+	return res, errors.New("not implemented")
+}
+
 // NewRuskMock creates a Rusk Network server mock for tests.
 func NewRuskMock(gossip *protocol.Gossip, errChan chan error) (*grpc.Server, error) {
 	// create listener
@@ -277,6 +283,12 @@ func (c *MockNetworkClient) Send(ctx context.Context, in *rusk.SendMessage, opts
 // Propagate is just here to satisfy the interface. Not used.
 func (c *MockNetworkClient) Propagate(ctx context.Context, in *rusk.PropagateMessage, opts ...grpc.CallOption) (*rusk.Null, error) {
 	res := &rusk.Null{}
+	return res, errors.New("not implemented")
+}
+
+// AliveNodes is just here to satisfy the interface. Not used.
+func (c *MockNetworkClient) AliveNodes(ctx context.Context, in *rusk.AliveNodesRequest, opts ...grpc.CallOption) (*rusk.AliveNodesResponse, error) {
+	res := &rusk.AliveNodesResponse{}
 	return res, errors.New("not implemented")
 }
 

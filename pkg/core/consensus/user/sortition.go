@@ -115,8 +115,9 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 				break
 			}
 
-			if m.Stakes[i].StartHeight > round || m.Stakes[i].EndHeight < round {
-				subtractFromTotalWeight(W, m.Stakes[i].Amount)
+			isStakeMature := m.Stakes[i].Eligibility <= round
+			if !isStakeMature {
+				subtractFromTotalWeight(W, m.Stakes[i].Value)
 				m.RemoveStake(i)
 				continue
 			}

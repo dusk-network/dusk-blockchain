@@ -339,9 +339,9 @@ func UMember(r *rusk.Provisioner, t *user.Member) {
 	t.Stakes = make([]user.Stake, len(r.Stakes))
 	for i := range r.Stakes {
 		t.Stakes[i] = user.Stake{
-			Amount:      r.Stakes[i].Amount,
-			StartHeight: r.Stakes[i].StartHeight,
-			EndHeight:   r.Stakes[i].EndHeight,
+			Value:       r.Stakes[i].Value,
+			CreatedAt:   r.Stakes[i].CreatedAt,
+			Eligibility: r.Stakes[i].Eligibility,
 		}
 	}
 }

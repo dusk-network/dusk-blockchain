@@ -30,7 +30,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	logger "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
 
 var log = logger.WithFields(logger.Fields{"process": "mempool"})
@@ -79,7 +78,7 @@ type Mempool struct {
 }
 
 // NewMempool instantiates and initializes node mempool.
-func NewMempool(db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber, srv *grpc.Server) *Mempool {
+func NewMempool(db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifier transactions.UnconfirmedTxProber) *Mempool {
 	log.Infof("create instance")
 
 	l := log.WithField("backend_type", config.Get().Mempool.PoolType).
