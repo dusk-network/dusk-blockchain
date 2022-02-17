@@ -42,6 +42,9 @@ type Executor interface {
 
 	// GetStateRoot returns root hash of the finalized state.
 	GetStateRoot(ctx context.Context) ([]byte, error)
+
+	// Persist instructs Rusk to persist the state if in-sync with provided stateRoot.
+	Persist(ctx context.Context, stateRoot []byte) error
 }
 
 // Proxy toward the rusk client.
@@ -326,6 +329,21 @@ func (e *executor) GetStateRoot(ctx context.Context) ([]byte, error) {
 	}
 
 	return r.StateRoot, nil
+}
+
+// Persist proxy call to state.Persist grpc.
+func (e *executor) Persist(ctx context.Context, stateRoot []byte) error {
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
+	defer cancel()
+
+	req := &rusk.PersistRequest{StateRoot: stateRoot}
+
+	_, err := e.stateClient.Persist(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // UMember deep copies from the rusk.Provisioner.

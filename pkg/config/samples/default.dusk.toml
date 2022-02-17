@@ -218,6 +218,11 @@ consensustimeout = 5
 # useCompressedKeys determines if AggregatePks works with compressed or uncompressed pks.
 useCompressedKeys = false
 
+# State-related configuration
+[state]
+# Period of state persistance attempts (in blocks)
+persistEvery = 100
+
 [genesis]
 legacy = false
 

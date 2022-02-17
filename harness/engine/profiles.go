@@ -123,6 +123,8 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 	viper.Set("consensus.usecompressedkeys", false)
 	viper.Set("consensus.keysfile", consensusKeysPath+"/"+consensusKeysFileName)
 
+	viper.Set("state.persistevery", 100)
+
 	viper.Set("api.enabled", false)
 	viper.Set("api.enabletls", false)
 	viper.Set("api.address", "127.0.0.1:9199")

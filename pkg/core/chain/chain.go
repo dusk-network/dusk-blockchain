@@ -482,6 +482,23 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 		go c.storeStakesInStormDB(blk.Header.Height)
 	}
 
+	// 4. Persist state
+	pe := config.Get().State.PersistEvery
+
+	if pe > 0 {
+		if blk.Header.Height%pe == 0 {
+			l.Debug("chain: persist state", blk.Header.Height)
+
+			if err := c.proxy.Executor().Persist(c.ctx, c.tip.Header.StateHash); err != nil {
+				// TODO: trigger resync procedure
+				// https://github.com/dusk-network/dusk-blockchain/issues/1286
+				l.WithError(err).Error("chain: persist state failed")
+			}
+		}
+	} else {
+		l.Warn("State won't persist! Set `state.persistEvery` to a positive value")
+	}
+
 	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
 	l.Debug("procedure ended")
 }

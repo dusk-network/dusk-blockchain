@@ -196,3 +196,8 @@ type consensusConfiguration struct {
 	// UseCompressedKeys determines if AggregatePks works with compressed or uncompressed pks.
 	UseCompressedKeys bool
 }
+
+type stateConfiguration struct {
+	// PersistEvery N blocks the state in rusk
+	PersistEvery uint64
+}
