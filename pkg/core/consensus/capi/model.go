@@ -61,9 +61,9 @@ type Member struct {
 
 // Stake represents the Provisioner's stake.
 type Stake struct {
-	Amount      uint64 `json:"amount"`
-	StartHeight uint64 `json:"start_height"`
-	EndHeight   uint64 `json:"end_height"`
+	Value       uint64 `json:"value"`
+	CreatedAt   uint64 `json:"created_at"`
+	Eligibility uint64 `json:"eligibility"`
 }
 
 // ProvisionerJSON represents the Provisioner.
