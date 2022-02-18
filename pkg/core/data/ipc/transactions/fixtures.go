@@ -74,6 +74,11 @@ func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, u
 	return nil, *p.P, make([]byte, 32), nil
 }
 
+// Persist ...
+func (p *PermissiveExecutor) Persist(context.Context, []byte) error {
+	return nil
+}
+
 // MockProxy mocks a proxy for ease of testing.
 type MockProxy struct {
 	V UnconfirmedTxProber

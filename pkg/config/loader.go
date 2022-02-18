@@ -59,6 +59,7 @@ type Registry struct {
 	Kadcast   kadcastConfiguration
 	Mempool   mempoolConfiguration
 	Consensus consensusConfiguration
+	State     stateConfiguration
 
 	RPC rpcConfiguration
 	Gql gqlConfiguration
@@ -260,4 +261,5 @@ func init() {
 	r.Consensus.ConsensusTimeOut = 5
 	r.Timeout.TimeoutBrokerGetCandidate = 2
 	r.Mempool.MaxInvItems = 10000
+	r.State.PersistEvery = 1
 }
