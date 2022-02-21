@@ -13,7 +13,7 @@ import (
 // A single point of constants definition.
 const (
 	// DUSK is one whole unit of DUSK.
-	DUSK = uint64(1_000_000)
+	DUSK = uint64(1_000_000_000)
 
 	// Default Block Gas limit.
 	BlockGasLimit = 1000 * DUSK
