@@ -8,4 +8,5 @@ do
     mv wallets/node_$i-0.key $HOME/go/src/github.com/dusk-network/dusk-blockchain/consensus-keys/node_$i.keys
     mv wallets/node_$i-0.pub $HOME/go/src/github.com/dusk-network/dusk-blockchain/consensus-keys/node_$i.pub
     mv wallets/node_$i.address $HOME/go/src/github.com/dusk-network/dusk-blockchain/consensus-keys/
+    mv wallets/node_$i.dat $HOME/go/src/github.com/dusk-network/dusk-blockchain/consensus-keys/
 done
