@@ -22,7 +22,7 @@ func TestTxByTxID(t *testing.T) {
 			  blockhash
 			  gaslimit
 			  gasprice
-			  feepaid
+			  gasspent
 		  }
 		}
 		`, bid1Hash)
@@ -36,7 +36,7 @@ func TestTxByTxID(t *testing.T) {
 						"txtype": "3",
 						"gaslimit": 50000,
 						"gasprice": 100,
-						"feepaid": 5000000
+						"gasspent": 5000000
 					}
 				]
 			}

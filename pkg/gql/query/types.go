@@ -104,7 +104,7 @@ var Transaction = graphql.NewObject(
 			"gasprice": &graphql.Field{
 				Type: graphql.Int,
 			},
-			"feepaid": &graphql.Field{
+			"gasspent": &graphql.Field{
 				Type: graphql.Int,
 			},
 		},

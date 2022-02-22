@@ -152,7 +152,7 @@ NB: The examples from below represent only query structures. To send a query as 
       blocktimestamp
       gaslimit
       gasprice
-      feepaid
+      gasspent
 
       output {
         pubkey
@@ -175,7 +175,7 @@ NB: The examples from below represent only query structures. To send a query as 
       blockhash
       gaslimit
       gasprice
-      feepaid
+      gasspent
   }
 }
 ```
