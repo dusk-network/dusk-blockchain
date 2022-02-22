@@ -43,7 +43,7 @@ type (
 		Inputs   []queryInput  `json:"input"`
 		GasLimit uint64
 		GasPrice uint64
-		FeePaid  uint64
+		GasSpent uint64
 
 		// Non-StandardTx data fields.
 		BlockHash      []byte
@@ -85,7 +85,7 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 	qd.GasLimit = decoded.Fee.GasLimit
 	qd.GasPrice = decoded.Fee.GasPrice
 
-	qd.FeePaid = tx.GasSpent()
+	qd.GasSpent = tx.GasSpent()
 
 	qd.BlockHash = blockHash
 	qd.BlockTimestamp = timestamp

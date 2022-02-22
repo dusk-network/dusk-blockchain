@@ -68,12 +68,15 @@ func newQueryBlock(b *block.Block) queryBlock {
 	feesPaid := uint64(0)
 
 	for _, tx := range b.Txs {
-		feesPaid += tx.GasSpent()
+		decoded, _ := tx.Decode()
+
+		feesPaid += tx.GasSpent() * decoded.Fee.GasPrice
 
 		if tx.Type() == core.Distribute {
-			distribute, _ := tx.Decode()
-			for _, note := range distribute.Notes {
-				reward += note.DecodeTxAmount()
+			// The reward is the only BlockProducer note (dusk excluded)
+			if len(decoded.Notes) == 2 {
+				producerRewardNote := decoded.Notes[1]
+				reward = producerRewardNote.DecodeTxAmount()
 			}
 		}
 	}
