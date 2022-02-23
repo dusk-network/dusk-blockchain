@@ -177,11 +177,11 @@ func TestFetchTip(t *testing.T) {
 	_, chain := setupChainTest(t, 0)
 
 	// on a modern chain, state(tip) must point at genesis
-	var s *database.State
+	var s *database.Registry
 
 	err := chain.db.View(func(t database.Transaction) error {
 		var err error
-		s, err = t.FetchState()
+		s, err = t.FetchRegistry()
 		return err
 	})
 	assert.NoError(err)

@@ -78,13 +78,6 @@ func (l *DBLoader) Height() (uint64, error) {
 	return height, err
 }
 
-// Append stores a block in the DB.
-func (l *DBLoader) Append(blk *block.Block) error {
-	return l.db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(blk)
-	})
-}
-
 // BlockAt returns the block stored at a given height.
 func (l *DBLoader) BlockAt(searchingHeight uint64) (block.Block, error) {
 	var blk *block.Block
@@ -188,22 +181,24 @@ func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmou
 }
 
 // LoadTip returns the tip of the chain.
-func (l *DBLoader) LoadTip() (*block.Block, error) {
+func (l *DBLoader) LoadTip() (*block.Block, []byte, error) {
 	var tip *block.Block
+	var persistedHash []byte
 
 	err := l.db.Update(func(t database.Transaction) error {
-		s, err := t.FetchState()
+		s, err := t.FetchRegistry()
 		if err != nil {
 			// TODO: maybe log the error here and diversify between empty
 			// results and actual errors
 
 			// Store Genesis Block, if a modern node runs
-			err = t.StoreBlock(l.genesis)
+			err = t.StoreBlock(l.genesis, true)
 			if err != nil {
 				return err
 			}
 
 			tip = l.genesis
+			persistedHash = l.genesis.Header.Hash
 			return nil
 		}
 
@@ -219,10 +214,12 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 		}
 
 		tip = &block.Block{Header: h, Txs: txs}
+		persistedHash = s.PersistedHash
+
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Verify chain state. There shouldn't be any blocks higher than chainTip
@@ -244,8 +241,8 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return tip, nil
+	return tip, persistedHash, nil
 }

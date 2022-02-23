@@ -40,8 +40,8 @@ func (m *MockLoader) Height() (uint64, error) {
 }
 
 // LoadTip of the chain.
-func (m *MockLoader) LoadTip() (*block.Block, error) {
-	return &m.blockchain[len(m.blockchain)], nil
+func (m *MockLoader) LoadTip() (*block.Block, []byte, error) {
+	return &m.blockchain[len(m.blockchain)], nil, nil
 }
 
 // PerformSanityCheck on first N blocks and M last blocks.

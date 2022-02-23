@@ -59,7 +59,7 @@ type Verifier interface {
 // store the blockchain.
 type Loader interface {
 	// LoadTip of the chain.
-	LoadTip() (*block.Block, error)
+	LoadTip() (*block.Block, []byte, error)
 	// Clear removes everything from the DB.
 	Clear() error
 	// Close the Loader and finalizes any pending connection.
@@ -68,8 +68,6 @@ type Loader interface {
 	Height() (uint64, error)
 	// BlockAt returns the block at a given height.
 	BlockAt(uint64) (block.Block, error)
-	// Append a block on the storage.
-	Append(*block.Block) error
 }
 
 // Chain represents the nodes blockchain.
@@ -131,20 +129,22 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		return nil, err
 	}
 
-	chain.p = &provisioners
-
-	prevBlock, err := loader.LoadTip()
-	if err != nil {
-		return nil, err
-	}
-
-	chain.tip = prevBlock
-
 	if srv != nil {
 		node.RegisterChainServer(srv, chain)
 	}
 
+	chain.p = &provisioners
+
+	if err := chain.syncWithRusk(); err != nil {
+		return nil, err
+	}
+
 	return chain, nil
+}
+
+func (c *Chain) syncWithRusk() error {
+	// TODO:
+	return nil
 }
 
 // ProcessBlockFromNetwork will handle blocks incoming from the network.
@@ -443,11 +443,11 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 		return err
 	}
 
-	// 3. Store the approved block and update in-memory chain tip
-	l.Debug("storing block")
+	// 3. Persist the approved block and update in-memory chain tip
+	l.Debug("persisting block")
 
-	if err := c.loader.Append(b); err != nil {
-		l.WithError(err).Error("block storing failed")
+	if err := c.persist(b); err != nil {
+		l.WithError(err).Error("persisting block failed")
 		return err
 	}
 
@@ -457,6 +457,55 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 	c.postAcceptBlock(blk, l)
 
 	return nil
+}
+
+// Persist persists a block in both Contract Storage state and dusk-blockchain in ACID-compliant manner.
+func (c *Chain) persist(b *block.Block) error {
+	var (
+		fields = logger.Fields{
+			"event":  "accept_block",
+			"height": b.Header.Height,
+			"hash":   util.StringifyBytes(b.Header.Hash),
+			"curr_h": c.tip.Header.Height,
+		}
+		log = log.WithFields(fields)
+
+		err error
+		pe  = config.Get().State.PersistEvery
+	)
+
+	//  Persisting
+
+	err = c.db.Update(func(t database.Transaction) error {
+		var persisted bool
+
+		if pe > 0 && b.Header.Height%pe == 0 {
+			// Mark it as a persisted block
+			persisted = true
+		}
+
+		// Persist block into dusk-blockchain database before any attempt to persist in Rusk.
+		// If StoreBlock fails, no change will be applied in Rusk.
+		// If Rusk.Persist fails, StoreBlock is rollbacked.
+		err := t.StoreBlock(b, persisted)
+		if err != nil {
+			return err
+		}
+
+		// Persist Rusk state
+		if persisted {
+			if err := c.proxy.Executor().Persist(c.ctx, b.Header.StateHash); err != nil {
+				log.WithError(err).Error("persisting contract state failed")
+				return err
+			}
+
+			log.Debug("persisting contract state completed")
+		}
+
+		return nil
+	})
+
+	return err
 }
 
 // postAcceptBlock performs all post-events on accepting a block.
@@ -480,23 +529,6 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 	// 3. Update Storm DB
 	if config.Get().API.Enabled {
 		go c.storeStakesInStormDB(blk.Header.Height)
-	}
-
-	// 4. Persist state
-	pe := config.Get().State.PersistEvery
-
-	if pe > 0 {
-		if blk.Header.Height%pe == 0 {
-			l.Debug("chain: persist state", blk.Header.Height)
-
-			if err := c.proxy.Executor().Persist(c.ctx, c.tip.Header.StateHash); err != nil {
-				// TODO: trigger resync procedure
-				// https://github.com/dusk-network/dusk-blockchain/issues/1286
-				l.WithError(err).Error("chain: persist state failed")
-			}
-		}
-	} else {
-		l.Warn("State won't persist! Set `state.persistEvery` to a positive value")
 	}
 
 	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)

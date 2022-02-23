@@ -77,7 +77,7 @@ func createGetBlocks(locator []byte) message.Message {
 func storeBlocks(db database.DB, blocks []*block.Block) error {
 	for _, blk := range blocks {
 		err := db.Update(func(t database.Transaction) error {
-			return t.StoreBlock(blk)
+			return t.StoreBlock(blk, false)
 		})
 		if err != nil {
 			return err

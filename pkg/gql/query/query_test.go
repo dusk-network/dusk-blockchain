@@ -147,7 +147,7 @@ func initializeDB(db database.DB) error {
 
 	return db.Update(func(t database.Transaction) error {
 		for _, block := range chain {
-			err := t.StoreBlock(block)
+			err := t.StoreBlock(block, false)
 			if err != nil {
 				return err
 			}
