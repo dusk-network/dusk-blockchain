@@ -139,7 +139,7 @@ func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCal
 // fetchOrTimeout will keep trying to FetchMempoolTxs() until either
 // we get some txs or or the timeout expires.
 func (bg *generator) fetchOrTimeout(keys [][]byte) ([]transactions.ContractCall, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	tick := time.NewTicker(500 * time.Millisecond)
