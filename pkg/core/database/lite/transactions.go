@@ -8,7 +8,6 @@ package lite
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -189,32 +188,7 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 	return tx, txIndex, hash, err
 }
 
-func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) {
-	var txID []byte
-	var exists bool
-
-	if txID, exists = t.db.storage[keyImagesInd][toKey(keyImage)]; !exists {
-		return false, nil, database.ErrKeyImageNotFound
-	}
-
-	return true, txID, nil
-}
-
-func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
-	_, exists := t.db.storage[outputKeyInd][toKey(destkey)]
-	return exists, nil
-}
-
-func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
-	unlockHeight, exists := t.db.storage[outputKeyInd][toKey(destkey)]
-	if !exists {
-		return 0, errors.New("this output does not exist")
-	}
-
-	return binary.LittleEndian.Uint64(unlockHeight), nil
-}
-
-func (t transaction) FetchState() (*database.State, error) {
+func (t transaction) FetchRegistry() (*database.Registry, error) {
 	var hash []byte
 	var exists bool
 
@@ -226,7 +200,7 @@ func (t transaction) FetchState() (*database.State, error) {
 		return nil, database.ErrStateNotFound
 	}
 
-	s := &database.State{}
+	s := &database.Registry{}
 	s.TipHash = hash
 
 	if hash, exists = t.db.storage[persistedInd][toKey(stateKey)]; !exists {
@@ -274,7 +248,7 @@ func (t *transaction) FetchBlock(hash []byte) (*block.Block, error) {
 }
 
 func (t *transaction) FetchCurrentHeight() (uint64, error) {
-	state, err := t.FetchState()
+	state, err := t.FetchRegistry()
 	if err != nil {
 		return 0, err
 	}

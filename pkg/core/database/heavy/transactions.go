@@ -8,7 +8,6 @@ package heavy
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -50,16 +49,12 @@ var (
 	HeightPrefix = []byte{0x03}
 	// TxIDPrefix is the prefix to identify the Transaction ID.
 	TxIDPrefix = []byte{0x04}
-	// KeyImagePrefix is the prefix to identify the Key Image.
-	KeyImagePrefix = []byte{0x05}
-	// TipPrefix is the prefix to identify the Blockchain tip hash.
-	TipPrefix = []byte{0x06}
-	// OutputKeyPrefix is the prefix to identify the Output. // TODO: Remove this
-	OutputKeyPrefix = []byte{0x07}
+	// TipPrefix is the prefix to identify the hash of the latest blochchain block.
+	TipPrefix = []byte{0x05}
+	// PersistedPrefix is the prefix to identify the hash of the latest blochchain persisted block.
+	PersistedPrefix = []byte{0x06}
 	// CandidatePrefix is the prefix to identify Candidate messages.
-	CandidatePrefix = []byte{0x08}
-	//
-	PersistedPrefix = []byte{0x09}
+	CandidatePrefix = []byte{0x07}
 )
 
 type transaction struct {
@@ -229,39 +224,6 @@ func (t transaction) FetchBlockExists(hash []byte) (bool, error) {
 	return exists, err
 }
 
-// FetchOutputExists checks if an output exists in the db.
-func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
-	key := append(OutputKeyPrefix, destkey...)
-	exists, err := t.snapshot.Has(key, nil)
-
-	// goleveldb returns nilIfNotFound
-	// see also nilIfNotFound in leveldb/db.go
-	if !exists && err == nil {
-		// overwrite error message
-		err = database.ErrOutputNotFound
-	}
-
-	return exists, err
-}
-
-// FetchOutputUnlockHeight returns the unlockheight of an output.
-func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
-	key := append(OutputKeyPrefix, destkey...)
-
-	unlockHeightBytes, err := t.snapshot.Get(key, nil)
-	if err != nil {
-		return 0, err
-	}
-
-	if len(unlockHeightBytes) != 8 {
-		return 0, errors.New("unlock height malformed")
-	}
-
-	// output unlock height is the first 8 bytes
-	unlockHeight := binary.LittleEndian.Uint64(unlockHeightBytes[0:8])
-	return unlockHeight, err
-}
-
 func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	key := append(HeaderPrefix, hash...)
 
@@ -408,27 +370,6 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 	return nil, txIndex, nil, errors.New("block tx is available but fetching it fails")
 }
 
-// FetchKeyImageExists checks if the KeyImage exists. If so, it also returns the
-// hash of its corresponding tx.
-//
-// Due to performance concerns, the found tx is not verified. By explicitly
-// calling FetchBlockTxByHash, a consumer can check if the tx is real.
-func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) {
-	key := append(KeyImagePrefix, keyImage...)
-
-	txID, err := t.snapshot.Get(key, nil)
-	if err != nil {
-		if err == leveldb.ErrNotFound {
-			// overwrite error message
-			err = database.ErrKeyImageNotFound
-		}
-
-		return false, nil, err
-	}
-
-	return true, txID, nil
-}
-
 func (t transaction) FetchBlock(hash []byte) (*block.Block, error) {
 	header, err := t.FetchBlockHeader(hash)
 	if err != nil {
@@ -446,7 +387,7 @@ func (t transaction) FetchBlock(hash []byte) (*block.Block, error) {
 	}, nil
 }
 
-func (t transaction) FetchState() (*database.State, error) {
+func (t transaction) FetchRegistry() (*database.Registry, error) {
 	tipHash, err := t.snapshot.Get(TipPrefix, nil)
 	if err == leveldb.ErrNotFound || len(tipHash) == 0 {
 		// overwrite error message
@@ -467,14 +408,14 @@ func (t transaction) FetchState() (*database.State, error) {
 		return nil, err
 	}
 
-	return &database.State{
+	return &database.Registry{
 		TipHash:       tipHash,
 		PersistedHash: persistedHash,
 	}, nil
 }
 
 func (t transaction) FetchCurrentHeight() (uint64, error) {
-	state, err := t.FetchState()
+	state, err := t.FetchRegistry()
 	if err != nil {
 		return 0, err
 	}

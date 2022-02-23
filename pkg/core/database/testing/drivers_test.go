@@ -185,7 +185,7 @@ func TestStoreBlock(test *testing.T) {
 
 	// Ensure chain tip is updated too
 	err = db.View(func(t database.Transaction) error {
-		s, err1 := t.FetchState()
+		s, err1 := t.FetchRegistry()
 		if err1 != nil {
 			return err1
 		}

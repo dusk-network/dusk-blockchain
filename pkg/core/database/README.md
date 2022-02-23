@@ -80,6 +80,11 @@ _ = db.View(func(tx database.Tx) error {
 })
 ```
 
+## Blockchain registry
+Blockchain database supports (read/write) two additional KV records which store both hash of the blockchain latest block and hash of blockchain latest `persisted` block. A block has a meaning of a persisted block only if rusk.Persist grpc has been called for it successfully.
+
+`FetchRegistry` method from Transaction interface should be used to fetch the abovementioned KV records.
+
 ## Additional features
 
 Additional features that can be provided by a Driver:
