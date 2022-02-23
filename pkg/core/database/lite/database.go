@@ -29,6 +29,7 @@ const (
 	stateInd
 	outputKeyInd
 	candidateInd
+	persistedInd
 	maxInd
 )
 

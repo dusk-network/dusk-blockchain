@@ -148,18 +148,28 @@ func _TestDriver(m *testing.M, driverName string) int {
 
 func TestStoreBlock(test *testing.T) {
 	// Generate additional blocks to store
-	genBlocks, err := generateChainBlocks(2)
+	blocks, err := generateChainBlocks(20)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
 
+	var persistedHash []byte
 	done := false
+
 	err = db.Update(func(t database.Transaction) error {
-		for _, block := range genBlocks {
-			err = t.StoreBlock(block)
+		for i, b := range blocks {
+
+			var persisted bool
+			if i%3 == 0 {
+				persisted = true
+				persistedHash = b.Header.Hash
+			}
+
+			err = t.StoreBlock(b, persisted)
 			if err != nil {
 				return err
 			}
+
 		}
 		done = true
 		return nil
@@ -180,9 +190,14 @@ func TestStoreBlock(test *testing.T) {
 			return err1
 		}
 
-		if !bytes.Equal(genBlocks[len(genBlocks)-1].Header.Hash, s.TipHash) {
+		if !bytes.Equal(blocks[len(blocks)-1].Header.Hash, s.TipHash) {
 			return fmt.Errorf("invalid chain tip")
 		}
+
+		if !bytes.Equal(s.PersistedHash, persistedHash) {
+			return fmt.Errorf("invalid persisted hash")
+		}
+
 		return nil
 	})
 
@@ -379,7 +394,7 @@ func TestAtomicUpdates(test *testing.T) {
 	forcedError := errors.New("force majeure situation")
 	err := db.Update(func(t database.Transaction) error {
 		for height, block := range genBlocks {
-			err := t.StoreBlock(block)
+			err := t.StoreBlock(block, false)
 			if err != nil {
 				return err
 			}
@@ -426,7 +441,7 @@ func TestReadOnlyTx(test *testing.T) {
 	// Try to call StoreBlock on a read-only DB Tx
 	err := db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
-			err := t.StoreBlock(block)
+			err := t.StoreBlock(block, false)
 			if err != nil {
 				return err
 			}
@@ -501,7 +516,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	// Store all blocks with read-write DB
 	err = dbReadWrite.Update(func(t database.Transaction) error {
 		for _, b := range genBlocks {
-			if e := t.StoreBlock(b); e != nil {
+			if e := t.StoreBlock(b, false); e != nil {
 				return e
 			}
 		}
@@ -532,7 +547,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	// Ensure read-only DB cannot write
 	err = dbReadOnly.Update(func(t database.Transaction) error {
 		for _, block := range blocks {
-			err1 := t.StoreBlock(block)
+			err1 := t.StoreBlock(block, false)
 			if err1 != nil {
 				return err1
 			}

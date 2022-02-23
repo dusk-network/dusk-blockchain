@@ -52,12 +52,14 @@ var (
 	TxIDPrefix = []byte{0x04}
 	// KeyImagePrefix is the prefix to identify the Key Image.
 	KeyImagePrefix = []byte{0x05}
-	// StatePrefix is the prefix to identify the State.
-	StatePrefix = []byte{0x06}
-	// OutputKeyPrefix is the prefix to identify the Output.
+	// TipPrefix is the prefix to identify the Blockchain tip hash.
+	TipPrefix = []byte{0x06}
+	// OutputKeyPrefix is the prefix to identify the Output. // TODO: Remove this
 	OutputKeyPrefix = []byte{0x07}
 	// CandidatePrefix is the prefix to identify Candidate messages.
 	CandidatePrefix = []byte{0x08}
+	//
+	PersistedPrefix = []byte{0x09}
 )
 
 type transaction struct {
@@ -83,7 +85,7 @@ type transaction struct {
 //
 // It is assumed that StoreBlock would be called much less times than Fetch*
 // APIs. Based on that, extra indexing data is put to provide fast-read lookups.
-func (t transaction) StoreBlock(b *block.Block) error {
+func (t transaction) StoreBlock(b *block.Block, persisted bool) error {
 	if t.batch == nil {
 		// t.batch is initialized only on a open, read-write transaction
 		// (built with transaction.Update()).
@@ -161,18 +163,23 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	}
 
 	key = append(HeightPrefix, heightBuf.Bytes()...)
-	value = b.Header.Hash
 
-	t.put(key, value)
+	t.put(key, b.Header.Hash)
 
-	// Key = StatePrefix
+	// Key = TipPrefix
 	// Value = Hash(chain tip)
 	//
 	// To support fetching  blockchain tip
-	key = StatePrefix
-	value = b.Header.Hash
+	t.put(TipPrefix, b.Header.Hash)
 
-	t.put(key, value)
+	if persisted {
+		// Key = PersistedPrefix
+		// Value = Hash(chain tip)
+		//
+		// To support fetching blockchain persisted hash
+
+		t.put(PersistedPrefix, b.Header.Hash)
+	}
 
 	return nil
 }
@@ -440,10 +447,8 @@ func (t transaction) FetchBlock(hash []byte) (*block.Block, error) {
 }
 
 func (t transaction) FetchState() (*database.State, error) {
-	key := StatePrefix
-
-	value, err := t.snapshot.Get(key, nil)
-	if err == leveldb.ErrNotFound || len(value) == 0 {
+	tipHash, err := t.snapshot.Get(TipPrefix, nil)
+	if err == leveldb.ErrNotFound || len(tipHash) == 0 {
 		// overwrite error message
 		err = database.ErrStateNotFound
 	}
@@ -452,7 +457,20 @@ func (t transaction) FetchState() (*database.State, error) {
 		return nil, err
 	}
 
-	return &database.State{TipHash: value}, nil
+	persistedHash, err := t.snapshot.Get(PersistedPrefix, nil)
+	if err == leveldb.ErrNotFound || len(persistedHash) == 0 {
+		// overwrite error message
+		err = database.ErrStateNotFound
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &database.State{
+		TipHash:       tipHash,
+		PersistedHash: persistedHash,
+	}, nil
 }
 
 func (t transaction) FetchCurrentHeight() (uint64, error) {

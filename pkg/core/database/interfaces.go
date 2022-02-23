@@ -66,7 +66,7 @@ type Transaction interface {
 	FetchBlockTxByHash(txID []byte) (tx transactions.ContractCall, txIndex uint32, blockHeaderHash []byte, err error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
-	// Fetch chain state information (chain tip hash).
+	// Fetch chain state information (chain tip hash, persisted block etc).
 	FetchState() (*State, error)
 
 	// Check if an input keyImage is already stored. If succeeds, it returns
@@ -77,7 +77,7 @@ type Transaction interface {
 	// Store the next chain block in a append-only manner
 	// Overwrites only if block with same hash already stored
 	// Not to be called concurrently, as it updates chain tip.
-	StoreBlock(block *block.Block) error
+	StoreBlock(block *block.Block, persisted bool) error
 
 	// FetchBlock will return a block, given a hash.
 	FetchBlock(hash []byte) (*block.Block, error)
@@ -134,5 +134,6 @@ type DB interface {
 // State represents a single db entry that provides chain metadata. This
 // includes currently only chain tip hash but could be extended at later stage.
 type State struct {
-	TipHash []byte
+	TipHash       []byte
+	PersistedHash []byte
 }

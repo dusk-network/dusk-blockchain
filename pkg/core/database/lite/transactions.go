@@ -30,7 +30,7 @@ type transaction struct {
 // map lookup operation on block per height, one can utilize a height as index
 // in a slice.
 // NB: A single slice of all blocks to be used to avoid all duplications.
-func (t *transaction) StoreBlock(b *block.Block) error {
+func (t *transaction) StoreBlock(b *block.Block, persisted bool) error {
 	if !t.writable {
 		return errors.New("read-only transaction")
 	}
@@ -81,6 +81,10 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	// Map stateKey to chain state (tip)
 	t.batch[stateInd][toKey(stateKey)] = b.Header.Hash
+
+	if persisted {
+		t.batch[persistedInd][toKey(stateKey)] = b.Header.Hash
+	}
 
 	return nil
 }
@@ -224,6 +228,16 @@ func (t transaction) FetchState() (*database.State, error) {
 
 	s := &database.State{}
 	s.TipHash = hash
+
+	if hash, exists = t.db.storage[persistedInd][toKey(stateKey)]; !exists {
+		return nil, database.ErrStateNotFound
+	}
+
+	if len(hash) == 0 {
+		return nil, database.ErrStateNotFound
+	}
+
+	s.PersistedHash = hash
 
 	return s, nil
 }
