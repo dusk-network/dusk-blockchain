@@ -64,26 +64,6 @@ func newQueryBlock(b *block.Block) queryBlock {
 	qb.Header.Hash = b.Header.Hash
 	qb.Header.StateHash = b.Header.StateHash
 
-	reward := uint64(0)
-	feesPaid := uint64(0)
-
-	for _, tx := range b.Txs {
-		decoded, _ := tx.Decode()
-
-		feesPaid += tx.GasSpent() * decoded.Fee.GasPrice
-
-		if tx.Type() == core.Distribute {
-			// The reward is the only BlockProducer note (dusk excluded)
-			if len(decoded.Notes) == 2 {
-				producerRewardNote := decoded.Notes[1]
-				reward = producerRewardNote.DecodeTxAmount()
-			}
-		}
-	}
-
-	qb.Header.Reward = reward
-	qb.Header.FeesPaid = feesPaid
-
 	return qb
 }
 
@@ -207,8 +187,74 @@ func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 
 		return txs, err
 	}
-
 	return nil, errors.New("invalid source block")
+}
+
+func resolveReward(p graphql.ResolveParams) (interface{}, error) {
+	b, ok := p.Source.(*queryHeader)
+	if ok {
+		// Retrieve DB conn from context
+		db, ok := p.Context.Value("database").(database.DB)
+		if !ok {
+			return nil, errors.New("context does not store database conn")
+		}
+
+		reward := uint64(0)
+
+		err := db.View(func(t database.Transaction) error {
+			fetched, err := t.FetchBlockTxs(b.Hash)
+			if err != nil {
+				return err
+			}
+
+			for _, tx := range fetched {
+
+				decoded, _ := tx.Decode()
+
+				if tx.Type() == core.Distribute {
+					// The reward is the only BlockProducer note (dusk excluded)
+					if len(decoded.Notes) == 2 {
+						producerRewardNote := decoded.Notes[1]
+						reward = producerRewardNote.DecodeTxAmount()
+						return nil
+					}
+				}
+			}
+			return nil
+		})
+		return &reward, err
+	}
+
+	return nil, errors.New("invalid resolveReward source block")
+}
+
+func resolveFee(p graphql.ResolveParams) (interface{}, error) {
+	b, ok := p.Source.(*queryHeader)
+	if ok {
+		// Retrieve DB conn from context
+		db, ok := p.Context.Value("database").(database.DB)
+		if !ok {
+			return nil, errors.New("context does not store database conn")
+		}
+
+		feesPaid := uint64(0)
+
+		err := db.View(func(t database.Transaction) error {
+			fetched, err := t.FetchBlockTxs(b.Hash)
+			if err != nil {
+				return err
+			}
+
+			for _, tx := range fetched {
+				decoded, _ := tx.Decode()
+				feesPaid += tx.GasSpent() * decoded.Fee.GasPrice
+			}
+			return nil
+		})
+		return feesPaid, err
+	}
+
+	return nil, errors.New("invalid resolveFee source block")
 }
 
 // Fetch block headers by a list of hashes.
