@@ -208,24 +208,23 @@ func resolveReward(p graphql.ResolveParams) (interface{}, error) {
 			}
 
 			for _, tx := range fetched {
-
-				decoded, _ := tx.Decode()
-
-				if tx.Type() == core.Distribute {
-					// The reward is the only BlockProducer note (dusk excluded)
-					if len(decoded.Notes) == 2 {
-						producerRewardNote := decoded.Notes[1]
-						reward = producerRewardNote.DecodeTxAmount()
-						return nil
+				if decoded, e := tx.Decode(); e == nil {
+					if tx.Type() == core.Distribute {
+						// The reward is the only BlockProducer note (dusk excluded)
+						if len(decoded.Notes) == 2 {
+							producerRewardNote := decoded.Notes[1]
+							reward = producerRewardNote.DecodeTxAmount()
+							return nil
+						}
 					}
 				}
 			}
 			return nil
 		})
-		return &reward, err
+		return reward, err
 	}
 
-	return nil, errors.New("invalid resolveReward source block")
+	return 0, errors.New("invalid resolveReward source block")
 }
 
 func resolveFee(p graphql.ResolveParams) (interface{}, error) {
@@ -246,15 +245,16 @@ func resolveFee(p graphql.ResolveParams) (interface{}, error) {
 			}
 
 			for _, tx := range fetched {
-				decoded, _ := tx.Decode()
-				feesPaid += tx.GasSpent() * decoded.Fee.GasPrice
+				if decoded, e := tx.Decode(); e == nil {
+					feesPaid += tx.GasSpent() * decoded.Fee.GasPrice
+				}
 			}
 			return nil
 		})
 		return feesPaid, err
 	}
 
-	return nil, errors.New("invalid resolveFee source block")
+	return 0, errors.New("invalid resolveFee source block")
 }
 
 // Fetch block headers by a list of hashes.
