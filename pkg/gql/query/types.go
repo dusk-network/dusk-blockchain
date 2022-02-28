@@ -60,10 +60,12 @@ var Header = graphql.NewObject(
 				Type: UnixTimestamp,
 			},
 			"reward": &graphql.Field{
-				Type: graphql.Int,
+				Type:    graphql.Float,
+				Resolve: resolveReward,
 			},
 			"feespaid": &graphql.Field{
-				Type: graphql.Int,
+				Type:    graphql.Float,
+				Resolve: resolveFee,
 			},
 		},
 	},
