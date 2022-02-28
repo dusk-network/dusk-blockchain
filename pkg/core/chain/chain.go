@@ -143,7 +143,72 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 }
 
 func (c *Chain) syncWithRusk() error {
-	// TODO:
+	ruskStateHash, err := c.proxy.Executor().GetStateRoot(c.ctx)
+	if err != nil {
+		return err
+	}
+
+	prevBlock, persistedHash, err := c.loader.LoadTip()
+	if err != nil {
+		return err
+	}
+
+	// Detect if both services are on the different state
+	var persitedBlock *block.Block
+	err = c.db.View(func(t database.Transaction) error {
+		persitedBlock, err = t.FetchBlock(persistedHash)
+		if err != nil {
+			return err
+		}
+
+		if !bytes.Equal(persitedBlock.Header.StateHash, ruskStateHash) {
+			log.WithField("rusk", hex.EncodeToString(ruskStateHash)).
+				WithField("node", hex.EncodeToString(persitedBlock.Header.StateHash)).
+				Error("invalid state detected")
+			return errors.New("invalid state detected")
+		}
+
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	// Update blockchain tip (in-memory)
+	c.tip = persitedBlock
+
+	// If both persisted block hash and latest blockchain block hash are the
+	// same then there is no need to execute sync-up.
+	if bytes.Equal(persistedHash, prevBlock.Header.Hash) {
+		return nil
+	}
+
+	// re-accept missing block in order to recover Rusk (unpersisted) state.
+	i := persitedBlock.Header.Height
+	for {
+		i++
+
+		var blk *block.Block
+		err = c.db.View(func(t database.Transaction) error {
+			hash, err := t.FetchBlockHashByHeight(i)
+			if err != nil {
+				return err
+			}
+
+			blk, err = t.FetchBlock(hash)
+			return err
+		})
+		if err != nil {
+			break
+		}
+
+		// Re-accepting all blocks that have not been persisted in Rusk.
+		// This will re-execute accept/finalize accordingly and update chain tip.
+		if err := c.acceptBlock(*blk, false); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -200,7 +265,7 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 // from the network during out-of-sync state.
 func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting sync block")
-	return c.acceptBlock(blk)
+	return c.acceptBlock(blk, true)
 }
 
 // TryNextConsecutiveBlockInSync is the processing path for accepting a block
@@ -235,7 +300,7 @@ func (c *Chain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
 
 	l := log.WithFields(fields)
 
-	return c.isValidBlock(blk, l)
+	return c.isValidBlock(blk, l, true)
 }
 
 // ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
@@ -263,7 +328,7 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
 
-	if err := c.acceptBlock(blk); err != nil {
+	if err := c.acceptBlock(blk, true); err != nil {
 		return err
 	}
 
@@ -317,7 +382,9 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			blk.Header.Height,
 			config.BlockGasLimit)
 		if err != nil {
-			l.WithError(err).Error("Error in executing the state transition")
+			l.WithError(err).
+				WithField("grpc", "finalize").
+				Error("Error in executing the state transition")
 			return block.NewBlock(), err
 		}
 	default:
@@ -328,7 +395,10 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			blk.Header.Height,
 			config.BlockGasLimit)
 		if err != nil {
-			l.WithError(err).Error("Error in executing the state transition")
+			l.WithError(err).
+				WithField("grpc", "accept").
+				Error("Error in executing the state transition")
+
 			return block.NewBlock(), err
 		}
 	}
@@ -390,12 +460,14 @@ func (c *Chain) sanityCheckStateHash() error {
 	return nil
 }
 
-func (c *Chain) isValidBlock(blk block.Block, l *logrus.Entry) error {
+func (c *Chain) isValidBlock(blk block.Block, l *logrus.Entry, withSanityCheck bool) error {
 	l.Debug("verifying block")
 	// Check that stateless and stateful checks pass
-	if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
-		l.WithError(err).Error("block verification failed")
-		return err
+	if withSanityCheck {
+		if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
+			l.WithError(err).Error("block verification failed")
+			return err
+		}
 	}
 
 	// Check the certificate
@@ -417,7 +489,7 @@ func (c *Chain) isValidBlock(blk block.Block, l *logrus.Entry) error {
 // 1. We have not seen it before
 // 2. All stateless and stateful checks are true
 // Returns nil, if checks passed and block was successfully saved.
-func (c *Chain) acceptBlock(blk block.Block) error {
+func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 	fields := logger.Fields{
 		"event":    "accept_block",
 		"height":   blk.Header.Height,
@@ -430,7 +502,7 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 	var err error
 
 	// 1. Ensure block fields and certificate are valid
-	if err = c.isValidBlock(blk, l); err != nil {
+	if err = c.isValidBlock(blk, l, withSanityCheck); err != nil {
 		l.WithError(err).Error("invalid block error")
 		return err
 	}
@@ -451,15 +523,15 @@ func (c *Chain) acceptBlock(blk block.Block) error {
 		return err
 	}
 
-	c.tip = &blk
+	c.tip = b
 
 	// 5. Perform all post-events on accepting a block
-	c.postAcceptBlock(blk, l)
+	c.postAcceptBlock(*b, l)
 
 	return nil
 }
 
-// Persist persists a block in both Contract Storage state and dusk-blockchain in ACID-compliant manner.
+// Persist persists a block in both Contract Storage state and dusk-blockchain db in atomic manner.
 func (c *Chain) persist(b *block.Block) error {
 	var (
 		fields = logger.Fields{
@@ -474,26 +546,25 @@ func (c *Chain) persist(b *block.Block) error {
 		pe  = config.Get().State.PersistEvery
 	)
 
-	//  Persisting
-
+	//  Atomic persist
 	err = c.db.Update(func(t database.Transaction) error {
-		var persisted bool
+		var p bool
 
 		if pe > 0 && b.Header.Height%pe == 0 {
 			// Mark it as a persisted block
-			persisted = true
+			p = true
 		}
 
 		// Persist block into dusk-blockchain database before any attempt to persist in Rusk.
 		// If StoreBlock fails, no change will be applied in Rusk.
 		// If Rusk.Persist fails, StoreBlock is rollbacked.
-		err := t.StoreBlock(b, persisted)
+		err := t.StoreBlock(b, p)
 		if err != nil {
 			return err
 		}
 
 		// Persist Rusk state
-		if persisted {
+		if p {
 			if err := c.proxy.Executor().Persist(c.ctx, b.Header.StateHash); err != nil {
 				log.WithError(err).Error("persisting contract state failed")
 				return err

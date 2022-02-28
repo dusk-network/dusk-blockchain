@@ -35,7 +35,7 @@ func (c *Chain) tryFallback(blk block.Block) error {
 	c.tip = &prevBlk
 
 	// Perform verify and accept block procedure
-	if err := c.acceptBlock(blk); err != nil {
+	if err := c.acceptBlock(blk, true); err != nil {
 		c.tip = &oldTip
 		return err
 	}

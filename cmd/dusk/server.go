@@ -115,6 +115,8 @@ func Setup() *Server {
 
 	proxy, ruskConn := setupGRPCClients(gctx)
 
+	log.Info("grpc connection with rusk service established")
+
 	m := mempool.NewMempool(db, eventBus, rpcBus, proxy.Prober())
 	m.Run(parentCtx)
 

@@ -11,7 +11,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
@@ -44,15 +43,12 @@ var (
 //
 // The network should be fully functioning and ready to accept messaging.
 func TestMain(m *testing.M) {
-	var err error
 
 	flag.Parse()
 
 	// create the temp-dir workspace. Quit on error
-	workspace, err = ioutil.TempDir(os.TempDir(), "localnet-")
-	if err != nil {
-		quit(localNet, workspace, err)
-	}
+	workspace = os.TempDir() + "/localnet"
+	os.Mkdir(workspace, 0700)
 
 	// set the network size
 	if localNetSizeStr != "" {
