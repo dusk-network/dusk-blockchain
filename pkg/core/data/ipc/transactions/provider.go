@@ -12,6 +12,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/sirupsen/logrus"
@@ -84,6 +85,15 @@ type verifier struct {
 
 // Preverify verifies a contract call transaction.
 func (v *verifier) Preverify(ctx context.Context, call ContractCall) ([]byte, Fee, error) {
+	decoded, decodeErr := call.Decode()
+	if decodeErr != nil {
+		return nil, Fee{}, decodeErr
+	}
+
+	if decoded.Fee.GasLimit >= config.BlockGasLimit {
+		return nil, Fee{}, errors.New("tx gas limit exceeds the block gas limit")
+	}
+
 	vstr := new(rusk.PreverifyRequest)
 
 	tx := new(rusk.Transaction)
