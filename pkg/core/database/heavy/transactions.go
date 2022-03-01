@@ -49,9 +49,9 @@ var (
 	HeightPrefix = []byte{0x03}
 	// TxIDPrefix is the prefix to identify the Transaction ID.
 	TxIDPrefix = []byte{0x04}
-	// TipPrefix is the prefix to identify the hash of the latest blochchain block.
+	// TipPrefix is the prefix to identify the hash of the latest blockchain block.
 	TipPrefix = []byte{0x05}
-	// PersistedPrefix is the prefix to identify the hash of the latest blochchain persisted block.
+	// PersistedPrefix is the prefix to identify the hash of the latest blockchain persisted block.
 	PersistedPrefix = []byte{0x06}
 	// CandidatePrefix is the prefix to identify Candidate messages.
 	CandidatePrefix = []byte{0x07}
@@ -167,12 +167,11 @@ func (t transaction) StoreBlock(b *block.Block, persisted bool) error {
 	// To support fetching  blockchain tip
 	t.put(TipPrefix, b.Header.Hash)
 
+	// Key = PersistedPrefix
+	// Value = Hash(chain tip)
+	//
+	// To support fetching blockchain persisted hash
 	if persisted {
-		// Key = PersistedPrefix
-		// Value = Hash(chain tip)
-		//
-		// To support fetching blockchain persisted hash
-
 		t.put(PersistedPrefix, b.Header.Hash)
 	}
 

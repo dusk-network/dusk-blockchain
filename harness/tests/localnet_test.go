@@ -43,7 +43,6 @@ var (
 //
 // The network should be fully functioning and ready to accept messaging.
 func TestMain(m *testing.M) {
-
 	flag.Parse()
 
 	// create the temp-dir workspace. Quit on error

@@ -24,10 +24,8 @@ const (
 	blocksInd = iota
 	txsInd
 	txHashInd
-	keyImagesInd
 	heightInd
 	stateInd
-	outputKeyInd
 	candidateInd
 	persistedInd
 	maxInd

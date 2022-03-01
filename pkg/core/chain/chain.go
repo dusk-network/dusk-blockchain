@@ -143,18 +143,26 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 }
 
 func (c *Chain) syncWithRusk() error {
-	ruskStateHash, err := c.proxy.Executor().GetStateRoot(c.ctx)
+	var (
+		err           error
+		ruskStateHash []byte
+		persistedHash []byte
+		prevBlock     *block.Block
+	)
+
+	ruskStateHash, err = c.proxy.Executor().GetStateRoot(c.ctx)
 	if err != nil {
 		return err
 	}
 
-	prevBlock, persistedHash, err := c.loader.LoadTip()
+	prevBlock, persistedHash, err = c.loader.LoadTip()
 	if err != nil {
 		return err
 	}
 
 	// Detect if both services are on the different state
 	var persitedBlock *block.Block
+
 	err = c.db.View(func(t database.Transaction) error {
 		persitedBlock, err = t.FetchBlock(persistedHash)
 		if err != nil {
@@ -185,12 +193,16 @@ func (c *Chain) syncWithRusk() error {
 
 	// re-accept missing block in order to recover Rusk (unpersisted) state.
 	i := persitedBlock.Header.Height
+
 	for {
 		i++
 
 		var blk *block.Block
+
 		err = c.db.View(func(t database.Transaction) error {
-			hash, err := t.FetchBlockHashByHeight(i)
+			var hash []byte
+
+			hash, err = t.FetchBlockHashByHeight(i)
 			if err != nil {
 				return err
 			}
@@ -198,6 +210,7 @@ func (c *Chain) syncWithRusk() error {
 			blk, err = t.FetchBlock(hash)
 			return err
 		})
+
 		if err != nil {
 			break
 		}
@@ -534,13 +547,12 @@ func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 // Persist persists a block in both Contract Storage state and dusk-blockchain db in atomic manner.
 func (c *Chain) persist(b *block.Block) error {
 	var (
-		fields = logger.Fields{
+		clog = log.WithFields(logger.Fields{
 			"event":  "accept_block",
 			"height": b.Header.Height,
 			"hash":   util.StringifyBytes(b.Header.Hash),
 			"curr_h": c.tip.Header.Height,
-		}
-		log = log.WithFields(fields)
+		})
 
 		err error
 		pe  = config.Get().State.PersistEvery
@@ -558,19 +570,18 @@ func (c *Chain) persist(b *block.Block) error {
 		// Persist block into dusk-blockchain database before any attempt to persist in Rusk.
 		// If StoreBlock fails, no change will be applied in Rusk.
 		// If Rusk.Persist fails, StoreBlock is rollbacked.
-		err := t.StoreBlock(b, p)
-		if err != nil {
+		if err = t.StoreBlock(b, p); err != nil {
 			return err
 		}
 
 		// Persist Rusk state
 		if p {
-			if err := c.proxy.Executor().Persist(c.ctx, b.Header.StateHash); err != nil {
-				log.WithError(err).Error("persisting contract state failed")
+			if err = c.proxy.Executor().Persist(c.ctx, b.Header.StateHash); err != nil {
+				clog.WithError(err).Error("persisting contract state failed")
 				return err
 			}
 
-			log.Debug("persisting contract state completed")
+			clog.Debug("persisting contract state completed")
 		}
 
 		return nil

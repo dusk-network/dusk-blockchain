@@ -147,17 +147,19 @@ func _TestDriver(m *testing.M, driverName string) int {
 }
 
 func TestStoreBlock(test *testing.T) {
+	var (
+		persistedHash []byte
+		done          bool
+	)
+
 	// Generate additional blocks to store
-	blocks, err := generateChainBlocks(20)
+	blks, err := generateChainBlocks(20)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
 
-	var persistedHash []byte
-	done := false
-
 	err = db.Update(func(t database.Transaction) error {
-		for i, b := range blocks {
+		for i, b := range blks {
 
 			var persisted bool
 			if i%3 == 0 {
@@ -190,7 +192,7 @@ func TestStoreBlock(test *testing.T) {
 			return err1
 		}
 
-		if !bytes.Equal(blocks[len(blocks)-1].Header.Hash, s.TipHash) {
+		if !bytes.Equal(blks[len(blks)-1].Header.Hash, s.TipHash) {
 			return fmt.Errorf("invalid chain tip")
 		}
 
