@@ -72,9 +72,9 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 
 	// Perform database sanity check to ensure that it is rational before
 	// bootstrapping all node subsystems
-	if err := l.PerformSanityCheck(0, 10, 0); err != nil {
-		return nil, err
-	}
+	//if err := l.PerformSanityCheck(0, 10, 0); err != nil {
+	//	return nil, err
+	//}
 
 	return chainProcess, nil
 }
