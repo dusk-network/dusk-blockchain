@@ -13,8 +13,8 @@ import (
 // MockVerifier is a mock for the chain.Verifier interface.
 type MockVerifier struct{}
 
-// PerformSanityCheck on first N blocks and M last blocks.
-func (v *MockVerifier) PerformSanityCheck(uint64, uint64, uint64) error {
+// SanityCheckBlockchain on first N blocks and M last blocks.
+func (v *MockVerifier) SanityCheckBlockchain(uint64, uint64) error {
 	return nil
 }
 
@@ -44,8 +44,8 @@ func (m *MockLoader) LoadTip() (*block.Block, []byte, error) {
 	return &m.blockchain[len(m.blockchain)], nil, nil
 }
 
-// PerformSanityCheck on first N blocks and M last blocks.
-func (m *MockLoader) PerformSanityCheck(uint64, uint64, uint64) error {
+// SanityCheckBlockchain on first N blocks and M last blocks.
+func (m *MockLoader) SanityCheckBlockchain(uint64, uint64, uint64) error {
 	return nil
 }
 

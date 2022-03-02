@@ -49,8 +49,8 @@ var ErrBlockAlreadyAccepted = errors.New("discarded block from the past")
 
 // Verifier performs checks on the blockchain and potentially new incoming block.
 type Verifier interface {
-	// PerformSanityCheck on first N blocks and M last blocks.
-	PerformSanityCheck(startAt uint64, firstBlocksAmount uint64, lastBlockAmount uint64) error
+	// SanityCheckBlockchain on first N blocks and M last blocks.
+	SanityCheckBlockchain(startAt uint64, firstBlocksAmount uint64) error
 	// SanityCheckBlock will verify whether a block is valid according to the rules of the consensus.
 	SanityCheckBlock(prevBlock block.Block, blk block.Block) error
 }
@@ -58,7 +58,7 @@ type Verifier interface {
 // Loader is an interface which abstracts away the storage used by the Chain to
 // store the blockchain.
 type Loader interface {
-	// LoadTip of the chain.
+	// LoadTip of the chain. Returns blockchain tip and persisted hash.
 	LoadTip() (*block.Block, []byte, error)
 	// Clear removes everything from the DB.
 	Clear() error

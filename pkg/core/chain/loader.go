@@ -18,7 +18,7 @@ import (
 
 const (
 	// SanityCheckHeight is the suggested amount of blocks to check when
-	// calling Loader.PerformSanityCheck.
+	// calling Loader.SanityCheckBlockchain.
 	SanityCheckHeight uint64 = 10
 )
 
@@ -117,40 +117,28 @@ func (l *DBLoader) Close(driver string) error {
 	return drvr.Close()
 }
 
-// PerformSanityCheck checks the head and the tail of the blockchain to avoid
+// SanityCheckBlockchain checks the head and the tail of the blockchain to avoid
 // inconsistencies and a faulty bootstrap.
-func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmount uint64) error {
+func (l *DBLoader) SanityCheckBlockchain(startAt, firstBlocksAmount uint64) error {
 	var height uint64
-	var prevBlock *block.Block
 
-	if startAt > 0 {
-		return errors.New("performing sanity checks from arbitrary points is not supported yet")
-	}
-
-	if startAt == 0 {
-		prevBlock = l.genesis
-	}
-
-	prevHeader := prevBlock.Header
 	// Verify first N blocks
 	err := l.db.View(func(t database.Transaction) error {
-		// This will most likely verify genesis, unless the startAt parameter
-		// is set to some other height. In case of genesis, failure here would mostly occur if mainnet node
-		// loads testnet blockchain
-		hash, err := t.FetchBlockHashByHeight(startAt)
+		h, err := t.FetchBlockHashByHeight(startAt)
 		if err != nil {
 			return err
 		}
 
-		if !bytes.Equal(prevHeader.Hash, hash) {
-			return fmt.Errorf("invalid genesis block")
+		prevHeader, err := t.FetchBlockHeader(h)
+		if err != nil {
+			return err
 		}
 
-		for height = 1; height <= firstBlocksAmount; height++ {
+		for height = startAt + 1; height <= firstBlocksAmount; height++ {
 			hash, err := t.FetchBlockHashByHeight(height)
 
 			if err == database.ErrBlockNotFound {
-				// seems we reach the tip
+				// we reach the tip
 				return nil
 			}
 
@@ -176,7 +164,7 @@ func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmou
 		return err
 	}
 
-	// TODO: Verify lastBlockAmount blocks
+	// TODO: Verify last blocks
 	return nil
 }
 
