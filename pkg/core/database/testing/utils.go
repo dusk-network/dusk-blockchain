@@ -30,7 +30,7 @@ func storeBlocks(db database.DB, blocks []*block.Block) error {
 	err := db.Update(func(t database.Transaction) error {
 		for _, block := range blocks {
 			// Store block
-			err := t.StoreBlock(block)
+			err := t.StoreBlock(block, false)
 			if err != nil {
 				fmt.Print(err.Error())
 				return err

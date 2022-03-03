@@ -72,7 +72,7 @@ func LaunchChain(ctx context.Context, cl *loop.Consensus, proxy transactions.Pro
 
 	// Perform database sanity check to ensure that it is rational before
 	// bootstrapping all node subsystems
-	if err := l.PerformSanityCheck(0, 10, 0); err != nil {
+	if err := l.SanityCheckBlockchain(0, 10); err != nil {
 		return nil, err
 	}
 
@@ -114,6 +114,8 @@ func Setup() *Server {
 	defer cancel()
 
 	proxy, ruskConn := setupGRPCClients(gctx)
+
+	log.Info("grpc connection with rusk service established")
 
 	m := mempool.NewMempool(db, eventBus, rpcBus, proxy.Prober())
 	m.Run(parentCtx)

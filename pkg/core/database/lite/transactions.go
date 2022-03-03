@@ -8,7 +8,6 @@ package lite
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -30,7 +29,7 @@ type transaction struct {
 // map lookup operation on block per height, one can utilize a height as index
 // in a slice.
 // NB: A single slice of all blocks to be used to avoid all duplications.
-func (t *transaction) StoreBlock(b *block.Block) error {
+func (t *transaction) StoreBlock(b *block.Block, persisted bool) error {
 	if !t.writable {
 		return errors.New("read-only transaction")
 	}
@@ -81,6 +80,10 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	// Map stateKey to chain state (tip)
 	t.batch[stateInd][toKey(stateKey)] = b.Header.Hash
+
+	if persisted {
+		t.batch[persistedInd][toKey(stateKey)] = b.Header.Hash
+	}
 
 	return nil
 }
@@ -185,32 +188,7 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.ContractCall,
 	return tx, txIndex, hash, err
 }
 
-func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) {
-	var txID []byte
-	var exists bool
-
-	if txID, exists = t.db.storage[keyImagesInd][toKey(keyImage)]; !exists {
-		return false, nil, database.ErrKeyImageNotFound
-	}
-
-	return true, txID, nil
-}
-
-func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
-	_, exists := t.db.storage[outputKeyInd][toKey(destkey)]
-	return exists, nil
-}
-
-func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
-	unlockHeight, exists := t.db.storage[outputKeyInd][toKey(destkey)]
-	if !exists {
-		return 0, errors.New("this output does not exist")
-	}
-
-	return binary.LittleEndian.Uint64(unlockHeight), nil
-}
-
-func (t transaction) FetchState() (*database.State, error) {
+func (t transaction) FetchRegistry() (*database.Registry, error) {
 	var hash []byte
 	var exists bool
 
@@ -222,8 +200,18 @@ func (t transaction) FetchState() (*database.State, error) {
 		return nil, database.ErrStateNotFound
 	}
 
-	s := &database.State{}
+	s := &database.Registry{}
 	s.TipHash = hash
+
+	if hash, exists = t.db.storage[persistedInd][toKey(stateKey)]; !exists {
+		return nil, database.ErrStateNotFound
+	}
+
+	if len(hash) == 0 {
+		return nil, database.ErrStateNotFound
+	}
+
+	s.PersistedHash = hash
 
 	return s, nil
 }
@@ -260,7 +248,7 @@ func (t *transaction) FetchBlock(hash []byte) (*block.Block, error) {
 }
 
 func (t *transaction) FetchCurrentHeight() (uint64, error) {
-	state, err := t.FetchState()
+	state, err := t.FetchRegistry()
 	if err != nil {
 		return 0, err
 	}

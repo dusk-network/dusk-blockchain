@@ -58,7 +58,7 @@ func setupSynchronizerTest() (*synchronizer, chan consensus.Results) {
 	genesis := genesis.Decode()
 
 	if err := db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(genesis)
+		return t.StoreBlock(genesis, false)
 	}); err != nil {
 		panic(err)
 	}

@@ -36,7 +36,7 @@ func newNode(ctx context.Context, assert *assert.Assertions, eb *eventbus.EventB
 	// the `proxy` either way.
 	genesis := genesis.Decode()
 	l := chain.NewDBLoader(db, genesis)
-	_, err := l.LoadTip()
+	_, _, err := l.LoadTip()
 	assert.NoError(err)
 
 	e := &consensus.Emitter{

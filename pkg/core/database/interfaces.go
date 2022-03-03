@@ -66,18 +66,14 @@ type Transaction interface {
 	FetchBlockTxByHash(txID []byte) (tx transactions.ContractCall, txIndex uint32, blockHeaderHash []byte, err error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
-	// Fetch chain state information (chain tip hash).
-	FetchState() (*State, error)
-
-	// Check if an input keyImage is already stored. If succeeds, it returns
-	// also txID the input belongs to.
-	FetchKeyImageExists(keyImage []byte) (exists bool, txID []byte, err error)
+	// Fetch chain registry (chain tip hash, persisted block etc).
+	FetchRegistry() (*Registry, error)
 
 	// Read-write transactions
 	// Store the next chain block in a append-only manner
 	// Overwrites only if block with same hash already stored
 	// Not to be called concurrently, as it updates chain tip.
-	StoreBlock(block *block.Block) error
+	StoreBlock(block *block.Block, persisted bool) error
 
 	// FetchBlock will return a block, given a hash.
 	FetchBlock(hash []byte) (*block.Block, error)
@@ -85,14 +81,6 @@ type Transaction interface {
 	// FetchCurrentHeight returns the height of the most recently stored
 	// block in the database.
 	FetchCurrentHeight() (uint64, error)
-
-	// FetchOutputExists returns whether or not an output exists for the
-	// given destination public key.
-	FetchOutputExists(destkey []byte) (bool, error)
-
-	// FetchOutputUnlockHeight will return the unlock height for an output
-	// given a destination public key.
-	FetchOutputUnlockHeight(destkey []byte) (uint64, error)
 
 	// FetchBlockHeightSince try to find height of a block generated around
 	// sinceUnixTime starting the search from height (tip - offset).
@@ -131,8 +119,8 @@ type DB interface {
 	Close() error
 }
 
-// State represents a single db entry that provides chain metadata. This
-// includes currently only chain tip hash but could be extended at later stage.
-type State struct {
-	TipHash []byte
+// Registry represents a set database records that provide chain metadata.
+type Registry struct {
+	TipHash       []byte
+	PersistedHash []byte
 }

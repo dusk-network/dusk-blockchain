@@ -18,7 +18,7 @@ import (
 
 const (
 	// SanityCheckHeight is the suggested amount of blocks to check when
-	// calling Loader.PerformSanityCheck.
+	// calling Loader.SanityCheckBlockchain.
 	SanityCheckHeight uint64 = 10
 )
 
@@ -78,13 +78,6 @@ func (l *DBLoader) Height() (uint64, error) {
 	return height, err
 }
 
-// Append stores a block in the DB.
-func (l *DBLoader) Append(blk *block.Block) error {
-	return l.db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(blk)
-	})
-}
-
 // BlockAt returns the block stored at a given height.
 func (l *DBLoader) BlockAt(searchingHeight uint64) (block.Block, error) {
 	var blk *block.Block
@@ -124,40 +117,28 @@ func (l *DBLoader) Close(driver string) error {
 	return drvr.Close()
 }
 
-// PerformSanityCheck checks the head and the tail of the blockchain to avoid
+// SanityCheckBlockchain checks the head and the tail of the blockchain to avoid
 // inconsistencies and a faulty bootstrap.
-func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmount uint64) error {
+func (l *DBLoader) SanityCheckBlockchain(startAt, firstBlocksAmount uint64) error {
 	var height uint64
-	var prevBlock *block.Block
 
-	if startAt > 0 {
-		return errors.New("performing sanity checks from arbitrary points is not supported yet")
-	}
-
-	if startAt == 0 {
-		prevBlock = l.genesis
-	}
-
-	prevHeader := prevBlock.Header
 	// Verify first N blocks
 	err := l.db.View(func(t database.Transaction) error {
-		// This will most likely verify genesis, unless the startAt parameter
-		// is set to some other height. In case of genesis, failure here would mostly occur if mainnet node
-		// loads testnet blockchain
-		hash, err := t.FetchBlockHashByHeight(startAt)
+		h, err := t.FetchBlockHashByHeight(startAt)
 		if err != nil {
 			return err
 		}
 
-		if !bytes.Equal(prevHeader.Hash, hash) {
-			return fmt.Errorf("invalid genesis block")
+		prevHeader, err := t.FetchBlockHeader(h)
+		if err != nil {
+			return err
 		}
 
-		for height = 1; height <= firstBlocksAmount; height++ {
+		for height = startAt + 1; height <= firstBlocksAmount; height++ {
 			hash, err := t.FetchBlockHashByHeight(height)
 
 			if err == database.ErrBlockNotFound {
-				// seems we reach the tip
+				// we reach the tip
 				return nil
 			}
 
@@ -183,27 +164,29 @@ func (l *DBLoader) PerformSanityCheck(startAt, firstBlocksAmount, lastBlocksAmou
 		return err
 	}
 
-	// TODO: Verify lastBlockAmount blocks
+	// TODO: Verify last blocks
 	return nil
 }
 
 // LoadTip returns the tip of the chain.
-func (l *DBLoader) LoadTip() (*block.Block, error) {
+func (l *DBLoader) LoadTip() (*block.Block, []byte, error) {
 	var tip *block.Block
+	var persistedHash []byte
 
 	err := l.db.Update(func(t database.Transaction) error {
-		s, err := t.FetchState()
+		s, err := t.FetchRegistry()
 		if err != nil {
 			// TODO: maybe log the error here and diversify between empty
 			// results and actual errors
 
 			// Store Genesis Block, if a modern node runs
-			err = t.StoreBlock(l.genesis)
+			err = t.StoreBlock(l.genesis, true)
 			if err != nil {
 				return err
 			}
 
 			tip = l.genesis
+			persistedHash = l.genesis.Header.Hash
 			return nil
 		}
 
@@ -219,10 +202,12 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 		}
 
 		tip = &block.Block{Header: h, Txs: txs}
+		persistedHash = s.PersistedHash
+
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Verify chain state. There shouldn't be any blocks higher than chainTip
@@ -244,8 +229,8 @@ func (l *DBLoader) LoadTip() (*block.Block, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return tip, nil
+	return tip, persistedHash, nil
 }

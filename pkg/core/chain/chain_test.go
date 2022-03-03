@@ -152,7 +152,7 @@ func TestAcceptBlock(t *testing.T) {
 	cert.Step = 5
 	blk.Header.Certificate = cert
 
-	assert.NoError(c.acceptBlock(*blk))
+	assert.NoError(c.acceptBlock(*blk, true), true)
 
 	// Should have `blk` as blockchain head now
 	assert.True(bytes.Equal(blk.Header.Hash, c.tip.Header.Hash))
@@ -177,11 +177,11 @@ func TestFetchTip(t *testing.T) {
 	_, chain := setupChainTest(t, 0)
 
 	// on a modern chain, state(tip) must point at genesis
-	var s *database.State
+	var s *database.Registry
 
 	err := chain.db.View(func(t database.Transaction) error {
 		var err error
-		s, err = t.FetchState()
+		s, err = t.FetchRegistry()
 		return err
 	})
 	assert.NoError(err)
