@@ -79,6 +79,11 @@ func (p *PermissiveExecutor) Persist(context.Context, []byte) error {
 	return nil
 }
 
+// Revert ...
+func (p *PermissiveExecutor) Revert(ctx context.Context) error {
+	return nil
+}
+
 // MockProxy mocks a proxy for ease of testing.
 type MockProxy struct {
 	V UnconfirmedTxProber
