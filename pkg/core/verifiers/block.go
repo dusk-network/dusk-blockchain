@@ -86,10 +86,6 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 		return ErrInvalidBlockHash
 	}
 
-	if !bytes.Equal(blk.Header.PrevBlockHash, prevBlock.Header.Hash) {
-		return ErrPrevBlockHash
-	}
-
 	// blk.Headerhash = prevHeaderHash
 	if !bytes.Equal(blk.Header.PrevBlockHash, prevBlock.Header.Hash) {
 		return ErrPrevBlockHash
