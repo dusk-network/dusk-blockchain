@@ -164,9 +164,9 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 		vstr.Txs[i] = tx
 	}
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
-	defer cancel()
-
+	// No deadline grpc call. It's all or nothing. This is to avoid a scenario
+	// where grpc call returns DeadlineExceeded error which may end up into an
+	// inconsistency between rusk and dusk service states.
 	res, err := e.stateClient.Finalize(ctx, vstr)
 	if err != nil {
 		return nil, user.Provisioners{}, nil, err
@@ -212,9 +212,9 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 		vstr.Txs[i] = tx
 	}
 
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
-	defer cancel()
-
+	// No deadline grpc call. It's all or nothing. This is to avoid a scenario
+	// where grpc call returns DeadlineExceeded error which may end up into an
+	// inconsistency between rusk and dusk service states.
 	res, err := e.stateClient.Accept(ctx, vstr)
 	if err != nil {
 		return nil, user.Provisioners{}, nil, err
@@ -343,11 +343,11 @@ func (e *executor) GetStateRoot(ctx context.Context) ([]byte, error) {
 
 // Persist proxy call to state.Persist grpc.
 func (e *executor) Persist(ctx context.Context, stateRoot []byte) error {
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
-	defer cancel()
-
 	req := &rusk.PersistRequest{StateRoot: stateRoot}
 
+	// No deadline grpc call. It's all or nothing. This is to avoid a scenario
+	// where grpc call returns DeadlineExceeded error which may end up into an
+	// inconsistency between rusk and dusk service states.
 	_, err := e.stateClient.Persist(ctx, req)
 	if err != nil {
 		return err
