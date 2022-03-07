@@ -46,6 +46,9 @@ type Executor interface {
 
 	// Persist instructs Rusk to persist the state if in-sync with provided stateRoot.
 	Persist(ctx context.Context, stateRoot []byte) error
+
+	// Revert instructs Rusk to revert to the most recent finalized state.
+	Revert(ctx context.Context) error
 }
 
 // Proxy toward the rusk client.
@@ -349,6 +352,18 @@ func (e *executor) Persist(ctx context.Context, stateRoot []byte) error {
 	// where grpc call returns DeadlineExceeded error which may end up into an
 	// inconsistency between rusk and dusk service states.
 	_, err := e.stateClient.Persist(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Revert to the last finalized state with a call to the client.
+func (e *executor) Revert(ctx context.Context) error {
+	req := &rusk.RevertRequest{}
+
+	_, err := e.stateClient.Revert(ctx, req)
 	if err != nil {
 		return err
 	}

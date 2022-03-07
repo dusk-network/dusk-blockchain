@@ -313,7 +313,7 @@ func (c *Chain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
 
 	l := log.WithFields(fields)
 
-	return c.isValidBlock(blk, l, true)
+	return c.isValidBlock(blk, *c.tip, l, true)
 }
 
 // ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
@@ -473,11 +473,11 @@ func (c *Chain) sanityCheckStateHash() error {
 	return nil
 }
 
-func (c *Chain) isValidBlock(blk block.Block, l *logrus.Entry, withSanityCheck bool) error {
+func (c *Chain) isValidBlock(blk, chainTipBlk block.Block, l *logrus.Entry, withSanityCheck bool) error {
 	l.Debug("verifying block")
 	// Check that stateless and stateful checks pass
 	if withSanityCheck {
-		if err := c.verifier.SanityCheckBlock(*c.tip, blk); err != nil {
+		if err := c.verifier.SanityCheckBlock(chainTipBlk, blk); err != nil {
 			l.WithError(err).Error("block verification failed")
 			return err
 		}
@@ -515,7 +515,7 @@ func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 	var err error
 
 	// 1. Ensure block fields and certificate are valid
-	if err = c.isValidBlock(blk, l, withSanityCheck); err != nil {
+	if err = c.isValidBlock(blk, *c.tip, l, withSanityCheck); err != nil {
 		l.WithError(err).Error("invalid block error")
 		return err
 	}

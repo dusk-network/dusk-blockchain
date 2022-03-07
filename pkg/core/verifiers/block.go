@@ -17,8 +17,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
-// ErrPrevBlockHash Previous block hash does not equal the previous hash in the current block.
-var ErrPrevBlockHash = errors.New("Previous block hash does not equal the previous hash in the current block")
+// ErrPrevBlockHash previous block hash does not equal the previous hash in the current block.
+var ErrPrevBlockHash = errors.New("previous block hash does not equal the previous hash in the current block")
+
+// ErrInvalidBlockHash hashed set of block header fields is not equal to block.header.hash.
+var ErrInvalidBlockHash = errors.New("invalid block hash")
 
 // CheckBlockCertificate ensures that the block certificate is valid.
 func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block, seed []byte) error {
@@ -72,6 +75,15 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 	// Version
 	if blk.Header.Version > 0 {
 		return errors.New("unsupported block version")
+	}
+
+	calculatedHash, err := blk.CalculateHash()
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(blk.Header.Hash, calculatedHash) {
+		return ErrInvalidBlockHash
 	}
 
 	// blk.Headerhash = prevHeaderHash

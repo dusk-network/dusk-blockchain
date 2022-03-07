@@ -9,6 +9,7 @@ package chain
 import (
 	"bytes"
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -269,6 +270,8 @@ func mockAcceptableBlock(prevBlock block.Block) *block.Block {
 }
 
 func setupChainTest(t *testing.T, startAtHeight uint64) (*eventbus.EventBus, *Chain) {
+	os.Setenv("RUSK_STATE_ROOT", "0000000000000000000000000000000000000000000000000000000000000000")
+
 	eb := eventbus.New()
 	rpc := rpcbus.New()
 
