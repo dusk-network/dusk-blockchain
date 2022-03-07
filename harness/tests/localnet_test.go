@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"testing"
 	"time"
@@ -46,8 +47,14 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	// create the temp-dir workspace. Quit on error
-	workspace = os.TempDir() + "/localnet"
-	os.Mkdir(workspace, 0700)
+	workspace = path.Join(os.TempDir(), "localnet")
+	if err := os.Mkdir(workspace, 0700); err != nil {
+		fmt.Println("Cleaning temp directory", workspace)
+
+		if err := os.RemoveAll(workspace); err == nil {
+			os.Mkdir(workspace, 0700)
+		}
+	}
 
 	// set the network size
 	if localNetSizeStr != "" {
