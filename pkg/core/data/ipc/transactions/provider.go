@@ -359,7 +359,7 @@ func (e *executor) Persist(ctx context.Context, stateRoot []byte) error {
 	return nil
 }
 
-// Persist proxy call to state.Persist grpc.
+// Revert to the last finalized state with a call to the client
 func (e *executor) Revert(ctx context.Context) error {
 	req := &rusk.RevertRequest{}
 
