@@ -138,7 +138,7 @@ func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCal
 
 // fetchOrTimeout will keep trying to FetchMempoolTxs() until either
 // we get some txs or or the timeout expires.
-func (bg *generator) fetchOrTimeout(keys [][]byte) ([]transactions.ContractCall, error) {
+func (bg *generator) FetchOrTimeout(keys [][]byte) ([]transactions.ContractCall, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -166,7 +166,7 @@ func (bg *generator) fetchOrTimeout(keys [][]byte) ([]transactions.ContractCall,
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
 func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
-	txs, err := bg.fetchOrTimeout(keys)
+	txs, err := bg.FetchMempoolTxs(keys)
 	if err != nil {
 		return nil, err
 	}

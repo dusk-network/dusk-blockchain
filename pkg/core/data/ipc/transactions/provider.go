@@ -122,6 +122,8 @@ type executor struct {
 
 // VerifyStateTransition see also Executor.VerifyStateTransition.
 func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64) error {
+	time.Sleep(1 * time.Second)
+
 	vstr := new(rusk.VerifyStateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 
@@ -150,6 +152,8 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 
 // Finalize proxy call performs both Finalize and GetProvisioners grpc calls.
 func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64, blockGasLiit uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+	time.Sleep(1 * time.Second)
+
 	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
@@ -193,11 +197,14 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 	}
 
 	provisioners.Members = memberMap
+
 	return resCalls, *provisioners, res.StateRoot, nil
 }
 
 // Accept proxy call performs both Accept and GetProvisioners grpc calls.
 func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height, blockGasLimit uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+	time.Sleep(1 * time.Second)
+
 	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
@@ -241,11 +248,14 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 	}
 
 	provisioners.Members = memberMap
+
 	return resCalls, *provisioners, res.StateRoot, nil
 }
 
 // ExecuteStateTransition proxy call performs a single grpc ExecuteStateTransition call.
 func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64) ([]ContractCall, []byte, error) {
+	time.Sleep(1 * time.Second)
+
 	vstr := new(rusk.ExecuteStateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = blockHeight
