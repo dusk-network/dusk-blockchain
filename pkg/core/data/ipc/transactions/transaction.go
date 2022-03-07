@@ -68,7 +68,7 @@ func (t Transaction) deepCopy() *Transaction {
 	}
 }
 
-// Fee returns GasLimit.
+// Fee returns GasPrice.
 func (t Transaction) Fee() (uint64, error) {
 	if t.Payload == nil {
 		return 0, errors.New("payload is nil")
@@ -79,7 +79,7 @@ func (t Transaction) Fee() (uint64, error) {
 		return 0, err
 	}
 
-	return decoded.Fee.GasLimit, nil
+	return decoded.Fee.GasPrice, nil
 }
 
 // GasSpent returns gas spent on transaction execution.
