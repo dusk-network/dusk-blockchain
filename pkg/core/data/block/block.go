@@ -13,6 +13,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-crypto/merkletree"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
 // Block defines a block on the Dusk blockchain.
@@ -129,8 +130,8 @@ func (b Block) Tx(txid []byte) (transactions.ContractCall, error) {
 	return nil, errors.New("not found")
 }
 
-// TamperGasSpent tamper gas spent value of a transaction specified by txid.
-func (b *Block) TamperGasSpent(txid []byte, gasSpent uint64) error {
+// TamperExecutedTransaction tamper gasSpent and txError of a transaction specified by txid.
+func (b *Block) TamperExecutedTransaction(txid []byte, gasSpent uint64, txError *rusk.ExecutedTransaction_Error) error {
 	if b.Txs == nil {
 		return errors.New("not found")
 	}
@@ -146,7 +147,7 @@ func (b *Block) TamperGasSpent(txid []byte, gasSpent uint64) error {
 		}
 
 		// Specified tx found.
-		updated, err := transactions.UpdateGasSpent(tx, gasSpent)
+		updated, err := transactions.UpdateTransaction(tx, gasSpent, txError)
 		if err != nil {
 			return err
 		}

@@ -42,6 +42,7 @@ type Transaction struct {
 
 	// TODO: Remove FeeValue as it's now read from decoded payload
 	FeeValue Fee
+	Error    *rusk.ExecutedTransaction_Error
 }
 
 // NewTransaction returns a new empty Transaction struct.
@@ -90,6 +91,11 @@ func (t Transaction) GasSpent() uint64 {
 // CalculateHash returns hash of transaction, if set.
 func (t Transaction) CalculateHash() ([]byte, error) {
 	return t.Hash[:], nil
+}
+
+// TxError returns the execution error, if set.
+func (t Transaction) TxError() *rusk.ExecutedTransaction_Error {
+	return t.Error
 }
 
 // MTransaction copies the Transaction structure into the Rusk equivalent.
@@ -190,6 +196,8 @@ type ContractCall interface {
 
 	Fee() (uint64, error)
 	GasSpent() uint64
+
+	TxError() *rusk.ExecutedTransaction_Error
 }
 
 // Marshal a Contractcall to a bytes.Buffer.
@@ -248,13 +256,14 @@ func UpdateHash(t ContractCall, hash []byte) (ContractCall, error) {
 	}
 }
 
-// UpdateGasSpent creates a deep copy of t and sets new gas spent value.
-func UpdateGasSpent(t ContractCall, gasSpent uint64) (ContractCall, error) {
+// UpdateTransaction creates a deep copy of t and sets new gas spent value and tx error.
+func UpdateTransaction(t ContractCall, gasSpent uint64, err *rusk.ExecutedTransaction_Error) (ContractCall, error) {
 	switch t := t.(type) {
 	case *Transaction:
 		cpy := t.deepCopy()
 
 		cpy.GasSpentValue = gasSpent
+		cpy.Error = err
 		return cpy, nil
 	default:
 		return nil, errors.New("unrecognized type of ContractCall")
