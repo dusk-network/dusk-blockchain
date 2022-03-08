@@ -227,6 +227,17 @@ func (n *Network) Teardown() {
 	}
 }
 
+func (n *Network) getWalletsPath() string {
+	walletsPath, _ := os.Getwd()
+
+	walletsPath += "/../../consensus-keys/"
+
+	if walletsPathOverride := os.Getenv("DUSK_WALLETS_PATH"); len(walletsPathOverride) > 0 {
+		walletsPath = walletsPathOverride
+	}
+	return walletsPath
+}
+
 // StartNode locally.
 //nolint
 func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
@@ -243,18 +254,14 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 
 	node.Dir = nodeDir
 
-	// Load wallet path as walletX.dat are hard-coded for now
-	// Later they could be generated on the fly per each test execution
-	walletsPath, _ := os.Getwd()
-	walletsPath += "/../../consensus-keys/"
-
 	// Generate node default config file
-	tomlFilePath, tomlErr := n.generateConfig(i, walletsPath)
+	tomlFilePath, tomlErr := n.generateConfig(i)
 	if tomlErr != nil {
 		return tomlErr
 	}
 
 	if MOCK_ADDRESS != "" {
+
 		// Start the mock RUSK server
 		if startErr := n.start(nodeDir, utilsExec, "mockrusk",
 			"--rusknetwork", node.Cfg.RPC.Rusk.Network,
@@ -271,7 +278,10 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	// Run Network service (Kadcast server)
 	// NB. Both Rusk Mock and Rusk executable are in use until we fully integrate Rusk State service.
 	if n.NetworkType == KadcastNetwork {
+
+		address, _, _ := n.GetWalletAddress(uint(i))
 		cfg := node.Cfg.Kadcast
+
 		switch cfg.Grpc.Network {
 		case "tcp":
 			addr, port, err := net.SplitHostPort(cfg.Grpc.Address)
@@ -279,12 +289,12 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 				panic(err)
 			}
 
-			if err := n.startRusk(nodeDir, cfg.BootstrapAddr, cfg.Address, addr, port); err != nil {
+			if err := n.startRusk(nodeDir, cfg.BootstrapAddr, cfg.Address, addr, port, address); err != nil {
 				return err
 			}
 
 		case "unix":
-			if err := n.startRuskWithUDS(nodeDir, cfg.BootstrapAddr, cfg.Address, cfg.Grpc.Address); err != nil {
+			if err := n.startRuskWithUDS(nodeDir, cfg.BootstrapAddr, cfg.Address, cfg.Grpc.Address, address); err != nil {
 				return err
 			}
 		default:
@@ -311,7 +321,8 @@ func (n *Network) GetGrpcConn(i uint, opts ...grpc.DialOption) (*grpc.ClientConn
 // generateConfig loads config profile assigned to the node identified by an
 // index.
 // It's based on viper global var so it cannot be called concurrently.
-func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, error) {
+func (n *Network) generateConfig(nodeIndex int) (string, error) {
+	walletPath := n.getWalletsPath()
 	node := n.nodes[nodeIndex]
 
 	// Load config profile from the global parameter profileList
@@ -445,7 +456,7 @@ func getEnv(envVarName string) (string, error) {
 	return execPath, nil
 }
 
-func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPublicAddr, grpcAddr, grpcPort string) error {
+func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPublicAddr, grpcAddr, grpcPort string, rewardAddress string) error {
 	if err := n.start(nodeDir, RUSK_EXE_PATH,
 		"--ipc_method", "tcp_ip",
 		"--host", grpcAddr,
@@ -454,6 +465,7 @@ func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPubl
 		"--kadcast_bootstrap", bootstrapNodes[0],
 		"--kadcast_bootstrap", bootstrapNodes[1],
 		"--log-level", "info",
+		"--generator", rewardAddress,
 	); err != nil {
 		return err
 	}
@@ -461,7 +473,7 @@ func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPubl
 	return nil
 }
 
-func (n *Network) startRuskWithUDS(nodeDir string, bootstrapNodes []string, kadcastPublicAddr string, grpcSocket string) error {
+func (n *Network) startRuskWithUDS(nodeDir string, bootstrapNodes []string, kadcastPublicAddr string, grpcSocket string, rewardAddress string) error {
 	if err := n.start(nodeDir, RUSK_EXE_PATH,
 		"--ipc_method", "uds",
 		"--socket", grpcSocket,
@@ -469,6 +481,7 @@ func (n *Network) startRuskWithUDS(nodeDir string, bootstrapNodes []string, kadc
 		"--kadcast_bootstrap", bootstrapNodes[0],
 		"--kadcast_bootstrap", bootstrapNodes[1],
 		"--log-level", "info",
+		"--generator", rewardAddress,
 	); err != nil {
 		return err
 	}

@@ -9,11 +9,14 @@ package engine
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -415,24 +418,22 @@ func (n *Network) IsSynced(threshold uint64) (uint64, error) {
 
 // GetWalletAddress makes an attempt to get wallet address of a specified node.
 func (n *Network) GetWalletAddress(ind uint) (string, []byte, error) {
-	c := n.grpcClients[n.nodes[ind].Id]
+	walletsPath := n.getWalletsPath()
+	addressFile := filepath.Join(walletsPath, fmt.Sprintf("node_%d.address", ind))
 
-	conn, err := c.GetSessionConn(grpc.WithInsecure(), grpc.WithBlock(), grpc.WithAuthority("dummy"))
+	addressBytes, err := ioutil.ReadFile(filepath.Clean(addressFile))
 	if err != nil {
-		return "", nil, err
+		return "N/A", nil, err
 	}
 
-	client := pb.NewWalletClient(conn)
+	addressHex := string(addressBytes)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	resp, err := client.GetAddress(ctx, &node.EmptyRequest{})
+	addressBytes, err = hex.DecodeString(addressHex)
 	if err != nil {
-		return "", nil, err
+		return "N/A", nil, err
 	}
 
-	return string(resp.Key.PublicKey[0:10]) + "...", resp.Key.PublicKey, nil
+	return addressHex, addressBytes, nil
 }
 
 // GetBalance makes an attempt to get wallet balance of a specified node.
