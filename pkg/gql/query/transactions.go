@@ -8,6 +8,7 @@ package query
 
 import (
 	"encoding/hex"
+	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
@@ -49,6 +50,7 @@ type (
 		BlockHash      []byte
 		BlockTimestamp int64 `json:"blocktimestamp"` // Block timestamp
 		Size           int
+		JSON           string
 	}
 )
 
@@ -92,6 +94,8 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 
 	// Consider Transaction payload length as transaction size
 	qd.Size = len(tx.StandardTx().Data)
+	b, _ := json.Marshal(decoded)
+	qd.JSON = string(b)
 
 	return qd, nil
 }
