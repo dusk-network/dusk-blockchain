@@ -7,10 +7,12 @@
 package query
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/gogo/protobuf/jsonpb"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
@@ -51,6 +53,7 @@ type (
 		BlockTimestamp int64 `json:"blocktimestamp"` // Block timestamp
 		Size           int
 		JSON           string
+		TxError        string
 	}
 )
 
@@ -96,6 +99,13 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 	qd.Size = len(tx.StandardTx().Data)
 	b, _ := json.Marshal(decoded)
 	qd.JSON = string(b)
+	if tx.TxError() != nil {
+		b, marshaler := bytes.Buffer{}, jsonpb.Marshaler{}
+		if err := marshaler.Marshal(&b, tx.TxError()); err == nil {
+			qd.TxError = b.String()
+		}
+
+	}
 
 	return qd, nil
 }
