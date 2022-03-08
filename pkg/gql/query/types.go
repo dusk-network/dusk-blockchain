@@ -112,6 +112,9 @@ var Transaction = graphql.NewObject(
 			"json": &graphql.Field{
 				Type: graphql.String,
 			},
+			"txerror": &graphql.Field{
+				Type: graphql.String,
+			},
 		},
 	},
 )

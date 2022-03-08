@@ -15,6 +15,9 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+	"google.golang.org/protobuf/proto"
 )
 
 var byteOrder = binary.LittleEndian
@@ -42,8 +45,22 @@ func EncodeBlockTx(tx transactions.ContractCall, txIndex uint32) ([]byte, error)
 	}
 
 	// Write transactions.ContractCall bytes
-	err := transactions.Marshal(buf, tx)
-	if err != nil {
+	if err := transactions.Marshal(buf, tx); err != nil {
+		return nil, err
+	}
+
+	txErrBytes := make([]byte, 0)
+
+	if tx.TxError() != nil {
+		txerr, err := proto.Marshal(tx.TxError())
+		if err != nil {
+			return nil, err
+		}
+
+		txErrBytes = txerr
+	}
+
+	if err := encoding.WriteVarBytesUint32(buf, txErrBytes); err != nil {
 		return nil, err
 	}
 
@@ -88,7 +105,21 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Co
 		return tx, txIndex, err
 	}
 
-	cc, err := transactions.UpdateGasSpent(tx, gasSpent)
+	var buferr []byte
+	if e := encoding.ReadVarBytesUint32LE(reader, &buferr); e != nil {
+		return tx, txIndex, err
+	}
+
+	if len(buferr) > 0 {
+		decodeError := new(rusk.ExecutedTransaction_Error)
+		if err = proto.Unmarshal(buferr, decodeError); err != nil {
+			return tx, txIndex, err
+		}
+
+		tx.Error = decodeError
+	}
+
+	cc, err := transactions.UpdateTransaction(tx, gasSpent, tx.Error)
 	if err != nil {
 		return tx, txIndex, err
 	}

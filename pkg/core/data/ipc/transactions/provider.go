@@ -301,6 +301,7 @@ func (e *executor) convertToContractCall(txs []*rusk.ExecutedTransaction) ([]Con
 		cc := NewTransaction()
 		copy(cc.Hash[:], tx.GetTxHash())
 		cc.GasSpentValue = tx.GetGasSpent()
+		cc.Error = tx.GetError()
 
 		logrus.WithField("txid", hex.EncodeToString(tx.GetTxHash())).
 			WithField("gas_spent", tx.GetGasSpent()).

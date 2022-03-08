@@ -432,8 +432,8 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			log.WithError(err).Warn("could not read rusk tx hash")
 		}
 
-		if err := blk.TamperGasSpent(h, tx.GasSpent()); err != nil {
-			log.WithError(err).Warn("could not tamper gas spent")
+		if err := blk.TamperExecutedTransaction(h, tx.GasSpent(), tx.TxError()); err != nil {
+			log.WithError(err).Warn("could not tamper ExecutedTransaction")
 		}
 	}
 
