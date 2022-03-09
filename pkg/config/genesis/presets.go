@@ -23,11 +23,13 @@ func GetPresetConfig(name string) (Config, error) {
 
 var configurations = map[string]Config{
 	"devnet": {
-		timestamp: 1600000000,
+		// March 9, 2022 16:10:22 GMT
+		timestamp: 1646842222,
 		seed:      make([]byte, 33),
 	},
 	"stressnet": {
-		timestamp: 1600000000,
+		// March 9, 2022 16:10:22 GMT
+		timestamp: 1646842222,
 		seed:      make([]byte, 33),
 	},
 }
