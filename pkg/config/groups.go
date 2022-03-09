@@ -195,6 +195,10 @@ type consensusConfiguration struct {
 	ConsensusTimeOut int64
 	// UseCompressedKeys determines if AggregatePks works with compressed or uncompressed pks.
 	UseCompressedKeys bool
+
+	// ThrottleMilli determines number of Milliseconds to throttle block
+	// acceptance if Consensus time is less than config.ConsensusTimeThreshold.
+	ThrottleMilli int64
 }
 
 type stateConfiguration struct {
