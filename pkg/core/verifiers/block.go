@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -99,6 +100,12 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 	// blk.Timestamp > prevTimestamp
 	if blk.Header.Timestamp < prevBlock.Header.Timestamp {
 		return errors.New("current timestamp is less than the previous timestamp")
+	}
+
+	if blk.Header.Height > 1 {
+		if blk.Header.Timestamp > prevBlock.Header.Timestamp+config.MaxBlockTime {
+			return errors.New("current timestamp is bigger than the prev timestamp + maxblocktime")
+		}
 	}
 
 	// Merkle tree check -- Check is here as the root is not calculated on decode
