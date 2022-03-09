@@ -11,6 +11,7 @@ require (
 	github.com/etherlabsio/healthcheck v0.0.0-20191224061800-dd3d2fd8c3f6
 	github.com/facebookgo/grace v0.0.0-20180706040059-75cf19382434
 	github.com/go-chi/render v1.0.1
+	github.com/gogo/protobuf v1.3.1
 	github.com/google/gofountain v0.0.0-20160820054803-4928733085e9
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/pat v1.0.1
@@ -30,6 +31,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0
 	google.golang.org/grpc v1.29.0
+	google.golang.org/protobuf v1.23.0
 	lukechampine.com/blake3 v1.1.7
 
 )
@@ -47,7 +49,6 @@ require (
 	github.com/facebookgo/stats v0.0.0-20151006221625-1b76add642e4 // indirect
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-cmp v0.5.2 // indirect
@@ -85,7 +86,6 @@ require (
 	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20200317114155-1f3552e48f24 // indirect
-	google.golang.org/protobuf v1.23.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/ini.v1 v1.51.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect

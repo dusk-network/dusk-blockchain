@@ -735,6 +735,7 @@ func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
 		Seed:            c.tip.Header.Seed,
 		Hash:            c.tip.Header.Hash,
 		LastCertificate: c.tip.Header.Certificate,
+		Timestamp:       c.tip.Header.Timestamp,
 	}
 }
 

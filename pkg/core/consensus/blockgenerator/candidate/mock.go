@@ -25,7 +25,7 @@ func (m *mock) MockCandidate(hdr header.Header, previousBlock []byte) block.Bloc
 
 	seed, _ := crypto.RandEntropy(32)
 
-	b, err := m.GenerateBlock(hdr.Round, seed, previousBlock, [][]byte{hdr.PubKeyBLS})
+	b, err := m.GenerateBlock(hdr.Round, seed, previousBlock, 0, [][]byte{hdr.PubKeyBLS})
 	if err != nil {
 		panic(err)
 	}

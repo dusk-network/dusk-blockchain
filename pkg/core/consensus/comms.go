@@ -55,12 +55,14 @@ type (
 
 	// RoundUpdate carries the data about the new Round, such as the active
 	// Provisioners, the BidList, the Seed and the Hash.
+	// TODO: consider replacing most of the fields with a full copy of most recent block.
 	RoundUpdate struct {
 		Round           uint64
 		P               user.Provisioners
 		Seed            []byte
 		Hash            []byte
 		LastCertificate *block.Certificate
+		Timestamp       int64
 	}
 
 	// InternalPacket is a specialization of the Payload of message.Message. It is used to
@@ -81,6 +83,7 @@ func (r RoundUpdate) Copy() payload.Safe {
 		Seed:            make([]byte, len(r.Seed)),
 		Hash:            make([]byte, len(r.Hash)),
 		LastCertificate: r.LastCertificate.Copy(),
+		Timestamp:       r.Timestamp,
 	}
 
 	copy(ru.Seed, r.Seed)
