@@ -52,8 +52,8 @@ func (c *Chain) startConsensus() error {
 func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan consensus.Results) {
 	for {
 		select {
-		case candidate := <-winnerChan:
-			block, err := candidate.Blk, candidate.Err
+		case r := <-winnerChan:
+			block, err := r.Blk, r.Err
 			if err != nil {
 				// Most likely a context cancellation, but could also be a reaching
 				// of maximum steps.

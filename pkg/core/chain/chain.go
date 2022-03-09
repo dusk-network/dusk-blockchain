@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -336,10 +337,33 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 	return nil
 }
 
+func throttle(startTimeMilli int64, maxDelayMilli int64) (time.Duration, error) {
+	if startTimeMilli == 0 || maxDelayMilli == 0 {
+		return time.Duration(0), errors.New("invalid input")
+	}
+
+	delta := time.Now().UnixMilli() - startTimeMilli
+
+	if delta > 0 && delta < maxDelayMilli {
+		duration := time.Duration((maxDelayMilli - delta) * int64(time.Millisecond))
+
+		if duration > 0 {
+			time.Sleep(duration)
+			return duration, nil
+		}
+	}
+
+	return time.Duration(0), errors.New("max delay exceeded")
+}
+
 // acceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
 func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
+	startTime := time.Now().UnixMilli()
+
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
+
+	prevBlockTimestamp := c.tip.Header.Timestamp
 
 	if err := c.acceptBlock(blk, true); err != nil {
 		return err
@@ -347,6 +371,23 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 
 	if blk.Header.Height > c.highestSeen {
 		c.highestSeen = blk.Header.Height
+	}
+
+	// Guarantee that the execution time of the entire process of accepting the
+	// next valid block (which includes rusk calls, block verification and
+	// persistence) will never be less than N Milliseconds.
+	// This won't be applied in cases when:
+	// node is in out-of-sync mode.
+	// block time is higher that ConsensusTimeThreshold
+	if prevBlockTimestamp+config.ConsensusTimeThreshold > blk.Header.Timestamp {
+		maxDelayMilli := config.Get().Consensus.ThrottleMilli
+		if maxDelayMilli == 0 {
+			maxDelayMilli = 2000
+		}
+
+		if d, err := throttle(startTime, maxDelayMilli); err == nil {
+			log.WithField("height", blk.Header.Height).WithField("sleep_for", d.String()).Trace("throttled")
+		}
 	}
 
 	if err := c.propagateBlock(blk, kadcastHeight); err != nil {

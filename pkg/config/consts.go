@@ -28,6 +28,9 @@ const (
 	// Protocol-based consensus step time.
 	ConsensusTimeOut = 5 * time.Second
 
+	// ConsensusTimeThreshold consensus time in seconds above which we don't throttle it.
+	ConsensusTimeThreshold = 10
+
 	// KadcastInitialHeight sets the default initial height for Kadcast broadcast algorithm.
 	KadcastInitialHeight byte = 128
 )
