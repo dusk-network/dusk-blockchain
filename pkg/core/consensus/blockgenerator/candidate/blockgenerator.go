@@ -115,7 +115,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 
 // Generate a Block.
 func (bg *generator) Generate(seed []byte, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
-	return bg.GenerateBlock(r.Round, seed, r.Hash, keys)
+	return bg.GenerateBlock(r.Round, seed, r.Hash, r.Timestamp, keys)
 }
 
 func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCall, round uint64) ([]transactions.ContractCall, []byte, error) {
@@ -165,7 +165,7 @@ func (bg *generator) FetchOrTimeout(keys [][]byte) ([]transactions.ContractCall,
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
-func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, keys [][]byte) (*block.Block, error) {
+func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, prevBlockTimestamp int64, keys [][]byte) (*block.Block, error) {
 	txs, err := bg.FetchMempoolTxs(keys)
 	if err != nil {
 		return nil, err
@@ -176,10 +176,22 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, key
 		return nil, err
 	}
 
+	timestamp := time.Now().Unix()
+	maxTimestamp := prevBlockTimestamp + config.MaxBlockTime
+
+	if round > 1 && prevBlockTimestamp > 0 {
+		if timestamp < prevBlockTimestamp {
+			timestamp = prevBlockTimestamp
+		} else if timestamp > maxTimestamp {
+			// block time should not exceed config.MaxBlockTime
+			timestamp = maxTimestamp
+		}
+	}
+
 	// Construct header
 	h := &block.Header{
 		Version:       0,
-		Timestamp:     time.Now().Unix(),
+		Timestamp:     timestamp,
 		Height:        round,
 		PrevBlockHash: prevBlockHash,
 		TxRoot:        nil,
