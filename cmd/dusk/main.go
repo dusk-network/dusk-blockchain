@@ -11,7 +11,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/Masterminds/semver"
 	"github.com/dusk-network/dusk-blockchain/cmd/dusk/genesis"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -33,7 +35,7 @@ func init() {
 	app.Name = "dusk"
 	app.Usage = "Official Dusk command-line interface"
 	app.Author = "DUSK 2020"
-	app.Version = "0.0.1"
+	app.Version = semver.MustParse(cfg.NodeVersion).String()
 	app.Commands = []cli.Command{
 		{
 			Name:    "genesis",
