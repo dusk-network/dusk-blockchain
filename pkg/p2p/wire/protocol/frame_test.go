@@ -25,8 +25,8 @@ func TestWriteReadFrame(t *testing.T) {
 	buf := make([]byte, length)
 	b.Read(buf)
 
-	// Remove magic, checksum and reserved bytes
-	buf = buf[16:]
+	// Remove magic, checksum, version, and reserved bytes
+	buf = buf[(16 + 8):]
 
 	assert.Equal(t, "pippo", string(buf))
 }

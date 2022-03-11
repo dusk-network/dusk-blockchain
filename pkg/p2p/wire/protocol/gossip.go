@@ -51,9 +51,13 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 		return 0, err
 	}
 
-	magic, err := Extract(r)
+	magic, version, err := Extract(r)
 	if err != nil {
 		return 0, err
+	}
+
+	if !VersionConstraint.Check(version) {
+		return 0, fmt.Errorf("invalid message version %s received, expected %s", version, VersionConstraintString)
 	}
 
 	// if magic != g.Magic {

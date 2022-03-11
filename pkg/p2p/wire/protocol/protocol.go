@@ -8,11 +8,11 @@ package protocol
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"strings"
 
+	"github.com/Masterminds/semver"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	log "github.com/sirupsen/logrus"
@@ -33,11 +33,21 @@ const (
 )
 
 // NodeVer is the current node version.
+// This is used only in the handshake, need to be removed.
 var NodeVer = &Version{
 	Major: 0,
 	Minor: 4,
 	Patch: 3,
 }
+
+// CurrentProtocolVersion indicates the protocol version used.
+var CurrentProtocolVersion = semver.MustParse("0.1.0")
+
+// VersionConstraintString represent the needed version.
+const VersionConstraintString = "~0.1.0"
+
+// VersionConstraint check incoming versions.
+var VersionConstraint, _ = semver.NewConstraint(VersionConstraintString)
 
 // Magic is the network that Dusk is running on.
 type Magic uint8
@@ -104,9 +114,27 @@ func fromUint32(n uint32) Magic {
 
 func asBuffer(magic uint32) bytes.Buffer {
 	buf := new(bytes.Buffer)
+
+	if err := encoding.WriteUint16LE(buf, uint16(0)); err != nil {
+		log.Panic(err)
+	}
+
+	if err := encoding.WriteUint16LE(buf, uint16(CurrentProtocolVersion.Major())); err != nil {
+		log.Panic(err)
+	}
+
+	if err := encoding.WriteUint16LE(buf, uint16(CurrentProtocolVersion.Minor())); err != nil {
+		log.Panic(err)
+	}
+
+	if err := encoding.WriteUint16LE(buf, uint16(CurrentProtocolVersion.Patch())); err != nil {
+		log.Panic(err)
+	}
+
 	if err := encoding.WriteUint32LE(buf, magic); err != nil {
 		log.Panic(err)
 	}
+
 	return *buf
 }
 
@@ -128,15 +156,43 @@ func MagicFromConfig() Magic {
 }
 
 // Extract the magic from io.Reader. In case of unknown Magic, it returns DevNet.
-func Extract(r io.Reader) (Magic, error) {
-	buffer := make([]byte, 4)
-	// `ReadFull` is used here, as using a plain `Read` call from a net.Conn could
-	// result in the read finishing before the buffer is filled. Using `ReadFull`
-	// prevents unintended 'magic mismatch' errors.
+func Extract(r io.Reader) (Magic, *semver.Version, error) {
+	buffer := make([]byte, 4+8)
 	if _, err := io.ReadFull(r, buffer); err != nil {
-		return Magic(byte(255)), err
+		return Magic(byte(255)), nil, err
 	}
 
-	magic := binary.LittleEndian.Uint32(buffer)
-	return fromUint32(magic), nil
+	buf := bytes.NewBuffer(buffer)
+
+	reserved := uint16(0)
+	if err := encoding.ReadUint16LE(buf, &reserved); err != nil {
+		return Magic(byte(255)), nil, err
+	}
+
+	major := uint16(0)
+	if err := encoding.ReadUint16LE(buf, &major); err != nil {
+		return Magic(byte(255)), nil, err
+	}
+
+	minor := uint16(0)
+	if err := encoding.ReadUint16LE(buf, &minor); err != nil {
+		return Magic(byte(255)), nil, err
+	}
+
+	patch := uint16(0)
+	if err := encoding.ReadUint16LE(buf, &patch); err != nil {
+		return Magic(byte(255)), nil, err
+	}
+
+	magic := uint32(0)
+	if err := encoding.ReadUint32LE(buf, &magic); err != nil {
+		return Magic(byte(255)), nil, err
+	}
+
+	version, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", major, minor, patch))
+	if err != nil {
+		return Magic(byte(255)), nil, err
+	}
+
+	return fromUint32(magic), version, nil
 }

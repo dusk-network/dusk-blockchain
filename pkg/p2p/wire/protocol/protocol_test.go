@@ -33,10 +33,11 @@ func TestExtract(t *testing.T) {
 	for _, tt := range magicTest {
 		buf = tt.magic.ToBuffer()
 		buf.ReadFrom(bytes.NewBuffer(tt.payload))
-		magic, err := protocol.Extract(&buf)
+		magic, version, err := protocol.Extract(&buf)
 		assert.Equal(t, magic, tt.magic)
 		assert.NoError(t, err)
 		assert.Equal(t, tt.payload, buf.Bytes())
+		assert.Equal(t, version, protocol.CurrentProtocolVersion)
 	}
 }
 
