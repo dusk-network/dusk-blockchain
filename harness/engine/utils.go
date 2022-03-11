@@ -9,7 +9,6 @@ package engine
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -422,18 +422,19 @@ func (n *Network) GetWalletAddress(ind uint) (string, []byte, error) {
 	addressFile := filepath.Join(walletsPath, fmt.Sprintf("node_%d.address", ind))
 
 	addressBytes, err := ioutil.ReadFile(filepath.Clean(addressFile))
+	if err != nil || len(addressBytes) == 0 {
+		return "N/A", nil, err
+	}
+
+	addressString := string(addressBytes)
+	addressString = strings.ReplaceAll(addressString, "\r", "")
+	addressString = strings.ReplaceAll(addressString, "\n", "")
+
 	if err != nil {
 		return "N/A", nil, err
 	}
 
-	addressHex := string(addressBytes)
-
-	addressBytes, err = hex.DecodeString(addressHex)
-	if err != nil {
-		return "N/A", nil, err
-	}
-
-	return addressHex, addressBytes, nil
+	return addressString, addressBytes, nil
 }
 
 // GetBalance makes an attempt to get wallet balance of a specified node.
