@@ -11,7 +11,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -23,11 +22,14 @@ const (
 
 	// reservedFieldSize is number of bytes the reserved field uses.
 	reservedFieldSize = 8
+
+	// VersionLength is number of bytes the version uses.
+	VersionLength = uint64(8)
 )
 
 // WriteFrame mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message.
-func WriteFrame(buf *bytes.Buffer, magic Magic, cs []byte) error {
-	ln := uint64(magic.Len() + reservedFieldSize + checksum.Length + buf.Len())
+func WriteFrame(buf *bytes.Buffer, cs []byte) error {
+	ln := VersionLength + uint64(reservedFieldSize+checksum.Length+buf.Len())
 	if ln > MaxFrameSize {
 		return fmt.Errorf("message size exceeds MaxFrameSize (%d)", MaxFrameSize)
 	}
@@ -38,18 +40,14 @@ func WriteFrame(buf *bytes.Buffer, magic Magic, cs []byte) error {
 		return err
 	}
 
-	// Add magic
-	mBuf := magic.ToBuffer()
-	if _, err := msg.Write(mBuf.Bytes()); err != nil {
+	// Add version
+	vBuf := VersionAsBuffer()
+	if _, err := msg.Write(vBuf.Bytes()); err != nil {
 		return err
 	}
 
 	// Add reserved field bytes
 	var reserved uint64
-	if magic == TestNet || magic == DevNet {
-		// populate reserved fields with timestamp
-		reserved = uint64(time.Now().UnixNano())
-	}
 
 	if err := encoding.WriteUint64LE(msg, reserved); err != nil {
 		return err

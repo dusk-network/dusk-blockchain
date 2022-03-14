@@ -10,10 +10,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/Masterminds/semver"
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	log "github.com/sirupsen/logrus"
 )
@@ -49,70 +47,8 @@ const VersionConstraintString = "~0.1.0"
 // VersionConstraint check incoming versions.
 var VersionConstraint, _ = semver.NewConstraint(VersionConstraintString)
 
-// Magic is the network that Dusk is running on.
-type Magic uint8
-
-const (
-	// MainNet identifies the production network of the Dusk blockchain.
-	MainNet Magic = iota
-	// TestNet identifies the test network of the Dusk blockchain.
-	TestNet
-	// DevNet identifies the development network of the Dusk blockchain.
-	DevNet
-	// StressNet identifies the stress testing network of the Dusk blockchain.
-	StressNet
-)
-
-const (
-	mainnetUint32 uint32 = 0x7630401f
-	testnetUint32 uint32 = 0x74746e41
-	//nolint
-	devnetUint32    uint32 = 0x74736e40
-	stressnetUint32 uint32 = 0x74726e39
-)
-
-type magicObj struct {
-	Magic
-	buf bytes.Buffer
-	str string
-}
-
-var magics = [...]magicObj{
-	{MainNet, asBuffer(0x7630401f), "mainnet"},
-	{TestNet, asBuffer(0x74746e41), "testnet"},
-	{DevNet, asBuffer(0x74736e40), "devnet"},
-	{StressNet, asBuffer(0x74726e39), "stressnet"},
-}
-
-// Len returns the amount of bytes of the Magic sequence.
-func (m Magic) Len() int {
-	return magics[m].buf.Len()
-}
-
-// String representation of Magic.
-func (m Magic) String() string {
-	return magics[m].str
-}
-
-// ToBuffer returns the buffer representation of the Magic.
-func (m Magic) ToBuffer() bytes.Buffer {
-	return magics[m].buf
-}
-
-func fromUint32(n uint32) Magic {
-	switch n {
-	case mainnetUint32:
-		return MainNet
-	case testnetUint32:
-		return TestNet
-	case stressnetUint32:
-		return StressNet
-	default:
-		return DevNet
-	}
-}
-
-func asBuffer(magic uint32) bytes.Buffer {
+// VersionAsBuffer returns protocol version encoded as BytesBuffer.
+func VersionAsBuffer() bytes.Buffer {
 	buf := new(bytes.Buffer)
 
 	if err := encoding.WriteUint16LE(buf, uint16(0)); err != nil {
@@ -131,68 +67,42 @@ func asBuffer(magic uint32) bytes.Buffer {
 		log.Panic(err)
 	}
 
-	if err := encoding.WriteUint32LE(buf, magic); err != nil {
-		log.Panic(err)
-	}
-
 	return *buf
 }
 
-// MagicFromConfig reads the loaded magic config and tries to map it to magic
-// identifier. Panic, if no match found.
-func MagicFromConfig() Magic {
-	magic := cfg.Get().General.Network
-	mstr := strings.ToLower(magic)
-
-	for _, m := range magics {
-		if mstr == m.str {
-			return m.Magic
-		}
-	}
-
-	// An invalid network identifier might cause node unexpected behavior.
-	log.Panic(fmt.Sprintf("not a valid network: %s", magic))
-	return 0
-}
-
-// Extract the magic from io.Reader. In case of unknown Magic, it returns DevNet.
-func Extract(r io.Reader) (Magic, *semver.Version, error) {
-	buffer := make([]byte, 4+8)
+// ExtractVersion extracts the version from io.Reader.
+func ExtractVersion(r io.Reader) (*semver.Version, error) {
+	buffer := make([]byte, 8)
 	if _, err := io.ReadFull(r, buffer); err != nil {
-		return Magic(byte(255)), nil, err
+		return nil, err
 	}
 
 	buf := bytes.NewBuffer(buffer)
 
 	reserved := uint16(0)
 	if err := encoding.ReadUint16LE(buf, &reserved); err != nil {
-		return Magic(byte(255)), nil, err
+		return nil, err
 	}
 
 	major := uint16(0)
 	if err := encoding.ReadUint16LE(buf, &major); err != nil {
-		return Magic(byte(255)), nil, err
+		return nil, err
 	}
 
 	minor := uint16(0)
 	if err := encoding.ReadUint16LE(buf, &minor); err != nil {
-		return Magic(byte(255)), nil, err
+		return nil, err
 	}
 
 	patch := uint16(0)
 	if err := encoding.ReadUint16LE(buf, &patch); err != nil {
-		return Magic(byte(255)), nil, err
-	}
-
-	magic := uint32(0)
-	if err := encoding.ReadUint32LE(buf, &magic); err != nil {
-		return Magic(byte(255)), nil, err
+		return nil, err
 	}
 
 	version, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", major, minor, patch))
 	if err != nil {
-		return Magic(byte(255)), nil, err
+		return nil, err
 	}
 
-	return fromUint32(magic), version, nil
+	return version, nil
 }

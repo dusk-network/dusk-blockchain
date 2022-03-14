@@ -19,14 +19,14 @@ import (
 func TestWriteReadFrame(t *testing.T) {
 	b := bytes.NewBufferString("pippo")
 	digest := sha3.Sum256(b.Bytes())
-	WriteFrame(b, TestNet, digest[0:checksum.Length])
+	WriteFrame(b, digest[0:checksum.Length])
 
 	length, _ := ReadFrame(b)
 	buf := make([]byte, length)
 	b.Read(buf)
 
-	// Remove magic, checksum, version, and reserved bytes
-	buf = buf[(16 + 8):]
+	// Remove version, checksum, and reserved bytes
+	buf = buf[(8 + 12):]
 
 	assert.Equal(t, "pippo", string(buf))
 }

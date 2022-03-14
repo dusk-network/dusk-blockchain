@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	assert "github.com/stretchr/testify/require"
@@ -55,7 +54,7 @@ func TestRequestor(t *testing.T) {
 
 	c := genesis.Decode()
 
-	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+	streamer := eventbus.NewGossipStreamer()
 
 	l := eventbus.NewStreamListener(streamer)
 	bus.Subscribe(topics.Gossip, l)

@@ -175,7 +175,7 @@ func Setup() *Server {
 	readerFactory := peer.NewReaderFactory(processor)
 
 	// Create the listener and contact the voucher seeder
-	gossip := protocol.NewGossip(protocol.TestNet)
+	gossip := protocol.NewGossip()
 
 	if !cfg.Get().Kadcast.Enabled {
 		connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag), peer.Create)

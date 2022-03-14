@@ -8,8 +8,6 @@ package database
 
 import (
 	"testing"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
 func unregisterAllDrivers() {
@@ -23,7 +21,7 @@ func unregisterAllDrivers() {
 // Dummy DriverA.
 type driverA struct{}
 
-func (d driverA) Open(path string, network protocol.Magic, readonly bool) (DB, error) {
+func (d driverA) Open(path string, readonly bool) (DB, error) {
 	return nil, nil
 }
 
@@ -38,7 +36,7 @@ func (d driverA) Close() error {
 // Dummy DriverB.
 type driverB struct{}
 
-func (d driverB) Open(path string, network protocol.Magic, readonly bool) (DB, error) {
+func (d driverB) Open(path string, readonly bool) (DB, error) {
 	return nil, nil
 }
 

@@ -137,7 +137,7 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 		return err
 	}
 
-	gossip := protocol.NewGossip(protocol.TestNet)
+	gossip := protocol.NewGossip()
 	pConn := peer.NewConnection(conn, gossip)
 	w := peer.NewWriter(pConn, nil)
 
@@ -161,9 +161,9 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 }
 
 // ConstructWireFrame creates a frame according to the wire protocol.
-func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.Buffer) ([]byte, error) {
+func ConstructWireFrame(cmd topics.Topic, payload *bytes.Buffer) ([]byte, error) {
 	// Write magic
-	buf := magic.ToBuffer()
+	buf := protocol.VersionAsBuffer()
 	// Write topic
 	if err := topics.Write(&buf, cmd); err != nil {
 		return nil, err

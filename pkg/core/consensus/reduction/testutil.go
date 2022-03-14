@@ -23,7 +23,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
@@ -33,7 +32,7 @@ func PrepareSendReductionTest(hlp *Helper, stepFn consensus.PhaseFn) func(t *tes
 	return func(t *testing.T) {
 		require := require.New(t)
 
-		streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+		streamer := eventbus.NewGossipStreamer()
 		l := eventbus.NewStreamListener(streamer)
 		hlp.EventBus.Subscribe(topics.Gossip, l)
 

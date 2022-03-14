@@ -36,12 +36,12 @@ func TestHandshake(t *testing.T) {
 
 	client, srv := net.Pipe()
 
-	g := protocol.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip()
 	pConn := NewConnection(client, g)
 	pw := NewWriter(pConn, eb)
 
 	go func() {
-		pConn := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
+		pConn := NewConnection(srv, protocol.NewGossip())
 
 		peerReader := factory.SpawnReader(pConn)
 		if err := peerReader.Accept(protocol.FullNode); err != nil {

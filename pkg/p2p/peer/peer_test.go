@@ -34,7 +34,7 @@ var receiveFn = func(c net.Conn) {
 
 // Test the functionality of the peer.Reader through the ReadLoop.
 func TestReader(t *testing.T) {
-	g := protocol.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip()
 	client, srv := net.Pipe()
 
 	eb := eventbus.New()
@@ -50,7 +50,7 @@ func TestReader(t *testing.T) {
 	processor.Register(topics.Agreement, respFn)
 	factory := NewReaderFactory(processor)
 
-	pConn := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
+	pConn := NewConnection(srv, protocol.NewGossip())
 	peerReader := factory.SpawnReader(pConn)
 
 	peerReader.services = protocol.FullNode
@@ -126,7 +126,7 @@ func makeAgreementGossip(keyAmount int) message.Message {
 
 func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *Writer {
 	client, srv := net.Pipe()
-	g := protocol.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip()
 	pConn := NewConnection(client, g)
 	pw := NewWriter(pConn, bus)
 

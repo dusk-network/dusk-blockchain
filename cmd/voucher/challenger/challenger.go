@@ -32,7 +32,7 @@ type Challenger struct {
 
 // New creates a new, initialized Challenger.
 func New(store *node.Store) *Challenger {
-	return &Challenger{nodes: store, gossip: protocol.NewGossip(protocol.TestNet)}
+	return &Challenger{nodes: store, gossip: protocol.NewGossip()}
 }
 
 // SendChallenge to a connecting peer.

@@ -14,7 +14,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -146,7 +145,7 @@ func TestSecondStepReduction(t *testing.T) {
 
 	table := initiateTableTest(timeout, hash, round, step)
 	for name, ttest := range table {
-		streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+		streamer := eventbus.NewGossipStreamer()
 		streamListener := eventbus.NewStreamListener(streamer)
 
 		// creating the Helper

@@ -12,7 +12,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
 var (
@@ -41,7 +40,7 @@ var (
 type Driver interface {
 	// Open returns a new connection to a blockchain database. The path is a
 	// string in a driver-specific format.
-	Open(path string, network protocol.Magic, readonly bool) (DB, error)
+	Open(path string, readonly bool) (DB, error)
 
 	// Close terminates all DB connections and closes underlying storage.
 	Close() error

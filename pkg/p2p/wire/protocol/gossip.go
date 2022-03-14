@@ -19,7 +19,6 @@ import (
 type (
 	// Gossip is a preprocessor/reader for gossip messages.
 	Gossip struct {
-		Magic Magic
 	}
 )
 
@@ -31,17 +30,15 @@ TODO:
 */
 
 // NewGossip returns a gossip preprocessor with the specified magic.
-func NewGossip(magic Magic) *Gossip {
-	return &Gossip{
-		Magic: magic,
-	}
+func NewGossip() *Gossip {
+	return &Gossip{}
 }
 
 // Process a message that is passing through, by prepending
 // magic and the message checksum, and finally by prepending the length.
 func (g *Gossip) Process(m *bytes.Buffer) error {
 	cs := checksum.Generate(m.Bytes())
-	return WriteFrame(m, g.Magic, cs)
+	return WriteFrame(m, cs)
 }
 
 // UnpackLength unwraps the incoming packet (likely from a net.Conn struct) and returns the length of the packet without reading the payload (which is left to the user of this method).
@@ -51,7 +48,7 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 		return 0, err
 	}
 
-	magic, version, err := Extract(r)
+	version, err := ExtractVersion(r)
 	if err != nil {
 		return 0, err
 	}
@@ -75,7 +72,7 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 
 	// If packetLength is less than magic.Len(), ln is close to MaxUint64
 	// due to integer overflow
-	ln := packetLength - uint64(rfSize) - uint64(magic.Len())
+	ln := packetLength - uint64(rfSize) - VersionLength
 
 	if ln > MaxFrameSize {
 		return 0, fmt.Errorf("invalid packet length %d", packetLength)

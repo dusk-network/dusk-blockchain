@@ -30,7 +30,6 @@ import (
 	// to the blockchain database layer requirements.
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -104,7 +103,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 
 	// Create a Database instance to use the temp directory. Multiple
 	// database instances can work concurrently
-	db, err = drvr.Open(storeDir, protocol.DevNet, false)
+	db, err = drvr.Open(storeDir, false)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -480,7 +479,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	// Create database in read-write mode
 	readonly := false
 
-	dbReadWrite, err := drvr.Open(storeDir, protocol.DevNet, readonly)
+	dbReadWrite, err := drvr.Open(storeDir, readonly)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -496,7 +495,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	// Re-open the storage in read-only mode
 	readonly = true
 
-	dbReadOnly, err := drvr.Open(storeDir, protocol.DevNet, readonly)
+	dbReadOnly, err := drvr.Open(storeDir, readonly)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -704,7 +703,7 @@ func _TestPersistence() int {
 
 	// Force reload storage and fetch blocks
 	{
-		db, err := drvr.Open(newStoreDir, protocol.DevNet, true)
+		db, err := drvr.Open(newStoreDir, true)
 		defer func() {
 			_ = drvr.Close()
 		}()
