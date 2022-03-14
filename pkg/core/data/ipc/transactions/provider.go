@@ -125,6 +125,8 @@ type executor struct {
 
 // VerifyStateTransition see also Executor.VerifyStateTransition.
 func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64) error {
+	time.Sleep(1 * time.Second)
+
 	vstr := new(rusk.VerifyStateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 
