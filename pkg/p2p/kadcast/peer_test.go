@@ -43,7 +43,7 @@ func TestListenStreamReader(t *testing.T) {
 	// basic infrastructure
 	eb := eventbus.New()
 	p := peer.NewMessageProcessor(eb)
-	g := protocol.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip()
 
 	// have a callback ready for Block topic
 	respFn := func(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
@@ -96,7 +96,7 @@ func TestBroadcastWriter(t *testing.T) {
 
 	// Basic infrastructure
 	eb := eventbus.New()
-	g := protocol.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip()
 
 	// create a mock client
 	cli := NewMockNetworkClient(rcvChan)

@@ -51,11 +51,11 @@ func TestPingLoop(t *testing.T) {
 
 	cfg.Mock(&r)
 
-	pConn := NewConnection(client, protocol.NewGossip(protocol.TestNet))
+	pConn := NewConnection(client, protocol.NewGossip())
 	writer := NewWriter(pConn, bus)
 
 	// Set up the other end of the exchange
-	pConn2 := NewConnection(srv, protocol.NewGossip(protocol.TestNet))
+	pConn2 := NewConnection(srv, protocol.NewGossip())
 	writer2 := NewWriter(pConn2, bus)
 
 	// Set up reader factory
@@ -108,7 +108,7 @@ func TestIncompleteChecksum(t *testing.T) {
 	}
 
 	// Add correct magic value
-	mBuf := protocol.TestNet.ToBuffer()
+	mBuf := protocol.VersionAsBuffer()
 	if _, err := frame.Write(mBuf.Bytes()); err != nil {
 		t.Error(err)
 	}
@@ -147,7 +147,7 @@ func TestZeroLength(t *testing.T) {
 	}
 
 	// Add correct magic value
-	mBuf := protocol.TestNet.ToBuffer()
+	mBuf := protocol.VersionAsBuffer()
 	if _, err := frame.Write(mBuf.Bytes()); err != nil {
 		t.Error(err)
 	}
@@ -211,7 +211,7 @@ func TestInvalidPayload(t *testing.T) {
 		buf.Write([]byte{0, 1, 2})
 
 		cs := checksum.Generate(buf.Bytes())
-		_ = protocol.WriteFrame(buf, protocol.TestNet, cs)
+		_ = protocol.WriteFrame(buf, cs)
 
 		_, err := w.Write(buf.Bytes())
 		if err != nil {
@@ -227,7 +227,7 @@ func testReader(t *testing.T, f *ReaderFactory) (*Reader, net.Conn, net.Conn, ch
 	r, w := net.Pipe()
 
 	respChan := make(chan bytes.Buffer, 10)
-	g := protocol.NewGossip(protocol.TestNet)
+	g := protocol.NewGossip()
 	c := NewConnection(r, g)
 	peer := f.SpawnReader(c)
 

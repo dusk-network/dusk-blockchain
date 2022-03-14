@@ -9,7 +9,6 @@ package engine
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -137,7 +137,7 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 		return err
 	}
 
-	gossip := protocol.NewGossip(protocol.TestNet)
+	gossip := protocol.NewGossip()
 	pConn := peer.NewConnection(conn, gossip)
 	w := peer.NewWriter(pConn, nil)
 
@@ -161,9 +161,9 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 }
 
 // ConstructWireFrame creates a frame according to the wire protocol.
-func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.Buffer) ([]byte, error) {
+func ConstructWireFrame(cmd topics.Topic, payload *bytes.Buffer) ([]byte, error) {
 	// Write magic
-	buf := magic.ToBuffer()
+	buf := protocol.VersionAsBuffer()
 	// Write topic
 	if err := topics.Write(&buf, cmd); err != nil {
 		return nil, err
@@ -422,18 +422,19 @@ func (n *Network) GetWalletAddress(ind uint) (string, []byte, error) {
 	addressFile := filepath.Join(walletsPath, fmt.Sprintf("node_%d.address", ind))
 
 	addressBytes, err := ioutil.ReadFile(filepath.Clean(addressFile))
+	if err != nil || len(addressBytes) == 0 {
+		return "N/A", nil, err
+	}
+
+	addressString := string(addressBytes)
+	addressString = strings.ReplaceAll(addressString, "\r", "")
+	addressString = strings.ReplaceAll(addressString, "\n", "")
+
 	if err != nil {
 		return "N/A", nil, err
 	}
 
-	addressHex := string(addressBytes)
-
-	addressBytes, err = hex.DecodeString(addressHex)
-	if err != nil {
-		return "N/A", nil, err
-	}
-
-	return addressHex, addressBytes, nil
+	return addressString, addressBytes, nil
 }
 
 // GetBalance makes an attempt to get wallet balance of a specified node.

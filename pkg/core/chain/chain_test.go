@@ -27,7 +27,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -103,7 +102,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	startingHeight := uint64(1)
 	eb, c := setupChainTest(t, startingHeight)
 
-	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+	streamer := eventbus.NewGossipStreamer()
 	l := eventbus.NewStreamListener(streamer)
 	eb.Subscribe(topics.Gossip, l)
 

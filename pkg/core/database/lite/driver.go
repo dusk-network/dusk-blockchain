@@ -8,7 +8,6 @@ package lite
 
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,8 +16,8 @@ var DriverName = "lite_v0.1.0"
 
 type driver struct{}
 
-func (d *driver) Open(path string, network protocol.Magic, readonly bool) (database.DB, error) {
-	return NewDatabase(path, network, readonly)
+func (d *driver) Open(path string, readonly bool) (database.DB, error) {
+	return NewDatabase(path, readonly)
 }
 
 func (d *driver) Close() error {
@@ -43,7 +42,7 @@ func CreateDBConnection() (database.Driver, database.DB) {
 		log.Panic(err)
 	}
 
-	db, err := drvr.Open("", protocol.TestNet, false)
+	db, err := drvr.Open("", false)
 	if err != nil {
 		log.Panic(err)
 	}

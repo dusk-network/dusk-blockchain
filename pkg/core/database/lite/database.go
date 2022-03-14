@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
 type (
@@ -45,7 +44,7 @@ type DB struct {
 // This should be the ideal situation with lowest latency on storing or fetching data.
 // In-memory only (as result autoDeleted).
 // multi-instances (no singleton).
-func NewDatabase(path string, network protocol.Magic, readonly bool) (database.DB, error) {
+func NewDatabase(path string, readonly bool) (database.DB, error) {
 	var db *DB
 	var tables [maxInd]table
 

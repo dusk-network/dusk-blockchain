@@ -47,7 +47,7 @@ func (m *Collector) Collect(b message.Message) error {
 // gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 	eb := New()
-	streamer := NewGossipStreamer(protocol.TestNet)
+	streamer := NewGossipStreamer()
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topics.Gossip, streamListener)
 	return eb, streamer
@@ -57,7 +57,7 @@ func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 // gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateFrameStreamer(topic topics.Topic) (*EventBus, ring.Writer) {
 	eb := New()
-	streamer := NewSimpleStreamer(protocol.TestNet)
+	streamer := NewSimpleStreamer()
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topic, streamListener)
 	return eb, streamer
@@ -136,14 +136,14 @@ type SimpleStreamer struct {
 }
 
 // NewSimpleStreamer returns an initialized SimpleStreamer.
-func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
+func NewSimpleStreamer() *SimpleStreamer {
 	r, w := io.Pipe()
 
 	return &SimpleStreamer{
 		seenTopics: make([]topics.Topic, 0),
 		Reader:     bufio.NewReader(r),
 		Writer:     bufio.NewWriter(w),
-		gossip:     protocol.NewGossip(magic),
+		gossip:     protocol.NewGossip(),
 	}
 }
 
@@ -187,9 +187,9 @@ type GossipStreamer struct {
 }
 
 // NewGossipStreamer creates a new GossipStreamer instance.
-func NewGossipStreamer(magic protocol.Magic) *GossipStreamer {
+func NewGossipStreamer() *GossipStreamer {
 	return &GossipStreamer{
-		SimpleStreamer: NewSimpleStreamer(magic),
+		SimpleStreamer: NewSimpleStreamer(),
 	}
 }
 

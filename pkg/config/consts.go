@@ -35,6 +35,12 @@ const (
 
 	// KadcastInitialHeight sets the default initial height for Kadcast broadcast algorithm.
 	KadcastInitialHeight byte = 128
+
+	// The dusk-blockchain executable version.
+	NodeVersion = "0.5.0"
+
+	// The shared API version (between dusk-blockchain and rusk).
+	InteropVersion = "0.1.0"
 )
 
 // KadcastInitHeader is used as default initial kadcast message header.

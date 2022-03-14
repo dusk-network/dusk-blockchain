@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 )
@@ -82,7 +81,7 @@ func closeStorage() error {
 // NewDatabase create or open backend storage (goleveldb) located at the
 // specified path. Readonly option is pseudo read-only mode implemented by
 // heavy.Database. Not to be confused with read-only goleveldb mode.
-func NewDatabase(path string, network protocol.Magic, readonly bool) (database.DB, error) {
+func NewDatabase(path string, readonly bool) (database.DB, error) {
 	storage, err := openStorage(path)
 	if err != nil {
 		return nil, err

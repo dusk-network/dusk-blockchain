@@ -16,7 +16,7 @@ import (
 )
 
 func TestProcess(t *testing.T) {
-	g := protocol.NewGossip(protocol.DevNet)
+	g := protocol.NewGossip()
 
 	m := bytes.NewBufferString("pippo")
 
@@ -36,15 +36,15 @@ func TestProcess(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write([]byte("pippo"))
-	// First 16 bytes of `msg` are the magic, checksum and reserved bytes
-	assert.Equal(t, buf.Bytes(), msg[16:])
+	// First 20 bytes of `msg` are the version, checksum, and reserved bytes
+	assert.Equal(t, buf.Bytes(), msg[(8+12):])
 }
 
 func TestUnpackLength(t *testing.T) {
 	test := "pippo"
 	b := bytes.NewBufferString(test)
 
-	g := protocol.NewGossip(protocol.DevNet)
+	g := protocol.NewGossip()
 	assert.NoError(t, g.Process(b))
 
 	length, err := g.UnpackLength(b)
