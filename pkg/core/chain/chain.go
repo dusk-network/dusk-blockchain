@@ -531,7 +531,7 @@ func (c *Chain) isValidBlock(blk, chainTipBlk block.Block, l *logrus.Entry, with
 	l.Debug("verifying block certificate")
 
 	var err error
-	if err = verifiers.CheckBlockCertificate(*c.p, blk, c.tip.Header.Seed); err != nil {
+	if err = verifiers.CheckBlockCertificate(*c.p, blk, chainTipBlk.Header.Seed); err != nil {
 		l.WithError(err).Error("certificate verification failed")
 		return err
 	}
