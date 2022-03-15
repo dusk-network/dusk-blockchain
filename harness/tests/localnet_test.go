@@ -32,6 +32,9 @@ var (
 
 	// tomlProfile could be 'default', 'kadcast', kadcast_uds.
 	tomlProfile = os.Getenv("DUSK_NETWORK_PROFILE")
+
+	// networkReuse is flag to instruct test-harness to reuse the existing state.
+	_, networkReuse = os.LookupEnv("DUSK_NETWORK_REUSE")
 )
 
 var (
@@ -46,14 +49,21 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 
+	localNet.Reuse = networkReuse
+
 	// create the temp-dir workspace. Quit on error
 	workspace = path.Join(os.TempDir(), "localnet")
-	if err := os.Mkdir(workspace, 0700); err != nil {
-		fmt.Println("Cleaning temp directory", workspace)
 
-		if err := os.RemoveAll(workspace); err == nil {
-			os.Mkdir(workspace, 0700)
+	if !localNet.Reuse {
+		if err := os.Mkdir(workspace, 0700); err != nil {
+			fmt.Println("Cleaning temp directory", workspace)
+
+			if err := os.RemoveAll(workspace); err == nil {
+				os.Mkdir(workspace, 0700)
+			}
 		}
+	} else {
+		fmt.Println("Network reuse mode enabled")
 	}
 
 	// set the network size
