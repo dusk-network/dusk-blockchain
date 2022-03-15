@@ -199,6 +199,9 @@ type consensusConfiguration struct {
 	// ThrottleMilli determines number of Milliseconds to throttle block
 	// acceptance if Consensus time is less than config.ConsensusTimeThreshold.
 	ThrottleMilli int64
+
+	// ThrottleIterMilli determines number of Milliseconds to throttle VerifyST.
+	ThrottleIterMilli int64
 }
 
 type stateConfiguration struct {
