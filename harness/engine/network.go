@@ -112,6 +112,7 @@ type Network struct {
 	processes   []*os.Process
 
 	NetworkType byte
+	Reuse       bool
 }
 
 // AddNode to the network.
@@ -248,8 +249,11 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 
 	// create node folder
 	nodeDir := workspace + "/node-" + node.Id
-	if e := os.Mkdir(nodeDir, os.ModeDir|os.ModePerm); e != nil {
-		return e
+
+	if !n.Reuse {
+		if e := os.Mkdir(nodeDir, os.ModeDir|os.ModePerm); e != nil {
+			return e
+		}
 	}
 
 	node.Dir = nodeDir
@@ -325,6 +329,24 @@ func (n *Network) generateConfig(nodeIndex int) (string, error) {
 	walletPath := n.getWalletsPath()
 	node := n.nodes[nodeIndex]
 
+	configPath := node.Dir + "/dusk.toml"
+
+	if n.Reuse {
+		var err error
+
+		node.Cfg, err = config.LoadFromFile(configPath)
+		if err != nil {
+			return "", fmt.Errorf("LoadFromFile %s failed with err %s", configPath, err.Error())
+		}
+
+		return configPath, nil
+	}
+
+	if _, err := os.Stat(configPath); err == nil {
+		// path/to/whatever exists
+		return configPath, nil
+	}
+
 	// Load config profile from the global parameter profileList
 	profileFunc, ok := profileList[node.ConfigProfileID]
 	if !ok {
@@ -336,17 +358,16 @@ func (n *Network) generateConfig(nodeIndex int) (string, error) {
 	profileFunc(nodeIndex, node, walletPath)
 
 	// setting the root directory for node's sandbox
-	configPath := node.Dir + "/dusk.toml"
 	if err := viper.WriteConfigAs(configPath); err != nil {
 		return "", fmt.Errorf("config profile err '%s' for node index %d", err.Error(), nodeIndex)
 	}
 
 	// Finally load sandbox configuration and setting it in the node
-	var err error
+	var err1 error
 
-	node.Cfg, err = config.LoadFromFile(configPath)
-	if err != nil {
-		return "", fmt.Errorf("LoadFromFile %s failed with err %s", configPath, err.Error())
+	node.Cfg, err1 = config.LoadFromFile(configPath)
+	if err1 != nil {
+		return "", fmt.Errorf("LoadFromFile %s failed with err %s", configPath, err1.Error())
 	}
 
 	return configPath, nil
@@ -400,14 +421,14 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 
 		stdOutFile, err := os.Create(nodeDir + "/" + id + "_stdout")
 		if err != nil {
-			log.Panic(err)
+			log.Info(err)
 		}
 
 		var stdErrFile *os.File
 
 		stdErrFile, err = os.Create(nodeDir + "/" + id + "_stderr")
 		if err != nil {
-			log.Panic(err)
+			log.Info(err)
 		}
 
 		cmd.Stdout = stdOutFile
@@ -474,6 +495,8 @@ func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPubl
 }
 
 func (n *Network) startRuskWithUDS(nodeDir string, bootstrapNodes []string, kadcastPublicAddr string, grpcSocket string, rewardAddress string) error {
+	_ = os.Remove(grpcSocket)
+
 	if err := n.start(nodeDir, RUSK_EXE_PATH,
 		"--ipc_method", "uds",
 		"--socket", grpcSocket,
