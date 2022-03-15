@@ -30,7 +30,7 @@ func (c *Chain) allowFallback(fallbackBlock block.Block, l *logrus.Entry) (*bloc
 		return nil, err
 	}
 
-	// Ensure block fields and certificate are valid agaist previous block.
+	// Ensure block fields and certificate are valid against previous block.
 	if err = c.isValidBlock(fallbackBlock, prevBlk, l, true); err != nil {
 		return nil, err
 	}
@@ -39,7 +39,11 @@ func (c *Chain) allowFallback(fallbackBlock block.Block, l *logrus.Entry) (*bloc
 }
 
 func (c *Chain) tryFallback(blk block.Block) error {
-	l := log.WithField("curr_h", c.tip.Header.Height).WithField("event", "fallback")
+	l := log.WithField("curr_h", c.tip.Header.Height).
+		WithField("curr_step", c.tip.Header.Certificate.Step).
+		WithField("fallback_step", blk.Header.Certificate.Step).
+		WithField("event", "fallback")
+
 	l.Info("initialize procedure")
 
 	var prevBlk *block.Block
