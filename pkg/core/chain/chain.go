@@ -337,25 +337,6 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 	return nil
 }
 
-func throttle(startTimeMilli int64, maxDelayMilli int64) (time.Duration, error) {
-	if startTimeMilli == 0 || maxDelayMilli == 0 {
-		return time.Duration(0), errors.New("invalid input")
-	}
-
-	delta := time.Now().UnixMilli() - startTimeMilli
-
-	if delta > 0 && delta < maxDelayMilli {
-		duration := time.Duration((maxDelayMilli - delta) * int64(time.Millisecond))
-
-		if duration > 0 {
-			time.Sleep(duration)
-			return duration, nil
-		}
-	}
-
-	return time.Duration(0), errors.New("max delay exceeded")
-}
-
 // acceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
 func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
@@ -385,7 +366,7 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 			maxDelayMilli = 2000
 		}
 
-		if d, err := throttle(startTime, maxDelayMilli); err == nil {
+		if d, err := util.Throttle(startTime, maxDelayMilli); err == nil {
 			log.WithField("height", blk.Header.Height).WithField("sleep_for", d.String()).Trace("throttled")
 		}
 	}

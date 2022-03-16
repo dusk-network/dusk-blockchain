@@ -193,6 +193,9 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
 	}
 
+	// start measuring the execution time.
+	st := time.Now().UnixMilli()
+
 	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Header.Hash) {
 		var err error
 
@@ -214,6 +217,18 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 			WithField("step", hdr.Step).
 			Error("firststep_verifyCandidateBlock failed")
 		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
+	}
+
+	if step > 3 {
+		maxDelay := config.Get().Consensus.ThrottleIterMilli
+		if maxDelay == 0 {
+			maxDelay = 1000
+		}
+
+		d, err := util.Throttle(st, maxDelay)
+		if err == nil {
+			log.WithField("step", step).WithField("sleep_for", d.String()).Trace("vst throttled")
+		}
 	}
 
 	return p.createStepVoteMessage(result, round, step)
