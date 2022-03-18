@@ -16,7 +16,7 @@ import (
 )
 
 // DEFAULT_STATE_ROOT is the state root result of "rusk make state".
-const DEFAULT_STATE_ROOT string = "898cbd84e22709c548ff44acf9a49b8eb2f10d11ea8d5cee11ed3baa648d891a"
+const DEFAULT_STATE_ROOT string = "b40ba0dac43dd7bfa8e390c05e9da481a9598bed0689ef81c6eb52e86de6deac"
 
 // Generate a genesis block. The constitution of the block depends on the passed
 // config.
