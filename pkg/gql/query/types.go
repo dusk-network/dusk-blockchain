@@ -101,13 +101,13 @@ var Transaction = graphql.NewObject(
 				Type: graphql.Int,
 			},
 			"gaslimit": &graphql.Field{
-				Type: graphql.Int,
+				Type: graphql.Float,
 			},
 			"gasprice": &graphql.Field{
 				Type: graphql.Int,
 			},
 			"gasspent": &graphql.Field{
-				Type: graphql.Int,
+				Type: graphql.Float,
 			},
 			"json": &graphql.Field{
 				Type: graphql.String,
