@@ -321,6 +321,46 @@ func (t *transaction) FetchCandidateMessage(hash []byte) (block.Block, error) {
 	return *cm, nil
 }
 
+// FetchBlockByStateRoot finds a block that is linked to a specified state_root.
+// Loop through all blocks in reverse order.
+func (t *transaction) FetchBlockByStateRoot(fromHeight uint64, stateRoot []byte) (*block.Block, error) {
+	i := fromHeight
+
+	for {
+		hash, err := t.FetchBlockHashByHeight(i)
+		if err != nil {
+			return nil, err
+		}
+
+		header, err := t.FetchBlockHeader(hash)
+		if err != nil {
+			return nil, err
+		}
+
+		if bytes.Equal(header.StateHash, stateRoot) {
+			txs, err := t.FetchBlockTxs(hash)
+			if err != nil {
+				return nil, err
+			}
+
+			b := block.Block{
+				Header: header,
+				Txs:    txs,
+			}
+
+			return &b, nil
+		}
+
+		if i == 0 {
+			// If this point is reached, all blocks including genesis does
+			// not know this state_root.
+			return nil, database.ErrStateHashNotFound
+		}
+
+		i--
+	}
+}
+
 func (t *transaction) ClearCandidateMessages() error {
 	for k := range t.db.storage[candidateInd] {
 		delete(t.db.storage[candidateInd], k)
