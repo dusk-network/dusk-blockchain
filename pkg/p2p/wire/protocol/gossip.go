@@ -37,8 +37,12 @@ func NewGossip() *Gossip {
 // Process a message that is passing through, by prepending
 // magic and the message checksum, and finally by prepending the length.
 func (g *Gossip) Process(m *bytes.Buffer) error {
+	return g.ProcessWithReserved(m, 0)
+}
+
+func (g *Gossip) ProcessWithReserved(m *bytes.Buffer, reserved uint64) error {
 	cs := checksum.Generate(m.Bytes())
-	return WriteFrame(m, cs)
+	return WriteFrameWithReserved(m, cs, reserved)
 }
 
 // UnpackLength unwraps the incoming packet (likely from a net.Conn struct) and returns the length of the packet without reading the payload (which is left to the user of this method).

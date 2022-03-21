@@ -9,12 +9,15 @@ package kadcast
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
+
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 const (
@@ -139,9 +142,15 @@ func (w *Writer) writeToPoint(data, header []byte, _ byte) error {
 	}
 	// create the message
 	b := bytes.NewBuffer(data)
-	if err := w.gossip.Process(b); err != nil {
+
+	// Make the message unique so it is not fitered out by kadcast cache.
+	e, _ := crypto.RandEntropy(64)
+	reserved := binary.LittleEndian.Uint64(e)
+
+	if err := w.gossip.ProcessWithReserved(b, reserved); err != nil {
 		return err
 	}
+
 	// extract destination address
 	addr := string(header)
 	// prepare message

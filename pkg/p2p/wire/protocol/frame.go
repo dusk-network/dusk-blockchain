@@ -27,8 +27,12 @@ const (
 	VersionLength = uint64(8)
 )
 
-// WriteFrame mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message.
 func WriteFrame(buf *bytes.Buffer, cs []byte) error {
+	return WriteFrameWithReserved(buf, cs, 0)
+}
+
+// WriteFrameWithReserved mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message.
+func WriteFrameWithReserved(buf *bytes.Buffer, cs []byte, reserved uint64) error {
 	ln := VersionLength + uint64(reservedFieldSize+checksum.Length+buf.Len())
 	if ln > MaxFrameSize {
 		return fmt.Errorf("message size exceeds MaxFrameSize (%d)", MaxFrameSize)
@@ -47,8 +51,6 @@ func WriteFrame(buf *bytes.Buffer, cs []byte) error {
 	}
 
 	// Add reserved field bytes
-	var reserved uint64
-
 	if err := encoding.WriteUint64LE(msg, reserved); err != nil {
 		return err
 	}
