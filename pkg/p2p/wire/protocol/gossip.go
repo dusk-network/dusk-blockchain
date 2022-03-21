@@ -22,24 +22,19 @@ type (
 	}
 )
 
-/*
-Gossip message/frame
-
-TODO:
-
-*/
-
 // NewGossip returns a gossip preprocessor with the specified magic.
 func NewGossip() *Gossip {
 	return &Gossip{}
 }
 
-// Process a message that is passing through, by prepending
-// magic and the message checksum, and finally by prepending the length.
+// Process same as ProcessWithReserved but with reserved field fixed to 0.
 func (g *Gossip) Process(m *bytes.Buffer) error {
 	return g.ProcessWithReserved(m, 0)
 }
 
+// ProcessWithReserved process a message that is passing through, by prepending
+// magic and the message checksum, and finally by prepending the length. It
+// allows to set reserved field.
 func (g *Gossip) ProcessWithReserved(m *bytes.Buffer, reserved uint64) error {
 	cs := checksum.Generate(m.Bytes())
 	return WriteFrameWithReserved(m, cs, reserved)

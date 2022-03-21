@@ -27,6 +27,8 @@ const (
 	VersionLength = uint64(8)
 )
 
+// WriteFrame same as WriteFrameWithReserved but with reserved field
+// fixed to 0.
 func WriteFrame(buf *bytes.Buffer, cs []byte) error {
 	return WriteFrameWithReserved(buf, cs, 0)
 }

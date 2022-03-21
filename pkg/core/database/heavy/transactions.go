@@ -342,14 +342,12 @@ func (t transaction) op(opType int, key []byte, value []byte) {
 	}
 
 	if t.batch != nil {
-
 		switch opType {
 		case optypePut:
 			t.batch.Put(key, value)
 		case optypeDelete:
 			t.batch.Delete(key)
 		}
-
 	} else {
 		// fail-fast when a writable transaction is not capable of storing data
 		log.Panic("leveldb batch is unreachable")

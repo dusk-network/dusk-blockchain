@@ -59,7 +59,7 @@ func (c *Chain) tryFallback(b block.Block) error {
 
 	llog.Info("initialize procedure")
 
-	if err := c.allowFallback(b, llog); err != nil {
+	if err = c.allowFallback(b, llog); err != nil {
 		return err
 	}
 
@@ -77,13 +77,14 @@ func (c *Chain) tryFallback(b block.Block) error {
 		Info("revert contract storage completed")
 
 	// it's needed to persist otherwise we may end up having the new state
-	// (after revert) inconsistant with the one that has been persisted.
+	// (after revert) inconsistent with the one that has been persisted.
 	if err = c.proxy.Executor().Persist(c.ctx, stateHash); err != nil {
 		return err
 	}
 
 	// Find the most recent finalized block.
 	var finalized *block.Block
+
 	err = c.db.View(func(t database.Transaction) error {
 		var e error
 		finalized, e = t.FetchBlockByStateRoot(th-1, stateHash)
