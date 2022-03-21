@@ -74,6 +74,9 @@ type Transaction interface {
 	// Not to be called concurrently, as it updates chain tip.
 	StoreBlock(block *block.Block, persisted bool) error
 
+	// DeleteBlock deletes all records associated with a specified block.
+	DeleteBlock(b *block.Block) error
+
 	// FetchBlock will return a block, given a hash.
 	FetchBlock(hash []byte) (*block.Block, error)
 

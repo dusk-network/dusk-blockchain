@@ -25,6 +25,10 @@ type transaction struct {
 	batch    memdb
 }
 
+func (t *transaction) DeleteBlock(b *block.Block) error {
+	return nil
+}
+
 // NB: More optimal data structure can be used to speed up fetching. E.g instead
 // map lookup operation on block per height, one can utilize a height as index
 // in a slice.
