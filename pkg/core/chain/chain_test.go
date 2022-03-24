@@ -212,6 +212,8 @@ func TestSyncProgress(t *testing.T) {
 }
 
 func TestFallbackProcedure(t *testing.T) {
+	t.Skip()
+
 	// Set up a chain instance with mocking verifiers
 	_, chain := setupChainTest(t, 1)
 
