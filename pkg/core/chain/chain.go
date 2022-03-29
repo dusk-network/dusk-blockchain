@@ -23,6 +23,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/loop"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
@@ -104,6 +105,8 @@ type Chain struct {
 	proxy transactions.Proxy
 
 	ctx context.Context
+
+	blacklisted dupemap.TmpMap
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -120,6 +123,7 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		ctx:               ctx,
 		loop:              loop,
 		stopConsensusChan: make(chan struct{}),
+		blacklisted:       *dupemap.NewTmpMap(1000, 120),
 	}
 
 	chain.synchronizer = newSynchronizer(db, chain)
@@ -247,6 +251,13 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 
 	l.Trace("block received")
 
+	hash := blk.Header.Hash
+
+	if c.blacklisted.Has(bytes.NewBuffer(hash)) {
+		log.WithField("hash", util.StringifyBytes(hash)).Warn("filter out blacklisted block")
+		return nil, nil
+	}
+
 	switch {
 	case blk.Header.Height == c.tip.Header.Height:
 		{
@@ -256,12 +267,20 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 				return nil, nil
 			}
 
+			hash := c.tip.Header.Hash
+
 			// Try to fallback
 			if err := c.tryFallback(blk); err != nil {
 				l.WithError(err).Error("failed fallback procedure")
+				return nil, nil
 			}
 
-			return nil, nil
+			// Fallback completed successfully. This means that the old tip hash
+			// came from a consensus fork. That's said, we should filter it
+			// out if any other node propagates it back when this node is syncing up.
+			c.blacklisted.Add(bytes.NewBuffer(hash))
+
+			return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kh)
 		}
 	case blk.Header.Height < c.tip.Header.Height:
 		l.WithError(ErrBlockAlreadyAccepted).Debug("failed block processing")
@@ -390,6 +409,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 		fields = logger.Fields{
 			"event":      "accept_block",
 			"height":     blk.Header.Height,
+			"cert_step":  blk.Header.Certificate.Step,
 			"hash":       util.StringifyBytes(blk.Header.Hash),
 			"curr_h":     c.tip.Header.Height,
 			"block_time": blk.Header.Timestamp - tipBlk.Header.Timestamp,
@@ -452,6 +472,10 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 		h, err := tx.CalculateHash()
 		if err != nil {
 			log.WithError(err).Warn("could not read rusk tx hash")
+		}
+
+		if tx.TxError() != nil {
+			log.WithField("desc", tx.TxError().String()).Warn("transaction rusk error")
 		}
 
 		if err := blk.TamperExecutedTransaction(h, tx.GasSpent(), tx.TxError()); err != nil {
@@ -526,11 +550,12 @@ func (c *Chain) isValidBlock(blk, chainTipBlk block.Block, l *logrus.Entry, with
 // Returns nil, if checks passed and block was successfully saved.
 func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 	fields := logger.Fields{
-		"event":    "accept_block",
-		"height":   blk.Header.Height,
-		"hash":     util.StringifyBytes(blk.Header.Hash),
-		"curr_h":   c.tip.Header.Height,
-		"prov_num": c.p.Set.Len(),
+		"event":     "accept_block",
+		"height":    blk.Header.Height,
+		"cert_step": blk.Header.Certificate.Step,
+		"hash":      util.StringifyBytes(blk.Header.Hash),
+		"curr_h":    c.tip.Header.Height,
+		"prov_num":  c.p.Set.Len(),
 	}
 
 	l := log.WithFields(fields)

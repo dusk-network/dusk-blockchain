@@ -32,6 +32,9 @@ const (
 	optionFsyncEnabled = false
 
 	optionNoWriteMerge = false
+
+	optypePut    = 1
+	optypeDelete = 0
 )
 
 var (
@@ -71,6 +74,11 @@ type transaction struct {
 	closed bool
 }
 
+// DeleteBlock deletes all records associated with a specified block.
+func (t transaction) DeleteBlock(b *block.Block) error {
+	return t.modify(optypeDelete, b)
+}
+
 // StoreBlock stores the entire block data into storage. No validations are
 // applied. Method simply stores the block data into LevelDB storage in an
 // atomic way. That said, storage state changes only when Commit() is called on
@@ -81,6 +89,32 @@ type transaction struct {
 // It is assumed that StoreBlock would be called much less times than Fetch*
 // APIs. Based on that, extra indexing data is put to provide fast-read lookups.
 func (t transaction) StoreBlock(b *block.Block, persisted bool) error {
+	if len(b.Header.Hash) != block.HeaderHashSize {
+		return fmt.Errorf("header hash size is %d but it must be %d", len(b.Header.Hash), block.HeaderHashSize)
+	}
+
+	if err := t.modify(optypePut, b); err != nil {
+		return err
+	}
+
+	// Key = TipPrefix
+	// Value = Hash(chain tip)
+	//
+	// To support fetching  blockchain tip
+	t.put(TipPrefix, b.Header.Hash)
+
+	// Key = PersistedPrefix
+	// Value = Hash(chain tip)
+	//
+	// To support fetching blockchain persisted hash
+	if persisted {
+		t.put(PersistedPrefix, b.Header.Hash)
+	}
+
+	return nil
+}
+
+func (t *transaction) modify(optype int, b *block.Block) error {
 	if t.batch == nil {
 		// t.batch is initialized only on a open, read-write transaction
 		// (built with transaction.Update()).
@@ -103,7 +137,7 @@ func (t transaction) StoreBlock(b *block.Block, persisted bool) error {
 	key := append(HeaderPrefix, b.Header.Hash...)
 	value := blockHeaderFields.Bytes()
 
-	t.put(key, value)
+	t.op(optype, key, value)
 
 	if uint64(len(b.Txs)) > math.MaxUint32 {
 		return errors.New("too many transactions")
@@ -135,7 +169,7 @@ func (t transaction) StoreBlock(b *block.Block, persisted bool) error {
 			return err
 		}
 
-		t.put(keys, entry)
+		t.op(optype, keys, entry)
 
 		// Schema
 		//
@@ -143,7 +177,7 @@ func (t transaction) StoreBlock(b *block.Block, persisted bool) error {
 		// Value = block.header.hash
 		//
 		// For the retrival of a single transaction by TxId
-		t.put(append(TxIDPrefix, txID...), b.Header.Hash)
+		t.op(optype, append(TxIDPrefix, txID...), b.Header.Hash)
 	}
 
 	// Key = HeightPrefix + block.header.height
@@ -159,21 +193,7 @@ func (t transaction) StoreBlock(b *block.Block, persisted bool) error {
 
 	key = append(HeightPrefix, heightBuf.Bytes()...)
 
-	t.put(key, b.Header.Hash)
-
-	// Key = TipPrefix
-	// Value = Hash(chain tip)
-	//
-	// To support fetching  blockchain tip
-	t.put(TipPrefix, b.Header.Hash)
-
-	// Key = PersistedPrefix
-	// Value = Hash(chain tip)
-	//
-	// To support fetching blockchain persisted hash
-	if persisted {
-		t.put(PersistedPrefix, b.Header.Hash)
-	}
+	t.op(optype, key, b.Header.Hash)
 
 	return nil
 }
@@ -310,6 +330,24 @@ func (t transaction) put(key []byte, value []byte) {
 
 	if t.batch != nil {
 		t.batch.Put(key, value)
+	} else {
+		// fail-fast when a writable transaction is not capable of storing data
+		log.Panic("leveldb batch is unreachable")
+	}
+}
+
+func (t transaction) op(opType int, key []byte, value []byte) {
+	if !t.writable {
+		return
+	}
+
+	if t.batch != nil {
+		switch opType {
+		case optypePut:
+			t.batch.Put(key, value)
+		case optypeDelete:
+			t.batch.Delete(key)
+		}
 	} else {
 		// fail-fast when a writable transaction is not capable of storing data
 		log.Panic("leveldb batch is unreachable")
@@ -483,6 +521,46 @@ func (t transaction) FetchCandidateMessage(hash []byte) (block.Block, error) {
 	}
 
 	return *cm, nil
+}
+
+// FetchBlockByStateRoot finds a block that is linked to a specified state_root.
+// Loop through all blocks in reverse order.
+func (t *transaction) FetchBlockByStateRoot(fromHeight uint64, stateRoot []byte) (*block.Block, error) {
+	i := fromHeight
+
+	for {
+		hash, err := t.FetchBlockHashByHeight(i)
+		if err != nil {
+			return nil, err
+		}
+
+		header, err := t.FetchBlockHeader(hash)
+		if err != nil {
+			return nil, err
+		}
+
+		if bytes.Equal(header.StateHash, stateRoot) {
+			txs, err := t.FetchBlockTxs(hash)
+			if err != nil {
+				return nil, err
+			}
+
+			b := block.Block{
+				Header: header,
+				Txs:    txs,
+			}
+
+			return &b, nil
+		}
+
+		if i == 0 {
+			// If this point is reached, all blocks including genesis does
+			// not know this state_root.
+			return nil, database.ErrStateHashNotFound
+		}
+
+		i--
+	}
 }
 
 func (t transaction) ClearCandidateMessages() error {

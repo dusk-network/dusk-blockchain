@@ -18,8 +18,6 @@ var (
 	// Common blockchain database errors. See also database/testing for the
 	// cases where they are returned.
 
-	// ErrKeyImageNotFound returned on a keyImage lookup.
-	ErrKeyImageNotFound = errors.New("database: keyImage not found")
 	// ErrTxNotFound returned on a tx lookup by hash.
 	ErrTxNotFound = errors.New("database: transaction not found")
 	// ErrBlockNotFound returned on a block lookup by hash or height.
@@ -28,6 +26,8 @@ var (
 	ErrStateNotFound = errors.New("database: state not found")
 	// ErrOutputNotFound returned on output lookup during tx verification.
 	ErrOutputNotFound = errors.New("database: output not found")
+	// ErrStateHashNotFound returned on state hash not linked to any block.
+	ErrStateHashNotFound = errors.New("database: state hash was not found")
 
 	// AnyTxType is used as a filter value on FetchBlockTxByHash.
 	AnyTxType = transactions.TxType(math.MaxUint8)
@@ -65,6 +65,8 @@ type Transaction interface {
 	FetchBlockTxByHash(txID []byte) (tx transactions.ContractCall, txIndex uint32, blockHeaderHash []byte, err error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
+	FetchBlockByStateRoot(fromHeight uint64, stateRoot []byte) (*block.Block, error)
+
 	// Fetch chain registry (chain tip hash, persisted block etc).
 	FetchRegistry() (*Registry, error)
 
@@ -73,6 +75,9 @@ type Transaction interface {
 	// Overwrites only if block with same hash already stored
 	// Not to be called concurrently, as it updates chain tip.
 	StoreBlock(block *block.Block, persisted bool) error
+
+	// DeleteBlock deletes all records associated with a specified block.
+	DeleteBlock(b *block.Block) error
 
 	// FetchBlock will return a block, given a hash.
 	FetchBlock(hash []byte) (*block.Block, error)

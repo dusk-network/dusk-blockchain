@@ -67,6 +67,10 @@ var Header = graphql.NewObject(
 				Type:    graphql.Float,
 				Resolve: resolveFee,
 			},
+			"step": &graphql.Field{
+				Type:    graphql.Int,
+				Resolve: resolveStep,
+			},
 		},
 	},
 )

@@ -80,8 +80,8 @@ func (p *PermissiveExecutor) Persist(context.Context, []byte) error {
 }
 
 // Revert ...
-func (p *PermissiveExecutor) Revert(ctx context.Context) error {
-	return nil
+func (p *PermissiveExecutor) Revert(ctx context.Context) ([]byte, error) {
+	return nil, nil
 }
 
 // MockProxy mocks a proxy for ease of testing.

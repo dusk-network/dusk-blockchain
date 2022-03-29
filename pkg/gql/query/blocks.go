@@ -257,6 +257,33 @@ func resolveFee(p graphql.ResolveParams) (interface{}, error) {
 	return 0, errors.New("invalid resolveFee source block")
 }
 
+func resolveStep(p graphql.ResolveParams) (interface{}, error) {
+	b, ok := p.Source.(*queryHeader)
+	if ok {
+		// Retrieve DB conn from context
+		db, ok := p.Context.Value("database").(database.DB)
+		if !ok {
+			return nil, errors.New("context does not store database conn")
+		}
+
+		step := int(0)
+
+		err := db.View(func(t database.Transaction) error {
+			h, err := t.FetchBlockHeader(b.Hash)
+			if err != nil {
+				return err
+			}
+
+			step = int(h.Certificate.Step)
+			return nil
+		})
+
+		return step, err
+	}
+
+	return 0, errors.New("invalid step source block")
+}
+
 // Fetch block headers by a list of hashes.
 func (b blocks) fetchBlocksByHashes(db database.DB, hashes []interface{}) ([]queryBlock, error) {
 	blocks := make([]*block.Block, 0)

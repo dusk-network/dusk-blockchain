@@ -47,8 +47,8 @@ type Executor interface {
 	// Persist instructs Rusk to persist the state if in-sync with provided stateRoot.
 	Persist(ctx context.Context, stateRoot []byte) error
 
-	// Revert instructs Rusk to revert to the most recent finalized state.
-	Revert(ctx context.Context) error
+	// Revert instructs Rusk to revert to the most recent finalized state. Returns stateRoot, if no error.
+	Revert(ctx context.Context) ([]byte, error)
 }
 
 // Proxy toward the rusk client.
@@ -363,15 +363,15 @@ func (e *executor) Persist(ctx context.Context, stateRoot []byte) error {
 }
 
 // Revert to the last finalized state with a call to the client.
-func (e *executor) Revert(ctx context.Context) error {
+func (e *executor) Revert(ctx context.Context) ([]byte, error) {
 	req := &rusk.RevertRequest{}
 
-	_, err := e.stateClient.Revert(ctx, req)
+	resp, err := e.stateClient.Revert(ctx, req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return resp.StateRoot, nil
 }
 
 // UMember deep copies from the rusk.Provisioner.
