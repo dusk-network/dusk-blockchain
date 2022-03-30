@@ -153,9 +153,8 @@ func RandTx() *Transaction {
 	tx := &Transaction{
 		Payload: &TransactionPayload{},
 
-		TxType:   Distribute,
-		Version:  2,
-		FeeValue: Fee{GasLimit: 10, GasPrice: 99},
+		TxType:  Distribute,
+		Version: 2,
 	}
 
 	b := Rand32Bytes()
@@ -171,9 +170,8 @@ func MockTx() *Transaction {
 			Data: make([]byte, 100),
 		},
 
-		TxType:   1,
-		Version:  2,
-		FeeValue: Fee{GasLimit: 10, GasPrice: 99},
+		TxType:  1,
+		Version: 2,
 	}
 
 	return tx

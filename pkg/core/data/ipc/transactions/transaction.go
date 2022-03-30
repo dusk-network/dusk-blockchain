@@ -40,9 +40,7 @@ type Transaction struct {
 	Hash          [32]byte
 	GasSpentValue uint64
 
-	// TODO: Remove FeeValue as it's now read from decoded payload
-	FeeValue Fee
-	Error    *rusk.ExecutedTransaction_Error
+	Error *rusk.ExecutedTransaction_Error
 }
 
 // NewTransaction returns a new empty Transaction struct.
@@ -64,7 +62,6 @@ func (t Transaction) deepCopy() *Transaction {
 		TxType:        t.TxType,
 		Payload:       t.Payload.Copy(),
 		Hash:          t.Hash,
-		FeeValue:      t.FeeValue,
 		GasSpentValue: t.GasSpentValue,
 	}
 }
@@ -131,15 +128,7 @@ func MarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 		return err
 	}
 
-	if err := encoding.Write256(r, f.Hash[:]); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint64LE(r, f.FeeValue.GasLimit); err != nil {
-		return err
-	}
-
-	return encoding.WriteUint64LE(r, f.FeeValue.GasPrice)
+	return nil
 }
 
 // UnmarshalTransaction reads a Transaction struct from a bytes.Buffer.
@@ -158,26 +147,17 @@ func UnmarshalTransaction(r *bytes.Buffer, f *Transaction) error {
 		return err
 	}
 
-	b := make([]byte, 32)
-	if err := encoding.Read256(r, b); err != nil {
+	d, err := f.Decode()
+	if err != nil {
 		return err
 	}
 
-	copy(f.Hash[:], b)
-
-	var gaslimit uint64
-	if err := encoding.ReadUint64LE(r, &gaslimit); err != nil {
+	hash, err := d.Hash(f.TxType)
+	if err != nil {
 		return err
 	}
 
-	f.FeeValue.GasLimit = gaslimit
-
-	var gasPrice uint64
-	if err := encoding.ReadUint64LE(r, &gasPrice); err != nil {
-		return err
-	}
-
-	f.FeeValue.GasPrice = gasPrice
+	copy(f.Hash[:], hash)
 	return nil
 }
 

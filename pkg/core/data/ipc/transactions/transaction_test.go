@@ -18,9 +18,6 @@ func equal(assert *assert.Assertions, tx1, tx2 *Transaction) {
 	assert.Equal(tx1.TxType, tx2.TxType)
 	assert.Equal(tx1.Version, tx2.Version)
 	assert.True(bytes.Equal(tx1.Payload.Data, tx2.Payload.Data))
-
-	assert.Equal(tx1.FeeValue.GasLimit, tx2.FeeValue.GasLimit)
-	assert.Equal(tx1.FeeValue.GasPrice, tx2.FeeValue.GasPrice)
 }
 
 func TestMarshal(t *testing.T) {
