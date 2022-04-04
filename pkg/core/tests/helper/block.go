@@ -26,7 +26,7 @@ func RandomBlock(height uint64, txBatchCount uint16) *block.Block {
 		Txs:    transactions.RandContractCalls(int(txBatchCount), 0, true),
 	}
 
-	dist := transactions.RandTx()
+	dist := transactions.MockDistributeTx()
 	b.Txs = append(b.Txs, dist)
 
 	txRoot, err := b.CalculateRoot()
