@@ -46,7 +46,6 @@ type Phase struct {
 
 	selectionResult message.NewBlock
 
-	verifyFn  consensus.CandidateVerificationFunc
 	requestor *candidate.Requestor
 
 	next consensus.Phase
@@ -57,8 +56,10 @@ type Phase struct {
 // and reduce them to just one candidate obtaining 64% of the committee vote.
 func New(next consensus.Phase, e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration, db database.DB, requestor *candidate.Requestor) *Phase {
 	return &Phase{
-		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
-		verifyFn:  verifyFn,
+		Reduction: &reduction.Reduction{Emitter: e,
+			TimeOut:  timeOut,
+			VerifyFn: verifyFn,
+		},
 		next:      next,
 		db:        db,
 		requestor: requestor,
@@ -90,7 +91,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
-		p.SendReduction(r.Round, step, p.selectionResult.State().BlockHash)
+		p.SendReduction(r.Round, step, &p.selectionResult.Candidate)
 	}
 
 	timeoutChan := time.After(p.TimeOut)
@@ -140,7 +141,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
-			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step)
+			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step, nil)
 			return p.next.Initialize(*sv)
 
 		case <-ctx.Done():
@@ -190,11 +191,8 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 	// if the votes converged for an empty hash we invoke halt with no
 	// StepVotes
 	if bytes.Equal(hdr.BlockHash, reduction.EmptyHash[:]) {
-		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
+		return p.createStepVoteMessage(reduction.EmptyResult, round, step, nil)
 	}
-
-	// start measuring the execution time.
-	st := time.Now().UnixMilli()
 
 	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Header.Hash) {
 		var err error
@@ -206,32 +204,11 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 				WithField("round", hdr.Round).
 				WithField("step", hdr.Step).
 				Error("firststep_fetchCandidateBlock failed")
-			return p.createStepVoteMessage(reduction.EmptyResult, round, step)
+			return p.createStepVoteMessage(reduction.EmptyResult, round, step, nil)
 		}
 	}
 
-	if err := p.verifyFn(p.selectionResult.Candidate); err != nil {
-		log.
-			WithError(err).
-			WithField("round", hdr.Round).
-			WithField("step", hdr.Step).
-			Error("firststep_verifyCandidateBlock failed")
-		return p.createStepVoteMessage(reduction.EmptyResult, round, step)
-	}
-
-	if step > 3 {
-		maxDelay := config.Get().Consensus.ThrottleIterMilli
-		if maxDelay == 0 {
-			maxDelay = 1000
-		}
-
-		d, err := util.Throttle(st, maxDelay)
-		if err == nil {
-			log.WithField("step", step).WithField("sleep_for", d.String()).Trace("vst throttled")
-		}
-	}
-
-	return p.createStepVoteMessage(result, round, step)
+	return p.createStepVoteMessage(result, round, step, &p.selectionResult.Candidate)
 }
 
 func (p *Phase) fetchCandidate(ctx context.Context, hash []byte) (block.Block, error) {
@@ -268,9 +245,15 @@ func (p *Phase) requestCandidate(ctx context.Context, hash []byte) (block.Block,
 	return cm, nil
 }
 
-func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8) *message.StepVotesMsg {
+func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8, candidate *block.Block) *message.StepVotesMsg {
 	if r.IsEmpty() {
 		p.IncreaseTimeout(round)
+	}
+
+	var cpy *block.Block
+	if candidate != nil {
+		b := candidate.Copy().(block.Block)
+		cpy = &b
 	}
 
 	return &message.StepVotesMsg{
@@ -281,6 +264,7 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 			PubKeyBLS: p.Keys.BLSPubKey,
 		},
 		StepVotes: r.SV,
+		Candidate: cpy,
 	}
 }
 

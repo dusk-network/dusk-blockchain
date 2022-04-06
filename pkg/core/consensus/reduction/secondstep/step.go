@@ -50,9 +50,13 @@ type Phase struct {
 // NB: we cannot push the agreement directly within the agreementChannel
 // until we have a way to deduplicate it from the peer (the dupemap will not be
 // notified of duplicates).
-func New(e *consensus.Emitter, timeOut time.Duration) *Phase {
+func New(e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration) *Phase {
 	return &Phase{
-		Reduction: &reduction.Reduction{Emitter: e, TimeOut: timeOut},
+		Reduction: &reduction.Reduction{
+			Emitter:  e,
+			TimeOut:  timeOut,
+			VerifyFn: verifyFn,
+		},
 	}
 }
 
@@ -86,7 +90,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
-		p.SendReduction(r.Round, step, p.firstStepVotesMsg.BlockHash)
+		p.SendReduction(r.Round, step, p.firstStepVotesMsg.Candidate)
 	}
 
 	timeoutChan := time.After(p.TimeOut)
