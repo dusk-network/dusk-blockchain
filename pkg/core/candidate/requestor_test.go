@@ -57,7 +57,7 @@ func TestRequestor(t *testing.T) {
 	streamer := eventbus.NewGossipStreamer()
 
 	l := eventbus.NewStreamListener(streamer)
-	bus.Subscribe(topics.Gossip, l)
+	bus.Subscribe(topics.Kadcast, l)
 
 	cChan := make(chan block.Block, 1)
 
