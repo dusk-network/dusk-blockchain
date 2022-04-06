@@ -12,6 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
@@ -48,6 +49,12 @@ func (r *Result) IsEmpty() bool {
 type Reduction struct {
 	*consensus.Emitter
 	TimeOut time.Duration
+
+	// candidate is the block proposed by Block Generator
+	candidate block.Block
+
+	// VerifyFn verifies candidate block
+	VerifyFn consensus.CandidateVerificationFunc
 }
 
 // IncreaseTimeout is used when reduction does not reach the quorum or
@@ -65,12 +72,32 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 	}
 }
 
-// SendReduction to the other peers.
-func (r *Reduction) SendReduction(round uint64, step uint8, hash []byte) {
+// SendReduction propagates a signed vote for the candidate block, if block is
+// fully valid.
+func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) {
+	voteHash := EmptyHash[:]
+
+	if candidate != nil {
+		// TODO: EmptyBlock handled
+		if err := r.VerifyFn(*candidate); err != nil {
+			log.
+				WithError(err).
+				WithField("round", round).
+				WithField("step", step).
+				Error("verifyfn failed")
+		} else {
+			// Candidate block is fully valid.
+			// Vote for it.
+			voteHash, _ = candidate.CalculateHash()
+		}
+		// TODO: Throttle
+	}
+
+	// Generate Reduction message to propagate my vote.
 	hdr := header.Header{
 		Round:     round,
 		Step:      step,
-		BlockHash: hash,
+		BlockHash: voteHash,
 		PubKeyBLS: r.Keys.BLSPubKey,
 	}
 
