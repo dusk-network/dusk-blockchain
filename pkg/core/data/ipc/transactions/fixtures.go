@@ -189,6 +189,20 @@ func MockTx() *Transaction {
 	return RandTx()
 }
 
+// EmptyTx creates an zero-ed transaction.
+func EmptyTx() *Transaction {
+	tx := &Transaction{
+		Payload: &TransactionPayload{
+			Data: make([]byte, 100),
+		},
+
+		TxType:  1,
+		Version: 0,
+	}
+
+	return tx
+}
+
 // MockTxWithParams mocks a transactions with specified params.
 func MockTxWithParams(txtype TxType, gasSpent uint64) ContractCall {
 	t := RandTx()
