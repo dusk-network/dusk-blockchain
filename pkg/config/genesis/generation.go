@@ -7,6 +7,7 @@
 package genesis
 
 import (
+	"bytes"
 	"encoding/hex"
 	"os"
 
@@ -14,9 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
-
-// DEFAULT_STATE_ROOT is the state root result of "rusk make state".
-const DEFAULT_STATE_ROOT string = "b40ba0dac43dd7bfa8e390c05e9da481a9598bed0689ef81c6eb52e86de6deac"
 
 // Generate a genesis block. The constitution of the block depends on the passed
 // config.
@@ -30,7 +28,7 @@ func Generate(c Config) *block.Block {
 	var state_root []byte
 	var err error
 
-	state_root_str := DEFAULT_STATE_ROOT
+	state_root_str := config.DEFAULT_STATE_ROOT
 
 	if state_root_override := os.Getenv("RUSK_STATE_ROOT"); len(state_root_override) > 0 {
 		state_root_str = state_root_override
@@ -67,6 +65,15 @@ func Generate(c Config) *block.Block {
 	hash, err := b.CalculateHash()
 	if err != nil {
 		panic(err)
+	}
+
+	// ensure the genesis hash is the expected one
+	if len(c.hash) > 0 {
+		expected, _ := hex.DecodeString(c.hash)
+		if !bytes.Equal(hash, expected) {
+			// The panic will be fired if testnet genesis block changes.
+			panic("calculated hash is not correct")
+		}
 	}
 
 	b.Header.Hash = hash
