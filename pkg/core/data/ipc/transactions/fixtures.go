@@ -326,16 +326,14 @@ func MockInvalidTx() *Transaction {
 // RuskPublicKey mocks rusk pk.
 func RuskPublicKey() *rusk.PublicKey {
 	return &rusk.PublicKey{
-		AG: make([]byte, 32),
-		BG: make([]byte, 32),
+		Payload: make([]byte, 64),
 	}
 }
 
 // RuskSecretKey mocks rusk sk.
 func RuskSecretKey() *rusk.SecretKey {
 	return &rusk.SecretKey{
-		A: make([]byte, 32),
-		B: make([]byte, 32),
+		Payload: make([]byte, 32),
 	}
 }
 

@@ -69,8 +69,8 @@ github.com/dusk-network/bls12_381-sign/go/cgo/bls v0.1.5/go.mod h1:zaPS7YfC0Fu8D
 github.com/dusk-network/bn256 v0.5.1-lattices/go.mod h1:ddVn3p/nch27uVwd+3QGreudmSKfbAVr39LvBaSUEGg=
 github.com/dusk-network/dusk-crypto v0.1.3 h1:XWzB0wXuJ/6kRE7VCQ/K1Sr+OlInDyTndLRat1owfuo=
 github.com/dusk-network/dusk-crypto v0.1.3/go.mod h1:XEU09/mHLIAg9cS0m/6Hu2+wvJPxybfoXYSCrveHh3U=
-github.com/dusk-network/dusk-protobuf v0.3.10 h1:3/yebJsptagHNE+WvGqT8aVAnSFB3wjm8h74eHh2/14=
-github.com/dusk-network/dusk-protobuf v0.3.10/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
+github.com/dusk-network/dusk-protobuf v0.3.11 h1:+yB1EceN1hxrsyQnsKfiEtECQulWtHuaH+xbgJnqdSE=
+github.com/dusk-network/dusk-protobuf v0.3.11/go.mod h1:QkBrW0iuC0jVqgAwWkCT2TVQhVGRXv3suRVyOcbJS10=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
