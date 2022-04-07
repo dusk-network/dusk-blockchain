@@ -17,12 +17,12 @@ import (
 // Validate an incoming Candidate message.
 func Validate(m message.Message) error {
 	cm := m.Payload().(block.Block)
-	return ValidateCandidate(cm)
+	return SanityCheckCandidate(cm)
 }
 
-// ValidateCandidate makes sure the hash and root are correct, to avoid
+// SanityCheckCandidate makes sure the hash and root are correct, to avoid
 // malicious nodes from overwriting the candidate block for a specific hash.
-func ValidateCandidate(cm block.Block) error {
+func SanityCheckCandidate(cm block.Block) error {
 	if err := checkHash(&cm); err != nil {
 		log.WithError(err).Errorln("validation failed")
 		return errors.New("invalid candidate received")

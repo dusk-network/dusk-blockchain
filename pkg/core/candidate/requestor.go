@@ -88,13 +88,7 @@ func (r *Requestor) publishGetCandidate(hash []byte) error {
 
 	m := message.NewWithHeader(topics.GetCandidate, *buf, config.KadcastInitHeader)
 
-	if config.Get().Kadcast.Enabled {
-		r.publisher.Publish(topics.Kadcast, m)
-		return nil
-	}
-
-	r.publisher.Publish(topics.Gossip, m)
-
+	r.publisher.Publish(topics.Kadcast, m)
 	return nil
 }
 

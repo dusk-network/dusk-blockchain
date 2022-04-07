@@ -99,6 +99,17 @@ func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 	return size
 }
 
+// Seed returns seed value.
+func (b *Handler) Seed() []byte {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	cpy := make([]byte, len(b.seed))
+	copy(cpy, b.seed)
+
+	return cpy
+}
+
 func (b *Handler) membersAt(idx uint8) int {
 	b.lock.RLock()
 	defer b.lock.RUnlock()

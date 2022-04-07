@@ -8,6 +8,7 @@ package message
 
 import (
 	"bytes"
+	"encoding/hex"
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -16,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/sirupsen/logrus"
 )
 
 // NewBlock extends the ScoreProposal with additional fields related to the
@@ -56,6 +58,15 @@ func (e NewBlock) Copy() payload.Safe {
 	copy(cpy.PrevHash, e.PrevHash)
 	copy(cpy.SignedHash, e.SignedHash)
 	return cpy
+}
+
+// WithFields adds a logrus.Entry fields to print all msg fields.
+func (e NewBlock) WithFields(l *logrus.Entry) *logrus.Entry {
+	return l.WithField("msg_pubkey", hex.EncodeToString(e.State().PubKeyBLS)).
+		WithField("msg_blockhash", hex.EncodeToString(e.State().BlockHash)).
+		WithField("msg_round", e.State().Round).
+		WithField("msg_step", e.State().Step).
+		WithField("msg_signature", hex.EncodeToString(e.SignedHash))
 }
 
 // IsEmpty checks if a NewBlock message is empty.
