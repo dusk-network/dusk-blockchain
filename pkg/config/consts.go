@@ -41,6 +41,12 @@ const (
 
 	// The shared API version (between dusk-blockchain and rusk).
 	InteropVersion = "0.1.0"
+
+	// TESTNET_GENESIS_HASH is the default genesis hash for testnet.
+	TESTNET_GENESIS_HASH = "3f2f22608ff4657c488c029eb0fcf372bcc419531c2e578f3e5f957c39b171fb"
+
+	// DEFAULT_STATE_ROOT is the state root result of "rusk make state".
+	DEFAULT_STATE_ROOT string = "b40ba0dac43dd7bfa8e390c05e9da481a9598bed0689ef81c6eb52e86de6deac"
 )
 
 // KadcastInitHeader is used as default initial kadcast message header.
