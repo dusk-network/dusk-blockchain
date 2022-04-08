@@ -20,15 +20,10 @@ func Validate(m message.Message) error {
 	return SanityCheckCandidate(cm)
 }
 
-// SanityCheckCandidate makes sure the hash and root are correct, to avoid
+// SanityCheckCandidate makes sure the hash is correct, to avoid
 // malicious nodes from overwriting the candidate block for a specific hash.
 func SanityCheckCandidate(cm block.Block) error {
 	if err := checkHash(&cm); err != nil {
-		log.WithError(err).Errorln("validation failed")
-		return errors.New("invalid candidate received")
-	}
-
-	if err := checkRoot(&cm); err != nil {
 		log.WithError(err).Errorln("validation failed")
 		return errors.New("invalid candidate received")
 	}
@@ -44,19 +39,6 @@ func checkHash(blk *block.Block) error {
 
 	if !bytes.Equal(hash, blk.Header.Hash) {
 		return errors.New("invalid block hash")
-	}
-
-	return nil
-}
-
-func checkRoot(blk *block.Block) error {
-	root, err := blk.CalculateRoot()
-	if err != nil {
-		return err
-	}
-
-	if !bytes.Equal(root, blk.Header.TxRoot) {
-		return errors.New("invalid merkle root hash")
 	}
 
 	return nil

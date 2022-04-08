@@ -29,13 +29,6 @@ func RandomBlock(height uint64, txBatchCount uint16) *block.Block {
 	dist := transactions.MockDistributeTx()
 	b.Txs = append(b.Txs, dist)
 
-	txRoot, err := b.CalculateRoot()
-	if err != nil {
-		panic(err)
-	}
-
-	b.Header.TxRoot = txRoot
-
 	hash, err := b.CalculateHash()
 	if err != nil {
 		panic(err)
@@ -43,12 +36,6 @@ func RandomBlock(height uint64, txBatchCount uint16) *block.Block {
 
 	b.Header.Hash = hash
 
-	root, xerr := b.CalculateRoot()
-	if xerr != nil {
-		panic(xerr)
-	}
-
-	b.Header.TxRoot = root
 	return b
 }
 
@@ -73,11 +60,6 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 	blk1.Header.Height = blk0.Header.Height + 1
 	blk1.Header.Timestamp = blk0.Header.Timestamp + 100
 
-	root, err := blk1.CalculateRoot()
-	assert.Nil(t, err)
-
-	blk1.Header.TxRoot = root
-
 	hash, err = blk1.CalculateHash()
 	assert.Nil(t, err)
 
@@ -98,10 +80,10 @@ func RandomHeader(height uint64) *block.Header {
 		Height:    height,
 		Timestamp: time.Now().Unix(),
 
-		PrevBlockHash: transactions.Rand32Bytes(),
-		Seed:          RandomBLSSignature(),
-		TxRoot:        transactions.Rand32Bytes(),
-		StateHash:     make([]byte, 32),
+		PrevBlockHash:      transactions.Rand32Bytes(),
+		Seed:               RandomBLSSignature(),
+		GeneratorBlsPubkey: key.NewRandKeys().BLSPubKey,
+		StateHash:          make([]byte, 32),
 
 		Certificate: RandomCertificate(),
 	}

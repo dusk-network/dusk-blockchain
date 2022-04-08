@@ -94,11 +94,6 @@ func initializeDB(db database.DB) error {
 
 	b1.Header.Timestamp = 10
 
-	b1.Header.TxRoot, err = b1.CalculateRoot()
-	if err != nil {
-		return err
-	}
-
 	b1.Header.Hash, err = b1.CalculateHash()
 	if err != nil {
 		return err
@@ -113,11 +108,6 @@ func initializeDB(db database.DB) error {
 	b2.Txs = append(b2.Txs, bid2)
 	b2.Header.Timestamp = 20
 
-	b2.Header.TxRoot, err = b2.CalculateRoot()
-	if err != nil {
-		return err
-	}
-
 	b2.Header.Hash, err = b2.CalculateHash()
 	if err != nil {
 		return err
@@ -131,11 +121,6 @@ func initializeDB(db database.DB) error {
 	b3.Txs = make([]core.ContractCall, 0)
 	b3.Txs = append(b3.Txs, bid3)
 	b3.Header.Timestamp = 30
-
-	b3.Header.TxRoot, err = b3.CalculateRoot()
-	if err != nil {
-		return err
-	}
 
 	b3.Header.Hash, err = b3.CalculateHash()
 	if err != nil {

@@ -32,9 +32,9 @@ type Header struct {
 	Height    uint64 `json:"height"`    // Block height
 	Timestamp string `json:"timestamp"` // Block timestamp
 
-	PrevBlockHash []byte `json:"prev-hash"` // Hash of previous block (32 bytes)
-	Seed          []byte `json:"seed"`      // Marshaled BLS signature or hash of the previous block seed (32 bytes)
-	TxRoot        []byte `json:"txroot"`    // Root hash of the merkle tree containing all txes (32 bytes)
+	PrevBlockHash      []byte `json:"prev-hash"` // Hash of previous block (32 bytes)
+	Seed               []byte `json:"seed"`      // Marshaled BLS signature or hash of the previous block seed (32 bytes)
+	GeneratorBlsPubkey []byte `json:"generator"` // Generator BLS Public Key (96 bytes)
 
 	//*Certificate `json:"certificate"` // Block certificate
 	Hash []byte `json:"hash"` // Hash of all previous fields

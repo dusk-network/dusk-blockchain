@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/sirupsen/logrus"
@@ -36,6 +37,10 @@ func TestValidatorInvalidBlock(t *testing.T) {
 	// Remove one of the transactions to remove the integrity of
 	// the merkle root
 	cm.Txs = cm.Txs[1:]
+
+	// Change GeneratorBlsPubkey with random 96bytes
+	cm.Header.GeneratorBlsPubkey = key.NewRandKeys().BLSPubKey
+
 	msg := message.New(topics.Candidate, *cm)
 	assert.Error(t, Validate(msg))
 }
