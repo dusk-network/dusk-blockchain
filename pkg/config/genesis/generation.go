@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
+	"github.com/sirupsen/logrus"
 )
 
 // Generate a genesis block. The constitution of the block depends on the passed
@@ -63,6 +64,10 @@ func Generate(c Config) *block.Block {
 	if len(c.hash) > 0 {
 		expected, _ := hex.DecodeString(c.hash)
 		if !bytes.Equal(hash, expected) {
+			logrus.
+				WithField("expected", hex.EncodeToString(expected)).
+				WithField("actual", hex.EncodeToString(hash)).
+				Error("Generated genesis block hash does not match expected hash")
 			// The panic will be fired if testnet genesis block changes.
 			panic("calculated hash is not correct")
 		}
