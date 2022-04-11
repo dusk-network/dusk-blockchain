@@ -121,7 +121,7 @@ func ReadBLSPKey(r *bytes.Buffer, b []byte) error {
 	return nil
 }
 
-// WriteBLSPKey will write a compressed bls signature (33 bytes) to w.
+// WriteBLSPKey will write a compressed bls public key (96 bytes) to w.
 func WriteBLSPKey(w *bytes.Buffer, b []byte) error {
 	if len(b) != 96 {
 		return fmt.Errorf("b is not proper size - expected 96 bytes, is actually %d bytes", len(b))
