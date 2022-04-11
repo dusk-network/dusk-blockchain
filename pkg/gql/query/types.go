@@ -53,7 +53,7 @@ var Header = graphql.NewObject(
 			"seed": &graphql.Field{
 				Type: Hex,
 			},
-			"txroot": &graphql.Field{
+			"generatorblspubkey": &graphql.Field{
 				Type: Hex,
 			},
 			"timestamp": &graphql.Field{

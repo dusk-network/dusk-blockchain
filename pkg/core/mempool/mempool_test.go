@@ -192,8 +192,6 @@ func TestRemoveAccepted(t *testing.T) {
 		}
 	}
 
-	root, _ := b.CalculateRoot()
-	b.Header.TxRoot = root
 	blockMsg := message.New(topics.AcceptedBlock, *b)
 	errList := bus.Publish(topics.AcceptedBlock, blockMsg)
 	assert.Empty(errList)

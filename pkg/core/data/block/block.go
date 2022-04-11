@@ -12,7 +12,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
-	"github.com/dusk-network/dusk-crypto/merkletree"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
 
@@ -55,22 +54,6 @@ func (b Block) Copy() payload.Safe {
 // SetPrevBlock will set all the previous block hash field from a header.
 func (b *Block) SetPrevBlock(prevHeader *Header) {
 	b.Header.PrevBlockHash = prevHeader.Hash
-}
-
-// CalculateRoot will calculate and return the block merkle root hash.
-func (b *Block) CalculateRoot() ([]byte, error) {
-	// convert Transaction interface to Payload interface
-	txs := make([]merkletree.Payload, len(b.Txs))
-	for i, tx := range b.Txs {
-		txs[i] = tx.(merkletree.Payload)
-	}
-
-	tree, err := merkletree.NewTree(txs)
-	if err != nil {
-		return nil, err
-	}
-
-	return tree.MerkleRoot, nil
 }
 
 // AddTx will add a transaction to the block.

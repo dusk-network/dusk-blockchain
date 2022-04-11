@@ -190,14 +190,14 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, pre
 
 	// Construct header
 	h := &block.Header{
-		Version:       0,
-		Timestamp:     timestamp,
-		Height:        round,
-		PrevBlockHash: prevBlockHash,
-		TxRoot:        nil,
-		Seed:          seed,
-		Certificate:   block.EmptyCertificate(),
-		StateHash:     stateHash,
+		Version:            0,
+		Timestamp:          timestamp,
+		Height:             round,
+		PrevBlockHash:      prevBlockHash,
+		GeneratorBlsPubkey: bg.Keys.BLSPubKey,
+		Seed:               seed,
+		Certificate:        block.EmptyCertificate(),
+		StateHash:          stateHash,
 	}
 
 	// Construct the candidate block
@@ -205,17 +205,6 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, pre
 		Header: h,
 		Txs:    txs,
 	}
-
-	// Update TxRoot
-	root, err := candidateBlock.CalculateRoot()
-	if err != nil {
-		lg.
-			WithError(err).
-			Error("failed to CalculateRoot")
-		return nil, err
-	}
-
-	candidateBlock.Header.TxRoot = root
 
 	// Generate the block hash
 	hash, err := candidateBlock.CalculateHash()

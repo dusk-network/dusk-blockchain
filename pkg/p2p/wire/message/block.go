@@ -105,7 +105,7 @@ func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
-	if err := encoding.Write256(r, h.TxRoot); err != nil {
+	if err := encoding.WriteBLSPKey(r, h.GeneratorBlsPubkey); err != nil {
 		return err
 	}
 
@@ -161,8 +161,8 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
-	h.TxRoot = make([]byte, 32)
-	if err := encoding.Read256(r, h.TxRoot); err != nil {
+	h.GeneratorBlsPubkey = make([]byte, 96)
+	if err := encoding.ReadBLSPKey(r, h.GeneratorBlsPubkey); err != nil {
 		return err
 	}
 

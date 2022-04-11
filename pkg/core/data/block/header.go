@@ -26,10 +26,10 @@ type Header struct {
 	Height    uint64 `json:"height"`    // Block height
 	Timestamp int64  `json:"timestamp"` // Block timestamp
 
-	PrevBlockHash []byte `json:"prev-hash"`  // Hash of previous block (32 bytes)
-	Seed          []byte `json:"seed"`       // Marshaled BLS signature or hash of the previous block seed (32 bytes)
-	TxRoot        []byte `json:"tx-root"`    // Root hash of the merkle tree containing all txes (32 bytes)
-	StateHash     []byte `json:"state-hash"` // Root hash of the Rusk Contract Storage state
+	PrevBlockHash      []byte `json:"prev-hash"`  // Hash of previous block (32 bytes)
+	Seed               []byte `json:"seed"`       // Marshaled BLS signature or hash of the previous block seed (32 bytes)
+	GeneratorBlsPubkey []byte `json:"generator"`  // Generator BLS Public Key (96 bytes)
+	StateHash          []byte `json:"state-hash"` // Root hash of the Rusk Contract Storage state
 
 	Hash []byte `json:"hash"` // Hash of all previous fields
 
@@ -57,8 +57,8 @@ func (b *Header) Copy() *Header {
 	copy(h.PrevBlockHash, b.PrevBlockHash)
 	h.Seed = make([]byte, len(b.Seed))
 	copy(h.Seed, b.Seed)
-	h.TxRoot = make([]byte, len(b.TxRoot))
-	copy(h.TxRoot, b.TxRoot)
+	h.GeneratorBlsPubkey = make([]byte, len(b.GeneratorBlsPubkey))
+	copy(h.GeneratorBlsPubkey, b.GeneratorBlsPubkey)
 	h.Hash = make([]byte, len(b.Hash))
 	copy(h.Hash, b.Hash)
 	h.StateHash = make([]byte, len(b.StateHash))
@@ -100,7 +100,7 @@ func (b *Header) Equals(other *Header) bool {
 		return false
 	}
 
-	if !bytes.Equal(b.TxRoot, other.TxRoot) {
+	if !bytes.Equal(b.GeneratorBlsPubkey, other.GeneratorBlsPubkey) {
 		return false
 	}
 
@@ -144,7 +144,7 @@ func marshalHashable(b *bytes.Buffer, h *Header) error {
 		return err
 	}
 
-	if err := binary.Write(b, binary.BigEndian, h.TxRoot); err != nil {
+	if err := binary.Write(b, binary.BigEndian, h.GeneratorBlsPubkey); err != nil {
 		return err
 	}
 

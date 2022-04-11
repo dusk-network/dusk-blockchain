@@ -167,7 +167,7 @@ func getBlockByHash(client *graphql.Client, values map[string]interface{}) (inte
 			version
 			seed
 			prevblockhash
-			txroot
+			generatorblspublickey
 		  }
 		}
 	  }

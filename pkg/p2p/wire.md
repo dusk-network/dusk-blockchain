@@ -174,7 +174,7 @@ A GetBlocks message is sent when a block is received which has a height that is 
 | 8 | Timestamp | int64 |  |
 | 32 | Previous Block Hash | \[\]byte |  |
 | 33 | Seed | \[\]byte | BLS Signature of the previous block seed, made by a block generator |
-| 32 | Tx Root | \[\]byte | Merkle root hash of all transactions in this block |
+| 96 | Generator Bls Public Key | \[\]byte | BLS Public key of the block generator |
 | 83 | Certificate | Block Certificate |  |
 | 32 | Hash | \[\]byte | Hash of this block |
 | ?? | Txs | \[\]tx | All transactions contained in this block |
