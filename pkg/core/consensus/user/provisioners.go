@@ -280,6 +280,7 @@ func marshalStake(r *bytes.Buffer, stake Stake) error {
 	if err := encoding.WriteUint64LE(r, stake.Reward); err != nil {
 		return err
 	}
+
 	if err := encoding.WriteUint64LE(r, stake.Counter); err != nil {
 		return err
 	}

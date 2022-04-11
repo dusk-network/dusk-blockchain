@@ -38,13 +38,13 @@ func MockExecutor(height uint64) *PermissiveExecutor {
 }
 
 // VerifyStateTransition ...
-func (p *PermissiveExecutor) VerifyStateTransition(context.Context, []ContractCall, uint64, uint64) error {
+func (p *PermissiveExecutor) VerifyStateTransition(context.Context, []ContractCall, uint64, uint64, []byte) error {
 	time.Sleep(stateTransitionDelay)
 	return nil
 }
 
 // ExecuteStateTransition ...
-func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, blockGasLimit uint64, blockHeight uint64) ([]ContractCall, []byte, error) {
+func (p *PermissiveExecutor) ExecuteStateTransition(ctx context.Context, cc []ContractCall, blockGasLimit uint64, blockHeight uint64, generator []byte) ([]ContractCall, []byte, error) {
 	time.Sleep(stateTransitionDelay)
 
 	result := cc
@@ -66,12 +66,12 @@ func (p *PermissiveExecutor) GetStateRoot(ctx context.Context) ([]byte, error) {
 }
 
 // Accept ...
-func (p *PermissiveExecutor) Accept(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+func (p *PermissiveExecutor) Accept(context.Context, []ContractCall, []byte, uint64, uint64, []byte) ([]ContractCall, user.Provisioners, []byte, error) {
 	return nil, *p.P, make([]byte, 32), nil
 }
 
 // Finalize ...
-func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+func (p *PermissiveExecutor) Finalize(context.Context, []ContractCall, []byte, uint64, uint64, []byte) ([]ContractCall, user.Provisioners, []byte, error) {
 	return nil, *p.P, make([]byte, 32), nil
 }
 

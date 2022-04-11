@@ -42,7 +42,7 @@ type (
 	CandidateVerificationFunc func(block.Block) error
 
 	// ExecuteTxsFunc is a callback used to retrieve a valid set of txs.
-	ExecuteTxsFunc func(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64) ([]transactions.ContractCall, []byte, error)
+	ExecuteTxsFunc func(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64, generator []byte) ([]transactions.ContractCall, []byte, error)
 
 	// Emitter is a simple struct to pass the communication channels that the steps should be
 	// able to emit onto.

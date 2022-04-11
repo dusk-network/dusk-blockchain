@@ -119,7 +119,7 @@ func (bg *generator) Generate(seed []byte, keys [][]byte, r consensus.RoundUpdat
 }
 
 func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCall, round uint64) ([]transactions.ContractCall, []byte, error) {
-	txs, stateHash, err := bg.executeFn(ctx, txs, round)
+	txs, stateHash, err := bg.executeFn(ctx, txs, round, bg.Keys.BLSPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
