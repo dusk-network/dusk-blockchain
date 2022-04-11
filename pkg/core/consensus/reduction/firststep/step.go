@@ -56,7 +56,8 @@ type Phase struct {
 // and reduce them to just one candidate obtaining 64% of the committee vote.
 func New(next consensus.Phase, e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration, db database.DB, requestor *candidate.Requestor) *Phase {
 	return &Phase{
-		Reduction: &reduction.Reduction{Emitter: e,
+		Reduction: &reduction.Reduction{
+			Emitter:  e,
 			TimeOut:  timeOut,
 			VerifyFn: verifyFn,
 		},
@@ -203,7 +204,7 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 				WithError(err).
 				WithField("round", hdr.Round).
 				WithField("step", hdr.Step).
-				Error("firststep_fetchCandidateBlock failed")
+				Warn("firststep_fetchCandidateBlock failed")
 			return p.createStepVoteMessage(reduction.EmptyResult, round, step, nil)
 		}
 	}
@@ -251,6 +252,7 @@ func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step ui
 	}
 
 	var cpy *block.Block
+
 	if candidate != nil {
 		b := candidate.Copy().(block.Block)
 		cpy = &b

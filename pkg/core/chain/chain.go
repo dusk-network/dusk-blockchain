@@ -385,7 +385,7 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 			maxDelayMilli = 2000
 		}
 
-		if d, err := util.Throttle(startTime, maxDelayMilli); err == nil {
+		if d, err := util.Delay(startTime, maxDelayMilli); err == nil {
 			log.WithField("height", blk.Header.Height).WithField("sleep_for", d.String()).Trace("throttled")
 		}
 	}

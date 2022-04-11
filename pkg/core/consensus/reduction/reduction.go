@@ -7,6 +7,7 @@
 package reduction
 
 import (
+	"errors"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -15,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -50,9 +52,6 @@ type Reduction struct {
 	*consensus.Emitter
 	TimeOut time.Duration
 
-	// candidate is the block proposed by Block Generator
-	candidate block.Block
-
 	// VerifyFn verifies candidate block
 	VerifyFn consensus.CandidateVerificationFunc
 }
@@ -72,25 +71,55 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 	}
 }
 
+// verifyWithDelay calls verifyFn upon the candidate block but also incorporates a
+// delay on success verification.
+func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte, error) {
+	if candidate == nil {
+		return nil, errors.New("nil candidate")
+	}
+
+	st := time.Now().UnixMilli()
+
+	if err := r.VerifyFn(*candidate); err != nil {
+		return nil, err
+	}
+
+	// Candidate block is fully valid.
+	// Vote for it.
+	hash, err := candidate.CalculateHash()
+	if err != nil {
+		return nil, err
+	}
+
+	// Enable the delay if iteration is higher than 1
+	if step > 3 {
+		maxDelay := config.Get().Consensus.ThrottleIterMilli
+		if maxDelay == 0 {
+			maxDelay = 1000
+		}
+
+		d, err := util.Delay(st, maxDelay)
+		if err == nil {
+			log.WithField("step", step).WithField("sleep_for", d.String()).Trace("vst delayed")
+		}
+	}
+
+	return hash, nil
+}
+
 // SendReduction propagates a signed vote for the candidate block, if block is
 // fully valid.
-func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) {
-	voteHash := EmptyHash[:]
+func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) []byte {
+	voteHash, err := r.verifyWithDelay(candidate, step)
+	if err != nil {
+		log.
+			WithError(err).
+			WithField("round", round).
+			WithField("step", step).
+			Warn("verifyfn failed")
 
-	if candidate != nil {
-		// TODO: EmptyBlock handled
-		if err := r.VerifyFn(*candidate); err != nil {
-			log.
-				WithError(err).
-				WithField("round", round).
-				WithField("step", step).
-				Error("verifyfn failed")
-		} else {
-			// Candidate block is fully valid.
-			// Vote for it.
-			voteHash, _ = candidate.CalculateHash()
-		}
-		// TODO: Throttle
+		// Vote for an empty hash
+		voteHash = EmptyHash[:]
 	}
 
 	// Generate Reduction message to propagate my vote.
@@ -113,6 +142,8 @@ func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Blo
 	if err := r.Republish(m); err != nil {
 		panic(err)
 	}
+
+	return voteHash
 }
 
 // ShouldProcess checks whether a message is consistent with the current round
