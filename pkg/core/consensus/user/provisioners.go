@@ -34,7 +34,8 @@ type (
 	// Stake represents the Provisioner's stake.
 	Stake struct {
 		Value       uint64 `json:"value"`
-		CreatedAt   uint64 `json:"created_at"`
+		Reward      uint64 `json:"reward"`
+		Counter     uint64 `json:"counter"`
 		Eligibility uint64 `json:"eligibility"`
 	}
 )
@@ -72,7 +73,8 @@ func (m *Member) Copy() *Member {
 	for i, s := range m.Stakes {
 		cpy.Stakes[i] = Stake{
 			Value:       s.Value,
-			CreatedAt:   s.CreatedAt,
+			Counter:     s.Counter,
+			Reward:      s.Reward,
 			Eligibility: s.Eligibility,
 		}
 	}
@@ -117,13 +119,13 @@ func NewProvisioners() *Provisioners {
 }
 
 // Add a Member to the Provisioners by using the bytes of a BLS public key.
-func (p *Provisioners) Add(pubKeyBLS []byte, value, createdAt, eligibility uint64) error {
+func (p *Provisioners) Add(pubKeyBLS []byte, value, reward, counter, eligibility uint64) error {
 	if len(pubKeyBLS) != 96 {
 		return fmt.Errorf("public key is %v bytes long instead of 96", len(pubKeyBLS))
 	}
 
 	i := string(pubKeyBLS)
-	stake := Stake{Value: value, CreatedAt: createdAt, Eligibility: eligibility}
+	stake := Stake{Value: value, Reward: reward, Counter: counter, Eligibility: eligibility}
 
 	// Check for duplicates
 	_, inserted := p.Set.IndexOf(pubKeyBLS)
@@ -275,7 +277,10 @@ func marshalStake(r *bytes.Buffer, stake Stake) error {
 		return err
 	}
 
-	if err := encoding.WriteUint64LE(r, stake.CreatedAt); err != nil {
+	if err := encoding.WriteUint64LE(r, stake.Reward); err != nil {
+		return err
+	}
+	if err := encoding.WriteUint64LE(r, stake.Counter); err != nil {
 		return err
 	}
 
@@ -348,7 +353,11 @@ func unmarshalStake(r *bytes.Buffer) (Stake, error) {
 		return Stake{}, err
 	}
 
-	if err := encoding.ReadUint64LE(r, &stake.CreatedAt); err != nil {
+	if err := encoding.ReadUint64LE(r, &stake.Reward); err != nil {
+		return Stake{}, err
+	}
+
+	if err := encoding.ReadUint64LE(r, &stake.Counter); err != nil {
 		return Stake{}, err
 	}
 
@@ -361,6 +370,6 @@ func unmarshalStake(r *bytes.Buffer) (Stake, error) {
 
 // Format implements fmt.Formatter interface.
 func (s Stake) Format(f fmt.State, c rune) {
-	r := fmt.Sprintf("Value: %d, CreatedAt: %d, Eligibility: %d", s.Value, s.CreatedAt, s.Eligibility)
+	r := fmt.Sprintf("Value: %d, Reward: %d, Counter: %d, Eligibility: %d", s.Value, s.Reward, s.Counter, s.Eligibility)
 	_, _ = f.Write([]byte(r))
 }

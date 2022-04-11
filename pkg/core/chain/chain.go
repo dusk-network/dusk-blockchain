@@ -787,7 +787,8 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 		for _, s := range v.Stakes {
 			stake := capi.Stake{
 				Value:       s.Value,
-				CreatedAt:   s.CreatedAt,
+				Reward:      s.Reward,
+				Counter:     s.Counter,
 				Eligibility: s.Eligibility,
 			}
 
