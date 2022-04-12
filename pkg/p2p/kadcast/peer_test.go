@@ -121,7 +121,7 @@ func TestBroadcastWriter(t *testing.T) {
 
 	// process status/output
 	m := <-rcvChan
-	assert.True(m.KadcastHeight == 127)
+	assert.True(m.KadcastHeight == 127-1)
 
 	// attempt to read the message
 	reader := bytes.NewReader(m.Message)
