@@ -26,9 +26,6 @@ func RandomBlock(height uint64, txBatchCount uint16) *block.Block {
 		Txs:    transactions.RandContractCalls(int(txBatchCount), 0, true),
 	}
 
-	dist := transactions.MockDistributeTx()
-	b.Txs = append(b.Txs, dist)
-
 	hash, err := b.CalculateHash()
 	if err != nil {
 		panic(err)

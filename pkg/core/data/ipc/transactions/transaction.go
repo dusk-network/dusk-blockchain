@@ -22,8 +22,6 @@ type TxType uint32
 const (
 	// Tx indicates the phoenix transaction type.
 	Tx TxType = iota
-	// Distribute indicates the coinbase and reward distribution contract call.
-	Distribute = 0
 	// Transfer transaction id.
 	Transfer = 1
 	// Stake transaction id.

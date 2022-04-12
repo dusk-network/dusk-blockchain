@@ -57,7 +57,6 @@ func Mock(e *consensus.Emitter) Generator {
 			// Function simulates Rusk ExecuteStateTransition.
 			// That said, it should always provide a Distribute transaction
 			txs = make([]transactions.ContractCall, 0)
-			txs = append(txs, transactions.MockDistributeTx())
 		}
 
 		return txs, make([]byte, 32), nil

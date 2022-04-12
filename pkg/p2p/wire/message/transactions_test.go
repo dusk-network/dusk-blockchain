@@ -89,48 +89,6 @@ func TestWireTransaction(t *testing.T) {
 }
 
 //nolint
-func TestCoinbaseTransaction(t *testing.T) {
-	assert := assert.New(t)
-
-	hexPayload := "007d2f25b968f9d81cb8d53cc4149888c8f9dc28b8746380c9f54c9dbec55548a0dc95b7941a61534f5b12733a8ede7869d21ee3108d95e7c3ad2cf95a5e3502248f718574d92c255f0e4a3ac0394baf17d45d87d621287edd07674b8809da13cb1ee914c33fb33d2b6b39ad18ffc7d816102c23421e7b99a68b71a08a43826bd20e00000000000000c8fbac010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002f35c3ada6983ea2e312d68fee8e8e50d590cdc846164931a6edeaf0c3fe07493a866915a98c56251bc5bb561e97f7bdf687003c4a742fa42aa6697c2e5afa10eedba04eec9b41e4b800b80be19b2a506c99360f41b8663ae5e7bd4d93f8f79e09455d26c1f02f3c71364f1e471110dfa2ad406bc0fc437c827fbd48193b67c00f000000000000000eda140f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-	hexTxHash := "bdcadedb29422e70d2f39d5901cd13f7ddeade980198aa2a79be2a16e080890a"
-
-	txHash, err := hex.DecodeString(hexTxHash)
-	if err != nil {
-		t.Fatalf("Unable to decode hash hex: %v", err)
-	}
-
-	payload, err := hex.DecodeString(hexPayload)
-	if err != nil {
-		t.Fatalf("Unable to decode tx hex: %v", err)
-	}
-
-	txdummy := transactions.NewTransaction()
-	txdummy.TxType = 0
-	txdummy.Payload.Data = payload
-
-	decoded, err := txdummy.Decode()
-	if err != nil {
-		t.Fatalf("Unable to decode coinbase: %v", err)
-	}
-	assert.EqualValues(decoded.Anchor, make([]byte, 32), "Anchor should be empty")
-	assert.Nil(decoded.Call, "Call should not be present")
-	assert.Nil(decoded.Crossover, "Crossover should not be present")
-	assert.Zero(decoded.Fee.GasLimit, "GasLimit should be 0")
-	assert.Zero(decoded.Fee.GasPrice, "GasPrice should be 0")
-	assert.Empty(decoded.Nullifiers, "Nullifiers should not be present")
-	assert.EqualValues(uint64(28113864), decoded.Notes[0].DecodeTxAmount())
-	assert.EqualValues(uint64(253024782), decoded.Notes[1].DecodeTxAmount())
-
-	hash, err := decoded.Hash(txdummy.TxType)
-	if err != nil {
-		t.Fatalf("Unable to calculate hash for coinbase: %v", err)
-	}
-
-	assert.EqualValues(txHash, hash, "hash mismatch")
-}
-
-//nolint
 func TestStakeTransaction(t *testing.T) {
 	assert := assert.New(t)
 

@@ -53,10 +53,6 @@ func (l *DBLoader) SanityCheckBlock(prevBlock block.Block, blk block.Block) erro
 		return err
 	}
 
-	if err := verifiers.CheckMultiCoinbases(blk.Txs); err != nil {
-		return err
-	}
-
 	return nil
 }
 

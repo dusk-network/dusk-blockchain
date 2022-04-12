@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
 // ErrPrevBlockHash previous block hash does not equal the previous hash in the current block.
@@ -108,28 +107,5 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 		}
 	}
 
-	return nil
-}
-
-// CheckMultiCoinbases returns an error if there is more than one coinbase transaction
-// in the list or if there are none.
-func CheckMultiCoinbases(txs []transactions.ContractCall) error {
-	var seen bool
-
-	for _, tx := range txs {
-		if tx.Type() != transactions.Distribute {
-			continue
-		}
-
-		if seen {
-			return errors.New("multiple coinbase transactions present")
-		}
-
-		seen = true
-	}
-
-	if !seen {
-		return errors.New("no coinbase transactions in the list")
-	}
 	return nil
 }
