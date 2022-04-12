@@ -82,11 +82,16 @@ func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 // of votes, or we experience an unrecoverable error.
 func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	tlog := getLog(r.Round, step)
-	tlog.Traceln("starting first reduction step")
 
 	defer func() {
 		tlog.Traceln("ending first reduction step")
 	}()
+
+	if log.GetLevel() >= logrus.DebugLevel {
+		c := p.selectionResult.Candidate
+		tlog.WithField("hash", util.StringifyBytes(c.Header.Hash)).
+			Debug("initialized")
+	}
 
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 
@@ -142,7 +147,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
-			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step, nil)
+			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step, *block.NewBlock())
 			return p.next.Initialize(*sv)
 
 		case <-ctx.Done():
@@ -191,8 +196,8 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 
 	// if the votes converged for an empty hash we invoke halt with no
 	// StepVotes
-	if bytes.Equal(hdr.BlockHash, reduction.EmptyHash[:]) {
-		return p.createStepVoteMessage(reduction.EmptyResult, round, step, nil)
+	if bytes.Equal(hdr.BlockHash, block.EmptyHash[:]) {
+		return p.createStepVoteMessage(reduction.EmptyResult, round, step, *block.NewBlock())
 	}
 
 	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Header.Hash) {
@@ -205,11 +210,11 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 				WithField("round", hdr.Round).
 				WithField("step", hdr.Step).
 				Warn("firststep_fetchCandidateBlock failed")
-			return p.createStepVoteMessage(reduction.EmptyResult, round, step, nil)
+			return p.createStepVoteMessage(reduction.EmptyResult, round, step, *block.NewBlock())
 		}
 	}
 
-	return p.createStepVoteMessage(result, round, step, &p.selectionResult.Candidate)
+	return p.createStepVoteMessage(result, round, step, p.selectionResult.Candidate)
 }
 
 func (p *Phase) fetchCandidate(ctx context.Context, hash []byte) (block.Block, error) {
@@ -246,17 +251,15 @@ func (p *Phase) requestCandidate(ctx context.Context, hash []byte) (block.Block,
 	return cm, nil
 }
 
-func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8, candidate *block.Block) *message.StepVotesMsg {
+func (p *Phase) createStepVoteMessage(r *reduction.Result, round uint64, step uint8, candidate block.Block) *message.StepVotesMsg {
 	if r.IsEmpty() {
 		p.IncreaseTimeout(round)
 	}
 
 	var cpy *block.Block
 
-	if candidate != nil {
-		b := candidate.Copy().(block.Block)
-		cpy = &b
-	}
+	b := candidate.Copy().(block.Block)
+	cpy = &b
 
 	return &message.StepVotesMsg{
 		Header: header.Header{

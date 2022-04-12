@@ -16,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
@@ -81,11 +82,15 @@ func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	tlog := getLog(r.Round, step)
 
-	tlog.Traceln("starting second reduction step")
-
 	defer func() {
 		tlog.Traceln("ending second reduction step")
 	}()
+
+	if log.GetLevel() >= logrus.DebugLevel {
+		c := p.firstStepVotesMsg.Candidate
+		tlog.WithField("hash", util.StringifyBytes(c.Header.Hash)).
+			Debug("initialized")
+	}
 
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 	// first we send our own Selection
@@ -272,6 +277,6 @@ func stepVotesAreValid(svs ...*message.StepVotesMsg) bool {
 	return len(svs) == 2 &&
 		!svs[0].IsEmpty() &&
 		!svs[1].IsEmpty() &&
-		!bytes.Equal(svs[0].BlockHash, reduction.EmptyHash[:]) &&
-		!bytes.Equal(svs[1].BlockHash, reduction.EmptyHash[:])
+		!bytes.Equal(svs[0].BlockHash, block.EmptyHash[:]) &&
+		!bytes.Equal(svs[1].BlockHash, block.EmptyHash[:])
 }

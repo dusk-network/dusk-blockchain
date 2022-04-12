@@ -28,6 +28,27 @@ func NewBlock() *Block {
 	}
 }
 
+// IsZero will return if Block has a zero-ed header.
+func (b Block) IsZero() bool {
+	if len(b.Header.StateHash) != 32 {
+		return false
+	}
+
+	if bytes.Equal(b.Header.StateHash, EmptyHash[:]) {
+		return true
+	}
+
+	if len(b.Header.Hash) != 32 {
+		return false
+	}
+
+	if bytes.Equal(b.Header.Hash, EmptyHash[:]) {
+		return true
+	}
+
+	return false
+}
+
 // IsEmpty tells us if a block is empty. We can check this easily, because an
 // empty block will be created as `block.Block{}`, meaning that the header
 // is always nil. This function basically checks the existence of the block

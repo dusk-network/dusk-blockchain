@@ -20,8 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// EmptyHash ...
-var EmptyHash [32]byte
+var errEmptyBlockHash = errors.New("empty hash")
 
 // EmptyStepVotes ...
 var EmptyStepVotes = message.StepVotes{}
@@ -31,7 +30,7 @@ var EmptyResult *Result
 
 func init() {
 	EmptyResult = &Result{
-		EmptyHash[:],
+		block.EmptyHash[:],
 		EmptyStepVotes,
 	}
 }
@@ -78,6 +77,10 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 		return nil, errors.New("nil candidate")
 	}
 
+	if candidate.IsZero() {
+		return nil, errEmptyBlockHash
+	}
+
 	st := time.Now().UnixMilli()
 
 	if err := r.VerifyFn(*candidate); err != nil {
@@ -118,8 +121,11 @@ func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Blo
 			WithField("step", step).
 			Warn("verifyfn failed")
 
+		// errEmptyBlockHash could be returned here if either Selection or
+		// 1st_reduction steps experience a timeout event
+
 		// Vote for an empty hash
-		voteHash = EmptyHash[:]
+		voteHash = block.EmptyHash[:]
 	}
 
 	// Generate Reduction message to propagate my vote.
