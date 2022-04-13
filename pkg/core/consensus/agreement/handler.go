@@ -100,7 +100,7 @@ func (a *handler) Verify(ev message.Agreement) error {
 		return fmt.Errorf("failed to verify Agreement Sender: %w", err)
 	}
 
-	allVoters := 0
+	quorumTarget := a.Quorum(hdr.Round)
 
 	for i, votes := range ev.VotesPerStep {
 		// the beginning step is the same of the second reduction. Since the
@@ -116,31 +116,42 @@ func (a *handler) Verify(ev message.Agreement) error {
 			return err
 		}
 
+		// Committee the sortition determines for this round
 		committee := a.Committee(hdr.Round, step)
+
+		// subcommittee is a subset of the committee members that voted - the so-called quorum-committee
 		subcommittee := committee.IntersectCluster(votes.BitSet)
 
-		allVoters += subcommittee.TotalOccurrences()
+		stepVoters := subcommittee.TotalOccurrences()
 
 		log := consensus.WithFields(hdr.Round, step, "agreement_received",
 			hdr.BlockHash, a.Keys.BLSPubKey, &committee, &subcommittee, &a.Provisioners)
 
-		log.WithField("bitset", votes.BitSet).WithField("voted_len", subcommittee.Len()).
-			WithField("total_votes", allVoters).Info()
+		log.WithField("bitset", votes.BitSet).
+			// number of committee members for current (round, step, seed) tuple
+			WithField("comm", committee.Len()).
+			// number of subcommittee members
+			WithField("subcomm", subcommittee.Len()).
+			// total votes.
+			// NB if same provisioner is extracted multiple times per a step and
+			// it does vote, stepVoters is higher than subcommittee.Len().
+			WithField("t_votes", stepVoters).Info()
 
+		// Verify quorum threshold reached
+		if stepVoters < quorumTarget {
+			return fmt.Errorf("vote set too small - %v/%v", stepVoters, quorumTarget)
+		}
+
+		// Verify aggregated signature is correct
+		// a.k.a message (round, step, hash) is signed by all subcomittee members
 		apk, err := AggregatePks(&a.Provisioners, subcommittee.Set)
 		if err != nil {
 			return fmt.Errorf("failed to reconstruct APK in the Agreement verification: %w", err)
 		}
 
 		if err := header.VerifySignatures(hdr.Round, step, hdr.BlockHash, apk, votes.Signature); err != nil {
-			err = fmt.Errorf("failed to verify BLS multisig: %w", err)
-			log.Error(err)
-			return err
+			return fmt.Errorf("failed to verify BLS multisig: %w", err)
 		}
-	}
-
-	if allVoters < a.Quorum(hdr.Round) {
-		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum(hdr.Round))
 	}
 
 	return nil
