@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// Throttle sleeps for up to maxDelayMilli but subtracting the time passed since startTimeMilli.
-func Throttle(startTimeMilli int64, maxDelayMilli int64) (time.Duration, error) {
+// Delay sleeps for up to maxDelayMilli but subtracting the time passed since startTimeMilli.
+func Delay(startTimeMilli int64, maxDelayMilli int64) (time.Duration, error) {
 	if startTimeMilli == 0 || maxDelayMilli == 0 {
 		return time.Duration(0), errors.New("invalid input")
 	}

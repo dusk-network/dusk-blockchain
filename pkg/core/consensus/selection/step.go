@@ -167,8 +167,6 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 }
 
 func (p *Phase) endSelection(result message.NewBlock) consensus.PhaseFn {
-	log.WithField("empty", result.IsEmpty()).
-		Debug("endSelection")
 	return p.next.Initialize(result)
 }
 

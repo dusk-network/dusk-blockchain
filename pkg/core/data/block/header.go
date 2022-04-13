@@ -20,6 +20,9 @@ const (
 	HeightSize = 8
 )
 
+// EmptyHash ...
+var EmptyHash [32]byte
+
 // Header defines a block header on a Dusk block.
 type Header struct {
 	Version   uint8  `json:"version"`   // Block version byte
@@ -36,10 +39,15 @@ type Header struct {
 	*Certificate `json:"certificate"` // Block certificate
 }
 
-// NewHeader creates a new Block Header.
+// NewHeader creates a new Block Header zero-ed.
 func NewHeader() *Header {
 	return &Header{
-		Certificate: EmptyCertificate(),
+		Hash:               EmptyHash[:],
+		PrevBlockHash:      EmptyHash[:],
+		Seed:               EmptyHash[:],
+		StateHash:          EmptyHash[:],
+		GeneratorBlsPubkey: make([]byte, 96),
+		Certificate:        EmptyCertificate(),
 	}
 }
 

@@ -13,12 +13,17 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/require"
 )
+
+func verifyFn(block.Block) error {
+	return nil
+}
 
 // TestSendReduction tests that the reduction step completes without problems
 // and produces a StepVotesMsg in case it receives enough valid Reduction messages.
@@ -32,7 +37,7 @@ func TestSendReduction(t *testing.T) {
 	timeout := time.Second
 
 	hlp := reduction.NewHelper(messageToSpawn, timeout)
-	secondStep := New(hlp.Emitter, 10*time.Second)
+	secondStep := New(hlp.Emitter, verifyFn, 10*time.Second)
 
 	// Generate second StepVotes
 	svs := message.GenVotes(hash, []byte{0, 0, 0, 0}, 1, 2, hlp.ProvisionersKeys, hlp.P)
@@ -170,7 +175,7 @@ func TestSecondStepReduction(t *testing.T) {
 			}
 
 			// spin secondStepVotes
-			secondStepReduction := New(hlp.Emitter, timeout)
+			secondStepReduction := New(hlp.Emitter, verifyFn, timeout)
 
 			// Generate second StepVotes
 			svs := message.GenVotes(hash, []byte{0, 0, 0, 0}, 1, 2, hlp.ProvisionersKeys, hlp.P)
