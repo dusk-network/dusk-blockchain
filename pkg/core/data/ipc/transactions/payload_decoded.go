@@ -53,10 +53,6 @@ func NewTransactionPayloadDecoded() *TransactionPayloadDecoded {
 
 // Hash the decoded payload in the same way as the transaction is hashed in `dusk-wallet-core`.
 func (p *TransactionPayloadDecoded) Hash(txType TxType) ([]byte, error) {
-	if txType == Distribute {
-		return p.hashCoinbase()
-	}
-
 	hash, err := blake2b.New(32, nil)
 	if err != nil {
 		return nil, err
@@ -131,35 +127,8 @@ func (p *TransactionPayloadDecoded) Hash(txType TxType) ([]byte, error) {
 	return hashBytes, nil
 }
 
-func (p *TransactionPayloadDecoded) hashCoinbase() ([]byte, error) {
-	hash, err := blake2b.New(32, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, note := range p.Notes {
-		var buf bytes.Buffer
-		if err := MarshalNote(&buf, note); err != nil {
-			return nil, err
-		}
-
-		if _, err := hash.Write(buf.Bytes()); err != nil {
-			return nil, err
-		}
-	}
-
-	hashBytes := hash.Sum(nil)
-	hashBytes[31] &= 0xf // truncate in the same way as `rusk-abi`
-
-	return hashBytes, nil
-}
-
 // UnmarshalTransactionPayloadDecoded reads a TransactionPayloadDecoded struct from a bytes.Buffer.
 func UnmarshalTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDecoded, txType TxType) error {
-	if txType == Distribute {
-		return unmarshalCoinbaseTransactionPayloadDecoded(r, f)
-	}
-
 	var lenInputs uint64
 	if err := encoding.ReadUint64LE(r, &lenInputs); err != nil {
 		return err
@@ -218,18 +187,6 @@ func UnmarshalTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDe
 	if callFlag > 0 {
 		f.Call = NewCall()
 		if err := UnmarshalCall(r, f.Call); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func unmarshalCoinbaseTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDecoded) error {
-	f.Notes = make([]*Note, 2)
-	for i := range f.Notes {
-		f.Notes[i] = NewNote()
-		if err := UnmarshalNote(r, f.Notes[i]); err != nil {
 			return err
 		}
 	}

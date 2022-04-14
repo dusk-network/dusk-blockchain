@@ -97,14 +97,10 @@ func (r *Reader) processMessage(msg *rusk.Message) {
 		return
 	}
 
-	// Decrement kadcast height
-	repropagateHeight := msg.Metadata.KadcastHeight
-	if repropagateHeight >= 1 {
-		repropagateHeight = repropagateHeight - 1
-	}
+	h := []byte{byte(msg.Metadata.KadcastHeight)}
 
 	// collect (process) the message
-	respBufs, err := r.processor.Collect(msg.Metadata.SrcAddress, m, nil, protocol.FullNode, []byte{byte(repropagateHeight)})
+	respBufs, err := r.processor.Collect(msg.Metadata.SrcAddress, m, nil, protocol.FullNode, h)
 	if err != nil {
 		var topic string
 		if len(m) > 0 {

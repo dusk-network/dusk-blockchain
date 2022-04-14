@@ -62,7 +62,8 @@ type Member struct {
 // Stake represents the Provisioner's stake.
 type Stake struct {
 	Value       uint64 `json:"value"`
-	CreatedAt   uint64 `json:"created_at"`
+	Reward      uint64 `json:"reward"`
+	Counter     uint64 `json:"counter"`
 	Eligibility uint64 `json:"eligibility"`
 }
 

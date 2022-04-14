@@ -282,8 +282,6 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	// Run Network service (Kadcast server)
 	// NB. Both Rusk Mock and Rusk executable are in use until we fully integrate Rusk State service.
 	if n.NetworkType == KadcastNetwork {
-
-		address, _, _ := n.GetWalletAddress(uint(i))
 		cfg := node.Cfg.Kadcast
 
 		switch cfg.Grpc.Network {
@@ -293,12 +291,12 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 				panic(err)
 			}
 
-			if err := n.startRusk(nodeDir, cfg.BootstrapAddr, cfg.Address, addr, port, address); err != nil {
+			if err := n.startRusk(nodeDir, cfg.BootstrapAddr, cfg.Address, addr, port); err != nil {
 				return err
 			}
 
 		case "unix":
-			if err := n.startRuskWithUDS(nodeDir, cfg.BootstrapAddr, cfg.Address, cfg.Grpc.Address, address); err != nil {
+			if err := n.startRuskWithUDS(nodeDir, cfg.BootstrapAddr, cfg.Address, cfg.Grpc.Address); err != nil {
 				return err
 			}
 		default:
@@ -477,7 +475,7 @@ func getEnv(envVarName string) (string, error) {
 	return execPath, nil
 }
 
-func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPublicAddr, grpcAddr, grpcPort string, rewardAddress string) error {
+func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPublicAddr, grpcAddr, grpcPort string) error {
 	if err := n.start(nodeDir, RUSK_EXE_PATH,
 		"--ipc_method", "tcp_ip",
 		"--host", grpcAddr,
@@ -486,7 +484,6 @@ func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPubl
 		"--kadcast_bootstrap", bootstrapNodes[0],
 		"--kadcast_bootstrap", bootstrapNodes[1],
 		"--log-level", "info",
-		"--generator", rewardAddress,
 	); err != nil {
 		return err
 	}
@@ -494,7 +491,7 @@ func (n *Network) startRusk(nodeDir string, bootstrapNodes []string, kadcastPubl
 	return nil
 }
 
-func (n *Network) startRuskWithUDS(nodeDir string, bootstrapNodes []string, kadcastPublicAddr string, grpcSocket string, rewardAddress string) error {
+func (n *Network) startRuskWithUDS(nodeDir string, bootstrapNodes []string, kadcastPublicAddr string, grpcSocket string) error {
 	_ = os.Remove(grpcSocket)
 
 	if err := n.start(nodeDir, RUSK_EXE_PATH,
@@ -504,7 +501,6 @@ func (n *Network) startRuskWithUDS(nodeDir string, bootstrapNodes []string, kadc
 		"--kadcast_bootstrap", bootstrapNodes[0],
 		"--kadcast_bootstrap", bootstrapNodes[1],
 		"--log-level", "info",
-		"--generator", rewardAddress,
 	); err != nil {
 		return err
 	}

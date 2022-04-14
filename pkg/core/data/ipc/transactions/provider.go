@@ -27,16 +27,16 @@ type UnconfirmedTxProber interface {
 // Executor encapsulate the Global State operations.
 type Executor interface {
 	// VerifyStateTransition performs dry-run state transition to ensure all txs are valid.
-	VerifyStateTransition(context.Context, []ContractCall, uint64, uint64) error
+	VerifyStateTransition(context.Context, []ContractCall, uint64, uint64, []byte) error
 
 	// ExecuteStateTransition performs dry-run state transition to return valid-only set of txs and state hash.
-	ExecuteStateTransition(context.Context, []ContractCall, uint64, uint64) ([]ContractCall, []byte, error)
+	ExecuteStateTransition(context.Context, []ContractCall, uint64, uint64, []byte) ([]ContractCall, []byte, error)
 
 	// Accept creates an ephemeral state transition.
-	Accept(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error)
+	Accept(context.Context, []ContractCall, []byte, uint64, uint64, []byte) ([]ContractCall, user.Provisioners, []byte, error)
 
 	// Finalize creates a finalized state transition.
-	Finalize(context.Context, []ContractCall, []byte, uint64, uint64) ([]ContractCall, user.Provisioners, []byte, error)
+	Finalize(context.Context, []ContractCall, []byte, uint64, uint64, []byte) ([]ContractCall, user.Provisioners, []byte, error)
 
 	// GetProvisioners returns the current set of provisioners.
 	GetProvisioners(ctx context.Context) (user.Provisioners, error)
@@ -124,9 +124,10 @@ type executor struct {
 }
 
 // VerifyStateTransition see also Executor.VerifyStateTransition.
-func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64) error {
+func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64, generator []byte) error {
 	vstr := new(rusk.VerifyStateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
+	vstr.Generator = generator
 
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
@@ -152,11 +153,12 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 }
 
 // Finalize proxy call performs both Finalize and GetProvisioners grpc calls.
-func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64, blockGasLiit uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64, blockGasLimit uint64, generator []byte) ([]ContractCall, user.Provisioners, []byte, error) {
 	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
-	vstr.BlockGasLimit = blockGasLiit
+	vstr.BlockGasLimit = blockGasLimit
+	vstr.Generator = generator
 
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
@@ -201,11 +203,12 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 }
 
 // Accept proxy call performs both Accept and GetProvisioners grpc calls.
-func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height, blockGasLimit uint64) ([]ContractCall, user.Provisioners, []byte, error) {
+func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height, blockGasLimit uint64, generator []byte) ([]ContractCall, user.Provisioners, []byte, error) {
 	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
 	vstr.BlockGasLimit = blockGasLimit
+	vstr.Generator = generator
 
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
@@ -250,11 +253,12 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 }
 
 // ExecuteStateTransition proxy call performs a single grpc ExecuteStateTransition call.
-func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64) ([]ContractCall, []byte, error) {
+func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64, generator []byte) ([]ContractCall, []byte, error) {
 	vstr := new(rusk.ExecuteStateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = blockHeight
 	vstr.BlockGasLimit = blockGasLimit
+	vstr.Generator = generator
 
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
@@ -386,7 +390,8 @@ func UMember(r *rusk.Provisioner, t *user.Member) {
 	for i := range r.Stakes {
 		t.Stakes[i] = user.Stake{
 			Value:       r.Stakes[i].Value,
-			CreatedAt:   r.Stakes[i].CreatedAt,
+			Reward:      r.Stakes[i].Reward,
+			Counter:     r.Stakes[i].Counter,
 			Eligibility: r.Stakes[i].Eligibility,
 		}
 	}

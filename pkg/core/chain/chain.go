@@ -435,7 +435,8 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			blk.Txs,
 			tipBlk.Header.StateHash,
 			blk.Header.Height,
-			config.BlockGasLimit)
+			config.BlockGasLimit,
+			blk.Header.GeneratorBlsPubkey)
 		if err != nil {
 			l.WithError(err).
 				WithField("grpc", "finalize").
@@ -448,7 +449,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			blk.Txs,
 			tipBlk.Header.StateHash,
 			blk.Header.Height,
-			config.BlockGasLimit)
+			config.BlockGasLimit, blk.Header.GeneratorBlsPubkey)
 		if err != nil {
 			l.WithError(err).
 				WithField("grpc", "accept").
@@ -678,12 +679,12 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 		return err
 	}
 
-	return c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, config.BlockGasLimit, blk.Header.Height)
+	return c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, config.BlockGasLimit, blk.Header.Height, blk.Header.GeneratorBlsPubkey)
 }
 
 // ExecuteStateTransition calls Rusk ExecuteStateTransitiongrpc method.
-func (c *Chain) ExecuteStateTransition(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64) ([]transactions.ContractCall, []byte, error) {
-	return c.proxy.Executor().ExecuteStateTransition(c.ctx, txs, config.BlockGasLimit, blockHeight)
+func (c *Chain) ExecuteStateTransition(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64, generator []byte) ([]transactions.ContractCall, []byte, error) {
+	return c.proxy.Executor().ExecuteStateTransition(c.ctx, txs, config.BlockGasLimit, blockHeight, generator)
 }
 
 // propagateBlock send inventory message to all peers in gossip network or rebroadcast block in kadcast network.
@@ -787,7 +788,8 @@ func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 		for _, s := range v.Stakes {
 			stake := capi.Stake{
 				Value:       s.Value,
-				CreatedAt:   s.CreatedAt,
+				Reward:      s.Reward,
+				Counter:     s.Counter,
 				Eligibility: s.Eligibility,
 			}
 
