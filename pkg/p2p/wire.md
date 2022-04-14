@@ -7,7 +7,7 @@ Messages sent over the wire are length-prefixed frames of data, with the followi
 | Field | Size \(bytes\) |
 | :--- | :--- |
 | Packet Length | 8 |
-| Magic | 4 |
+| Version | 8 |
 | Reserved | 8 |
 | Checksum | 4 |
 | Topic | 1 |

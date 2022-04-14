@@ -108,21 +108,27 @@ func (w *Writer) writeToAll(data, header []byte, _ byte) error {
 	if len(header) == 0 {
 		return errors.New("empty message header")
 	}
+
+	// extract kadcast height
+	h := uint32(header[0])
+	if h == 0 {
+		// Apparently, this node is the last peer in a bucket of height 0. We
+		// should not repropagate.
+		return nil
+	}
+
+	// Decrement kadcast height
+	h--
+
 	// create the message
 	b := bytes.NewBuffer(data)
 	if err := w.gossip.Process(b); err != nil {
 		return err
 	}
 
-	// extract kadcast height
-	height := uint32(header[0])
-	if height == 0 {
-		return nil
-	}
-
 	// prepare message
 	m := &rusk.BroadcastMessage{
-		KadcastHeight: height,
+		KadcastHeight: h,
 		Message:       b.Bytes(),
 	}
 	// broadcast message
