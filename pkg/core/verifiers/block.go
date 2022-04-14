@@ -62,8 +62,8 @@ func checkBlockCertificateForStep(batchedSig []byte, bitSet uint64, round uint64
 }
 
 func committeeSize(memberAmount int) int {
-	if memberAmount > agreement.MaxCommitteeSize {
-		return agreement.MaxCommitteeSize
+	if memberAmount > config.ConsensusMaxCommitteeSize {
+		return config.ConsensusMaxCommitteeSize
 	}
 
 	return memberAmount

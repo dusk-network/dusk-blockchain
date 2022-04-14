@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -62,8 +61,8 @@ func New(e *consensus.Emitter, executeFn consensus.ExecuteTxsFunc) Generator {
 
 func (bg *generator) regenerateCommittee(r consensus.RoundUpdate) [][]byte {
 	size := r.P.SubsetSizeAt(r.Round - 1)
-	if size > agreement.MaxCommitteeSize {
-		size = agreement.MaxCommitteeSize
+	if size > config.ConsensusMaxCommitteeSize {
+		size = config.ConsensusMaxCommitteeSize
 	}
 
 	return r.P.CreateVotingCommittee(r.Seed, r.Round-1, r.LastCertificate.Step, size).MemberKeys()
