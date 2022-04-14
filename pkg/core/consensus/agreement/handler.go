@@ -159,10 +159,9 @@ func (a *handler) getVoterKeys(ev message.Agreement) ([][]byte, error) {
 	keys := make([][]byte, 0)
 
 	for i, votes := range ev.VotesPerStep {
-		step := hdr.Step - 2 + uint8(i)
+		step := hdr.Step - 1 + uint8(i)
 
-		// FIXME: what shall we do when step overflows uint8 ?
-		if step >= math.MaxInt8 {
+		if step > config.ConsensusMaxStep {
 			err := errors.New("getVoterKeys, step reached max limit")
 			lg.WithError(err).Error("step overflow")
 
