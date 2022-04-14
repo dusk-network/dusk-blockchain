@@ -80,7 +80,7 @@ func TestListenStreamReader(t *testing.T) {
 		b := m.Payload().(block.Block)
 		assert.True(m.Category() == topics.Block)
 		assert.True(b.Header.Height == 5525)
-		assert.True(len(b.Txs) == 11)
+		assert.True(len(b.Txs) == 10)
 	}
 
 	// Disconnect client and stop server

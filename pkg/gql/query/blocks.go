@@ -200,30 +200,20 @@ func resolveReward(p graphql.ResolveParams) (interface{}, error) {
 		}
 
 		reward := uint64(0)
-
 		err := db.View(func(t database.Transaction) error {
 			fetched, err := t.FetchBlockTxs(b.Hash)
 			if err != nil {
 				return err
 			}
-
 			for _, tx := range fetched {
-				if decoded, e := tx.Decode(); e == nil {
-					if tx.Type() == core.Distribute {
-						// The reward is the only BlockProducer note (dusk excluded)
-						if len(decoded.Notes) == 2 {
-							producerRewardNote := decoded.Notes[1]
-							reward = producerRewardNote.DecodeTxAmount()
-							return nil
-						}
-					}
+				if gasPrice, e := tx.Fee(); e == nil {
+					reward += tx.GasSpent() * gasPrice
 				}
 			}
 			return nil
 		})
 		return reward, err
 	}
-
 	return 0, errors.New("invalid resolveReward source block")
 }
 

@@ -103,14 +103,14 @@ func TestRemoveStake(t *testing.T) {
 		t.FailNow()
 	}
 
-	m.AddStake(user.Stake{500, 1000, 10000})
+	m.AddStake(user.Stake{500, 0, 1000, 10000})
 
 	m, err = p.MemberAt(2)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
 
-	m.AddStake(user.Stake{500, 1000, 10000})
+	m.AddStake(user.Stake{500, 0, 1000, 10000})
 
 	// Now, extract a committee for round 1 step 1
 	seed := []byte{0, 0, 0, 0}

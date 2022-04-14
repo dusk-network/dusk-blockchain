@@ -76,10 +76,6 @@ func TestGenesisBlock(t *testing.T) {
 	if b.Header.Version != 0 {
 		t.Fatalf("expecting valid version in cfg.TestNetGenesisBlob")
 	}
-
-	if b.Txs[len(b.Txs)-1].Type() != transactions.Distribute {
-		t.Fatalf("expecting coinbase tx in cfg.TestNetGenesisBlob")
-	}
 }
 
 func provideMempoolTxs(rpcBus *rpcbus.RPCBus) {

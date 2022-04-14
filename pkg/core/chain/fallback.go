@@ -158,11 +158,6 @@ func (c *Chain) revertBlockchain(from, to *block.Block, llog *logrus.Entry) erro
 func (c *Chain) resubmitTxs(txs []transactions.ContractCall) {
 	// Find diff txs between consensus-split block and new block
 	for _, tx := range txs {
-		if tx.Type() == transactions.Distribute {
-			// Distribute tx should not be resubmitted
-			continue
-		}
-
 		// transaction has not been accepted by new block then it should be resubmitted to mempool.
 		if _, err := c.rpcBus.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 5*time.Second); err != nil {
 			log.WithError(err).Warn("could not resubmit txs")
