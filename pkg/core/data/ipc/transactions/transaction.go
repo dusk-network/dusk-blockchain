@@ -24,8 +24,6 @@ const (
 	Tx TxType = iota
 	// Transfer transaction id.
 	Transfer = 1
-	// Stake transaction id.
-	Stake
 )
 
 // Transaction is a Phoenix transaction.

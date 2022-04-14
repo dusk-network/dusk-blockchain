@@ -43,10 +43,10 @@ const (
 	InteropVersion = "0.1.0"
 
 	// TESTNET_GENESIS_HASH is the default genesis hash for testnet.
-	TESTNET_GENESIS_HASH = "603ab6274792ab9c250c673c4e60791b9b0303109ddb9947c36334b66a6884ff"
+	TESTNET_GENESIS_HASH = "f2d4ced34bacbdfe768c32f5e4d4844ca5f9bf5a3b10b7021097267a39187443"
 
 	// DEFAULT_STATE_ROOT is the state root result of "rusk make state".
-	DEFAULT_STATE_ROOT string = "b40ba0dac43dd7bfa8e390c05e9da481a9598bed0689ef81c6eb52e86de6deac"
+	DEFAULT_STATE_ROOT string = "613bda15876aff55ce08e975cb9626fd5c1123d0550dad1f6e4d1a20cff5adda"
 )
 
 // KadcastInitHeader is used as default initial kadcast message header.
