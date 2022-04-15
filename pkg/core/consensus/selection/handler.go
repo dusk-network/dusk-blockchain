@@ -9,6 +9,7 @@ package selection
 import (
 	"bytes"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -16,8 +17,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
-
-const maxCommitteeSize = 1
 
 type (
 	// Handler is responsible for performing operations that need to know
@@ -37,13 +36,13 @@ func NewHandler(keys key.Keys, p user.Provisioners, seed []byte) *Handler {
 
 // AmMember checks if we are part of the committee.
 func (b *Handler) AmMember(round uint64, step uint8) bool {
-	return b.Handler.AmMember(round, step, maxCommitteeSize)
+	return b.Handler.AmMember(round, step, config.ConsensusSelectionMaxCommitteeSize)
 }
 
 // IsMember delegates the committee.Handler to check if a BLS public key belongs
 // to a committee for the specified round and step.
 func (b *Handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	return b.Handler.IsMember(pubKeyBLS, round, step, maxCommitteeSize)
+	return b.Handler.IsMember(pubKeyBLS, round, step, config.ConsensusSelectionMaxCommitteeSize)
 }
 
 // VerifySignature verifies the BLS signature of the NewBlock event. Since the
@@ -61,5 +60,5 @@ func (b *Handler) VerifySignature(scr message.NewBlock) error {
 
 // Committee returns a VotingCommittee for a given round and step.
 func (b *Handler) Committee(round uint64, step uint8) user.VotingCommittee {
-	return b.Handler.Committee(round, step, maxCommitteeSize)
+	return b.Handler.Committee(round, step, config.ConsensusSelectionMaxCommitteeSize)
 }

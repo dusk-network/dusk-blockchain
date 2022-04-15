@@ -202,7 +202,7 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 			go report(round.Round, step)
 		}
 
-		if step >= 213 {
+		if step >= config.ConsensusMaxStep {
 			lg.
 				WithFields(log.Fields{
 					"round": round.Round,

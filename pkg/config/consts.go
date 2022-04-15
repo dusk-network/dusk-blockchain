@@ -6,9 +6,7 @@
 
 package config
 
-import (
-	"time"
-)
+import "time"
 
 // A single point of constants definition.
 const (
@@ -24,12 +22,6 @@ const (
 
 	// Maximum number of blocks to be requested/delivered on a single syncing session with a peer.
 	MaxInvBlocks = 500
-
-	// Protocol-based consensus step time.
-	ConsensusTimeOut = 5 * time.Second
-
-	// ConsensusTimeThreshold consensus time in seconds above which we don't throttle it.
-	ConsensusTimeThreshold = 10
 
 	MaxBlockTime = 360 // maximum block time in seconds
 
@@ -47,6 +39,27 @@ const (
 
 	// DEFAULT_STATE_ROOT is the state root result of "rusk make state".
 	DEFAULT_STATE_ROOT string = "613bda15876aff55ce08e975cb9626fd5c1123d0550dad1f6e4d1a20cff5adda"
+
+	// Consensus-related settings
+	// Protocol-based consensus step time.
+	ConsensusTimeOut = 5 * time.Second
+
+	// ConsensusTimeThreshold consensus time in seconds above which we don't throttle it.
+	ConsensusTimeThreshold = 10
+
+	// ConsensusQuorumThreshold is consensus quorum percentage.
+	ConsensusQuorumThreshold = 0.67
+
+	// ConsensusMaxStep consensus max step number.
+	ConsensusMaxStep = uint8(213)
+
+	// ConsensusMaxCommitteeSize represents the maximum size of the committee in
+	// 1st_Reduction, 2th_Reduction and Agreement phases.
+	ConsensusMaxCommitteeSize = 64
+
+	// ConsensusMaxCommitteeSize represents the maximum size of the committee in
+	// Selection phase.
+	ConsensusSelectionMaxCommitteeSize = 1
 )
 
 // KadcastInitHeader is used as default initial kadcast message header.

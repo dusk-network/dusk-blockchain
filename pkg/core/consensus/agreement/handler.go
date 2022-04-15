@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
@@ -24,10 +25,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
-
-// MaxCommitteeSize represents the maximum size of the committee for an
-// Agreement quorum.
-const MaxCommitteeSize = 64
 
 // Handler interface is handy for tests.
 type Handler interface {
@@ -53,29 +50,29 @@ func NewHandler(keys key.Keys, p user.Provisioners, seed []byte) *handler {
 
 // AmMember checks if we are part of the committee.
 func (a *handler) AmMember(round uint64, step uint8) bool {
-	return a.Handler.AmMember(round, step, MaxCommitteeSize)
+	return a.Handler.AmMember(round, step, config.ConsensusMaxCommitteeSize)
 }
 
 // IsMember delegates the committee.Handler to check if a Provisioner is in the
 // committee for a specified round and step.
 func (a *handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	return a.Handler.IsMember(pubKeyBLS, round, step, MaxCommitteeSize)
+	return a.Handler.IsMember(pubKeyBLS, round, step, config.ConsensusMaxCommitteeSize)
 }
 
 // Committee returns a VotingCommittee for a given round and step.
 func (a *handler) Committee(round uint64, step uint8) user.VotingCommittee {
-	return a.Handler.Committee(round, step, MaxCommitteeSize)
+	return a.Handler.Committee(round, step, config.ConsensusMaxCommitteeSize)
 }
 
 // VotesFor delegates embedded committee.Handler to accumulate a vote for a
 // given round.
 func (a *handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
-	return a.Handler.VotesFor(pubKeyBLS, round, step, MaxCommitteeSize)
+	return a.Handler.VotesFor(pubKeyBLS, round, step, config.ConsensusMaxCommitteeSize)
 }
 
 // Quorum returns the amount of committee members necessary to reach a quorum.
 func (a *handler) Quorum(round uint64) int {
-	return int(math.Ceil(float64(a.CommitteeSize(round, MaxCommitteeSize)) * 0.67))
+	return int(math.Ceil(float64(a.CommitteeSize(round, config.ConsensusMaxCommitteeSize)) * config.ConsensusQuorumThreshold))
 }
 
 // Verify checks the signature of the set.
@@ -100,7 +97,11 @@ func (a *handler) Verify(ev message.Agreement) error {
 		return fmt.Errorf("failed to verify Agreement Sender: %w", err)
 	}
 
-	allVoters := 0
+	quorumTarget := a.Quorum(hdr.Round)
+
+	if len(ev.VotesPerStep) != 2 {
+		return fmt.Errorf("wrong votesperstep count: %d", len(ev.VotesPerStep))
+	}
 
 	for i, votes := range ev.VotesPerStep {
 		// the beginning step is the same of the second reduction. Since the
@@ -108,39 +109,46 @@ func (a *handler) Verify(ev message.Agreement) error {
 		// The first reduction step is one less
 		step := hdr.Step - 1 + uint8(i)
 
-		// FIXME: what shall we do when step overflows uint8 ?
-		if step == math.MaxInt8 {
-			err := errors.New("verify, step reached max limit")
-			lg.WithError(err).Error("step overflow")
-
-			return err
+		if step > config.ConsensusMaxStep {
+			return fmt.Errorf("invalid step value")
 		}
 
+		// Committee the sortition determines for this round
 		committee := a.Committee(hdr.Round, step)
+
+		// subcommittee is a subset of the committee members that voted - the so-called quorum-committee
 		subcommittee := committee.IntersectCluster(votes.BitSet)
 
-		allVoters += subcommittee.TotalOccurrences()
+		stepVoters := subcommittee.TotalOccurrences()
 
 		log := consensus.WithFields(hdr.Round, step, "agreement_received",
 			hdr.BlockHash, a.Keys.BLSPubKey, &committee, &subcommittee, &a.Provisioners)
 
-		log.WithField("bitset", votes.BitSet).WithField("voted_len", subcommittee.Len()).
-			WithField("total_votes", allVoters).Info()
+		log.WithField("bitset", votes.BitSet).
+			// number of committee members for current (round, step, seed) tuple
+			WithField("comm", committee.Len()).
+			// number of subcommittee members
+			WithField("subcomm", subcommittee.Len()).
+			// total votes.
+			// NB if same provisioner is extracted multiple times per a step and
+			// it does vote, stepVoters is higher than subcommittee.Len().
+			WithField("t_votes", stepVoters).Info()
 
+		// Verify quorum threshold reached
+		if stepVoters < quorumTarget {
+			return fmt.Errorf("vote set too small - %v/%v", stepVoters, quorumTarget)
+		}
+
+		// Verify aggregated signature is correct
+		// a.k.a message (round, step, hash) is signed by all subcomittee members
 		apk, err := AggregatePks(&a.Provisioners, subcommittee.Set)
 		if err != nil {
 			return fmt.Errorf("failed to reconstruct APK in the Agreement verification: %w", err)
 		}
 
 		if err := header.VerifySignatures(hdr.Round, step, hdr.BlockHash, apk, votes.Signature); err != nil {
-			err = fmt.Errorf("failed to verify BLS multisig: %w", err)
-			log.Error(err)
-			return err
+			return fmt.Errorf("failed to verify BLS multisig: %w", err)
 		}
-	}
-
-	if allVoters < a.Quorum(hdr.Round) {
-		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum(hdr.Round))
 	}
 
 	return nil
@@ -151,10 +159,9 @@ func (a *handler) getVoterKeys(ev message.Agreement) ([][]byte, error) {
 	keys := make([][]byte, 0)
 
 	for i, votes := range ev.VotesPerStep {
-		step := hdr.Step - 2 + uint8(i)
+		step := hdr.Step - 1 + uint8(i)
 
-		// FIXME: what shall we do when step overflows uint8 ?
-		if step >= math.MaxInt8 {
+		if step > config.ConsensusMaxStep {
 			err := errors.New("getVoterKeys, step reached max limit")
 			lg.WithError(err).Error("step overflow")
 
