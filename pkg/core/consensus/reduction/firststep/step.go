@@ -75,6 +75,7 @@ func (p *Phase) String() string {
 // Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.selectionResult = re.(message.NewBlock)
+	p.VerifiedHash = nil
 	return p
 }
 
@@ -121,7 +122,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 				go func() {
 					<-timeoutChan
 				}()
-				return p.next.Initialize(*sv)
+				return p.gotoNextPhase(sv)
 			}
 		}
 	}
@@ -141,14 +142,14 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 					go func() {
 						<-timeoutChan
 					}()
-					return p.next.Initialize(*sv)
+					return p.gotoNextPhase(sv)
 				}
 			}
 
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
 			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step, *block.NewBlock())
-			return p.next.Initialize(*sv)
+			return p.gotoNextPhase(sv)
 
 		case <-ctx.Done():
 			// preventing timeout leakage
@@ -158,6 +159,14 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			return nil
 		}
 	}
+}
+
+func (p *Phase) gotoNextPhase(msg *message.StepVotesMsg) consensus.PhaseFn {
+	if msg != nil {
+		msg.VerifiedHash = p.VerifiedHash
+	}
+
+	return p.next.Initialize(*msg)
 }
 
 func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
