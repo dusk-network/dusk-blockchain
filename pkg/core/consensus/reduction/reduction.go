@@ -7,6 +7,7 @@
 package reduction
 
 import (
+	"bytes"
 	"errors"
 	"time"
 
@@ -53,6 +54,8 @@ type Reduction struct {
 
 	// VerifyFn verifies candidate block
 	VerifyFn consensus.CandidateVerificationFunc
+
+	VerifiedHash []byte
 }
 
 // IncreaseTimeout is used when reduction does not reach the quorum or
@@ -72,6 +75,7 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 
 // verifyWithDelay calls verifyFn upon the candidate block but also incorporates a
 // delay on success verification.
+// vHash param is hash of block that has been already verified.
 func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte, error) {
 	if candidate == nil {
 		return nil, errors.New("nil candidate")
@@ -79,6 +83,17 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 
 	if candidate.IsZero() {
 		return nil, errEmptyBlockHash
+	}
+
+	hash, err := candidate.CalculateHash()
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if we have already verified this block.
+	if len(r.VerifiedHash) == 32 && !bytes.Equal(r.VerifiedHash, block.EmptyHash[:]) && bytes.Equal(r.VerifiedHash, hash) {
+		lg.WithField("vhash", util.StringifyBytes(r.VerifiedHash)).Debug("block already verified")
+		return hash, nil
 	}
 
 	st := time.Now().UnixMilli()
@@ -89,10 +104,6 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 
 	// Candidate block is fully valid.
 	// Vote for it.
-	hash, err := candidate.CalculateHash()
-	if err != nil {
-		return nil, err
-	}
 
 	// Enable the delay if iteration is higher than 1
 	if step > 3 {
@@ -111,7 +122,7 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 }
 
 // SendReduction propagates a signed vote for the candidate block, if block is
-// fully valid.
+// fully valid. A full block validation will be performed if Candidate Hash differs from r.VerifiedHash.
 func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) []byte {
 	voteHash, err := r.verifyWithDelay(candidate, step)
 	if err != nil {
@@ -135,6 +146,8 @@ func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Blo
 		BlockHash: voteHash,
 		PubKeyBLS: r.Keys.BLSPubKey,
 	}
+
+	r.VerifiedHash = voteHash
 
 	sig, err := r.Sign(hdr)
 	if err != nil {
