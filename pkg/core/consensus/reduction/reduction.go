@@ -90,10 +90,17 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 		return nil, err
 	}
 
-	// Check if we have already verified this block.
-	if len(r.VerifiedHash) == 32 && !bytes.Equal(r.VerifiedHash, block.EmptyHash[:]) && bytes.Equal(r.VerifiedHash, hash) {
-		lg.WithField("vhash", util.StringifyBytes(r.VerifiedHash)).Debug("block already verified")
-		return hash, nil
+	// Handle cases when VerifiedHash is not empty
+	if len(r.VerifiedHash) == 32 && !bytes.Equal(r.VerifiedHash, block.EmptyHash[:]) {
+		// Check if we have already verified this block.
+		if bytes.Equal(r.VerifiedHash, hash) {
+			lg.WithField("verified_hash", util.StringifyBytes(r.VerifiedHash)).Debug("block already verified")
+			return hash, nil
+		}
+
+		lg.WithField("verified_hash", util.StringifyBytes(r.VerifiedHash)).
+			WithField("hash", util.StringifyBytes(hash)).
+			Warn("verified_hash and hash are different")
 	}
 
 	st := time.Now().UnixMilli()
@@ -126,11 +133,13 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) []byte {
 	voteHash, err := r.verifyWithDelay(candidate, step)
 	if err != nil {
-		log.
-			WithError(err).
-			WithField("round", round).
-			WithField("step", step).
-			Warn("verifyfn failed")
+		if err != errEmptyBlockHash {
+			log.
+				WithError(err).
+				WithField("round", round).
+				WithField("step", step).
+				Error("verifyfn failed")
+		}
 
 		// errEmptyBlockHash could be returned here if either Selection or
 		// 1st_reduction steps experience a timeout event
