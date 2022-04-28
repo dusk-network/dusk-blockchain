@@ -144,13 +144,12 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
-	_, err := e.stateClient.VerifyStateTransition(ctx, vstr)
+	resp, err := e.stateClient.VerifyStateTransition(ctx, vstr)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: return stateRoot
-	return nil, nil
+	return resp.GetStateRoot(), nil
 }
 
 // Finalize proxy call performs both Finalize and GetProvisioners grpc calls.
@@ -276,10 +275,6 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	res, err := e.stateClient.ExecuteStateTransition(ctx, vstr)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	if !res.Success {
-		return nil, nil, errors.New("unsuccessful state transition function execution")
 	}
 
 	resCalls, err := e.convertToContractCall(res.Txs)
