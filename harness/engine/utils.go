@@ -13,19 +13,18 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -129,33 +128,14 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 	}
 
 	targetNode := n.nodes[ind]
-	addr := "127.0.0.1:" + targetNode.Cfg.Network.Port
+	addr := targetNode.Cfg.RPC.Rusk.Address
+	client, _ := kadcast.CreateNetworkClient(context.Background(), "unix", addr, 5000)
 
-	// connect to this socket
-	conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
-	if err != nil {
-		return err
+	broadcast := rusk.BroadcastMessage{
+		Message: msg,
 	}
 
-	gossip := protocol.NewGossip()
-	pConn := peer.NewConnection(conn, gossip)
-	w := peer.NewWriter(pConn, nil)
-
-	// Run handshake procedure
-	if err = w.Connect(protocol.FullNode); err != nil {
-		return err
-	}
-
-	// Build wire frame
-	buf := bytes.NewBuffer(msg)
-	if err = gossip.Process(buf); err != nil {
-		return err
-	}
-
-	// Write to the Peer connection
-	if _, err = w.Connection.Write(buf.Bytes()); err != nil {
-		return err
-	}
+	_, err := client.Broadcast(context.Background(), &broadcast)
 
 	return err
 }
@@ -452,7 +432,7 @@ func (n *Network) GetBalance(ind uint) (uint64, uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	resp, err := client.GetBalance(ctx, &node.EmptyRequest{})
+	resp, err := client.GetBalance(ctx, &pb.EmptyRequest{})
 	if err != nil {
 		return 0, 0, err
 	}

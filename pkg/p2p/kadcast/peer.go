@@ -61,12 +61,12 @@ func (p *Peer) Launch() {
 		Info("launch peer connections")
 
 	// a writer for Kadcast messages
-	writerClient, wConn := createNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	writerClient, wConn := CreateNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
 	p.w = NewWriter(p.ctx, p.eventBus, p.gossip, writerClient)
 	p.w.Subscribe()
 
 	// a reader for Kadcast messages
-	readerClient, rConn := createNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	readerClient, rConn := CreateNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
 	p.r = NewReader(p.ctx, p.eventBus, p.gossip, p.processor, readerClient)
 
 	go p.r.Listen()
@@ -97,8 +97,8 @@ func (p *Peer) Close() {
 	log.Info("peer closed")
 }
 
-// createNetworkClient creates a client for the Kadcast network layer.
-func createNetworkClient(ctx context.Context, network, address string, dialTimeout int) (rusk.NetworkClient, *grpc.ClientConn) {
+// CreateNetworkClient creates a client for the Kadcast network layer.
+func CreateNetworkClient(ctx context.Context, network, address string, dialTimeout int) (rusk.NetworkClient, *grpc.ClientConn) {
 	var prefix string
 
 	switch network {

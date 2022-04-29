@@ -17,11 +17,9 @@ test-harness-unit: build ## Run a specified harness unit test e.g make UNIT_TEST
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run $(UNIT_TEST) -args -enable
 test-harness: ## Run harness tests
 	@go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable
-test-harness-ci: build
-	MOCK_ADDRESS=127.0.0.1:8080 DUSK_NETWORK_SIZE=3 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" make test-harness
-test-harness-ci-kadcast: stop build rusk
-	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=20 DUSK_NETWORK_PROFILE=kadcast_uds DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" RUSK_PATH=${PWD}/bin/rusk \
-	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestSendStakeTransaction -args -enable
+test-harness-ci: stop rusk build
+	DUSK_NETWORK_PROFILE=kadcast_uds RUSK_PATH=${PWD}/bin/rusk DUSK_NETWORK_SIZE=15 DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher \
+        DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_WALLET_PASS="password" make test-harness
 test-harness-alive: stop build
 	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run TestMultipleProvisioners -args -enable -keepalive
@@ -74,8 +72,9 @@ rusk:
 	git clone https://github.com/dusk-network/rusk rusk_co \
 	&& cd rusk_co \
 	&& make wasm \
-	&& cargo build --release -p rusk
-	mv rusk_co/target/release/rusk bin/rusk
+	&& cargo b --release -p rusk-recovery --features state -Z unstable-options --out-dir ../bin/ \
+	&& cargo b --release -p rusk -Z unstable-options --out-dir ../bin/ 
+	rm -rf rusk_co
 devnet: stop
 	./devnet.sh
 netcollector: build
