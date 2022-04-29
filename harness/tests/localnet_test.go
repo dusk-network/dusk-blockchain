@@ -8,9 +8,9 @@ package tests
 
 import (
 	"bytes"
-	"encoding/hex"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strconv"
@@ -23,7 +23,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -165,51 +164,6 @@ func monitorNetwork() {
 
 		// Monitoring iteration delay
 		time.Sleep(10 * time.Second)
-	}
-}
-
-func TestSendStakeTransaction(t *testing.T) {
-	t.Log("Wait until first block is finalized, so that we can easily stake")
-	localNet.WaitUntil(t, 0, 2, 60*time.Second, 5*time.Second)
-
-	t.Log("Send request to node 1 to generate and process a Stake transaction")
-
-	txidBytes, err := localNet.SendStakeCmd(0, 10, 10)
-	if err != nil {
-		t.Error(err)
-	}
-
-	for i := 0; i < localNet.Size(); i++ {
-		t.Logf("Send request to node %d to generate and process a Stake transaction", i)
-
-		if _, err := localNet.SendStakeCmd(uint(i), 10, 10); err != nil {
-			t.Error(err)
-		}
-	}
-
-	txID := hex.EncodeToString(txidBytes)
-	t.Logf("Stake transaction id: %s", txID)
-
-	t.Log("Ensure all nodes have accepted stake transaction at the same height")
-
-	blockhash := ""
-
-	for i := 0; i < localNet.Size(); i++ {
-		bh := localNet.WaitUntilTx(t, uint(i), txID)
-
-		if len(bh) == 0 {
-			t.Fatal("empty blockhash")
-		}
-
-		if len(blockhash) != 0 && blockhash != bh {
-			// the case where the network has inconsistency and same tx has been
-			// accepted within different blocks
-			t.Fatal("same tx hash has been accepted within different blocks")
-		}
-
-		if i == 0 {
-			blockhash = bh
-		}
 	}
 }
 
