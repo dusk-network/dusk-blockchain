@@ -38,9 +38,9 @@ func MockExecutor(height uint64) *PermissiveExecutor {
 }
 
 // VerifyStateTransition ...
-func (p *PermissiveExecutor) VerifyStateTransition(context.Context, []ContractCall, uint64, uint64, []byte) error {
+func (p *PermissiveExecutor) VerifyStateTransition(context.Context, []ContractCall, uint64, uint64, []byte) ([]byte, error) {
 	time.Sleep(stateTransitionDelay)
-	return nil
+	return make([]byte, 32), nil
 }
 
 // ExecuteStateTransition ...

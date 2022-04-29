@@ -107,5 +107,9 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 		}
 	}
 
+	if len(blk.Header.StateHash) != 32 {
+		return errors.New("invalid state hash")
+	}
+
 	return nil
 }

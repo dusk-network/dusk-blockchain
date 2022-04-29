@@ -27,7 +27,7 @@ type UnconfirmedTxProber interface {
 // Executor encapsulate the Global State operations.
 type Executor interface {
 	// VerifyStateTransition performs dry-run state transition to ensure all txs are valid.
-	VerifyStateTransition(context.Context, []ContractCall, uint64, uint64, []byte) error
+	VerifyStateTransition(context.Context, []ContractCall, uint64, uint64, []byte) ([]byte, error)
 
 	// ExecuteStateTransition performs dry-run state transition to return valid-only set of txs and state hash.
 	ExecuteStateTransition(context.Context, []ContractCall, uint64, uint64, []byte) ([]ContractCall, []byte, error)
@@ -124,7 +124,7 @@ type executor struct {
 }
 
 // VerifyStateTransition see also Executor.VerifyStateTransition.
-func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64, generator []byte) error {
+func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCall, blockGasLimit, blockHeight uint64, generator []byte) ([]byte, error) {
 	vstr := new(rusk.VerifyStateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.Generator = generator
@@ -132,7 +132,7 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 	for i, call := range calls {
 		tx := new(rusk.Transaction)
 		if err := MTransaction(tx, call.(*Transaction)); err != nil {
-			return err
+			return nil, err
 		}
 
 		vstr.Txs[i] = tx
@@ -144,12 +144,12 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
-	_, err := e.stateClient.VerifyStateTransition(ctx, vstr)
+	resp, err := e.stateClient.VerifyStateTransition(ctx, vstr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return resp.GetStateRoot(), nil
 }
 
 // Finalize proxy call performs both Finalize and GetProvisioners grpc calls.
@@ -275,10 +275,6 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	res, err := e.stateClient.ExecuteStateTransition(ctx, vstr)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	if !res.Success {
-		return nil, nil, errors.New("unsuccessful state transition function execution")
 	}
 
 	resCalls, err := e.convertToContractCall(res.Txs)

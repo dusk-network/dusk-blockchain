@@ -37,8 +37,10 @@ import (
 )
 
 var (
-	errInvalidStateHash = errors.New("invalid state hash")
-	log                 = logger.WithFields(logger.Fields{"process": "chain"})
+	errInvalidStateHash    = errors.New("invalid state hash")
+	errUnexpectedStateHash = errors.New("unexpected state hash")
+
+	log = logger.WithFields(logger.Fields{"process": "chain"})
 )
 
 // ErrBlockAlreadyAccepted block already known by blockchain state.
@@ -668,18 +670,35 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 // VerifyCandidateBlock can be used as a callback for the consensus in order to
 // verify potential winning candidates.
 func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
-	var chainTip block.Block
+	var (
+		err       error
+		chainTip  block.Block
+		stateRoot []byte
+	)
 
 	c.lock.Lock()
 	chainTip = c.tip.Copy().(block.Block)
 	c.lock.Unlock()
 
 	// We first perform a quick check on the Block Header and
-	if err := c.verifier.SanityCheckBlock(chainTip, blk); err != nil {
+	err = c.verifier.SanityCheckBlock(chainTip, blk)
+	if err != nil {
 		return err
 	}
 
-	return c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, config.BlockGasLimit, blk.Header.Height, blk.Header.GeneratorBlsPubkey)
+	stateRoot, err = c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, config.BlockGasLimit, blk.Header.Height, blk.Header.GeneratorBlsPubkey)
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(stateRoot, blk.Header.StateHash) {
+		log.WithField("block_state_hash", hex.EncodeToString(blk.Header.StateHash)).
+			WithField("vst_state_hash", hex.EncodeToString(stateRoot)).Error(errUnexpectedStateHash.Error())
+
+		return errUnexpectedStateHash
+	}
+
+	return nil
 }
 
 // ExecuteStateTransition calls Rusk ExecuteStateTransitiongrpc method.
