@@ -130,7 +130,7 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 
 // SendReduction propagates a signed vote for the candidate block, if block is
 // fully valid. A full block validation will be performed if Candidate Hash differs from r.VerifiedHash.
-func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) []byte {
+func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) (message.Message, []byte) {
 	voteHash, err := r.verifyWithDelay(candidate, step)
 	if err != nil {
 		if err != errEmptyBlockHash {
@@ -171,7 +171,7 @@ func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Blo
 		panic(err)
 	}
 
-	return voteHash
+	return m, voteHash
 }
 
 // ShouldProcess checks whether a message is consistent with the current round
