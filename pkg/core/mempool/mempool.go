@@ -12,7 +12,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -63,9 +62,6 @@ type Mempool struct {
 
 	// the collector to listen for new accepted blocks.
 	acceptedBlockChan <-chan block.Block
-
-	// used by tx verification procedure.
-	latestBlockTimestamp int64
 
 	eventBus *eventbus.EventBus
 
@@ -125,7 +121,6 @@ func NewMempool(db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCB
 
 	m := &Mempool{
 		eventBus:                eventBus,
-		latestBlockTimestamp:    math.MinInt32,
 		acceptedBlockChan:       acceptedBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
@@ -321,30 +316,36 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	}
 }
 
+// onBlock performs post-block-acceptance procedure to update mempool state
+// accordingly.
 func (m *Mempool) onBlock(b block.Block) {
-	m.latestBlockTimestamp = b.Header.Timestamp
-	m.removeAccepted(b)
+	// Discard transactions that are accepted with this block.
+	// This is the case when the accepted block has been proposed by another provisioner.
+	m.discardAcceptedTxs(b.Txs)
+
+	m.discardUsedNullifiers(b.Txs)
+
+	log.WithField("height", b.Header.Height).
+		WithField("txs_count", len(b.Txs)).
+		WithField("mem_alloc_size", int64(m.verified.Size())/1000).
+		WithField("mem_txs_len", m.verified.Len()).
+		Info("processing block completed")
 }
 
-// removeAccepted to clean up all txs from the mempool that have been already
+// discardAcceptedTxs to clean up all txs from the mempool that have been already
 // added to the chain.
 //
 // Instead of doing a full DB scan, here we rely on the latest accepted block to
 // update.
 //
 // The passed block is supposed to be the last one accepted.
-func (m *Mempool) removeAccepted(b block.Block) {
+func (m *Mempool) discardAcceptedTxs(txs []transactions.ContractCall) {
 	if m.verified.Len() == 0 {
 		// Empty pool then no need for cleanup
 		return
 	}
 
-	l := log.WithField("blk_height", b.Header.Height).
-		WithField("blk_txs_count", len(b.Txs)).
-		WithField("alloc_size", int64(m.verified.Size())/1000).
-		WithField("txs_count", m.verified.Len())
-
-	for _, tx := range b.Txs {
+	for _, tx := range txs {
 		hash, err := tx.CalculateHash()
 		if err != nil {
 			log.WithError(err).Panic("could not calculate tx hash")
@@ -352,8 +353,43 @@ func (m *Mempool) removeAccepted(b block.Block) {
 
 		_ = m.verified.Delete(hash)
 	}
+}
 
-	l.Info("processing_block_completed")
+// discardUsedNullifiers deletes mempool transactions containing
+// a nullifier already used by any given transaction.
+func (m *Mempool) discardUsedNullifiers(txs []transactions.ContractCall) {
+	if m.verified.Len() == 0 {
+		return
+	}
+
+	for _, tx := range txs {
+		txHash, err := tx.CalculateHash()
+		if err != nil {
+			continue
+		}
+
+		d, err := tx.Decode()
+		if err != nil {
+			continue
+		}
+
+		for _, n := range d.Nullifiers {
+			hashes, err := m.verified.GetTxsByNullifier(n)
+			if err != nil {
+				continue
+			}
+
+			// Found
+			for _, h := range hashes {
+				log.WithField("blk_tx", hex.EncodeToString(txHash)).
+					WithField("discarded_tx", hex.EncodeToString(h)).
+					WithField("nullifier", hex.EncodeToString(n)).
+					Info("discarded due to duplicated nullifier")
+
+				_ = m.verified.Delete(h)
+			}
+		}
+	}
 }
 
 // TODO: Get rid of stuck/expired transactions.
