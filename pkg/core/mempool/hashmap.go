@@ -7,6 +7,8 @@
 package mempool
 
 import (
+	"bytes"
+	"errors"
 	"sort"
 	"sync"
 
@@ -231,6 +233,35 @@ func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error {
 	}
 
 	return nil
+}
+
+// GetTxsByNullifier implements Pool.GetTxsByNullifier. The implementation is
+// naive and may need refactoring if it deals with large amount of transactions.
+func (m *HashMap) GetTxsByNullifier(nullifier []byte) ([][]byte, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	found := make([][]byte, 0)
+
+	for k, v := range m.data {
+		d, err := v.tx.Decode()
+		if err != nil {
+			continue
+		}
+
+		for _, n := range d.Nullifiers {
+			if bytes.Equal(n, nullifier) {
+				found = append(found, k[:])
+				break
+			}
+		}
+	}
+
+	if len(found) == 0 {
+		return nil, errors.New("not found")
+	}
+
+	return found, nil
 }
 
 // Close empty implementation of Pool.Close.

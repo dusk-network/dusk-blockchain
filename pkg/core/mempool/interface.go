@@ -40,6 +40,11 @@ type Pool interface {
 	Put(t TxDesc) error
 	// Get retrieves a transaction for a given txID, if it exists.
 	Get(txID []byte) transactions.ContractCall
+
+	// GetTxsByNullifier returns a set of hashes of all transactions that
+	// contain a given nullifier.
+	GetTxsByNullifier(nullifier []byte) ([][]byte, error)
+
 	// Contains returns true if the given key is in the pool.
 	Contains(key []byte) bool
 	// Delete a key in the pool.
