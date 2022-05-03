@@ -96,7 +96,10 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
-		p.SendReduction(r.Round, step, p.firstStepVotesMsg.Candidate)
+		m, _ := p.SendReduction(r.Round, step, p.firstStepVotesMsg.Candidate)
+
+		// Queue my own vote to be registered locally
+		evChan <- m
 	}
 
 	timeoutChan := time.After(p.TimeOut)
@@ -112,7 +115,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
-			svm := p.collectReduction(rMsg, r.Round, step)
+			svm := p.collectReduction(rMsg, r.Round, step, ev.Header())
 			if svm == nil {
 				continue
 			}
@@ -134,7 +137,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 					continue
 				}
 
-				svm := p.collectReduction(rMsg, r.Round, step)
+				svm := p.collectReduction(rMsg, r.Round, step, ev.Header())
 				if svm == nil {
 					continue
 				}
@@ -166,7 +169,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 }
 
-func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
+func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8, msgHeader []byte) *message.StepVotesMsg {
 	hdr := r.State()
 
 	if err := p.handler.VerifySignature(r.Copy().(message.Reduction)); err != nil {
@@ -190,7 +193,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8) 
 			Debug("")
 	}
 
-	m := message.NewWithHeader(topics.Reduction, r.Copy().(message.Reduction), config.KadcastInitHeader)
+	m := message.NewWithHeader(topics.Reduction, r.Copy().(message.Reduction), msgHeader)
 
 	// Once the event is verified, we can republish it.
 	if err := p.Emitter.Republish(m); err != nil {

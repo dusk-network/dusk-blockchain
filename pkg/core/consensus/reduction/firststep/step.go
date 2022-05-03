@@ -11,7 +11,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -98,7 +97,10 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
-		p.SendReduction(r.Round, step, &p.selectionResult.Candidate)
+		m, _ := p.SendReduction(r.Round, step, &p.selectionResult.Candidate)
+
+		// Queue my own vote to be registered locally
+		evChan <- m
 	}
 
 	timeoutChan := time.After(p.TimeOut)
@@ -118,7 +120,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
-			if sv := p.collectReduction(ctx, rMsg, r.Round, step); sv != nil {
+			if sv := p.collectReduction(ctx, rMsg, r.Round, step, ev.Header()); sv != nil {
 				go func() {
 					<-timeoutChan
 				}()
@@ -136,7 +138,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 					continue
 				}
 
-				sv := p.collectReduction(ctx, rMsg, r.Round, step)
+				sv := p.collectReduction(ctx, rMsg, r.Round, step, ev.Header())
 				if sv != nil {
 					// preventing timeout leakage
 					go func() {
@@ -169,7 +171,7 @@ func (p *Phase) gotoNextPhase(msg *message.StepVotesMsg) consensus.PhaseFn {
 	return p.next.Initialize(*msg)
 }
 
-func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round uint64, step uint8) *message.StepVotesMsg {
+func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round uint64, step uint8, msgHeader []byte) *message.StepVotesMsg {
 	if err := p.handler.VerifySignature(r.Copy().(message.Reduction)); err != nil {
 		lg.
 			WithError(err).
@@ -189,7 +191,7 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 			Debug("")
 	}
 
-	m := message.NewWithHeader(topics.Reduction, r, config.KadcastInitHeader)
+	m := message.NewWithHeader(topics.Reduction, r, msgHeader)
 
 	// Once the event is verified, we can republish it.
 	if err := p.Emitter.Republish(m); err != nil {
