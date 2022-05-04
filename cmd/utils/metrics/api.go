@@ -236,12 +236,6 @@ func getTransactionByID(client *graphql.Client, values map[string]interface{}) (
 		  blockhash
 		  txtype
 		  size
-		  output {
-			pubkey
-		  }
-		  input {
-			keyimage
-		  }
 		}
 	  }
 	`

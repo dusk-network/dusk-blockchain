@@ -154,12 +154,9 @@ NB: The examples from below represent only query structures. To send a query as 
       gasprice
       gasspent
 
-      output {
-        pubkey
-      }
-
-      input {
-        keyimage
+      contractinfo {
+        method,
+        contract
       }
   }
 }

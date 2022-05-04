@@ -226,14 +226,6 @@ func TestBlocksTxsQuery(t *testing.T) {
 				{
 					txid 
 					txtype 
-					output
-					{
-						pubkey
-					}         
-					input
-					{
-						keyimage
-					}
 				}
 			}
 	  	} 
@@ -248,16 +240,6 @@ func TestBlocksTxsQuery(t *testing.T) {
 					},
 					"transactions": [
 						{
-							"input": [
-								{
-									"keyimage": "0000000000000000000000000000000000000000000000000000000000000000"
-								}
-							],
-							"output": [
-								{
-									"pubkey": "0000000000000000000000000000000000000000000000000000000000000000"
-								}
-							],
 							"txid": "%s",
 							"txtype": "3"
 						}

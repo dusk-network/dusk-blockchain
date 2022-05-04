@@ -92,12 +92,6 @@ var Transaction = graphql.NewObject(
 			"blocktimestamp": &graphql.Field{
 				Type: UnixTimestamp,
 			},
-			"output": &graphql.Field{
-				Type: graphql.NewList(Output),
-			},
-			"input": &graphql.Field{
-				Type: graphql.NewList(Input),
-			},
 			"score": &graphql.Field{
 				Type: Hex,
 			},
@@ -119,28 +113,22 @@ var Transaction = graphql.NewObject(
 			"txerror": &graphql.Field{
 				Type: graphql.String,
 			},
-		},
-	},
-)
-
-// Output is the graphql object representing output.
-var Output = graphql.NewObject(
-	graphql.ObjectConfig{
-		Name: "Output",
-		Fields: graphql.Fields{
-			"pubkey": &graphql.Field{
-				Type: Hex,
+			"contractinfo": &graphql.Field{
+				Type: ContractInfo,
 			},
 		},
 	},
 )
 
-// Input is the graphql object representing input.
-var Input = graphql.NewObject(
+// ContractInfo is the graphql object representing Intercontract Call.
+var ContractInfo = graphql.NewObject(
 	graphql.ObjectConfig{
-		Name: "Input",
+		Name: "ContractInfo",
 		Fields: graphql.Fields{
-			"keyimage": &graphql.Field{
+			"method": &graphql.Field{
+				Type: graphql.String,
+			},
+			"contract": &graphql.Field{
 				Type: Hex,
 			},
 		},
