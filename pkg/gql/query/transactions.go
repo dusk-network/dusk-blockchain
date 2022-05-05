@@ -29,12 +29,9 @@ const (
 )
 
 type (
-	queryOutput struct {
-		PubKey []byte
-	}
-
-	queryInput struct {
-		KeyImage []byte
+	contractInfo struct {
+		Contract []byte
+		Method   string
 	}
 
 	// queryTx is a data-wrapper for all core.transaction relevant fields that
@@ -42,8 +39,6 @@ type (
 	queryTx struct {
 		TxID     []byte
 		TxType   core.TxType
-		Outputs  []queryOutput `json:"output"`
-		Inputs   []queryInput  `json:"input"`
 		GasLimit uint64
 		GasPrice uint64
 		GasSpent uint64
@@ -54,6 +49,7 @@ type (
 		Size           int
 		JSON           string
 		TxError        string
+		ContractInfo   *contractInfo `json:"contractinfo"`
 	}
 )
 
@@ -71,20 +67,9 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 	qd.TxID = txID
 	qd.TxType = tx.Type()
 
-	qd.Outputs = make([]queryOutput, 0)
-
 	decoded, err := tx.Decode()
 	if err != nil {
 		return queryTx{}, err
-	}
-
-	for _, note := range decoded.Notes {
-		qd.Outputs = append(qd.Outputs, queryOutput{note.StealthAddress})
-	}
-
-	qd.Inputs = make([]queryInput, 0)
-	for _, input := range decoded.Nullifiers {
-		qd.Inputs = append(qd.Inputs, queryInput{input})
 	}
 
 	qd.GasLimit = decoded.Fee.GasLimit
@@ -104,10 +89,20 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 		if err := marshaler.Marshal(&b, tx.TxError()); err == nil {
 			qd.TxError = b.String()
 		}
-
 	}
 
+	qd.ContractInfo = decodeContractInfo(decoded)
+
 	return qd, nil
+}
+
+func decodeContractInfo(decoded *core.TransactionPayloadDecoded) *contractInfo {
+	var info contractInfo = contractInfo{}
+	if decoded.Call != nil {
+		info.Contract = decoded.Call.ContractID
+		info.Method = hex.EncodeToString(decoded.Call.CallData[:1])
+	}
+	return &info
 }
 
 func (t transactions) getQuery() *graphql.Field {

@@ -150,11 +150,7 @@ func TestTxInput(t *testing.T) {
 		{      
 			transactions(last: 1)
 			{
-				txid  
-				input
-				{
-					keyimage
-				}         	 
+				txid  	 
 			}
 		}		 
 	`
@@ -163,11 +159,6 @@ func TestTxInput(t *testing.T) {
 		"data": {
 			"transactions": [
 				{
-					"input": [
-						{
-							"keyimage": "0000000000000000000000000000000000000000000000000000000000000000"
-						}
-					],
 					"txid": "%s"
 				}
 			]
