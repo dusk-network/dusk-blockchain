@@ -40,12 +40,12 @@ const (
 )
 
 var (
-	// ErrCoinbaseTxNotAllowed coinbase tx must be built by block generator only.
-	ErrCoinbaseTxNotAllowed = errors.New("coinbase tx not allowed")
 	// ErrAlreadyExists transaction with the same txid already exists in mempool.
 	ErrAlreadyExists = errors.New("already exists")
 	// ErrAlreadyExistsInBlockchain transaction with the same txid already exists in blockchain.
 	ErrAlreadyExistsInBlockchain = errors.New("already exists in blockchain")
+	// ErrNullifierExists nullifier(s) already exists in the mempool state.
+	ErrNullifierExists = errors.New("nullifier(s) already exists in the mempool")
 )
 
 // Mempool is a storage for the chain transactions that are valid according to the
@@ -262,12 +262,14 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 // processTx ensures all transaction rules are satisfied before adding the tx
 // into the verified pool.
 func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
+	var (
+		hash []byte
+		err  error
+	)
+
 	ctx, cancel := context.WithTimeout(context.Background(),
 		time.Duration(config.Get().RPC.Rusk.ContractTimeout)*time.Millisecond)
 	defer cancel()
-
-	var hash []byte
-	var err error
 
 	if hash, _, err = m.verifier.Preverify(ctx, t.tx); err != nil {
 		return nil, err
@@ -283,9 +285,15 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 		return txid, fmt.Errorf("hash err: %s", err.Error())
 	}
 
-	// ensure transaction does not exist in mempool
-	if m.verified.Contains(txid) {
+	// ensure transaction does not exist in the mempool state
+	if m.verified.Contain(txid) {
 		return txid, ErrAlreadyExists
+	}
+
+	// ensure nullifier does not exist in the mempool state
+	err = m.containNullifier(t.tx)
+	if err != nil {
+		return txid, err
 	}
 
 	// ensure transaction does not exist in blockchain
@@ -323,8 +331,6 @@ func (m *Mempool) onBlock(b block.Block) {
 	// This is the case when the accepted block has been proposed by another provisioner.
 	m.discardAcceptedTxs(b.Txs)
 
-	m.discardUsedNullifiers(b.Txs)
-
 	log.WithField("height", b.Header.Height).
 		WithField("txs_count", len(b.Txs)).
 		WithField("mem_alloc_size", int64(m.verified.Size())/1000).
@@ -355,41 +361,20 @@ func (m *Mempool) discardAcceptedTxs(txs []transactions.ContractCall) {
 	}
 }
 
-// discardUsedNullifiers deletes mempool transactions containing
-// a nullifier already used by any given transaction.
-func (m *Mempool) discardUsedNullifiers(txs []transactions.ContractCall) {
-	if m.verified.Len() == 0 {
-		return
+func (m Mempool) containNullifier(tx transactions.ContractCall) error {
+	decoded, err := tx.Decode()
+	if err != nil {
+		return err
 	}
 
-	for _, tx := range txs {
-		txHash, err := tx.CalculateHash()
-		if err != nil {
-			continue
-		}
+	if found, repeatedNullifier := m.verified.ContainAnyNullifiers(decoded.Nullifiers); found {
+		h := hex.EncodeToString(repeatedNullifier)
 
-		d, err := tx.Decode()
-		if err != nil {
-			continue
-		}
-
-		for _, n := range d.Nullifiers {
-			hashes, err := m.verified.GetTxsByNullifier(n)
-			if err != nil {
-				continue
-			}
-
-			// Found
-			for _, h := range hashes {
-				log.WithField("blk_tx", hex.EncodeToString(txHash)).
-					WithField("discarded_tx", hex.EncodeToString(h)).
-					WithField("nullifier", hex.EncodeToString(n)).
-					Info("discarded due to duplicated nullifier")
-
-				_ = m.verified.Delete(h)
-			}
-		}
+		log.WithField("repeated_nullifier", h).Warn(ErrNullifierExists.Error())
+		return ErrNullifierExists
 	}
+
+	return nil
 }
 
 // TODO: Get rid of stuck/expired transactions.

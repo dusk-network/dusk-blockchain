@@ -106,7 +106,7 @@ func TestProcessPendingTxs(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		hash, err := cc[i].CalculateHash()
 		assert.NoError(t, err)
-		assert.True(t, m.verified.Contains(hash))
+		assert.True(t, m.verified.Contain(hash))
 	}
 }
 
@@ -159,7 +159,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	for _, tx := range txs {
 		hash, err := tx.CalculateHash()
 		assert.NoError(t, err)
-		assert.True(t, m.verified.Contains(hash))
+		assert.True(t, m.verified.Contain(hash))
 	}
 }
 
@@ -209,9 +209,9 @@ func TestRemoveAccepted(t *testing.T) {
 		assert.NoError(err)
 
 		if math.Mod(float64(i), 2) == 0 {
-			assert.False(m.verified.Contains(hash))
+			assert.False(m.verified.Contain(hash))
 		} else {
-			assert.True(m.verified.Contains(hash))
+			assert.True(m.verified.Contain(hash))
 		}
 	}
 }
