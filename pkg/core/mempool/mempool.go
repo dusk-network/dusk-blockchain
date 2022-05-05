@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"golang.org/x/time/rate"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -194,14 +193,7 @@ func (m *Mempool) propagateLoop(ctx context.Context) {
 				continue
 			}
 
-			if config.Get().Kadcast.Enabled {
-				// Broadcast full transaction data in kadcast
-				err = m.kadcastTx(t)
-			} else {
-				// Advertise the transaction hash to gossip network via "Inventory Vectors"
-				err = m.advertiseTx(txid)
-			}
-
+			err = m.kadcastTx(t)
 			if err != nil {
 				log.WithField("txid", hex.EncodeToString(txid)).WithError(err).Error("failed to propagate")
 			}
@@ -478,29 +470,6 @@ func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{
 	}
 
 	return txs, err
-}
-
-// Send Inventory message to all peers.
-//nolint:unparam
-func (m *Mempool) advertiseTx(txID []byte) error {
-	msg := &message.Inv{}
-	msg.AddItem(message.InvTypeMempoolTx, txID)
-
-	// TODO: can we simply encode the message directly on a topic carrying buffer?
-	buf := new(bytes.Buffer)
-	if err := msg.Encode(buf); err != nil {
-		log.Panic(err)
-	}
-
-	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		log.Panic(err)
-	}
-
-	packet := message.New(topics.Inv, *buf)
-	errList := m.eventBus.Publish(topics.Gossip, packet)
-
-	diagnostics.LogPublishErrors("mempool.go, topics.Gossip, topics.Inv", errList)
-	return nil
 }
 
 // kadcastTx (re)propagates transaction in kadcast network.

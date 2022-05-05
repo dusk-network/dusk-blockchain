@@ -2,7 +2,7 @@
 
 ## Mempool
 
-Mempool represents a pool of valid transactions pushed by the network, ready to be included in the next candidate block. 
+Mempool represents a pool of valid transactions pushed by the network, ready to be included in the next candidate block. It also prioritizes transactions by fee.
 
 
 ### Main responsibilities:
@@ -10,7 +10,9 @@ Mempool represents a pool of valid transactions pushed by the network, ready to 
 * Queue transactions received from the network, ready to be verified
 * Verify any received transaction
 * Store transactions in the  mempool state that do pass fully acceptance criteria
+* Sort transactions in the mempool state by fee.
 * On block acceptance, remove all accepted transactions from the `mempool state`
+* On request from block generator, provide a set of transactions with highest fee, up to a specified total size.
 
 ### Transaction acceptance criteria:
 
@@ -36,11 +38,12 @@ Mempool exposes `ProcessTx` method that is concurrent-safe, implements trasactio
 Mempool is driven by two goroutines:
 
 `Main Loop` goroutine handles:
-- GetMempoolTransactions request from a Block Generator component
-- Block Accepted event
+- GetMempoolTxsBySize request from a Block Generator component.
+- GetMempoolTxs request from GraphQL component.
+- Block Accepted event triggered by Chain component.
 
 `PropagateLoop` goroutine handles:
-- any request for transaction repropagation sent by `ProcessTx`.
+- any request for transaction repropagation sent by `ProcessTx` and repropagates at proper rate. It also should prioritize propagation by transaction fee (not implemented).
 
 
 
