@@ -8,6 +8,7 @@ package mempool
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -326,6 +327,49 @@ func (m *buntdbPool) Clone() []transactions.ContractCall {
 func (m *buntdbPool) FilterByType(filterType transactions.TxType) []transactions.ContractCall {
 	// Not in use.
 	return nil
+}
+
+// GetTxsByNullifier implements Pool.GetTxsByNullifier. Later on, the execution time could
+// be improved by adding nullifier index, if needed.
+func (m *buntdbPool) GetTxsByNullifier(nullifier []byte) ([][]byte, error) {
+	found := make([][]byte, 0)
+
+	err := m.db.View(func(tx *buntdb.Tx) error {
+		err := tx.Ascend("", func(key, value string) bool {
+			buf := bytes.NewBufferString(value)
+
+			txdesc, err := unmarshalTxDesc(buf, needFullTx)
+			if err != nil {
+				panic(err)
+			}
+
+			d, err := txdesc.tx.Decode()
+			if err != nil {
+				// continue iterating
+				return true
+			}
+
+			for _, n := range d.Nullifiers {
+				if bytes.Equal(n, nullifier) {
+					hash := bytes.NewBufferString(key).Bytes()
+					found = append(found, hash)
+					break
+				}
+			}
+
+			return true // continue iteration
+		})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(found) == 0 {
+		return nil, errors.New("not found")
+	}
+
+	return found, nil
 }
 
 func (m *buntdbPool) createIndices() error {
