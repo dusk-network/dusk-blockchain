@@ -128,8 +128,8 @@ func (m HashMap) FilterByType(filterType transactions.TxType) []transactions.Con
 	return txs
 }
 
-// Contains returns true if the given key is in the pool.
-func (m *HashMap) Contains(txID []byte) bool {
+// Contain returns true if the given key is in the pool.
+func (m *HashMap) Contain(txID []byte) bool {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -233,6 +233,37 @@ func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error {
 	}
 
 	return nil
+}
+
+// ContainAnyNullifiers implements Pool.ContainAnyNullifiers.
+func (m *HashMap) ContainAnyNullifiers(nullifiers [][]byte) (bool, []byte) {
+	if len(nullifiers) == 0 {
+		return false, nil
+	}
+
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	for _, v := range m.data {
+		d, err := v.tx.Decode()
+		if err != nil {
+			continue
+		}
+
+		for _, n := range d.Nullifiers {
+			for _, t := range nullifiers {
+				if len(t) == 0 {
+					continue
+				}
+
+				if bytes.Equal(n, t) {
+					return true, t
+				}
+			}
+		}
+	}
+
+	return false, nil
 }
 
 // GetTxsByNullifier implements Pool.GetTxsByNullifier. The implementation is

@@ -137,8 +137,8 @@ func (m *buntdbPool) Put(t TxDesc) error {
 	return err
 }
 
-// Contains returns true if the given key is in the pool.
-func (m *buntdbPool) Contains(txID []byte) bool {
+// Contain returns true if the given key is in the pool.
+func (m *buntdbPool) Contain(txID []byte) bool {
 	var (
 		key bytes.Buffer
 		err error
@@ -314,6 +314,40 @@ func (m *buntdbPool) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error 
 		})
 		return err
 	})
+}
+
+// ContainNullifier implements Pool.ContainAnyNullifiers.
+func (m *buntdbPool) ContainAnyNullifiers(nullifiers [][]byte) (bool, []byte) {
+	var repeatedNullifier []byte
+
+	_ = m.db.View(func(tx *buntdb.Tx) error {
+		_ = tx.Ascend("", func(key, value string) bool {
+			t, err := unmarshalTxDesc(bytes.NewBufferString(value), needFullTx)
+			if err != nil {
+				return true
+			}
+
+			d, err := t.tx.Decode()
+			if err != nil {
+				return true
+			}
+
+			for _, n := range d.Nullifiers {
+				for _, t := range nullifiers {
+					if bytes.Equal(n, t) {
+						repeatedNullifier = t
+						// we found it, discontinue iterating
+						return false
+					}
+				}
+			}
+
+			return true
+		})
+		return nil
+	})
+
+	return len(repeatedNullifier) != 0, repeatedNullifier
 }
 
 // Clone the entire pool.

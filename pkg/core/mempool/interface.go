@@ -45,8 +45,12 @@ type Pool interface {
 	// contain a given nullifier.
 	GetTxsByNullifier(nullifier []byte) ([][]byte, error)
 
-	// Contains returns true if the given key is in the pool.
-	Contains(key []byte) bool
+	// ContainAnyNullifiers returns true if any pool transaction contains any of
+	// the given nullifiers.
+	ContainAnyNullifiers(nullifiers [][]byte) (bool, []byte)
+
+	// Contain returns true if the given key is in the pool.
+	Contain(key []byte) bool
 	// Delete a key in the pool.
 	Delete(key []byte) error
 	// Clone the entire pool.
