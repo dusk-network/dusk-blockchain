@@ -2,46 +2,47 @@
 
 ## Mempool
 
-Package mempool represents the chain transaction layer \(not to be confused with DB transaction layer\). A blockchain transaction has one of a finite number of states at any given time. Below are listed the logical states of a transaction.
+Mempool represents a pool of valid transactions pushed by the network, ready to be included in the next candidate block. 
 
-## States
 
-| Name | Desc |  | Started by | Transitions |  |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| created | tx data was built with RPC call |  | RPC subsystem |  |  |
-| signed | tx data was signed with RPC call |  | RPC subsystem |  |  |
-| received | tx was pushed into mempool by external subsystem \(RPC, P2P node, etc\) |  | Mempool | signed -&gt; received |  |
-|  |  |  | Mempool | propagated -&gt; received |  |
-| verified | tx passed the tx verification rules |  | Mempool | received -&gt; verified |  |
-| propagated | tx was gossiped to the P2P network |  | P2P network | verified -&gt; propagated |  |
-| accepted | tx is part of a block that was accepted by the network |  | Mempool | propagated -&gt; accepted |  |
-| stale | tx was removed due to exceeding expiry period |  | Mempool | any -&gt; stale |  |
+### Main responsibilities:
 
-Mempool participates in the following transitions
+* Queue transactions received from the network, ready to be verified
+* Verify any received transaction
+* Store transactions in the  mempool state that do pass fully acceptance criteria
+* On block acceptance, remove all accepted transactions from the `mempool state`
 
-* from `created/signed` to `received`
-* from `received` to `verified`
-* from `verified` to `propagated`
-* from `propagated` to `accepted`
+### Transaction acceptance criteria:
 
-## Mempool responsibilities:
+- Decodable 
+- Passes `rusk.Preverify`
+- Does not exist in the `mempool state`
+- Does not exist in the `blockchain state`
+- Does not contain a nullifier already used by another transaction in mempool state.
 
-* Store all transactions that are `received` from RPC call or P2P message ready to be verified
-* Execute transaction verification procedure 
-* Store all transactions that are `verified` by the chain and can be included in next candidate block
-* Update internal state on newly accepted block
-* Monitor and report for abnormal situations
+### Underlying storage
 
-## Implementation
+Mempool is storage-agnostic. An underlying storage must implement interface `Pool` to be applicable. At that stage, we support two types of stores:
 
-Mempool implementation tries to avoid use of mutex to protect shared state. Instead, all input/output communication is based on channels. Similarily to Unix Select\(..\) sementics, mempool waits on read/write \(input/output/timeout\) channels to trigger an event handler
+* hashmap - based on golang map that implements in-memory key/value store.
+* buntdb - based on buntdb, a low-level, in-memory and ACID compliant key/value store that persists to disk.
 
-### Underlying pool
+## Implementation details
 
-In addition, mempool tries to be storage-agnostic so that a verified tx can be stored in different forms of persistent and non-persistent pools. Supported and pending ideas for pools:
+### Exposed methods
+Mempool exposes `ProcessTx` method that is concurrent-safe, implements trasaction acceptance criteria and adds valid transaction to the mempool state.
 
-* hashmap - based on golang map implements non-persistent pool. Supported
-* syncpool - based sync.Pool. Pending
-* distributed - distributed memory object caching system \(e.g memcached\).  Pending
-* persistent - persistent KV storage. Pending
+### Background goroutines
+Mempool is driven by two goroutines:
+
+`Main Loop` goroutine handles:
+- GetMempoolTransactions request from a Block Generator component
+- Block Accepted event
+
+`PropagateLoop` goroutine handles:
+- any request for transaction repropagation sent by `ProcessTx`.
+
+
+
+
 
