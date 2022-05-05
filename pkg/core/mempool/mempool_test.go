@@ -60,7 +60,7 @@ func startMempoolTestWithLatency(ctx context.Context, latency time.Duration) (*M
 	return m, bus, rpcBus, streamer
 }
 
-func TestTxAdvertising(t *testing.T) {
+func TestTransactionPropagation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -73,17 +73,18 @@ func TestTxAdvertising(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	inv, err := streamer.Read()
+	txMsg, err := streamer.Read()
 	assert.NoError(t, err)
 
 	hash, err := tx.CalculateHash()
 	assert.NoError(t, err)
 
-	msg := &message.Inv{}
-	err = msg.Decode(bytes.NewBuffer(inv))
+	c := transactions.NewTransaction()
+	err = transactions.Unmarshal(bytes.NewBuffer(txMsg), c)
 	assert.NoError(t, err)
 
-	assert.Equal(t, msg.InvList[0].Hash, hash)
+	ch, _ := c.CalculateHash()
+	assert.Equal(t, ch, hash)
 }
 
 // QUESTION: What does this test actually do?

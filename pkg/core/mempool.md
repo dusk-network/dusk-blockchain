@@ -32,7 +32,7 @@ Mempool is storage-agnostic. An underlying storage must implement interface `Poo
 ## Implementation details
 
 ### Exposed methods
-Mempool exposes `ProcessTx` method that is concurrent-safe, implements trasaction acceptance criteria and adds valid transaction to the mempool state.
+Mempool exposes `ProcessTx` method that is concurrent-safe, implements transaction acceptance criteria and adds valid transactions to the mempool state.
 
 ### Background goroutines
 Mempool is driven by two goroutines:
@@ -43,7 +43,7 @@ Mempool is driven by two goroutines:
 - Block Accepted event triggered by Chain component.
 
 `PropagateLoop` goroutine handles:
-- any request for transaction repropagation sent by `ProcessTx` and repropagates at proper rate. It also should prioritize propagation by transaction fee (not implemented).
+- any request for transaction repropagation sent by `ProcessTx` and repropagates at proper rate. It also should prioritize propagation by transaction fee (not implemented, see also #1240).
 
 
 
