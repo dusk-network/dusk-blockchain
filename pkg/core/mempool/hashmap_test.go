@@ -150,7 +150,7 @@ func BenchmarkContains(b *testing.B) {
 	for tN := 0; tN < b.N; tN++ {
 		for i := 0; i < len(txs); i++ {
 			txid, _ := txs[i].CalculateHash()
-			if !pool.Contains(txid) {
+			if !pool.Contain(txid) {
 				b.Fatal("missing tx")
 			}
 		}

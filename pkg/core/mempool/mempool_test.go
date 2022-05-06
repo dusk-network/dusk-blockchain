@@ -60,7 +60,7 @@ func startMempoolTestWithLatency(ctx context.Context, latency time.Duration) (*M
 	return m, bus, rpcBus, streamer
 }
 
-func TestTxAdvertising(t *testing.T) {
+func TestTransactionPropagation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -73,17 +73,18 @@ func TestTxAdvertising(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	inv, err := streamer.Read()
+	txMsg, err := streamer.Read()
 	assert.NoError(t, err)
 
 	hash, err := tx.CalculateHash()
 	assert.NoError(t, err)
 
-	msg := &message.Inv{}
-	err = msg.Decode(bytes.NewBuffer(inv))
+	c := transactions.NewTransaction()
+	err = transactions.Unmarshal(bytes.NewBuffer(txMsg), c)
 	assert.NoError(t, err)
 
-	assert.Equal(t, msg.InvList[0].Hash, hash)
+	ch, _ := c.CalculateHash()
+	assert.Equal(t, ch, hash)
 }
 
 // QUESTION: What does this test actually do?
@@ -106,7 +107,7 @@ func TestProcessPendingTxs(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		hash, err := cc[i].CalculateHash()
 		assert.NoError(t, err)
-		assert.True(t, m.verified.Contains(hash))
+		assert.True(t, m.verified.Contain(hash))
 	}
 }
 
@@ -159,7 +160,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	for _, tx := range txs {
 		hash, err := tx.CalculateHash()
 		assert.NoError(t, err)
-		assert.True(t, m.verified.Contains(hash))
+		assert.True(t, m.verified.Contain(hash))
 	}
 }
 
@@ -209,9 +210,9 @@ func TestRemoveAccepted(t *testing.T) {
 		assert.NoError(err)
 
 		if math.Mod(float64(i), 2) == 0 {
-			assert.False(m.verified.Contains(hash))
+			assert.False(m.verified.Contain(hash))
 		} else {
-			assert.True(m.verified.Contains(hash))
+			assert.True(m.verified.Contain(hash))
 		}
 	}
 }

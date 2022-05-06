@@ -49,7 +49,7 @@ func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 	eb := New()
 	streamer := NewGossipStreamer()
 	streamListener := NewStreamListener(streamer)
-	eb.Subscribe(topics.Gossip, streamListener)
+	eb.Subscribe(topics.Kadcast, streamListener)
 	return eb, streamer
 }
 

@@ -64,10 +64,10 @@ func TestBuntStoreGet(t *testing.T) {
 		assert.True(bytes.Equal(hash, hash2))
 
 		// Check Delete / Contains
-		assert.True(pool.Contains(hash))
+		assert.True(pool.Contain(hash))
 
 		pool.Delete(hash)
-		assert.False(pool.Contains(hash))
+		assert.False(pool.Contain(hash))
 	}
 
 	// Now get a tx for a hash that is not in the pool
