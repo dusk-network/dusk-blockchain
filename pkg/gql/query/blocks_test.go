@@ -47,7 +47,7 @@ func TestBlocksByHeight(t *testing.T) {
 				"header":{  
 				  "height":2,
 				  "feespaid":0,
-				  "reward":0
+				  "reward":16000000000
 				}
 			  }
 			]
