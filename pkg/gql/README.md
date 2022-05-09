@@ -67,18 +67,29 @@ NB: The examples from below represent only query structures. To send a query as 
 {
   blocks(hash: "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620" ) {
     header {
-       height
-       hash
-       timestamp
-       version
-       seed
-       prevblockhash
-       statehash
-       generatorblspublickey
-       reward
-       feespaid
+      feespaid            # Total fees paid for all transactions in the block
+      generatorblspubkey  # BLS key of the block generator
+      hash                # Block hash
+      height              # Block height
+      prevblockhash       # Previous block hash
+      reward              # Total block reward. Includes fees and minted dusk
+      seed                # Seed of the block
+      statehash           # Hash of VM state
+      step                # Step at consensus reach
+      timestamp           # Timestamp of the block
+      version             # Version of the block
     }
-    transactions{
+    transactions {    
+      contractinfo {      
+        contract          
+        method
+      }
+      gaslimit
+      gasprice
+      gasspent
+      json
+      size
+      txerror
       txid
       txtype
     }

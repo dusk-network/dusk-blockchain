@@ -190,6 +190,31 @@ func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 	return nil, errors.New("invalid source block")
 }
 
+/// This implements the emission schedule described in the economic paper.
+func emissionAmount(blockHeight uint64) uint64 {
+	switch {
+	case blockHeight == 0: // genesis block
+		return uint64(0)
+	case blockHeight <= 12_500_000: // first 12_500_000 blocks emit 16 DUSK
+		return uint64(16 * 1_000_000_000)
+	case blockHeight <= 18_750_000: // from 12_500_001 to 18_750_000 blocks emit 12.8 DUSK
+		return uint64(12.8 * 1_000_000_000)
+	case blockHeight <= 25_000_000: // from 18_750_001 to 25_000_000 blocks emit 9.6 DUSK
+		return uint64(9.6 * 1_000_000_000)
+	case blockHeight <= 31_250_000: // from 25_000_001 to 31_250_000 blocks emit 8 DUSK
+		return uint64(8 * 1_000_000_000)
+	case blockHeight <= 37_500_000: // from 31_250_001 to 37_500_000 blocks emit 6.4 DUSK
+		return uint64(6.4 * 1_000_000_000)
+	case blockHeight <= 43_750_000: // from 37_500_001 to 43_750_000 blocks emit 4.8 DUSK
+		return uint64(4.8 * 1_000_000_000)
+	case blockHeight <= 50_000_000: // from 43_750_001 to 50_000_000 blocks emit 3.2 DUSK
+		return uint64(3.2 * 1_000_000_000)
+	case blockHeight <= 62_500_000: // from 50_000_001 to 62_500_000 blocks emit 1.6 DUSK
+		return uint64(1.6 * 1_000_000_000)
+	}
+	return uint64(0) // after 62_500_000 blocks emit 0 DUSK
+}
+
 func resolveReward(p graphql.ResolveParams) (interface{}, error) {
 	b, ok := p.Source.(*queryHeader)
 	if ok {
@@ -199,7 +224,7 @@ func resolveReward(p graphql.ResolveParams) (interface{}, error) {
 			return nil, errors.New("context does not store database conn")
 		}
 
-		reward := uint64(0)
+		reward := emissionAmount(b.Height)
 		err := db.View(func(t database.Transaction) error {
 			fetched, err := t.FetchBlockTxs(b.Hash)
 			if err != nil {
