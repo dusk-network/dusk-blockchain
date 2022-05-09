@@ -114,7 +114,8 @@ type Chain struct {
 // New returns a new chain object. It accepts the EventBus (for messages coming
 // from (remote) consensus components.
 func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus,
-	loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus) (*Chain, error) {
+	loader Loader, verifier Verifier, srv *grpc.Server, proxy transactions.Proxy, loop *loop.Consensus,
+) (*Chain, error) {
 	chain := &Chain{
 		eventBus:          eventBus,
 		rpcBus:            rpcBus,
@@ -658,11 +659,6 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 		l.WithError(err).Warn("candidate deletion failed")
 	}
 
-	// 3. Update Storm DB
-	if config.Get().API.Enabled {
-		go c.storeStakesInStormDB(blk.Header.Height)
-	}
-
 	diagnostics.LogPublishErrors("chain/chain.go, topics.AcceptedBlock", errList)
 	l.Debug("procedure ended")
 }
@@ -796,6 +792,7 @@ func (c *Chain) RebuildChain(_ context.Context, e *node.EmptyRequest) (*node.Gen
 	return &node.GenericResponse{Response: "Unimplemented"}, nil
 }
 
+//nolint
 func (c *Chain) storeStakesInStormDB(blkHeight uint64) {
 	store := capi.GetStormDBInstance()
 	members := make([]*capi.Member, len(c.p.Members))
