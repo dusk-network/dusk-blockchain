@@ -68,28 +68,35 @@ func (w *Writer) Subscribe() {
 	}
 
 	// Kadcast subs
-	l1 := eventbus.NewStreamListenerWithParams(w, MaxWriterQueueSize, mapper)
-	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, l1)
+	l := eventbus.NewStreamListenerWithParams(w, MaxWriterQueueSize, mapper)
+	w.kadcastSubscription = w.subscriber.Subscribe(topics.Kadcast, l)
 
 	// KadcastPoint subs
-	l2 := eventbus.NewStreamListener(w)
-	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l2)
+	l = eventbus.NewStreamListener(w)
+	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastPoint, l)
+
+	// KadcastPoint subs
+	l = eventbus.NewStreamListener(w)
+	w.kadcastPointSubscription = w.subscriber.Subscribe(topics.KadcastRandomPoints, l)
 }
 
 // Write sends a message through the Kadcast gRPC interface.
 // Depending on the value of header field, Send or Broadcast is called.
-func (w *Writer) Write(data, header []byte, priority byte) (int, error) {
+func (w *Writer) Write(data, header []byte, priority byte, category topics.Topic) (int, error) {
 	var err error
 
-	switch {
-	case len(header) > 1:
+	switch category {
+	case topics.KadcastRandomPoints:
+		// point-to-point messaging
+		err = w.writeToRandomPoints(data, header, priority)
+	case topics.KadcastPoint:
 		// point-to-point messaging
 		err = w.writeToPoint(data, header, priority)
-	case len(header) == 1:
+	case topics.Kadcast:
 		// broadcast messaging
 		err = w.writeToAll(data, header, priority)
 	default:
-		err = errors.New("empty message header")
+		err = errors.New("unsupported category")
 	}
 
 	// log errors but not return them.
@@ -139,13 +146,39 @@ func (w *Writer) writeToAll(data, header []byte, _ byte) error {
 	return nil
 }
 
+// writeToRandomPoints writes a message to a random active destinations.
+func (w *Writer) writeToRandomPoints(data, header []byte, _ byte) error {
+	if len(header) == 0 || header[0] == 0 {
+		return errors.New("empty message header")
+	}
+
+	// get N active nodes
+	req := &rusk.AliveNodesRequest{MaxNodes: uint32(header[0])}
+
+	resp, err := w.client.AliveNodes(w.ctx, req)
+	if err != nil {
+		log.WithError(err).Warn("get alive nodes failed")
+		return err
+	}
+
+	for _, addr := range resp.Address {
+		w.send(data, addr)
+	}
+
+	return nil
+}
+
 // writeToPoint writes a message to a single destination.
 // The receiver address is read from message Header.
 func (w *Writer) writeToPoint(data, header []byte, _ byte) error {
-	// check header
 	if len(header) == 0 {
 		return errors.New("empty message header")
 	}
+
+	return w.send(data, string(header))
+}
+
+func (w *Writer) send(data []byte, addr string) error {
 	// create the message
 	b := bytes.NewBuffer(data)
 
@@ -158,7 +191,6 @@ func (w *Writer) writeToPoint(data, header []byte, _ byte) error {
 	}
 
 	// extract destination address
-	addr := string(header)
 	// prepare message
 	m := &rusk.SendMessage{
 		TargetAddress: addr,
@@ -169,6 +201,7 @@ func (w *Writer) writeToPoint(data, header []byte, _ byte) error {
 		log.WithError(err).Warn("failed to broadcast message")
 		return err
 	}
+
 	return nil
 }
 

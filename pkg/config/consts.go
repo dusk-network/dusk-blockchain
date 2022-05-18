@@ -35,10 +35,10 @@ const (
 	InteropVersion = "0.1.0"
 
 	// TESTNET_GENESIS_HASH is the default genesis hash for testnet.
-	TESTNET_GENESIS_HASH = "385e119c573de55d8631ca1b58198070c3f612b8daca4192a8cf95a76802babe"
+	TESTNET_GENESIS_HASH = "bef3d7b99c3e4dafa6bebee5be63e78d72abb8ec2ae98e1db3a0618f7f2b4977"
 
 	// DEFAULT_STATE_ROOT is the state root result of "rusk make state".
-	DEFAULT_STATE_ROOT string = "c390ebe8f305c511c0fb2bd1bbf5caeaa7c38cd69cf95969f629b0e1c9ab1409"
+	DEFAULT_STATE_ROOT string = "f100e6fbc3297b6f2f084c0e1fe3833e0ed050830e790e8efd68536b75baa919"
 
 	// Consensus-related settings
 	// Protocol-based consensus step time.

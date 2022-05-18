@@ -134,12 +134,26 @@ func NewMempool(db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCB
 	// The pool is normally a Hashmap
 	m.verified = m.newPool()
 
-	// Perform cleanup as background process.
-	go cleanupAcceptedTxs(m.verified, db)
-
 	l.Info("running")
 
 	return m
+}
+
+func (m *Mempool) RequestUpdates() {
+	maxNodes := byte(config.
+		Get().
+		Mempool.
+		MaxNumUpdaters)
+
+	if maxNodes == 0 {
+		log.Warn("updates disabled")
+		return
+	}
+
+	log.WithField("num_nodes", maxNodes).Info("request updates")
+
+	msg := message.NewWithHeader(topics.MemPool, nil, []byte{maxNodes})
+	m.eventBus.Publish(topics.KadcastRandomPoints, msg)
 }
 
 // Run spawns the mempool lifecycle routines.
@@ -519,42 +533,4 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}
 	}
 
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
-}
-
-// cleanupAcceptedTxs discards any transactions that were accepted into
-// blockchain while node was offline.
-func cleanupAcceptedTxs(pool Pool, db database.DB) {
-	if db == nil {
-		return
-	}
-
-	deleteList := make([]txHash, 0)
-
-	_ = pool.Range(func(k txHash, t TxDesc) error {
-		_ = db.View(func(t database.Transaction) error {
-			// TODO: FetchBlockTxByHash should be replaced with FetchTxExists
-			_, _, _, err := t.FetchBlockTxByHash(k[:])
-			if err == nil {
-				// transaction already accepted.
-				deleteList = append(deleteList, k)
-			}
-
-			return nil
-		})
-
-		return nil
-	})
-
-	// BuntDB does not currently support deleting a key while in the process of
-	// iterating. As a workaround you'll need to delete keys following the
-	// completion of the iterator.
-	for _, txhash := range deleteList {
-		if err := pool.Delete(txhash[:]); err != nil {
-			log.WithError(err).WithField("txid", hex.EncodeToString(txhash[:])).Warn("could not delete tx")
-		}
-	}
-
-	if len(deleteList) > 0 {
-		log.WithField("len", len(deleteList)).Info("clean up redundant transactions")
-	}
 }

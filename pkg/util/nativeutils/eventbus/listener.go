@@ -125,6 +125,7 @@ func (s *StreamListener) Notify(m message.Message) error {
 			Data:     buf.Bytes(),
 			Header:   m.Header(),
 			Priority: 0,
+			Category: m.Category(),
 		}
 
 		if s.priorityMapper != nil {
@@ -153,7 +154,7 @@ func (s *StreamListener) Close() {
 // Consume an item by writing it to the specified WriteCloser. This is used in the StreamListener creation.
 func Consume(elems []ring.Elem, w ring.Writer) bool {
 	for _, e := range elems {
-		if _, err := w.Write(e.Data, e.Header, e.Priority); err != nil {
+		if _, err := w.Write(e.Data, e.Header, e.Priority, e.Category); err != nil {
 			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("error in writing to WriteCloser")
 			return false
 		}

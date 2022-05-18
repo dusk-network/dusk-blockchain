@@ -65,8 +65,8 @@ func Generate(c Config) *block.Block {
 		expected, _ := hex.DecodeString(c.hash)
 		if !bytes.Equal(hash, expected) {
 			logrus.
-				WithField("expected", hex.EncodeToString(expected)).
-				WithField("actual", hex.EncodeToString(hash)).
+				WithField("from_config", hex.EncodeToString(expected)).
+				WithField("computed", hex.EncodeToString(hash)).
 				Error("Generated genesis block hash does not match expected hash")
 			// The panic will be fired if testnet genesis block changes.
 			panic("calculated hash is not correct")

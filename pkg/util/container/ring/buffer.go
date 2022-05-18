@@ -10,6 +10,8 @@ import (
 	"bytes"
 	"sync"
 	"sync/atomic"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 // Elem single data unit of a ring buffer.
@@ -17,6 +19,7 @@ type Elem struct {
 	Data     []byte
 	Header   []byte
 	Priority byte
+	Category topics.Topic
 }
 
 // Buffer represents a circular array of data items.

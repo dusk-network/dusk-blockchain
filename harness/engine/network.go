@@ -265,7 +265,6 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	}
 
 	if MOCK_ADDRESS != "" {
-
 		// Start the mock RUSK server
 		if startErr := n.start(nodeDir, utilsExec, "mockrusk",
 			"--rusknetwork", node.Cfg.RPC.Rusk.Network,
@@ -374,7 +373,6 @@ func (n *Network) generateConfig(nodeIndex int) (string, error) {
 // Start an OS process with TMPDIR=nodeDir, manageable by the network.
 //nolint
 func (n *Network) start(nodeDir string, name string, arg ...string) error {
-
 	envWithNoRusk := os.Environ()
 	// Find and remove the SHARED RUSK_PROFILE_PATH
 	for i, v := range envWithNoRusk {
@@ -386,7 +384,7 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 
 	// CREATE THE RUSK STATE for the local rusk
 	stateExec := name + "-recovery-state"
-	cmd := exec.Command(stateExec)
+	cmd := exec.Command(stateExec, "-w", "-f", "-t")
 	cmd.Env = append(envWithNoRusk, "TMPDIR="+nodeDir, "RUSK_PROFILE_PATH="+nodeDir)
 
 	cmd.Start()

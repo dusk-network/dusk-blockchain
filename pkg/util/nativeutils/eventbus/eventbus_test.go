@@ -185,7 +185,7 @@ func TestExitChan(t *testing.T) {
 
 type mockWriteCloser struct{}
 
-func (m *mockWriteCloser) Write(data, header []byte, priority byte) (int, error) {
+func (m *mockWriteCloser) Write(data, header []byte, priority byte, category topics.Topic) (int, error) {
 	return 0, errors.New("failed")
 }
 

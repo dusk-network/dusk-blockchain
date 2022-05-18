@@ -8,11 +8,13 @@ package ring
 
 import (
 	"sort"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 // Writer defines a Writer interface compatible with ring.Elem.
 type Writer interface {
-	Write(data, header []byte, priority byte) (int, error)
+	Write(data, header []byte, priority byte, category topics.Topic) (int, error)
 	Close() error
 }
 

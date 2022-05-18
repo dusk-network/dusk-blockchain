@@ -62,7 +62,7 @@ type GossipConnector struct {
 	*Connection
 }
 
-func (g *GossipConnector) Write(b, header []byte, priority byte) (int, error) {
+func (g *GossipConnector) Write(b, header []byte, priority byte, category topics.Topic) (int, error) {
 	if !canRoute(g.services, topics.Topic(b[0])) {
 		if g.services != protocol.VoucherNode {
 			l.WithField("topic", topics.Topic(b[0]).String()).

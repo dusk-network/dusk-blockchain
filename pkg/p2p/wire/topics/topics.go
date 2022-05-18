@@ -92,6 +92,9 @@ const (
 
 	// Kadcast wire point-to-point messaging.
 	KadcastPoint
+
+	// KadcastRandomPoints wire random destination
+	KadcastRandomPoints
 )
 
 type topicBuf struct {
