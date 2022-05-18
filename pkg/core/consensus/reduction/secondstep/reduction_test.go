@@ -70,18 +70,12 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 				return evChan
 			},
 
-			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) {
-				_, err := streamer.Read()
-				require.NoError(err)
-
+			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer, published chan message.Message) {
 				for {
-					tpcs := streamer.SeenTopics()
-					for _, tpc := range tpcs {
-						if tpc == topics.Agreement {
-							return
-						}
+					m := <-published
+					if m.Category() == topics.Agreement {
+						return
 					}
-					streamer.Read()
 				}
 			},
 
@@ -100,7 +94,7 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 			},
 
 			// no agreement should be sent at the end of a failing second step reduction
-			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer) {
+			testResultFactory: func(require *require.Assertions, _ consensus.InternalPacket, streamer *eventbus.GossipStreamer, published chan message.Message) {
 				wrongChan := make(chan struct{}, 1)
 				go func() {
 					for i := 0; ; i++ {
@@ -158,6 +152,10 @@ func TestSecondStepReduction(t *testing.T) {
 		// wiring the Gossip streamer to capture the gossiped messages
 		id := hlp.EventBus.Subscribe(topics.Gossip, streamListener)
 
+		agreementChan := make(chan message.Message, 100)
+		aChan := eventbus.NewChanListener(agreementChan)
+		id2 := hlp.EventBus.Subscribe(topics.Agreement, aChan)
+
 		// running the subtest
 		t.Run(name, func(t *testing.T) {
 			queue := consensus.NewQueue()
@@ -181,7 +179,7 @@ func TestSecondStepReduction(t *testing.T) {
 			svs := message.GenVotes(hash, []byte{0, 0, 0, 0}, 1, 2, hlp.ProvisionersKeys, hlp.P)
 			msg := message.NewStepVotesMsg(round, hash, hlp.ThisSender, *svs[0], 0)
 
-			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, streamer)
+			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, streamer, agreementChan)
 			secondStepReduction.SetNext(testPhase)
 
 			// injecting the stepVotes into secondStep
@@ -195,5 +193,6 @@ func TestSecondStepReduction(t *testing.T) {
 		})
 
 		hlp.EventBus.Unsubscribe(topics.Gossip, id)
+		hlp.EventBus.Unsubscribe(topics.Agreement, id2)
 	}
 }

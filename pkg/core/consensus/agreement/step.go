@@ -73,7 +73,7 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 		switch ev.Category() {
 		case topics.Agreement:
 			// Agreement - Verify, broadcast and add to accumulator
-			go collectEvent(handler, acc, ev, s.Emitter)
+			go collectAgreement(handler, acc, ev, s.Emitter)
 		case topics.AggrAgreement:
 			// AggrAgreement - Verify, broadcast and create a block candidate
 			// Process aggregated agreement
@@ -137,7 +137,7 @@ func (s *Loop) Run(ctx context.Context, roundQueue *consensus.Queue, agreementCh
 			// 2 - AgreementChan: Collect agreement messages
 			case m := <-agreementChan:
 				if s.shouldCollectNow(m, r.Round, roundQueue) {
-					go collectEvent(handler, acc, m, s.Emitter)
+					go collectAgreement(handler, acc, m, s.Emitter)
 				}
 				break low_priority // Prevents us from getting stuck in the low priority select
 			}
@@ -229,7 +229,7 @@ func (s *Loop) requestCandidate(ctx context.Context, hash []byte) (block.Block, 
 	return s.requestor.RequestCandidate(ctx, hash)
 }
 
-func collectEvent(h *handler, accumulator *Accumulator, ev message.Message, e *consensus.Emitter) {
+func collectAgreement(h *handler, accumulator *Accumulator, ev message.Message, e *consensus.Emitter) {
 	a := ev.Payload().(message.Agreement)
 
 	hdr := a.State()
@@ -237,8 +237,7 @@ func collectEvent(h *handler, accumulator *Accumulator, ev message.Message, e *c
 		return
 	}
 
-	// TODO: As an optimization, ev.Header() should be used instead of always starting from KadcastInitHeader.
-	m := message.NewWithHeader(topics.Agreement, a.Copy().(message.Agreement), config.KadcastInitHeader)
+	m := message.NewWithHeader(topics.Agreement, a.Copy().(message.Agreement), ev.Header())
 
 	// Once the event is verified, we can republish it.
 	if err := e.Republish(m); err != nil {

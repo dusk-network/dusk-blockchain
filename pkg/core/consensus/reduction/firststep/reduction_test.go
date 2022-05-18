@@ -57,7 +57,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 				return evChan
 			},
 
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer) {
+			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer, aChan chan message.Message) {
 				require.NotNil(packet)
 
 				stepVoteMessage := packet.(message.StepVotesMsg)
@@ -84,7 +84,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 			},
 
 			// the result of the test should be empty step votes
-			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer) {
+			testResultFactory: func(require *require.Assertions, packet consensus.InternalPacket, _ *eventbus.GossipStreamer, aChan chan message.Message) {
 				require.NotNil(packet)
 				stepVoteMessage := packet.(message.StepVotesMsg)
 				require.True(stepVoteMessage.IsEmpty())
@@ -119,7 +119,7 @@ func TestFirstStepReduction(t *testing.T) {
 			evChan := ttest.batchEvents()
 
 			// injecting the test phase in the reduction step
-			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, nil)
+			testPhase := consensus.NewTestPhase(t, ttest.testResultFactory, nil, nil)
 			_, db := lite.CreateDBConnection()
 			firstStepReduction := New(testPhase, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, timeout, db, nil)
 

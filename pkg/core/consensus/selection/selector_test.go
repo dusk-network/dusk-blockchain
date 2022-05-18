@@ -45,13 +45,13 @@ func TestSelection(t *testing.T) {
 
 	for name, ttest := range table {
 		t.Run(name, func(t *testing.T) {
-			ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer) {
+			ttestCB := func(require *require.Assertions, p consensus.InternalPacket, _ *eventbus.GossipStreamer, aChan chan message.Message) {
 				require.NotNil(p)
 				messageNewBlock := p.(message.NewBlock)
 				require.NotEmpty(messageNewBlock)
 			}
 
-			testPhase := consensus.NewTestPhase(t, ttestCB, nil)
+			testPhase := consensus.NewTestPhase(t, ttestCB, nil, nil)
 			sel := selection.New(testPhase, ttest.bg, hlp.Emitter, consensusTimeOut, db)
 			selFn := sel.Initialize(nil)
 

@@ -267,14 +267,12 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 	lg.WithFields(log.Fields{
 		"round": round,
 		"step":  step,
-	}).Traceln("gossiping_agreement")
+	}).Traceln("publishing_agreement_internally")
 
+	// Publishing Agreement internally so that it's the internal Agreement process(goroutine)
+	// that should register it locally and only then broadcast it.
 	m := message.NewWithHeader(topics.Agreement, *ev, config.KadcastInitHeader)
-	if err := p.Republish(m); err != nil {
-		lg.
-			WithError(err).
-			Error("gossip the agreement reported error, consensus is continuing but this needs to be investigated!")
-	}
+	p.EventBus.Publish(topics.Agreement, m)
 }
 
 func stepVotesAreValid(svs ...*message.StepVotesMsg) bool {
