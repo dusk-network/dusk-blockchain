@@ -17,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 var log = logger.WithFields(logger.Fields{"process": "kadcast"})
@@ -119,4 +120,10 @@ func CreateNetworkClient(ctx context.Context, network, address string, dialTimeo
 	}
 
 	return rusk.NewNetworkClient(conn), conn
+}
+
+// InjectRuskVersion injects the rusk version into the grpc headers.
+func InjectRuskVersion(ctx context.Context) context.Context {
+	md := metadata.New(map[string]string{"x-rusk-version": config.RuskVersion})
+	return metadata.NewOutgoingContext(ctx, md)
 }

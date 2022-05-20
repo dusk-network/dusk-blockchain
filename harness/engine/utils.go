@@ -135,7 +135,9 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 		Message: msg,
 	}
 
-	_, err := client.Broadcast(context.Background(), &broadcast)
+	ruskCtx := kadcast.InjectRuskVersion(context.Background())
+
+	_, err := client.Broadcast(ruskCtx, &broadcast)
 
 	return err
 }

@@ -131,8 +131,11 @@ func (w *Writer) writeToAll(data, header []byte, _ byte) error {
 		KadcastHeight: h,
 		Message:       b.Bytes(),
 	}
+
+	ruskCtx := InjectRuskVersion(w.ctx)
+
 	// broadcast message
-	if _, err := w.client.Broadcast(w.ctx, m); err != nil {
+	if _, err := w.client.Broadcast(ruskCtx, m); err != nil {
 		log.WithError(err).Warn("failed to broadcast message")
 		return err
 	}
@@ -164,8 +167,11 @@ func (w *Writer) writeToPoint(data, header []byte, _ byte) error {
 		TargetAddress: addr,
 		Message:       b.Bytes(),
 	}
+
+	ruskCtx := InjectRuskVersion(w.ctx)
+
 	// send message
-	if _, err := w.client.Send(w.ctx, m); err != nil {
+	if _, err := w.client.Send(ruskCtx, m); err != nil {
 		log.WithError(err).Warn("failed to broadcast message")
 		return err
 	}

@@ -50,8 +50,10 @@ func NewReader(ctx context.Context, publisher eventbus.Publisher, g *protocol.Go
 
 // Listen starts accepting and processing stream data.
 func (r *Reader) Listen() {
+	ruskCtx := InjectRuskVersion(r.ctx)
+
 	// create stream handler
-	stream, err := r.client.Listen(r.ctx, &rusk.Null{})
+	stream, err := r.client.Listen(ruskCtx, &rusk.Null{})
 	if err != nil {
 		log.WithError(err).Fatal("open stream error")
 		return
