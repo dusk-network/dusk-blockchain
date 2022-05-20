@@ -16,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/metadata"
 )
 
 // UnconfirmedTxProber performs verification of contract calls (transactions).
@@ -109,7 +110,9 @@ func (v *verifier) Preverify(ctx context.Context, call ContractCall) ([]byte, Fe
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(v.txTimeout))
 	defer cancel()
 
-	res, err := v.stateClient.Preverify(ctx, vstr)
+	ruskCtx := injectRuskVersion(ctx)
+
+	res, err := v.stateClient.Preverify(ruskCtx, vstr)
 	if err != nil {
 		return nil, Fee{}, err
 	}
@@ -144,7 +147,9 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
-	resp, err := e.stateClient.VerifyStateTransition(ctx, vstr)
+	ruskCtx := injectRuskVersion(ctx)
+
+	resp, err := e.stateClient.VerifyStateTransition(ruskCtx, vstr)
 	if err != nil {
 		return nil, err
 	}
@@ -169,10 +174,12 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 		vstr.Txs[i] = tx
 	}
 
+	ruskCtx := injectRuskVersion(ctx)
+
 	// No deadline grpc call. It's all or nothing. This is to avoid a scenario
 	// where grpc call returns DeadlineExceeded error which may end up into an
 	// inconsistency between rusk and dusk service states.
-	res, err := e.stateClient.Finalize(ctx, vstr)
+	res, err := e.stateClient.Finalize(ruskCtx, vstr)
 	if err != nil {
 		return nil, user.Provisioners{}, nil, err
 	}
@@ -180,7 +187,7 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 	provisioners := user.NewProvisioners()
 	memberMap := make(map[string]*user.Member)
 
-	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})
+	pres, err := e.stateClient.GetProvisioners(ruskCtx, &rusk.GetProvisionersRequest{})
 	if err != nil {
 		return nil, user.Provisioners{}, nil, err
 	}
@@ -219,10 +226,12 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 		vstr.Txs[i] = tx
 	}
 
+	ruskCtx := injectRuskVersion(ctx)
+
 	// No deadline grpc call. It's all or nothing. This is to avoid a scenario
 	// where grpc call returns DeadlineExceeded error which may end up into an
 	// inconsistency between rusk and dusk service states.
-	res, err := e.stateClient.Accept(ctx, vstr)
+	res, err := e.stateClient.Accept(ruskCtx, vstr)
 	if err != nil {
 		return nil, user.Provisioners{}, nil, err
 	}
@@ -230,7 +239,7 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 	provisioners := user.NewProvisioners()
 	memberMap := make(map[string]*user.Member)
 
-	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})
+	pres, err := e.stateClient.GetProvisioners(ruskCtx, &rusk.GetProvisionersRequest{})
 	if err != nil {
 		return nil, user.Provisioners{}, nil, err
 	}
@@ -272,7 +281,9 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
-	res, err := e.stateClient.ExecuteStateTransition(ctx, vstr)
+	ruskCtx := injectRuskVersion(ctx)
+
+	res, err := e.stateClient.ExecuteStateTransition(ruskCtx, vstr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -317,8 +328,9 @@ func (e *executor) GetProvisioners(ctx context.Context) (user.Provisioners, erro
 
 	provisioners := user.NewProvisioners()
 	memberMap := make(map[string]*user.Member)
+	ruskCtx := injectRuskVersion(ctx)
 
-	pres, err := e.stateClient.GetProvisioners(ctx, &rusk.GetProvisionersRequest{})
+	pres, err := e.stateClient.GetProvisioners(ruskCtx, &rusk.GetProvisionersRequest{})
 	if err != nil {
 		return user.Provisioners{}, err
 	}
@@ -339,7 +351,9 @@ func (e *executor) GetStateRoot(ctx context.Context) ([]byte, error) {
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(e.txTimeout))
 	defer cancel()
 
-	r, err := e.stateClient.GetStateRoot(ctx, &rusk.GetStateRootRequest{})
+	ruskCtx := injectRuskVersion(ctx)
+
+	r, err := e.stateClient.GetStateRoot(ruskCtx, &rusk.GetStateRootRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -350,11 +364,12 @@ func (e *executor) GetStateRoot(ctx context.Context) ([]byte, error) {
 // Persist proxy call to state.Persist grpc.
 func (e *executor) Persist(ctx context.Context, stateRoot []byte) error {
 	req := &rusk.PersistRequest{StateRoot: stateRoot}
+	ruskCtx := injectRuskVersion(ctx)
 
 	// No deadline grpc call. It's all or nothing. This is to avoid a scenario
 	// where grpc call returns DeadlineExceeded error which may end up into an
 	// inconsistency between rusk and dusk service states.
-	_, err := e.stateClient.Persist(ctx, req)
+	_, err := e.stateClient.Persist(ruskCtx, req)
 	if err != nil {
 		return err
 	}
@@ -365,8 +380,9 @@ func (e *executor) Persist(ctx context.Context, stateRoot []byte) error {
 // Revert to the last finalized state with a call to the client.
 func (e *executor) Revert(ctx context.Context) ([]byte, error) {
 	req := &rusk.RevertRequest{}
+	ruskCtx := injectRuskVersion(ctx)
 
-	resp, err := e.stateClient.Revert(ctx, req)
+	resp, err := e.stateClient.Revert(ruskCtx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -391,4 +407,9 @@ func UMember(r *rusk.Provisioner, t *user.Member) {
 			Eligibility: r.Stakes[i].Eligibility,
 		}
 	}
+}
+
+func injectRuskVersion(ctx context.Context) context.Context {
+	md := metadata.New(map[string]string{"x-rusk-version": config.RuskVersion})
+	return metadata.NewOutgoingContext(ctx, md)
 }
