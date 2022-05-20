@@ -8,7 +8,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"net"
 	"time"
 
@@ -34,8 +33,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"google.golang.org/grpc"
 )
-
-const voucherRetryTime = 15 * time.Second
 
 // Server is the main process of the node.
 type Server struct {
@@ -263,34 +260,6 @@ func (s *Server) Close() {
 
 	s.rpcBus.Close()
 	s.eventBus.Close()
-}
-
-func connectToSeeders(connector *peer.Connector, seeders []string) error {
-	i := 0
-	var connected bool
-
-	for {
-		for _, seeder := range seeders {
-			if err := connector.Connect(seeder); err != nil {
-				log.WithError(err).Error("could not contact voucher seeder")
-			} else {
-				connected = true
-			}
-		}
-
-		if connected {
-			break
-		}
-
-		i++
-		if i >= 3 {
-			return errors.New("could not connect to any voucher seeders")
-		}
-
-		time.Sleep(voucherRetryTime * time.Duration(i))
-	}
-
-	return nil
 }
 
 func registerPeerServices(processor *peer.MessageProcessor, db database.DB, eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) {
