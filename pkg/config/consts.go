@@ -31,9 +31,6 @@ const (
 	// The dusk-blockchain executable version.
 	NodeVersion = "0.5.0"
 
-	// The shared API version (between dusk-blockchain and rusk).
-	InteropVersion = "0.1.0"
-
 	// TESTNET_GENESIS_HASH is the default genesis hash for testnet.
 	TESTNET_GENESIS_HASH = "385e119c573de55d8631ca1b58198070c3f612b8daca4192a8cf95a76802babe"
 
@@ -60,6 +57,9 @@ const (
 	// ConsensusMaxCommitteeSize represents the maximum size of the committee in
 	// Selection phase.
 	ConsensusSelectionMaxCommitteeSize = 1
+
+	// RuskVersion is the version of the supported rusk binary.
+	RuskVersion = "0.5.0"
 )
 
 // KadcastInitHeader is used as default initial kadcast message header.
