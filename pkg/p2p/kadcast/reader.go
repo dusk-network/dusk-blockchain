@@ -119,8 +119,8 @@ func (r *Reader) processMessage(msg *rusk.Message) {
 	for i := 0; i < len(respBufs); i++ {
 		log.WithField("r_addr", msg.Metadata.SrcAddress).Trace("send point-to-point message")
 		// send Kadcast point-to-point message with source address as destination
-		msg := message.NewWithHeader(topics.KadcastPoint, respBufs[i], []byte(msg.Metadata.SrcAddress))
-		r.publisher.Publish(topics.KadcastPoint, msg)
+		msg := message.NewWithHeader(topics.KadcastSendToOne, respBufs[i], []byte(msg.Metadata.SrcAddress))
+		r.publisher.Publish(topics.KadcastSendToOne, msg)
 	}
 }
 

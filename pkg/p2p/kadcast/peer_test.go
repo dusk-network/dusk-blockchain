@@ -18,6 +18,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/writer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -102,8 +103,7 @@ func TestBroadcastWriter(t *testing.T) {
 	cli := NewMockNetworkClient(rcvChan)
 
 	// create our kadcli Writer
-	w := NewWriter(context.Background(), eb, g, cli)
-	w.Subscribe()
+	_ = writer.NewBroadcast(context.Background(), eb, g, cli)
 
 	// create a mock message
 	buf, err := createBlockMessage()

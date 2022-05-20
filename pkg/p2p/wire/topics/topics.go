@@ -87,11 +87,14 @@ const (
 	// Monitoring topics.
 	SyncProgress
 
-	// Kadcast wire messaging.
+	// Kadcast broadcast.
 	Kadcast
 
-	// Kadcast wire point-to-point messaging.
-	KadcastPoint
+	// Kadcast send to one specified node.
+	KadcastSendToOne
+
+	// KadcastSendToMany send to many nodes.
+	KadcastSendToMany
 )
 
 type topicBuf struct {

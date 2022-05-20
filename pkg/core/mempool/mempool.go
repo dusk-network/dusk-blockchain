@@ -491,11 +491,12 @@ func (m *Mempool) kadcastTx(t TxDesc) error {
 	return nil
 }
 
+// RequestUpdates sends topics.MemPool to N Kadcast Network nodes.
 func (m *Mempool) RequestUpdates() {
-	maxNodes := byte(config.
+	maxNodes := config.
 		Get().
 		Mempool.
-		MaxNumUpdaters)
+		MaxNumUpdaters
 
 	if maxNodes == 0 {
 		log.Warn("updates disabled")
