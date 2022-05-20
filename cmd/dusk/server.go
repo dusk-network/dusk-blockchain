@@ -177,15 +177,6 @@ func Setup() *Server {
 	// Create the listener and contact the voucher seeder
 	gossip := protocol.NewGossip()
 
-	if !cfg.Get().Kadcast.Enabled {
-		connector := peer.NewConnector(eventBus, gossip, cfg.Get().Network.Port, processor, protocol.ServiceFlag(cfg.Get().Network.ServiceFlag), peer.Create)
-
-		seeders := cfg.Get().Network.Seeder.Addresses
-		if err = connectToSeeders(connector, seeders); err != nil {
-			panic("could not contact any voucher seeders")
-		}
-	}
-
 	// creating the Server
 	srv := &Server{
 		eventBus:      eventBus,
@@ -222,6 +213,13 @@ func Setup() *Server {
 		if err := grpcServer.Serve(l); err != nil {
 			log.WithError(err).Warn("Serve returned err")
 		}
+	}()
+
+	// Schedule mempool updates requesting a few seconds after all components
+	// are fully launched
+	go func() {
+		time.Sleep(5 * time.Second)
+		m.RequestUpdates()
 	}()
 
 	if err := c.RestartConsensus(); err != nil {

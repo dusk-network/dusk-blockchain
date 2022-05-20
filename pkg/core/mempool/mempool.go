@@ -491,6 +491,28 @@ func (m *Mempool) kadcastTx(t TxDesc) error {
 	return nil
 }
 
+func (m *Mempool) RequestUpdates() {
+	maxNodes := byte(config.
+		Get().
+		Mempool.
+		MaxNumUpdaters)
+
+	if maxNodes == 0 {
+		log.Warn("updates disabled")
+		return
+	}
+
+	log.WithField("num_nodes", maxNodes).Info("request updates")
+
+	buf := new(bytes.Buffer)
+	if err := topics.Prepend(buf, topics.MemPool); err != nil {
+		panic(err)
+	}
+
+	msg := message.NewWithHeader(topics.MemPool, buf, []byte{maxNodes})
+	m.eventBus.Publish(topics.KadcastSendToMany, msg)
+}
+
 // OnClose performs mempool cleanup procedure. It's called on canceling mempool
 // context.
 func (m *Mempool) OnClose() {
