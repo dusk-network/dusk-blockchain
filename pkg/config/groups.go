@@ -182,6 +182,9 @@ type mempoolConfiguration struct {
 
 	// Hashmap config
 	HashMapPreallocTxs uint32
+
+	// Number of nodes to ask for mempool transactions at start-up
+	MaxNumUpdaters uint8
 }
 
 type consensusConfiguration struct {
