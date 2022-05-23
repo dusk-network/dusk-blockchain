@@ -11,11 +11,13 @@ import (
 	"context"
 	"encoding/binary"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/metadata"
 
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
@@ -57,8 +59,12 @@ func (b *Base) Send(data []byte, addr string) error {
 		TargetAddress: addr,
 		Message:       blob.Bytes(),
 	}
+
+	md := metadata.New(map[string]string{"x-rusk-version": config.RuskVersion})
+	ctxWithVersion := metadata.NewOutgoingContext(b.ctx, md)
+
 	// send message
-	if _, err := b.client.Send(b.ctx, m); err != nil {
+	if _, err := b.client.Send(ctxWithVersion, m); err != nil {
 		log.WithError(err).Warn("failed to send message")
 		return err
 	}
