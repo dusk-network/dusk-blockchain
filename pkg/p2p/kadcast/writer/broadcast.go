@@ -11,13 +11,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
-	"google.golang.org/grpc/metadata"
 )
 
 // Broadcast is a proxy between EventBus and Kadcast service. It subscribes for
@@ -100,16 +98,13 @@ func (w *Broadcast) broadcast(data, header []byte, _ byte) error {
 		return err
 	}
 
-	md := metadata.New(map[string]string{"x-rusk-version": config.RuskVersion})
-	ctxWithVersion := metadata.NewOutgoingContext(w.ctx, md)
-
 	// prepare message
 	m := &rusk.BroadcastMessage{
 		KadcastHeight: h,
 		Message:       b.Bytes(),
 	}
 	// broadcast message
-	if _, err := w.client.Broadcast(ctxWithVersion, m); err != nil {
+	if _, err := w.client.Broadcast(w.ctx, m); err != nil {
 		log.WithError(err).Warn("failed to broadcast message")
 		return err
 	}

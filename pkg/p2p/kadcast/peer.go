@@ -64,36 +64,40 @@ func (p *Peer) Launch() {
 		WithField("grpc_network", cfg.Grpc.Network).
 		Info("launch peer connections")
 
+	// set rusk version
+	md := metadata.New(map[string]string{"x-rusk-version": config.RuskVersion})
+	ctx := metadata.NewOutgoingContext(p.ctx, md)
+
 	// initiate all writers for Kadcast messages.
-	p.createWriters()
+	p.createWriters(ctx)
 
 	// a reader for Kadcast messages
-	client, conn := CreateNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
-	p.reader = NewReader(p.ctx, p.eventBus, p.gossip, p.processor, client)
+	client, conn := CreateNetworkClient(ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	p.reader = NewReader(ctx, p.eventBus, p.gossip, p.processor, client)
 
 	p.connections = append(p.connections, conn)
 
 	go p.reader.Listen()
 }
 
-func (p *Peer) createWriters() {
+func (p *Peer) createWriters(ctx context.Context) {
 	cfg := config.Get().Kadcast
 
 	// Broadcast
-	client, conn := CreateNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
-	w := writer.NewBroadcast(p.ctx, p.eventBus, p.gossip, client)
+	client, conn := CreateNetworkClient(ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	w := writer.NewBroadcast(ctx, p.eventBus, p.gossip, client)
 	p.connections = append(p.connections, conn)
 	p.writers = append(p.writers, w)
 
 	// Send to One
-	client, conn = CreateNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
-	w = writer.NewSendToOne(p.ctx, p.eventBus, p.gossip, client)
+	client, conn = CreateNetworkClient(ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	w = writer.NewSendToOne(ctx, p.eventBus, p.gossip, client)
 	p.connections = append(p.connections, conn)
 	p.writers = append(p.writers, w)
 
 	// Send to Many
-	client, conn = CreateNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
-	w = writer.NewSendToMany(p.ctx, p.eventBus, p.gossip, client)
+	client, conn = CreateNetworkClient(ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	w = writer.NewSendToMany(ctx, p.eventBus, p.gossip, client)
 	p.connections = append(p.connections, conn)
 	p.writers = append(p.writers, w)
 }
