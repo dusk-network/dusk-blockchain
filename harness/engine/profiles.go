@@ -105,6 +105,7 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 	viper.Set("network.seeder.addresses", []string{"127.0.0.1:8081"})
 	viper.Set("network.port", strconv.Itoa(7100+index))
 	viper.Set("mempool.maxSizeMB", "100")
+	viper.Set("mempool.updates.numNodes", "1")
 
 	// viper.Set("mempool.poolType", "hashmap")
 	// viper.Set("mempool.preallocTxs", "100")

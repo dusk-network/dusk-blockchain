@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast/writer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	logger "github.com/sirupsen/logrus"
@@ -30,10 +32,10 @@ type Peer struct {
 	gossip    *protocol.Gossip
 
 	// processors
-	w *Writer
-	r *Reader
+	writers []ring.Writer
+	reader  *Reader
 
-	rConn, wConn *grpc.ClientConn
+	connections []*grpc.ClientConn
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -43,11 +45,12 @@ type Peer struct {
 func NewKadcastPeer(pCtx context.Context, eventBus *eventbus.EventBus, processor *peer.MessageProcessor, gossip *protocol.Gossip) *Peer {
 	ctx, cancel := context.WithCancel(pCtx)
 	return &Peer{
-		eventBus:  eventBus,
-		processor: processor,
-		gossip:    gossip,
-		cancel:    cancel,
-		ctx:       ctx,
+		eventBus:    eventBus,
+		processor:   processor,
+		gossip:      gossip,
+		cancel:      cancel,
+		ctx:         ctx,
+		connections: make([]*grpc.ClientConn, 0),
 	}
 }
 
@@ -61,19 +64,42 @@ func (p *Peer) Launch() {
 		WithField("grpc_network", cfg.Grpc.Network).
 		Info("launch peer connections")
 
-	// a writer for Kadcast messages
-	writerClient, wConn := CreateNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
-	p.w = NewWriter(p.ctx, p.eventBus, p.gossip, writerClient)
-	p.w.Subscribe()
+	// set rusk version
+	md := metadata.New(map[string]string{"x-rusk-version": config.RuskVersion})
+	ctx := metadata.NewOutgoingContext(p.ctx, md)
+
+	// initiate all writers for Kadcast messages.
+	p.createWriters(ctx)
 
 	// a reader for Kadcast messages
-	readerClient, rConn := CreateNetworkClient(p.ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
-	p.r = NewReader(p.ctx, p.eventBus, p.gossip, p.processor, readerClient)
+	client, conn := CreateNetworkClient(ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	p.reader = NewReader(ctx, p.eventBus, p.gossip, p.processor, client)
 
-	go p.r.Listen()
+	p.connections = append(p.connections, conn)
 
-	p.rConn = rConn
-	p.wConn = wConn
+	go p.reader.Listen()
+}
+
+func (p *Peer) createWriters(ctx context.Context) {
+	cfg := config.Get().Kadcast
+
+	// Broadcast
+	client, conn := CreateNetworkClient(ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	w := writer.NewBroadcast(ctx, p.eventBus, p.gossip, client)
+	p.connections = append(p.connections, conn)
+	p.writers = append(p.writers, w)
+
+	// Send to One
+	client, conn = CreateNetworkClient(ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	w = writer.NewSendToOne(ctx, p.eventBus, p.gossip, client)
+	p.connections = append(p.connections, conn)
+	p.writers = append(p.writers, w)
+
+	// Send to Many
+	client, conn = CreateNetworkClient(ctx, cfg.Grpc.Network, cfg.Grpc.Address, cfg.Grpc.DialTimeout)
+	w = writer.NewSendToMany(ctx, p.eventBus, p.gossip, client)
+	p.connections = append(p.connections, conn)
+	p.writers = append(p.writers, w)
 }
 
 // Close terminates kadcast peer instance.
@@ -83,16 +109,14 @@ func (p *Peer) Close() {
 	}
 
 	// close writer
-	if p.w != nil {
-		_ = p.w.Unsubscribe()
+	for _, w := range p.writers {
+		_ = w.Close()
 	}
 
-	if p.rConn != nil {
-		_ = p.rConn.Close()
-	}
-
-	if p.wConn != nil {
-		_ = p.wConn.Close()
+	for _, conn := range p.connections {
+		if conn != nil {
+			_ = conn.Close()
+		}
 	}
 
 	log.Info("peer closed")
@@ -111,7 +135,9 @@ func CreateNetworkClient(ctx context.Context, network, address string, dialTimeo
 		panic("unsupported network " + network)
 	}
 
-	dialCtx, cancel := context.WithTimeout(ctx, time.Duration(dialTimeout)*time.Second)
+	ctxWithVersion := InjectRuskVersion(ctx)
+
+	dialCtx, cancel := context.WithTimeout(ctxWithVersion, time.Duration(dialTimeout)*time.Second)
 	defer cancel()
 
 	conn, err := grpc.DialContext(dialCtx, prefix+address, grpc.WithInsecure(), grpc.WithAuthority("dummy"), grpc.WithBlock())

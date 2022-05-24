@@ -182,6 +182,17 @@ type mempoolConfiguration struct {
 
 	// Hashmap config
 	HashMapPreallocTxs uint32
+
+	// Enables mempool updates at startup
+	Updates updates
+}
+
+type updates struct {
+	// NumNodes is count of the nodes to ask for mempool transactions at start-up
+	NumNodes uint8
+
+	// Disabled is false by default which enables updates with default NumNodes
+	Disabled bool
 }
 
 type consensusConfiguration struct {

@@ -50,10 +50,8 @@ func NewReader(ctx context.Context, publisher eventbus.Publisher, g *protocol.Go
 
 // Listen starts accepting and processing stream data.
 func (r *Reader) Listen() {
-	ruskCtx := InjectRuskVersion(r.ctx)
-
 	// create stream handler
-	stream, err := r.client.Listen(ruskCtx, &rusk.Null{})
+	stream, err := r.client.Listen(r.ctx, &rusk.Null{})
 	if err != nil {
 		log.WithError(err).Fatal("open stream error")
 		return
@@ -119,8 +117,8 @@ func (r *Reader) processMessage(msg *rusk.Message) {
 	for i := 0; i < len(respBufs); i++ {
 		log.WithField("r_addr", msg.Metadata.SrcAddress).Trace("send point-to-point message")
 		// send Kadcast point-to-point message with source address as destination
-		msg := message.NewWithHeader(topics.KadcastPoint, respBufs[i], []byte(msg.Metadata.SrcAddress))
-		r.publisher.Publish(topics.KadcastPoint, msg)
+		msg := message.NewWithHeader(topics.KadcastSendToOne, respBufs[i], []byte(msg.Metadata.SrcAddress))
+		r.publisher.Publish(topics.KadcastSendToOne, msg)
 	}
 }
 
