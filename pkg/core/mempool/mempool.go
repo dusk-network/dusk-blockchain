@@ -493,24 +493,27 @@ func (m *Mempool) kadcastTx(t TxDesc) error {
 
 // RequestUpdates sends topics.MemPool to N Kadcast Network nodes.
 func (m *Mempool) RequestUpdates() {
-	maxNodes := config.
-		Get().
-		Mempool.
-		MaxNumUpdaters
-
-	if maxNodes == 0 {
-		log.Warn("updates disabled")
+	if config.Get().Mempool.Updates.Disabled {
+		log.Warn("mempool state updates disabled")
 		return
 	}
 
-	log.WithField("num_nodes", maxNodes).Info("request updates")
+	numNodes := config.
+		Get().
+		Mempool.Updates.NumNodes
+
+	if numNodes == 0 {
+		numNodes = 3
+	}
+
+	log.WithField("num_nodes", numNodes).Info("request updates")
 
 	buf := new(bytes.Buffer)
 	if err := topics.Prepend(buf, topics.MemPool); err != nil {
 		panic(err)
 	}
 
-	msg := message.NewWithHeader(topics.MemPool, buf, []byte{maxNodes})
+	msg := message.NewWithHeader(topics.MemPool, buf, []byte{numNodes})
 	m.eventBus.Publish(topics.KadcastSendToMany, msg)
 }
 

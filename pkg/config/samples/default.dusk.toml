@@ -123,6 +123,10 @@ maxInvItems = 10000
 propagateTimeout = "100ms"
 propagateBurst = 1
 
+[mempool.updates]
+disabled = false
+numNodes = 3
+
 # backend storage path applicable for diskpool type
 diskpoolDir = "mempool.db"
 
