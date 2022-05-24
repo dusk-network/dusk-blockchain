@@ -21,11 +21,13 @@ import (
 )
 
 const (
-	txsFetchLimit = 10000
+	txsFetchLimit       = 10000
+	txsBlocksFetchLimit = 10000
 
-	txidArg   = "txid"
-	txidsArg  = "txids"
-	txlastArg = "last"
+	txidArg     = "txid"
+	txidsArg    = "txids"
+	txlastArg   = "last"
+	txblocksArg = "blocks"
 )
 
 type (
@@ -118,6 +120,9 @@ func (t transactions) getQuery() *graphql.Field {
 			txlastArg: &graphql.ArgumentConfig{
 				Type: graphql.Int,
 			},
+			txblocksArg: &graphql.ArgumentConfig{
+				Type: graphql.Int,
+			},
 		},
 		Resolve: t.resolve,
 	}
@@ -145,10 +150,14 @@ func (t transactions) resolve(p graphql.ResolveParams) (interface{}, error) {
 	count, ok := p.Args[txlastArg].(int)
 	if ok {
 		if count <= 0 {
-			return nil, errors.New("invalid count")
+			return nil, errors.New("invalid ``" + txlastArg + "`` argument")
 		}
 
-		return t.fetchLastTxs(db, count)
+		maxBlocks, ok := p.Args[txblocksArg].(int)
+		if !ok {
+			maxBlocks = txsBlocksFetchLimit
+		}
+		return t.fetchLastTxs(db, count, maxBlocks)
 	}
 
 	return nil, nil
@@ -189,17 +198,24 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]que
 	return txs, err
 }
 
-// Fetch `count` number of txs from lastly accepted blocks.
-func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error) {
+// Fetch `count` number of txs from lastly `maxBlocks` accepted blocks.
+func (t transactions) fetchLastTxs(db database.DB, count int, maxBlocks int) ([]queryTx, error) {
 	txs := make([]queryTx, 0)
 
-	if count <= 0 {
+	if count <= 0 || maxBlocks <= 0 {
 		return txs, nil
 	}
 
-	if count >= txsFetchLimit {
+	if count > txsFetchLimit {
 		msg := "requested txs count exceeds the limit"
 		log.WithField("txsFetchLimit", txsFetchLimit).
+			Warn(msg)
+		return txs, errors.New(msg)
+	}
+
+	if maxBlocks > txsBlocksFetchLimit {
+		msg := "requested txs MaxBlock count exceeds the limit"
+		log.WithField("txsBlocksFetchLimit", txsBlocksFetchLimit).
 			Warn(msg)
 		return txs, errors.New(msg)
 	}
@@ -238,6 +254,11 @@ func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error)
 				if len(txs) >= count {
 					return nil
 				}
+			}
+
+			maxBlocks--
+			if maxBlocks <= 0 {
+				break
 			}
 
 			if height == 0 {
