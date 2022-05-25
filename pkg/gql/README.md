@@ -239,11 +239,24 @@ NB: The examples from below represent only query structures. To send a query as 
   }
   ```
 
-* Fetch last/latest accepted 100 transactions \(type and size fields\)
+* Fetch last/latest accepted 100 transactions \(type and size fields\) in the last 10.000 blocks
 
   ```graphql
   { 
     transactions(last: 100) 
+    { 
+      txid
+      txtype
+      size
+    }
+  }
+  ```
+
+* Fetch last/latest accepted 100 transactions \(type and size fields\) in the last 3 blocks
+
+  ```graphql
+  { 
+    transactions(last: 100, blocks: 3) 
     { 
       txid
       txtype
