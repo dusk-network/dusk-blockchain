@@ -214,9 +214,9 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 	if !bytes.Equal(hdr.BlockHash, p.selectionResult.Candidate.Header.Hash) {
 		var err error
 
-		p.selectionResult.Candidate, err = p.fetchCandidate(ctx, hdr.BlockHash)
+		p.selectionResult.Candidate, err = p.fetchCandidate(ctx, hdr.BlockHash, hdr.Round, hdr.Step)
 		if err != nil {
-			log.
+			lg.
 				WithError(err).
 				WithField("round", hdr.Round).
 				WithField("step", hdr.Step).
@@ -228,7 +228,7 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 	return p.createStepVoteMessage(result, round, step, p.selectionResult.Candidate)
 }
 
-func (p *Phase) fetchCandidate(ctx context.Context, hash []byte) (block.Block, error) {
+func (p *Phase) fetchCandidate(ctx context.Context, hash []byte, round uint64, step uint8) (block.Block, error) {
 	// First, check to see if we have the candidate in the db.
 	var cm block.Block
 
@@ -240,6 +240,11 @@ func (p *Phase) fetchCandidate(ctx context.Context, hash []byte) (block.Block, e
 	if err == nil && !cm.Equals(&block.Block{}) {
 		return cm, nil
 	}
+
+	lg.WithField("round", round).
+		WithField("step", step).
+		WithField("hash", util.StringifyBytes(hash)).
+		Info("request candidate block")
 
 	return p.requestCandidate(ctx, hash)
 }

@@ -203,7 +203,7 @@ func (s *Loop) shouldCollectNow(a message.Message, round uint64, queue *consensu
 	return true
 }
 
-func (s *Loop) createWinningBlock(ctx context.Context, hash []byte, cert *block.Certificate) (block.Block, error) {
+func (s *Loop) createWinningBlock(ctx context.Context, hash []byte, cert *block.Certificate, round uint64, step uint8) (block.Block, error) {
 	var cm block.Block
 
 	err := s.db.View(func(t database.Transaction) error {
@@ -212,7 +212,7 @@ func (s *Loop) createWinningBlock(ctx context.Context, hash []byte, cert *block.
 		return err
 	})
 	if err != nil {
-		cm, err = s.requestCandidate(ctx, hash)
+		cm, err = s.requestCandidate(ctx, hash, round, step)
 		if err != nil {
 			return block.Block{}, err
 		}
@@ -222,7 +222,12 @@ func (s *Loop) createWinningBlock(ctx context.Context, hash []byte, cert *block.
 	return cm, nil
 }
 
-func (s *Loop) requestCandidate(ctx context.Context, hash []byte) (block.Block, error) {
+func (s *Loop) requestCandidate(ctx context.Context, hash []byte, round uint64, step uint8) (block.Block, error) {
+	lg.WithField("round", round).
+		WithField("step", step).
+		WithField("hash", util.StringifyBytes(hash)).
+		Info("request candidate block")
+
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(2*time.Second))
 	// Ensure we release the resources associated to this context.
 	defer cancel()
@@ -296,7 +301,7 @@ func (s *Loop) processCollectedVotes(ctx context.Context, handler *handler, evs 
 	// Create a block and return
 	cert := evs[0].GenerateCertificate()
 
-	blk, err := s.createWinningBlock(ctx, evs[0].State().BlockHash, cert)
+	blk, err := s.createWinningBlock(ctx, evs[0].State().BlockHash, cert, r.Round, evs[0].State().Step)
 	if err != nil {
 		lg.WithError(err).Errorln("failed to create a winning block")
 	}
@@ -364,7 +369,8 @@ func (s *Loop) processAggrAgreement(ctx context.Context, h *handler, msg message
 		return nil, err
 	}
 
-	blk, err = s.createWinningBlock(ctx, aggro.State().BlockHash, aggro.GenerateCertificate())
+	blk, err = s.createWinningBlock(ctx, aggro.State().BlockHash, aggro.GenerateCertificate(),
+		r.Round, hdr.Step)
 	if err != nil {
 		lg.WithError(err).Errorln("failed to create a winning block")
 		return nil, err
