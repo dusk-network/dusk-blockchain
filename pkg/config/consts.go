@@ -58,6 +58,9 @@ const (
 	// Selection phase.
 	ConsensusSelectionMaxCommitteeSize = 1
 
+	// ConsensusGetCandidateNodes max number of nodes from which to request a missing Candidate block.
+	ConsensusGetCandidateNodes = 5
+
 	// RuskVersion is the version of the supported rusk binary.
 	RuskVersion = "0.5.0"
 )

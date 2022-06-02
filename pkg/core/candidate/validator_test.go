@@ -24,7 +24,8 @@ func TestValidatorValidBlock(t *testing.T) {
 	cm := genesis.Decode()
 
 	msg := message.New(topics.Candidate, *cm)
-	assert.NoError(t, Validate(msg))
+	_, err := Validate(msg)
+	assert.NoError(t, err)
 }
 
 // Ensure that blocks with an invalid hash or tx root will not be
@@ -42,5 +43,6 @@ func TestValidatorInvalidBlock(t *testing.T) {
 	cm.Header.GeneratorBlsPubkey = key.NewRandKeys().BLSPubKey
 
 	msg := message.New(topics.Candidate, *cm)
-	assert.Error(t, Validate(msg))
+	_, err := Validate(msg)
+	assert.Error(t, err)
 }

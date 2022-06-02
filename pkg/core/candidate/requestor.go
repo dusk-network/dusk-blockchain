@@ -17,7 +17,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/sirupsen/logrus"
 	lg "github.com/sirupsen/logrus"
 )
 
@@ -44,9 +46,14 @@ func NewRequestor(publisher eventbus.Publisher) *Requestor {
 // Invalid and non-matching Candidate messages are discarded.
 func (r *Requestor) ProcessCandidate(srcPeerID string, msg message.Message) ([]bytes.Buffer, error) {
 	if r.isRequesting() {
-		if err := Validate(msg); err != nil {
+		var hash []byte
+		var err error
+
+		if hash, err = Validate(msg); err != nil {
 			return nil, err
 		}
+
+		logrus.WithField("hash", util.StringifyBytes(hash)).Trace("process candidate")
 
 		cm := msg.Payload().(block.Block)
 		r.candidateQueue <- cm
@@ -86,9 +93,10 @@ func (r *Requestor) publishGetCandidate(hash []byte) error {
 		return err
 	}
 
-	m := message.NewWithHeader(topics.GetCandidate, *buf, config.KadcastInitHeader)
+	m := message.NewWithHeader(topics.GetCandidate, *buf,
+		[]byte{config.ConsensusGetCandidateNodes})
 
-	r.publisher.Publish(topics.Kadcast, m)
+	r.publisher.Publish(topics.KadcastSendToMany, m)
 	return nil
 }
 
