@@ -15,31 +15,36 @@ import (
 )
 
 // Validate an incoming Candidate message.
-func Validate(m message.Message) error {
+func Validate(m message.Message) ([]byte, error) {
 	cm := m.Payload().(block.Block)
 	return SanityCheckCandidate(cm)
 }
 
 // SanityCheckCandidate makes sure the hash is correct, to avoid
 // malicious nodes from overwriting the candidate block for a specific hash.
-func SanityCheckCandidate(cm block.Block) error {
-	if err := checkHash(&cm); err != nil {
+func SanityCheckCandidate(cm block.Block) ([]byte, error) {
+	var (
+		hash []byte
+		err  error
+	)
+
+	if hash, err = checkHash(&cm); err != nil {
 		log.WithError(err).Errorln("validation failed")
-		return errors.New("invalid candidate received")
+		return nil, errors.New("invalid candidate received")
 	}
 
-	return nil
+	return hash, nil
 }
 
-func checkHash(blk *block.Block) error {
+func checkHash(blk *block.Block) ([]byte, error) {
 	hash, err := blk.CalculateHash()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !bytes.Equal(hash, blk.Header.Hash) {
-		return errors.New("invalid block hash")
+		return nil, errors.New("invalid block hash")
 	}
 
-	return nil
+	return hash, nil
 }

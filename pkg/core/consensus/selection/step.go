@@ -174,23 +174,20 @@ func (p *Phase) endSelection(result message.NewBlock) consensus.PhaseFn {
 // candidate block has been signed by the single committee member of selection
 // step of this iteration.
 func (p *Phase) verifyNewBlock(msg message.NewBlock) error {
+	var err error
+	var hash []byte
+
 	if !p.handler.IsMember(msg.State().PubKeyBLS, msg.State().Round, msg.State().Step) {
 		return errNotBlockGenerator
 	}
 
 	// Verify message signagure
-	if err := p.handler.VerifySignature(msg); err != nil {
+	if err = p.handler.VerifySignature(msg); err != nil {
 		return err
 	}
 
 	// Sanity-check the candidate block
-	if err := candidate.SanityCheckCandidate(msg.Candidate); err != nil {
-		return err
-	}
-
-	// Ensure candidate block hash is equal to the BlockHash of the msg.header
-	hash, err := msg.Candidate.CalculateHash()
-	if err != nil {
+	if hash, err = candidate.SanityCheckCandidate(msg.Candidate); err != nil {
 		return err
 	}
 
