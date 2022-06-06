@@ -18,7 +18,7 @@ test-harness-unit: build ## Run a specified harness unit test e.g make UNIT_TEST
 test-harness: ## Run harness tests
 	@go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable
 test-harness-ci: stop rusk build
-	DUSK_NETWORK_PROFILE=kadcast_uds RUSK_PATH=${PWD}/bin/rusk DUSK_NETWORK_SIZE=15 DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher \
+	DUSK_NETWORK_PROFILE=kadcast_uds RUSK_PATH=${PWD}/bin/rusk DUSK_NETWORK_SIZE=5 DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher \
         DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_WALLET_PASS="password" make test-harness
 test-harness-alive: stop build
 	MOCK_ADDRESS=127.0.0.1:9191 DUSK_NETWORK_SIZE=9 DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher DUSK_WALLET_PASS="password" \
