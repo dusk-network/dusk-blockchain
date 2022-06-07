@@ -6,8 +6,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.0] - 2022-05-28
-
 ### Added
 - Adapt to the new and improved reward strategy [#1320](https://github.com/dusk-network/dusk-blockchain/issues/1320)
 - Include BlockGenerator reward into the header [#1368](https://github.com/dusk-network/dusk-blockchain/issues/1368)
@@ -26,5 +24,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ensure candidate block hash is equal to the BlockHash of the msg.header [#1364](https://github.com/dusk-network/dusk-blockchain/issues/1364)
 - Check quorum per each reduction step on agreement msg verification [#1373](https://github.com/dusk-network/dusk-blockchain/issues/1373)
 - Extend reduction 1 verification procedure with VST call [#1358](https://github.com/dusk-network/dusk-blockchain/issues/1358)
-
-## [0.5.0] - *TODO* 
