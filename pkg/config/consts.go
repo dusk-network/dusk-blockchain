@@ -29,7 +29,7 @@ const (
 	KadcastInitialHeight byte = 128 + 1
 
 	// The dusk-blockchain executable version.
-	NodeVersion = "0.5.0"
+	NodeVersion = "0.6.0-rc"
 
 	// TESTNET_GENESIS_HASH is the default genesis hash for testnet.
 	TESTNET_GENESIS_HASH = "883b55dd4b1cda7cee9b165c779e71a74ecd4d7e5d633db01587b20dd631b80a"
