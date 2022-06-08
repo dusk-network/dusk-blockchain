@@ -156,7 +156,16 @@ func (c *Chain) revertBlockchain(from, to *block.Block, llog *logrus.Entry) erro
 		return err
 	}
 
-	return err
+	// Restore provisioners set
+	provisioners, err := c.proxy.Executor().GetProvisioners(c.ctx)
+	if err != nil {
+		// unrecoverable error
+		panic(err)
+	}
+
+	c.p = &provisioners
+
+	return nil
 }
 
 func (c *Chain) resubmitTxs(txs []transactions.ContractCall) {
