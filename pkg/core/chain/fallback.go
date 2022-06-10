@@ -33,8 +33,9 @@ func (c *Chain) allowFallback(b block.Block, l *logrus.Entry) error {
 		return err
 	}
 
-	// Ensure block fields and certificate are valid against previous block.
-	if err = c.isValidBlock(b, prevBlk, l, true); err != nil {
+	// Ensure block fields and certificate are valid against previous block and
+	// current provisioners set.
+	if err = c.isValidBlock(b, prevBlk, *c.p, l, true); err != nil {
 		return err
 	}
 
@@ -151,8 +152,20 @@ func (c *Chain) revertBlockchain(from, to *block.Block, llog *logrus.Entry) erro
 		c.tip = to
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Restore provisioners set
+	provisioners, err := c.proxy.Executor().GetProvisioners(c.ctx)
+	if err != nil {
+		// unrecoverable error
+		panic(err)
+	}
+
+	c.p = &provisioners
+
+	return nil
 }
 
 func (c *Chain) resubmitTxs(txs []transactions.ContractCall) {

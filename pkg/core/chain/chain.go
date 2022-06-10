@@ -336,7 +336,7 @@ func (c *Chain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
 
 	l := log.WithFields(fields)
 
-	return c.isValidBlock(blk, *c.tip, l, true)
+	return c.isValidBlock(blk, *c.tip, *c.p, l, true)
 }
 
 // ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
@@ -523,11 +523,11 @@ func (c *Chain) sanityCheckStateHash() error {
 	return nil
 }
 
-func (c *Chain) isValidBlock(blk, chainTipBlk block.Block, l *logrus.Entry, withSanityCheck bool) error {
+func (c *Chain) isValidBlock(newBlock, prevBlock block.Block, provisioners user.Provisioners, l *logrus.Entry, withSanityCheck bool) error {
 	l.Debug("verifying block")
 	// Check that stateless and stateful checks pass
 	if withSanityCheck {
-		if err := c.verifier.SanityCheckBlock(chainTipBlk, blk); err != nil {
+		if err := c.verifier.SanityCheckBlock(prevBlock, newBlock); err != nil {
 			l.WithError(err).Error("block verification failed")
 			return err
 		}
@@ -540,7 +540,7 @@ func (c *Chain) isValidBlock(blk, chainTipBlk block.Block, l *logrus.Entry, with
 	l.Debug("verifying block certificate")
 
 	var err error
-	if err = verifiers.CheckBlockCertificate(*c.p, blk, chainTipBlk.Header.Seed); err != nil {
+	if err = verifiers.CheckBlockCertificate(provisioners, newBlock, prevBlock.Header.Seed); err != nil {
 		l.WithError(err).Error("certificate verification failed")
 		return err
 	}
@@ -566,7 +566,7 @@ func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 	var err error
 
 	// 1. Ensure block fields and certificate are valid
-	if err = c.isValidBlock(blk, *c.tip, l, withSanityCheck); err != nil {
+	if err = c.isValidBlock(blk, *c.tip, *c.p, l, withSanityCheck); err != nil {
 		l.WithError(err).Error("invalid block error")
 		return err
 	}
