@@ -14,7 +14,8 @@ const (
 	DUSK = uint64(1_000_000_000)
 
 	// Default Block Gas limit.
-	BlockGasLimit = 1000 * DUSK
+	// This value should handle up to ~20 transfers (or ~5 InterContract calls) per block.
+	BlockGasLimit = 5 * DUSK
 
 	// MaxTxSetSize defines the maximum amount of transactions.
 	// It is TBD along with block size and processing.MaxFrameSize.
