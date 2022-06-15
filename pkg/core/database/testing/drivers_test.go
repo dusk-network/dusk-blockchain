@@ -265,6 +265,8 @@ func TestFetchBlockHeader(test *testing.T) {
 
 			// Ensure the fetched header is what the original header bytes are
 			if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
+				test.Log("Fetched header bytes:", fetchedBuf.Bytes())
+				test.Log("Origin header bytes:", originBuf.Bytes())
 				return errors.New("block.Header not retrieved properly from storage")
 			}
 		}

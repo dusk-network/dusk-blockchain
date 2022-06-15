@@ -189,6 +189,7 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, pre
 		Seed:               seed,
 		Certificate:        block.EmptyCertificate(),
 		StateHash:          stateHash,
+		GasLimit:           config.BlockGasLimit,
 	}
 
 	// Construct the candidate block

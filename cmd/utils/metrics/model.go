@@ -31,6 +31,7 @@ type Header struct {
 	Version   uint8  `json:"version"`   // Block version byte
 	Height    uint64 `json:"height"`    // Block height
 	Timestamp string `json:"timestamp"` // Block timestamp
+	GasLimit  uint64 `json:"gaslimit"`  // Block gas limit
 
 	PrevBlockHash      []byte `json:"prev-hash"` // Hash of previous block (32 bytes)
 	Seed               []byte `json:"seed"`      // Marshaled BLS signature or hash of the previous block seed (32 bytes)

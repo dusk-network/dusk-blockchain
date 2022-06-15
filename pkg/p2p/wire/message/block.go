@@ -109,6 +109,10 @@ func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
+	if err := encoding.WriteUint64LE(r, h.GasLimit); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -163,6 +167,10 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 
 	h.GeneratorBlsPubkey = make([]byte, 96)
 	if err := encoding.ReadBLSPKey(r, h.GeneratorBlsPubkey); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint64LE(r, &h.GasLimit); err != nil {
 		return err
 	}
 

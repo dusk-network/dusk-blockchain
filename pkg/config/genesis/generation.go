@@ -48,6 +48,7 @@ func Generate(c Config) *block.Block {
 		Seed:               c.seed,
 		Certificate:        block.EmptyCertificate(),
 		StateHash:          state_root,
+		GasLimit:           0,
 	}
 
 	b := &block.Block{
