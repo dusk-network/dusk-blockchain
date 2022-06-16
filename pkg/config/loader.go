@@ -85,8 +85,6 @@ type Registry struct {
 // Dusk configuration file can be in form of TOML, JSON, YAML, HCL or Java
 // properties config files.
 func Load(configFileName string, secondary interface{}, customflags func() (string, error)) error {
-	r = new(Registry)
-	r.lock = new(sync.RWMutex)
 	r.ConfigFileName = configFileName
 
 	r.loadFlagsFn = loadFlags
