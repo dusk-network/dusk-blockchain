@@ -217,5 +217,6 @@ type consensusConfiguration struct {
 
 type stateConfiguration struct {
 	// PersistEvery N blocks the state in rusk
-	PersistEvery uint64
+	PersistEvery  uint64
+	BlockGasLimit uint64
 }

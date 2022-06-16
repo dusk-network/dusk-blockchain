@@ -114,8 +114,8 @@ func (bg *generator) Generate(seed []byte, keys [][]byte, r consensus.RoundUpdat
 	return bg.GenerateBlock(r.Round, seed, r.Hash, r.Timestamp, keys)
 }
 
-func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCall, round uint64) ([]transactions.ContractCall, []byte, error) {
-	txs, stateHash, err := bg.executeFn(ctx, txs, round, bg.Keys.BLSPubKey)
+func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCall, round uint64, gasLimit uint64) ([]transactions.ContractCall, []byte, error) {
+	txs, stateHash, err := bg.executeFn(ctx, txs, round, gasLimit, bg.Keys.BLSPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -162,7 +162,9 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, pre
 		return nil, err
 	}
 
-	txs, stateHash, err := bg.execute(context.Background(), txs, round)
+	blockGasLimit := config.Get().State.BlockGasLimit
+
+	txs, stateHash, err := bg.execute(context.Background(), txs, round, blockGasLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +191,7 @@ func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, pre
 		Seed:               seed,
 		Certificate:        block.EmptyCertificate(),
 		StateHash:          stateHash,
-		GasLimit:           config.BlockGasLimit,
+		GasLimit:           blockGasLimit,
 	}
 
 	// Construct the candidate block

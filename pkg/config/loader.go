@@ -262,4 +262,5 @@ func init() {
 	r.Timeout.TimeoutBrokerGetCandidate = 2
 	r.Mempool.MaxInvItems = 10000
 	r.State.PersistEvery = 1
+	r.State.BlockGasLimit = DefaultBlockGasLimit
 }
