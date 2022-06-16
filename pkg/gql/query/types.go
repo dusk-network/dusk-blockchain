@@ -36,7 +36,10 @@ var Header = graphql.NewObject(
 		Name: "Header",
 		Fields: graphql.Fields{
 			"height": &graphql.Field{
-				Type: graphql.Int,
+				Type: graphql.Float,
+			},
+			"gaslimit": &graphql.Field{
+				Type: graphql.Float,
 			},
 			"hash": &graphql.Field{
 				Type: Hex,
