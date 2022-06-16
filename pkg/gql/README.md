@@ -71,6 +71,7 @@ NB: The examples from below represent only query structures. To send a query as 
       generatorblspubkey  # BLS key of the block generator
       hash                # Block hash
       height              # Block height
+      gaslimit            # Block gas limit
       prevblockhash       # Previous block hash
       reward              # Total block reward. Includes fees and minted dusk
       seed                # Seed of the block

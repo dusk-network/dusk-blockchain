@@ -18,6 +18,7 @@ func TestBlocksByHeight(t *testing.T) {
 			header {
 			   height
 			   reward
+			   gaslimit
 			   feespaid
 			}
 		  },
@@ -25,6 +26,7 @@ func TestBlocksByHeight(t *testing.T) {
 			header {
 			   height
 			   reward
+			   gaslimit
 			   feespaid
 			}
 		  }
@@ -38,6 +40,7 @@ func TestBlocksByHeight(t *testing.T) {
 				"header":{  
 				  "height":0,
 				  "feespaid":0,
+				  "gaslimit":0,
 				  "reward":0
 				}
 			  }
@@ -47,6 +50,7 @@ func TestBlocksByHeight(t *testing.T) {
 				"header":{  
 				  "height":2,
 				  "feespaid":0,
+				  "gaslimit":0,
 				  "reward":16000000000
 				}
 			  }
