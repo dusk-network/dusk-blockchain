@@ -438,7 +438,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			blk.Txs,
 			tipBlk.Header.StateHash,
 			blk.Header.Height,
-			config.BlockGasLimit,
+			blk.Header.GasLimit,
 			blk.Header.GeneratorBlsPubkey)
 		if err != nil {
 			l.WithError(err).
@@ -452,7 +452,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			blk.Txs,
 			tipBlk.Header.StateHash,
 			blk.Header.Height,
-			config.BlockGasLimit, blk.Header.GeneratorBlsPubkey)
+			blk.Header.GasLimit, blk.Header.GeneratorBlsPubkey)
 		if err != nil {
 			l.WithError(err).
 				WithField("grpc", "accept").
@@ -682,7 +682,7 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 		return err
 	}
 
-	stateRoot, err = c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, config.BlockGasLimit, blk.Header.Height, blk.Header.GeneratorBlsPubkey)
+	stateRoot, err = c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, blk.Header.GasLimit, blk.Header.Height, blk.Header.GeneratorBlsPubkey)
 	if err != nil {
 		return err
 	}
