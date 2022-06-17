@@ -22,7 +22,7 @@ import (
 // as they would be different per network type. Once a genesis block is
 // approved, its hex blob should be copied into config.TestNetGenesisBlob.
 func GenerateGenesisBlock(e *consensus.Emitter) (string, error) {
-	f := func(ctx context.Context, txs []transactions.ContractCall, bh uint64, generator []byte) ([]transactions.ContractCall, []byte, error) {
+	f := func(ctx context.Context, txs []transactions.ContractCall, bh uint64, gasLimit uint64, generator []byte) ([]transactions.ContractCall, []byte, error) {
 		return txs, make([]byte, 32), nil
 	}
 

@@ -94,7 +94,7 @@ func (v *verifier) Preverify(ctx context.Context, call ContractCall) ([]byte, Fe
 		return nil, Fee{}, decodeErr
 	}
 
-	if decoded.Fee.GasLimit >= config.BlockGasLimit {
+	if decoded.Fee.GasLimit >= config.Get().State.BlockGasLimit {
 		return nil, Fee{}, errors.New("tx gas limit exceeds the block gas limit")
 	}
 

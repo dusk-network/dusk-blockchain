@@ -25,7 +25,7 @@ func TestGenerate(t *testing.T) {
 
 	hlp := candidate.NewHelper(50, time.Second)
 
-	fn := func(ctx context.Context, txs []transactions.ContractCall, h uint64, generator []byte) ([]transactions.ContractCall, []byte, error) {
+	fn := func(ctx context.Context, txs []transactions.ContractCall, h uint64, gaslimit uint64, generator []byte) ([]transactions.ContractCall, []byte, error) {
 		return []transactions.ContractCall{transactions.RandTx()}, make([]byte, 32), nil
 	}
 

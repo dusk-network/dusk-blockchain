@@ -698,8 +698,8 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 }
 
 // ExecuteStateTransition calls Rusk ExecuteStateTransitiongrpc method.
-func (c *Chain) ExecuteStateTransition(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64, generator []byte) ([]transactions.ContractCall, []byte, error) {
-	return c.proxy.Executor().ExecuteStateTransition(c.ctx, txs, config.BlockGasLimit, blockHeight, generator)
+func (c *Chain) ExecuteStateTransition(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64, blockGasLimit uint64, generator []byte) ([]transactions.ContractCall, []byte, error) {
+	return c.proxy.Executor().ExecuteStateTransition(c.ctx, txs, blockGasLimit, blockHeight, generator)
 }
 
 // propagateBlock send inventory message to all peers in gossip network or rebroadcast block in kadcast network.

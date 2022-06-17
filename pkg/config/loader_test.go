@@ -40,6 +40,10 @@ func TestDefaultConfigTOML(t *testing.T) {
 	if Get().Logger.Level != "debug" { //nolint
 		t.Error("Invalid logger level")
 	}
+
+	if Get().State.BlockGasLimit != DefaultBlockGasLimit { //nolint
+		t.Errorf("Invalid block gas limit: %d", Get().State.BlockGasLimit)
+	}
 }
 
 // TestSupportedFlags to ensure all supported flags are properly bound and they
