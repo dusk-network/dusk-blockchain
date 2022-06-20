@@ -193,3 +193,17 @@ func UnmarshalTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDe
 
 	return nil
 }
+
+// EstimatedGasSpent return the estimated amount of Gas that a transaction will
+// spend. For now it uses `t.Call` to determine if it's a normal transfer or it
+// is an intercontract call.
+// TODO: further improvement should take care of the contractAddress to compare
+// it against historical data.
+func (p *TransactionPayloadDecoded) EstimatedGasSpent() uint64 {
+	if p.Call == nil {
+		// This is a normal transfer transaction
+		return 300_000_000
+	}
+	// This is an inter-contract call
+	return 1_200_000_000
+}

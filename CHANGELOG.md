@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mempool discards any transaction with repeated nullifier [#1388]
 
 ### Changed
+- Extraction from mempool consider Gas expenditure estimation [#1421]
 - Add GasLimit to the Block's header [#1416]
 - Reduce wire messages needed for propagating an Agreement vote
 - Improve fallback procedure to revert multiple ephemeral blocks [#1343]
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Default configuration values loading [#1419] 
 
+[#1421]: (https://github.com/dusk-network/dusk-blockchain/issues/1421)
 [#1419]: (https://github.com/dusk-network/dusk-blockchain/issues/1419)
 [#1418]: (https://github.com/dusk-network/dusk-blockchain/issues/1418)
 [#1416]: (https://github.com/dusk-network/dusk-blockchain/issues/1416)

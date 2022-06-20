@@ -436,6 +436,7 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 // processGetMempoolTxsBySizeRequest returns a subset of verified mempool txs which
 // 1. contains only highest fee txs
 // 2. has total txs size not bigger than maxTxsSize (request param)
+// 3. has total txs EstimatedGasSpent not bigger than BlockGasLimit+10%
 // Called by BlockGenerator on generating a new candidate block.
 func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{}, error) {
 	// Read maxTxsSize param
@@ -447,18 +448,40 @@ func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{
 	}
 
 	txs := make([]transactions.ContractCall, 0)
+	gasLimit := config.Get().State.BlockGasLimit
+	// The slippageGasLimit is the threshold that consider the "estimated gas
+	// spent" acceptable even if it exceeds the strict GasLimit. This is
+	// required to avoid to iterate the whole meempol until it fit perfectly
+	// the block GasLimit
+	slippageGasLimit := gasLimit + gasLimit/10
 
 	var totalSize uint32
+	var totalGas uint64
 
 	err := m.verified.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-		var done bool
-		totalSize += uint32(t.size)
+		decoded, err := t.tx.Decode()
+		if err != nil {
+			// Cannot decode, skip the tx.
+			// This should never happen, keeping `err` to log it properly`
+			return false, err
+		}
 
+		totalGas += decoded.EstimatedGasSpent()
+		if totalGas > slippageGasLimit {
+			// Total gas exceeded the slippage threshold, skip the tx
+			return false, nil
+		}
+
+		totalSize += uint32(t.size)
 		if totalSize <= maxTxsSize {
 			txs = append(txs, t.tx)
-		} else {
-			done = true
 		}
+
+		// We stop to iterate the mempool if:
+		// 1. The totalGas exceeded the gasLimit (but still below the slippage
+		// threshold)
+		// 2. The totalSize exceeds the limit
+		done := totalGas >= gasLimit || totalSize >= maxTxsSize
 
 		return done, nil
 	})
