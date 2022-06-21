@@ -6,8 +6,6 @@
 
 package config
 
-import "time"
-
 // A single point of constants definition.
 const (
 	// DUSK is one whole unit of DUSK.
@@ -40,7 +38,7 @@ const (
 
 	// Consensus-related settings
 	// Protocol-based consensus step time.
-	ConsensusTimeOut = 5 * time.Second
+	DefaultConsensusTimeOutSeconds = 5
 
 	// ConsensusTimeThreshold consensus time in seconds above which we don't throttle it.
 	ConsensusTimeThreshold = 10

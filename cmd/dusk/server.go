@@ -141,7 +141,7 @@ func Setup() *Server {
 		EventBus:    eventBus,
 		RPCBus:      rpcBus,
 		Keys:        keys,
-		TimerLength: cfg.ConsensusTimeOut,
+		TimerLength: time.Duration(cfg.Get().Consensus.ConsensusTimeOut) * time.Second,
 	}
 
 	cl := loop.New(e)
