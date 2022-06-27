@@ -86,8 +86,9 @@ address="monitor.dusk.network:1337"
 
 # Kadcast peer settings
 [kadcast]
-# if disabled, gossip protocol is active
-enabled=false
+enabled=true
+# Back pressure on one-to-one messaging
+limit = "50ms"
 
 # grpc client connection config
 [kadcast.grpc]

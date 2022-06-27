@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -25,14 +26,10 @@ type SendToMany struct {
 
 // NewSendToMany ...
 func NewSendToMany(ctx context.Context, s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient) ring.Writer {
+	l := config.Get().Kadcast.Limit
+
 	w := &SendToMany{
-		Base: Base{
-			subscriber: s,
-			gossip:     g,
-			client:     rusk,
-			ctx:        ctx,
-			topic:      topics.KadcastSendToMany,
-		},
+		Base: newBaseWithLimiter(ctx, s, g, rusk, topics.KadcastSendToMany, l),
 	}
 
 	w.Subscribe()

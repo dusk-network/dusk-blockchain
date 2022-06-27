@@ -67,7 +67,9 @@ type clientConfiguration struct {
 }
 
 type kadcastConfiguration struct {
-	Enabled       bool
+	Enabled bool
+	Limit   string
+
 	Address       string
 	BootstrapAddr []string
 

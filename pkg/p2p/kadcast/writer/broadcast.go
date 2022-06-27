@@ -28,13 +28,7 @@ type Broadcast struct {
 // NewBroadcast ...
 func NewBroadcast(ctx context.Context, s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient) ring.Writer {
 	b := &Broadcast{
-		Base: Base{
-			subscriber: s,
-			gossip:     g,
-			client:     rusk,
-			ctx:        ctx,
-			topic:      topics.Kadcast,
-		},
+		Base: newBase(ctx, s, g, rusk, topics.Kadcast),
 	}
 
 	b.Subscribe()

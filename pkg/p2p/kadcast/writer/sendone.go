@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -25,14 +26,10 @@ type SendToOne struct {
 
 // NewSendToOne ...
 func NewSendToOne(ctx context.Context, s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient) ring.Writer {
+	l := config.Get().Kadcast.Limit
+
 	w := &SendToOne{
-		Base: Base{
-			subscriber: s,
-			gossip:     g,
-			client:     rusk,
-			ctx:        ctx,
-			topic:      topics.KadcastSendToOne,
-		},
+		Base: newBaseWithLimiter(ctx, s, g, rusk, topics.KadcastSendToOne, l),
 	}
 
 	w.Subscribe()

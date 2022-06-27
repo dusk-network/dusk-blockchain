@@ -10,12 +10,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
@@ -36,6 +38,34 @@ type Base struct {
 	ctx            context.Context
 
 	topic topics.Topic
+
+	limiter *rate.Limiter
+}
+
+func newBase(ctx context.Context, s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient, t topics.Topic) Base {
+	return Base{
+		subscriber: s,
+		gossip:     g,
+		client:     rusk,
+		ctx:        ctx,
+		topic:      t,
+		limiter:    nil,
+	}
+}
+
+func newBaseWithLimiter(ctx context.Context, s eventbus.Subscriber, g *protocol.Gossip, rusk rusk.NetworkClient, t topics.Topic, limit string) Base {
+	b := newBase(ctx, s, g, rusk, t)
+
+	if len(limit) > 0 {
+		timeout, err := time.ParseDuration(limit)
+		if err != nil {
+			log.WithError(err).Error("could not parse kadcast limit")
+		}
+
+		b.limiter = rate.NewLimiter(rate.Every(timeout), 1)
+	}
+
+	return b
 }
 
 // Send is a wrapper of rusk.NetworkClient Send method.
@@ -56,6 +86,12 @@ func (b *Base) Send(data []byte, addr string) error {
 	m := &rusk.SendMessage{
 		TargetAddress: addr,
 		Message:       blob.Bytes(),
+	}
+
+	if b.limiter != nil {
+		if err := b.limiter.WaitN(b.ctx, 1); err != nil {
+			return err
+		}
 	}
 
 	// send message
