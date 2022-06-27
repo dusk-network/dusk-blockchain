@@ -427,7 +427,11 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 	}
 
 	provisionersCount = c.p.Set.Len()
-	l.WithField("prov", provisionersCount).Info("run state transition")
+	eligibleProvisioners := c.p.SubsetSizeAt(c.tip.Header.Height)
+
+	l.WithField("prov", provisionersCount).
+		WithField("e_prov", eligibleProvisioners).
+		Info("run state transition")
 
 	var txs []transactions.ContractCall
 
@@ -490,10 +494,11 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 	// Update the provisioners.
 	// blk.Txs may bring new provisioners to the current state
 	c.p = &provisionersUpdated
+	eligibleProvisioners = c.p.SubsetSizeAt(c.tip.Header.Height + 1)
 
 	l.WithField("prov", c.p.Set.Len()).
 		WithField("added", c.p.Set.Len()-provisionersCount).
-		WithField("state_hash", util.StringifyBytes(respStateHash)).
+		WithField("state_hash", util.StringifyBytes(respStateHash)).WithField("e_prov", eligibleProvisioners).
 		Info("state transition completed")
 
 	return &blk, nil
