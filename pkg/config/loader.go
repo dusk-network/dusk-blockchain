@@ -256,7 +256,7 @@ func init() {
 	r.Wallet.Store = "walletDB"
 	r.Consensus.DefaultLockTime = 1000
 	r.Consensus.DefaultAmount = 10
-	r.Consensus.ConsensusTimeOut = 5
+	r.Consensus.ConsensusTimeOut = DefaultConsensusTimeOutSeconds
 	r.Timeout.TimeoutBrokerGetCandidate = 2
 	r.Mempool.MaxInvItems = 10000
 	r.State.PersistEvery = 1

@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"sync/atomic"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -92,12 +93,14 @@ func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan cons
 
 func (c *Chain) asyncSpin(ctx context.Context, winnerChan chan consensus.Results) error {
 	ru := c.getRoundUpdate()
+	consensusTimeOut := time.Duration(config.Get().Consensus.ConsensusTimeOut) * time.Second
 
 	log.WithField("round", ru.Round).
+		WithField("timeout", consensusTimeOut).
 		WithField("prov_size", ru.P.Set.Len()).Debug("start consensus_spin")
 
 	if c.loop != nil {
-		scr, agr, err := c.loop.CreateStateMachine(c.db, config.ConsensusTimeOut, c.VerifyCandidateBlock, c.ExecuteStateTransition)
+		scr, agr, err := c.loop.CreateStateMachine(c.db, consensusTimeOut, c.VerifyCandidateBlock, c.ExecuteStateTransition)
 		if err != nil {
 			log.WithError(err).Error("could not create consensus state machine")
 			return err
