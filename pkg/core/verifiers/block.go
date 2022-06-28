@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 )
 
@@ -77,13 +78,8 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 		return errors.New("unsupported block version")
 	}
 
-	calculatedHash, err := blk.CalculateHash()
-	if err != nil {
+	if err := CheckHash(&blk); err != nil {
 		return err
-	}
-
-	if !bytes.Equal(blk.Header.Hash, calculatedHash) {
-		return ErrInvalidBlockHash
 	}
 
 	// blk.Headerhash = prevHeaderHash
@@ -109,6 +105,20 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 
 	if len(blk.Header.StateHash) != 32 {
 		return errors.New("invalid state hash")
+	}
+
+	return nil
+}
+
+// CheckHash ensures that provided Header.Hash is valid.
+func CheckHash(blk *block.Block) error {
+	hash, err := blk.CalculateHash()
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(hash, blk.Header.Hash) {
+		return ErrInvalidBlockHash
 	}
 
 	return nil

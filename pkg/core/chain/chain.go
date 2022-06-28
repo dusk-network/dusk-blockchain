@@ -241,10 +241,16 @@ func (c *Chain) syncWithRusk() error {
 func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
 	blk := m.Payload().(block.Block)
 
+	// Ensure the received block provides a valid hash
+	if err := verifiers.CheckHash(&blk); err != nil {
+		return nil, err
+	}
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	l := log.WithField("recv_blk_h", blk.Header.Height).WithField("curr_h", c.tip.Header.Height)
+	l := log.WithField("recv_blk_h", blk.Header.Height).
+		WithField("curr_h", c.tip.Header.Height)
 
 	var kh byte = 255
 	if len(m.Header()) > 0 {
