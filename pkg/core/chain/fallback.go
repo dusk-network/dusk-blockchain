@@ -177,3 +177,64 @@ func (c *Chain) resubmitTxs(txs []transactions.ContractCall) {
 		}
 	}
 }
+
+// isBlockFromFork returns true if a valid block from a fork is detected by
+// satisfying the following conditions.
+//
+// - block is from the past, in other words its height is lower than local tip height
+// - block hash does not exist in the local blockchain state
+// - block is valid to its predecessor fetched from local blockchain state.
+func (c *Chain) isBlockFromFork(b block.Block) (bool, error) {
+	var (
+		th = c.tip.Header.Height
+		rh = b.Header.Height
+		pb *block.Block
+	)
+
+	if rh >= th {
+		// block is not from the past
+		return false, nil
+	}
+
+	// Sanity-check if this block has been already accepted
+	var exists bool
+
+	_ = c.db.View(func(t database.Transaction) error {
+		exists, _ = t.FetchBlockExists(b.Header.Hash)
+		return nil
+	})
+
+	if exists {
+		// block already exists in local blockchain state
+		return false, nil
+	}
+
+	// Fetch the predecessor block of the received one
+	err := c.db.View(func(t database.Transaction) error {
+		var e error
+		h, e := t.FetchBlockHashByHeight(b.Header.Height - 1)
+		if e != nil {
+			return e
+		}
+
+		pb, e = t.FetchBlock(h)
+		if e != nil {
+			return e
+		}
+
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	// A weak assumption is made here that provisioners state has not changed
+	// since recvBlk.Header.Height
+
+	err = c.isValidBlock(b, *pb, *c.p, log, true)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}

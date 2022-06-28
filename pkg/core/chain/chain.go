@@ -44,7 +44,7 @@ var (
 )
 
 // ErrBlockAlreadyAccepted block already known by blockchain state.
-var ErrBlockAlreadyAccepted = errors.New("discarded block from the past")
+var ErrBlockAlreadyAccepted = errors.New("already accepted")
 
 // TODO: This Verifier/Loader interface needs to be re-evaluated and most likely
 // renamed. They don't make too much sense on their own (the `Loader` also
@@ -260,10 +260,10 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 
 	l.Trace("block received")
 
-	hash := blk.Header.Hash
+	h := blk.Header.Hash
 
-	if c.blacklisted.Has(bytes.NewBuffer(hash)) {
-		log.WithField("hash", util.StringifyBytes(hash)).Warn("filter out blacklisted block")
+	if c.blacklisted.Has(bytes.NewBuffer(h)) {
+		log.WithField("hash", util.StringifyBytes(h)).Warn("filter out blacklisted block")
 		return nil, nil
 	}
 
@@ -272,7 +272,7 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 		{
 			// Check if we already accepted this block
 			if bytes.Equal(blk.Header.Hash, c.tip.Header.Hash) {
-				l.WithError(ErrBlockAlreadyAccepted).Debug("failed block processing")
+				l.WithError(ErrBlockAlreadyAccepted).Debug("discard block")
 				return nil, nil
 			}
 
@@ -292,7 +292,21 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 			return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kh)
 		}
 	case blk.Header.Height < c.tip.Header.Height:
-		l.WithError(ErrBlockAlreadyAccepted).Debug("failed block processing")
+		l.Debug("discard block")
+
+		// Due to a network glitch, the fallback procedure may be skipped.
+		// In this case, network may continue on a branch with higher cert_step value.
+		// Here we try to detect the above edge case.
+		if res, err := c.isBlockFromFork(blk); err != nil {
+			l.WithError(err).Warn("invalid block")
+		} else {
+			if res {
+				l.WithField("recv_blk_step", blk.Header.Certificate.Step).
+					WithField("recv_blk_hash", hex.EncodeToString(h)).
+					WithField("event", "fallback").Error("fork detected")
+			}
+		}
+
 		return nil, nil
 	}
 
