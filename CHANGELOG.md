@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Search txs up to 10.000 blocks [#1401]
 - Mempool updates its state at start-up automatically [#1258]
 - Mempool discards any transaction with repeated nullifier [#1388]
+- Detect any occurrences of missed fallback procedure [#1413] 
 
 ### Changed
 - Extraction from mempool consider Gas expenditure estimation [#1421]
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disable provisioners records storing in api.db  [#1361]
 - Optimize VST calls of a Provisioner per a consensus iteration [#1371]
 - Call VerifyStateTransition in Reduction 2 only if it is a committee member [#1357]
+- Drop topics.Block messages with invalid header.hash value [#1425]
 
 ### Security
 - Ensure candidate block hash is equal to the BlockHash of the msg.header [#1364]

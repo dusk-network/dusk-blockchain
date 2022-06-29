@@ -249,10 +249,16 @@ func (p *Phase) requestCandidate(ctx context.Context, hash []byte) (block.Block,
 	// Ensure we release the resources associated to this context.
 	defer cancel()
 
+	lg.WithField("hash", util.StringifyBytes(hash)).Info("request candidate block")
+
 	cm, err := p.requestor.RequestCandidate(ctx, hash)
 	if err != nil {
+		lg.WithField("hash", util.StringifyBytes(hash)).WithError(err).
+			Warn("failed to receive candidate block")
 		return block.Block{}, err
 	}
+
+	lg.WithField("hash", util.StringifyBytes(hash)).Info("candidate block received")
 
 	// Store candidate for later use
 	if err := p.storeCandidate(cm); err != nil {

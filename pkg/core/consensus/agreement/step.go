@@ -212,10 +212,16 @@ func (s *Loop) createWinningBlock(ctx context.Context, hash []byte, cert *block.
 		return err
 	})
 	if err != nil {
+		lg.WithField("hash", util.StringifyBytes(hash)).Info("request candidate block")
+
 		cm, err = s.requestCandidate(ctx, hash)
 		if err != nil {
+			lg.WithField("hash", util.StringifyBytes(hash)).WithError(err).
+				Warn("failed to receive candidate block")
 			return block.Block{}, err
 		}
+
+		lg.WithField("hash", util.StringifyBytes(hash)).Info("candidate block received")
 	}
 
 	cm.Header.Certificate = cert
