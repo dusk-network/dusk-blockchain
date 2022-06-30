@@ -59,6 +59,9 @@ const (
 
 	// RuskVersion is the version of the supported rusk binary.
 	RuskVersion = "0.5.0"
+
+	// GetCandidateReceivers is a redundancy factor on retrieving a missing candidate block.
+	GetCandidateReceivers = 7
 )
 
 // KadcastInitHeader is used as default initial kadcast message header.

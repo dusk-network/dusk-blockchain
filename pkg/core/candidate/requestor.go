@@ -61,7 +61,7 @@ func (r *Requestor) RequestCandidate(ctx context.Context, hash []byte) (block.Bl
 	r.setRequesting(true)
 	defer r.setRequesting(false)
 
-	if err := r.publishGetCandidate(hash); err != nil {
+	if err := r.sendGetCandidate(hash); err != nil {
 		return block.Block{}, nil
 	}
 
@@ -78,6 +78,7 @@ func (r *Requestor) RequestCandidate(ctx context.Context, hash []byte) (block.Bl
 	}
 }
 
+//nolint
 func (r *Requestor) publishGetCandidate(hash []byte) error {
 	// Send a request for this specific candidate
 	buf := bytes.NewBuffer(hash)
@@ -89,6 +90,20 @@ func (r *Requestor) publishGetCandidate(hash []byte) error {
 	m := message.NewWithHeader(topics.GetCandidate, *buf, config.KadcastInitHeader)
 
 	r.publisher.Publish(topics.Kadcast, m)
+	return nil
+}
+
+// sendGetCandidate send topics.GetCandidate request to arbitrary active nodes
+// for retrieving a candidate block of a specified hash.
+func (r *Requestor) sendGetCandidate(hash []byte) error {
+	// Send a request for this specific candidate
+	buf := bytes.NewBuffer(hash)
+	if err := topics.Prepend(buf, topics.GetCandidate); err != nil {
+		return err
+	}
+
+	msg := message.NewWithHeader(topics.GetCandidate, buf, []byte{config.GetCandidateReceivers})
+	r.publisher.Publish(topics.KadcastSendToMany, msg)
 	return nil
 }
 
