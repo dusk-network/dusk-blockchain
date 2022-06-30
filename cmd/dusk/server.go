@@ -92,7 +92,7 @@ func Setup() *Server {
 
 	grpcServer, err := server.SetupGRPC(server.FromCfg())
 	if err != nil {
-		log.Panic(err)
+		log.Debug(err)
 	}
 
 	_ = newConfigService(grpcServer)

@@ -53,8 +53,6 @@ func action(ctx *cli.Context) error {
 		log.WithError(err).Fatal("Could not load config ")
 	}
 
-	port := cfg.Get().Network.Port
-
 	rand.Seed(time.Now().UnixNano())
 
 	// Set up logging.
@@ -63,7 +61,7 @@ func action(ctx *cli.Context) error {
 
 	output := cfg.Get().Logger.Output
 	if output != "stdout" {
-		logFile, err = os.Create(output + port + ".log")
+		logFile, err = os.Create(output + ".log")
 		if err != nil {
 			log.Panic(err)
 		}

@@ -49,7 +49,7 @@ func action(ctx *cli.Context) error {
 	processor.Register(topics.Pong, responding.ProcessPong)
 
 	port := ctx.Int(portFlag.Name)
-	c := peer.NewConnector(eb, protocol.NewGossip(), strconv.Itoa(port), processor, protocol.VoucherNode, challenger.SendChallenge)
+	c := peer.NewConnector(eb, protocol.NewGossip(), strconv.Itoa(port), processor, protocol.FullNode, challenger.SendChallenge)
 
 	log.
 		WithField("port", port).

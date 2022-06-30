@@ -64,13 +64,6 @@ type GossipConnector struct {
 
 func (g *GossipConnector) Write(b, header []byte, priority byte) (int, error) {
 	if !canRoute(g.services, topics.Topic(b[0])) {
-		if g.services != protocol.VoucherNode {
-			l.WithField("topic", topics.Topic(b[0]).String()).
-				WithField("service flag", g.services).
-				WithField("r_addr", g.RemoteAddr().String()).
-				Trace("dropping message")
-		}
-
 		return 0, nil
 	}
 

@@ -18,7 +18,6 @@ import (
 
 	j "encoding/json"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-crypto/hash"
 )
@@ -65,7 +64,9 @@ func RegisterWireMsg(networkType string, rawdata []byte) {
 		}
 
 		// notify monitoring
-		addr := cfg.Get().Network.Port
+		// addr := cfg.Get().Network.Port
+		addr := "unknown"
+
 		msgID := networkType + "_" + category.String() + "_" + hex.EncodeToString(digest)
 
 		sendNote(msgID, addr, uint64(recv_at))

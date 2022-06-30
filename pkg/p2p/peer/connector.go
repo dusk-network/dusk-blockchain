@@ -55,7 +55,8 @@ type Connector struct {
 // accept incoming connection requests on the current address, with the given port.
 func NewConnector(eb eventbus.Broker, gossip *protocol.Gossip, port string,
 	processor *MessageProcessor, services protocol.ServiceFlag,
-	connectFunc connectFunc) *Connector {
+	connectFunc connectFunc,
+) *Connector {
 	addrPort := ":" + port
 
 	listener, err := net.Listen("tcp", addrPort)
@@ -127,7 +128,7 @@ func (c *Connector) logPeerCount() {
 // ProcessNewAddress will handle a new Addr message from the network.
 // Satisfies the peer.ProcessorFunc interface.
 func (c *Connector) ProcessNewAddress(srcPeerID string, m message.Message) ([]bytes.Buffer, error) {
-	maxConn := config.Get().Network.MaxConnections
+	maxConn := 0
 	if maxConn == 0 {
 		maxConn = defaultMaxConnections
 	}
@@ -247,17 +248,6 @@ func (c *Connector) removePeer(address string) {
 				plog.Error("failed to Delete peerCount into StormDB")
 			}
 		}()
-	}
-
-	// Ensure we are still above the minimum connections threshold.
-	if len(c.registry) < config.Get().Network.MinimumConnections {
-		buf := new(bytes.Buffer)
-		if err := topics.Prepend(buf, topics.GetAddrs); err != nil {
-			plog.WithError(err).
-				Panic("could not create topic buffer")
-		}
-
-		c.eventBus.Publish(topics.Gossip, message.New(topics.GetAddrs, *buf))
 	}
 }
 

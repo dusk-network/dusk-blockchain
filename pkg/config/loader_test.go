@@ -75,10 +75,6 @@ func TestSupportedFlags(t *testing.T) {
 	if Get().Logger.Output != "modified" {
 		t.Errorf("Invalid logger output %s", Get().Logger.Output)
 	}
-
-	if Get().Network.Port != "9876" {
-		t.Errorf("Invalid network port %s", Get().Network.Port)
-	}
 }
 
 // TestSupportedEnv

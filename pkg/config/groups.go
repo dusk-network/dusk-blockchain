@@ -7,10 +7,7 @@
 package config
 
 type generalConfiguration struct {
-	Network              string
-	WalletOnly           bool
-	SafeCallbackListener bool
-	TestHarness          bool
+	Network string
 }
 
 type timeoutConfiguration struct {
@@ -47,15 +44,8 @@ type logMonitorConfiguration struct {
 }
 
 type networkConfiguration struct {
-	Seeder  seedersConfiguration
-	Monitor monitorConfiguration
-	Port    string
-
 	MaxDupeMapItems  uint32
 	MaxDupeMapExpire uint32
-
-	MinimumConnections int
-	MaxConnections     int
 
 	ServiceFlag uint8
 }
@@ -74,26 +64,10 @@ type kadcastConfiguration struct {
 	Grpc clientConfiguration
 }
 
-type monitorConfiguration struct {
-	Address string
-	Enabled bool
-}
-
-type seedersConfiguration struct {
-	Addresses []string
-	Fixed     []string
-}
-
 // pkg/core/database package configs.
 type databaseConfiguration struct {
 	Driver string
 	Dir    string
-}
-
-// wallet configs.
-type walletConfiguration struct {
-	File  string
-	Store string
 }
 
 // pprof configs.
@@ -200,8 +174,6 @@ type consensusConfiguration struct {
 	// if file does not exist, it will be created at startup.
 	KeysFile string
 
-	DefaultLockTime uint64
-	DefaultAmount   uint64
 	// ConsensusTimeOut is the time out for consensus step timers.
 	ConsensusTimeOut int64
 	// UseCompressedKeys determines if AggregatePks works with compressed or uncompressed pks.

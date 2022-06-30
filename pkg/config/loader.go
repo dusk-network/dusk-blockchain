@@ -54,7 +54,6 @@ type Registry struct {
 	General   generalConfiguration
 	Timeout   timeoutConfiguration
 	Database  databaseConfiguration
-	Wallet    walletConfiguration
 	Network   networkConfiguration
 	Kadcast   kadcastConfiguration
 	Mempool   mempoolConfiguration
@@ -252,10 +251,6 @@ func init() {
 	r.lock = new(sync.RWMutex)
 	r.Database.Driver = "lite_v0.1.0"
 	r.General.Network = devnet
-	r.Wallet.File = "wallet.dat"
-	r.Wallet.Store = "walletDB"
-	r.Consensus.DefaultLockTime = 1000
-	r.Consensus.DefaultAmount = 10
 	r.Consensus.ConsensusTimeOut = DefaultConsensusTimeOutSeconds
 	r.Timeout.TimeoutBrokerGetCandidate = 2
 	r.Mempool.MaxInvItems = 10000
