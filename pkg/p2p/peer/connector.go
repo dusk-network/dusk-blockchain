@@ -155,10 +155,7 @@ func (c *Connector) Connect(addr string) error {
 
 // Dial dials up a connection, given its address string.
 func (c *Connector) Dial(addr string) (net.Conn, error) {
-	t := config.Get().Timeout.TimeoutDial
-	if t == 0 {
-		t = defaultDialTimeout
-	}
+	t := defaultDialTimeout
 
 	dialTimeout := time.Duration(t) * time.Second
 

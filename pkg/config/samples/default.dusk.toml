@@ -135,6 +135,11 @@ consensustimeout = 5
 # useCompressedKeys determines if AggregatePks works with compressed or uncompressed pks.
 useCompressedKeys = false
 
+# Timeout cfg for rpcBus calls
+[timeout]
+  timeoutgetmempooltxsbysize = 4
+  timeoutgetmempooltxs = 3
+
 [api]
 # enable consensus API service
 enabled = false
@@ -143,27 +148,6 @@ enabletls = false
 address="127.0.0.1:9199"
 #5 mins
 expirationtime=300
-
-# Timeout cfg for rpcBus calls
-[timeout]
-timeoutgetlastcommittee = 5
-timeoutgetlastcertificate = 5
-timeoutgetmempooltxsbysize = 4
-timeoutgetlastblock = 5
-timeoutgetcandidate = 5
-timeoutclearwalletdatabase = 0
-timeoutverifycandidateblock = 5
-timeoutsendstaketx = 5
-timeoutgetmempooltxs = 3
-timeoutgetroundresults = 5
-timeoutbrokergetcandidate = 2
-timeoutdial = 5
-
-# timeoutkeepalivetime must be always smaller than timeoutreadwrite
-# otherwise the node will disconnect due to read timeout error
-timeoutreadwrite = 60
-timeoutkeepalivetime = 30
-
 
 # gRPC API service
 [rpc]

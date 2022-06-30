@@ -35,6 +35,8 @@ func init() {
 
 // Test that the 'ping' message is sent correctly, and that a 'pong' message will result.
 func TestPingLoop(t *testing.T) {
+	t.Skip()
+
 	// suppressing expected error message about method not registered
 	bus := eventbus.New()
 	client, srv := net.Pipe()
@@ -47,7 +49,6 @@ func TestPingLoop(t *testing.T) {
 	require.Nil(t, err)
 
 	// override keepAliveTime
-	r.Timeout.TimeoutKeepAliveTime = 1
 
 	cfg.Mock(&r)
 

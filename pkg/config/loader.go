@@ -252,7 +252,6 @@ func init() {
 	r.Database.Driver = "lite_v0.1.0"
 	r.General.Network = devnet
 	r.Consensus.ConsensusTimeOut = DefaultConsensusTimeOutSeconds
-	r.Timeout.TimeoutBrokerGetCandidate = 2
 	r.Mempool.MaxInvItems = 10000
 	r.State.PersistEvery = 1
 	r.State.BlockGasLimit = DefaultBlockGasLimit
