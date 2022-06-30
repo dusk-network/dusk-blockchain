@@ -17,8 +17,10 @@ import (
 // configService implements handlers for node.ConfigService calls.
 // The service is about modifying specific config settings in runtime.
 // supported configs: logger.level.
+//nolint
 type configService struct{}
 
+//nolint
 func newConfigService(srv *grpc.Server) *configService {
 	cs := new(configService)
 

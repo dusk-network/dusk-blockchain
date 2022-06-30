@@ -33,7 +33,7 @@ func TestDefaultConfigTOML(t *testing.T) {
 		t.Errorf("Failed parse: %v", err)
 	}
 
-	if Get().General.Network != "devnet" { //nolint
+	if Get().General.Network != "testnet" { //nolint
 		t.Error("Invalid general/network value")
 	}
 

@@ -42,8 +42,6 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 	viper.Set("gql.notification.clientsPerBroker", "1000")
 	viper.Set("gql.enabled", "true")
 
-	viper.Set("rpc.network", node.Cfg.RPC.Network)
-
 	addr := node.Cfg.RPC.Rusk.Address
 	if node.Cfg.RPC.Rusk.Network == "unix" {
 		addr = node.Dir + node.Cfg.RPC.Rusk.Address
