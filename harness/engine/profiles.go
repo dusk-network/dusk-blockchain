@@ -76,36 +76,9 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 
 	viper.Set("state.persistevery", 100)
 
-	// blockgenerator.go
-	viper.Set("timeout.timeoutgetlastcommittee", 5)
-	// blockgenerator.go
-	viper.Set("timeout.timeoutgetlastcertificate", 5)
-	// blockgenerator.go
+	// internal rpc timeouts
 	viper.Set("timeout.timeoutgetmempooltxsbysize", 4)
-	// initiator.go
-	// sync.go
-	viper.Set("timeout.timeoutgetlastblock", 5)
-	// aggregator.go
-	// candidatebroker.go
-	// chain.go
-	viper.Set("timeout.timeoutgetcandidate", 5)
-	// chain.go
-	viper.Set("timeout.timeoutclearwalletdatabase", 0)
-	// aggregator.go
-	viper.Set("timeout.timeoutverifycandidateblock", 5)
-	// stakeautomaton.go
-	viper.Set("timeout.timeoutsendstaketx", 5)
-	// mempool.go datarequestor.go
 	viper.Set("timeout.timeoutgetmempooltxs", 3)
-	// roundresultsbroker.go
-	viper.Set("timeout.timeoutgetroundresults", 5)
-	// broker.go
-	viper.Set("timeout.timeoutbrokergetcandidate", 2)
-	// peer.go
-	viper.Set("timeout.timeoutreadwrite", 60)
-	// peer.go
-	viper.Set("timeout.timeoutkeepalivetime", 30)
-	viper.Set("timeout.timeoutdial", 5)
 }
 
 // Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing).
