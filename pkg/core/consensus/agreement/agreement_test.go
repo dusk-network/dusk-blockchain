@@ -79,7 +79,7 @@ func TestRequestor(t *testing.T) {
 
 	c := make(chan message.Message, 100)
 	l := eventbus.NewChanListener(c)
-	hlp.Emitter.EventBus.Subscribe(topics.Kadcast, l)
+	hlp.Emitter.EventBus.Subscribe(topics.KadcastSendToMany, l)
 
 	loop := agreement.New(hlp.Emitter, db, req)
 
