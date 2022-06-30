@@ -9,10 +9,13 @@ package responding
 import (
 	"bytes"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // CandidateBroker holds instances to RPCBus and responseChan.
@@ -43,6 +46,10 @@ func (c *CandidateBroker) ProvideCandidate(srcPeerID string, m message.Message) 
 	if err := message.MarshalBlock(candidateBytes, &cm); err != nil {
 		return nil, err
 	}
+
+	log.WithField("hash", util.StringifyBytes(msg.Hash)).
+		WithField("id", config.Get().Kadcast.Address).
+		Debug("provide candidate block")
 
 	if err := topics.Prepend(candidateBytes, topics.Candidate); err != nil {
 		return nil, err
