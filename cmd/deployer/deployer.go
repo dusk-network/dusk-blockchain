@@ -159,7 +159,6 @@ func (d *Deployer) startAll() error {
 	ps[1], err = startProcess(ruskPath, "mockrusk",
 		"--rusknetwork", conf.RPC.Rusk.Network,
 		"--ruskaddress", conf.RPC.Rusk.Address,
-		"--walletstore", conf.Wallet.Store, "--walletfile", conf.Wallet.File,
 		"--configfile", d.ConfigPath)
 
 	if err != nil {

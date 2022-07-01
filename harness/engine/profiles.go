@@ -28,46 +28,12 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 
 	viper.Reset()
 	viper.Set("general.network", "testnet")
-	viper.Set("general.walletonly", "false")
-	viper.Set("general.safecallbacklistener", "false")
 	viper.Set("general.testharness", "true")
 
 	viper.Set("network.serviceflag", 1)
-	viper.Set("network.maxconnections", 50)
-
-	// blockgenerator.go
-	viper.Set("timeout.timeoutgetlastcommittee", 5)
-	// blockgenerator.go
-	viper.Set("timeout.timeoutgetlastcertificate", 5)
-	// blockgenerator.go
-	viper.Set("timeout.timeoutgetmempooltxsbysize", 4)
-	// initiator.go
-	// sync.go
-	viper.Set("timeout.timeoutgetlastblock", 5)
-	// aggregator.go
-	// candidatebroker.go
-	// chain.go
-	viper.Set("timeout.timeoutgetcandidate", 5)
-	// chain.go
-	viper.Set("timeout.timeoutclearwalletdatabase", 0)
-	// aggregator.go
-	viper.Set("timeout.timeoutverifycandidateblock", 5)
-	// stakeautomaton.go
-	viper.Set("timeout.timeoutsendstaketx", 5)
-	// mempool.go datarequestor.go
-	viper.Set("timeout.timeoutgetmempooltxs", 3)
-	// roundresultsbroker.go
-	viper.Set("timeout.timeoutgetroundresults", 5)
-	// broker.go
-	viper.Set("timeout.timeoutbrokergetcandidate", 2)
-	// peer.go
-	viper.Set("timeout.timeoutreadwrite", 60)
-	// peer.go
-	viper.Set("timeout.timeoutkeepalivetime", 30)
-	viper.Set("timeout.timeoutdial", 5)
 
 	viper.Set("logger.output", node.Dir+"/dusk")
-	viper.Set("logger.level", "info")
+	viper.Set("logger.level", "debug")
 	viper.Set("logger.format", "json")
 
 	viper.Set("gql.address", node.Cfg.Gql.Address)
@@ -75,19 +41,6 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 	viper.Set("gql.notification.brokersNum", "1")
 	viper.Set("gql.notification.clientsPerBroker", "1000")
 	viper.Set("gql.enabled", "true")
-
-	viper.Set("rpc.network", node.Cfg.RPC.Network)
-
-	if node.Cfg.RPC.Network == "unix" {
-		viper.Set("rpc.address", node.Dir+node.Cfg.RPC.Address)
-	} else {
-		viper.Set("rpc.address", node.Cfg.RPC.Address)
-	}
-
-	viper.Set("rpc.sessionDurationMins", node.Cfg.RPC.SessionDurationMins)
-	viper.Set("rpc.requireSession", node.Cfg.RPC.RequireSession)
-
-	viper.Set("rpc.enabled", "true")
 
 	addr := node.Cfg.RPC.Rusk.Address
 	if node.Cfg.RPC.Rusk.Network == "unix" {
@@ -99,17 +52,16 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 	viper.Set("rpc.rusk.contractTimeout", 20000)
 	viper.Set("rpc.rusk.defaultTimeout", 1000)
 	viper.Set("rpc.rusk.connectiontimeout", 10000)
+
+	// database configs
 	viper.Set("database.driver", heavy.DriverName)
 	viper.Set("database.dir", node.Dir+"/chain/")
 
-	viper.Set("network.seeder.addresses", []string{"127.0.0.1:8081"})
-	viper.Set("network.port", strconv.Itoa(7100+index))
+	// mempool configs
 	viper.Set("mempool.maxSizeMB", "100")
 	viper.Set("mempool.updates.numNodes", "1")
-
 	// viper.Set("mempool.poolType", "hashmap")
 	// viper.Set("mempool.preallocTxs", "100")
-
 	viper.Set("mempool.poolType", "diskpool")
 	viper.Set("mempool.diskpoolDir", node.Dir+"/mempool.db")
 
@@ -117,19 +69,16 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 	viper.Set("mempool.propagateTimeout", "100ms")
 	viper.Set("mempool.propagateBurst", 1)
 
-	viper.Set("consensus.defaultlocktime", 1000)
-	viper.Set("consensus.defaultoffset", 10)
-	viper.Set("consensus.defaultamount", 50)
+	// consensus config
 	viper.Set("consensus.consensustimeout", 5)
 	viper.Set("consensus.usecompressedkeys", false)
 	viper.Set("consensus.keysfile", consensusKeysPath+"/"+consensusKeysFileName)
 
 	viper.Set("state.persistevery", 100)
 
-	viper.Set("api.enabled", false)
-	viper.Set("api.enabletls", false)
-	viper.Set("api.address", "127.0.0.1:9199")
-	viper.Set("api.expirationtime", 300)
+	// internal rpc timeouts
+	viper.Set("timeout.timeoutgetmempooltxsbysize", 4)
+	viper.Set("timeout.timeoutgetmempooltxs", 3)
 }
 
 // Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing).

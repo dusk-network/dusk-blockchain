@@ -8,7 +8,6 @@ package main
 
 import (
 	"context"
-	"net"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/api"
@@ -28,7 +27,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc/client"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc/server"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"google.golang.org/grpc"
@@ -90,13 +88,6 @@ func (s *Server) launchKadcastPeer(ctx context.Context, p *peer.MessageProcessor
 func Setup() *Server {
 	parentCtx, parentCancel := context.WithCancel(context.Background())
 
-	grpcServer, err := server.SetupGRPC(server.FromCfg())
-	if err != nil {
-		log.Panic(err)
-	}
-
-	_ = newConfigService(grpcServer)
-
 	eventBus := eventbus.New()
 	rpcBus := rpcbus.New()
 
@@ -147,7 +138,7 @@ func Setup() *Server {
 	cl := loop.New(e)
 	processor.Register(topics.Candidate, cl.ProcessCandidate)
 
-	c, err := LaunchChain(parentCtx, cl, proxy, eventBus, rpcBus, grpcServer, db)
+	c, err := LaunchChain(parentCtx, cl, proxy, eventBus, rpcBus, nil, db)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -181,7 +172,7 @@ func Setup() *Server {
 		c:             c,
 		gossip:        gossip,
 		gqlServer:     gqlServer,
-		grpcServer:    grpcServer,
+		grpcServer:    nil,
 		ruskConn:      ruskConn,
 		readerFactory: readerFactory,
 		dbDriver:      driver,
@@ -194,23 +185,6 @@ func Setup() *Server {
 	if kcfg.Enabled {
 		srv.launchKadcastPeer(parentCtx, processor, gossip)
 	}
-
-	// Start serving from the gRPC server
-	go func() {
-		conf := cfg.Get().RPC
-
-		l, err := net.Listen(conf.Network, conf.Address)
-		if err != nil {
-			log.Panic(err)
-		}
-
-		log.WithField("net", conf.Network).
-			WithField("addr", conf.Address).Infof("gRPC HTTP server listening")
-
-		if err := grpcServer.Serve(l); err != nil {
-			log.WithError(err).Warn("Serve returned err")
-		}
-	}()
 
 	// Schedule mempool updates requesting a few seconds after all components
 	// are fully launched

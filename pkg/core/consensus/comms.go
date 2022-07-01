@@ -170,7 +170,8 @@ func (e *Emitter) Republish(msg message.Message) error {
 // It also adds extra fields for TraceLevel only.
 func WithFields(round uint64, step uint8, eventName string, hash,
 	blsPubKey []byte, sVotingCommittee *user.VotingCommittee,
-	sVotedCommittee *sortedset.Cluster, p *user.Provisioners) *log.Entry {
+	sVotedCommittee *sortedset.Cluster, p *user.Provisioners,
+) *log.Entry {
 	l := log.WithField("process", "consensus").
 		WithField("round", round).
 		WithField("step", step).
@@ -185,7 +186,7 @@ func WithFields(round uint64, step uint8, eventName string, hash,
 	// For long-lived tests, logfile size may become a concern.
 	if log.GetLevel() == log.TraceLevel {
 		// This node network identification
-		l = l.WithField("node_id", config.Get().Network.Port)
+		l = l.WithField("node_id", config.Get().Kadcast.Address)
 
 		if len(blsPubKey) > 0 {
 			// This node (loaded wallet) provisioner BLS Public Key

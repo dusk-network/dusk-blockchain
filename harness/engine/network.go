@@ -242,7 +242,7 @@ func (n *Network) getWalletsPath() string {
 // StartNode locally.
 //nolint
 func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
-	blockchainExec, utilsExec, _, err := n.getExec()
+	blockchainExec, _, _, err := n.getExec()
 	if err != nil {
 		return err
 	}
@@ -262,21 +262,6 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	tomlFilePath, tomlErr := n.generateConfig(i)
 	if tomlErr != nil {
 		return tomlErr
-	}
-
-	if MOCK_ADDRESS != "" {
-
-		// Start the mock RUSK server
-		if startErr := n.start(nodeDir, utilsExec, "mockrusk",
-			"--rusknetwork", node.Cfg.RPC.Rusk.Network,
-			"--ruskaddress", node.Cfg.RPC.Rusk.Address,
-			"--walletstore", node.Cfg.Wallet.Store,
-			"--walletfile", node.Cfg.Wallet.File,
-			"--configfile", tomlFilePath,
-			// Optional "--cpuprofile", nodeDir+"/mockrusk_cpu.prof",
-		); startErr != nil {
-			return startErr
-		}
 	}
 
 	// Run Network service (Kadcast server)
@@ -374,7 +359,6 @@ func (n *Network) generateConfig(nodeIndex int) (string, error) {
 // Start an OS process with TMPDIR=nodeDir, manageable by the network.
 //nolint
 func (n *Network) start(nodeDir string, name string, arg ...string) error {
-
 	envWithNoRusk := os.Environ()
 	// Find and remove the SHARED RUSK_PROFILE_PATH
 	for i, v := range envWithNoRusk {
@@ -443,6 +427,7 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 
 // getExec returns paths of all node executables.
 // dusk-blockchain, blindbid and seeder.
+//nolint
 func (n *Network) getExec() (string, string, string, error) {
 	blockchainExec, err := getEnv("DUSK_BLOCKCHAIN")
 	if err != nil {

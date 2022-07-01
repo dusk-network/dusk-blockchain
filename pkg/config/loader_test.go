@@ -33,7 +33,7 @@ func TestDefaultConfigTOML(t *testing.T) {
 		t.Errorf("Failed parse: %v", err)
 	}
 
-	if Get().General.Network != "devnet" { //nolint
+	if Get().General.Network != "testnet" { //nolint
 		t.Error("Invalid general/network value")
 	}
 
@@ -74,10 +74,6 @@ func TestSupportedFlags(t *testing.T) {
 
 	if Get().Logger.Output != "modified" {
 		t.Errorf("Invalid logger output %s", Get().Logger.Output)
-	}
-
-	if Get().Network.Port != "9876" {
-		t.Errorf("Invalid network port %s", Get().Network.Port)
 	}
 }
 

@@ -171,7 +171,7 @@ func verifyVersionMessage(v *VersionMessage) error {
 		return errors.New("version mismatch")
 	}
 
-	if v.Services != protocol.FullNode && v.Services != protocol.VoucherNode {
+	if v.Services != protocol.FullNode {
 		return errors.New("unknown service flag")
 	}
 

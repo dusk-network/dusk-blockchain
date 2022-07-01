@@ -34,15 +34,6 @@ var routingRegistry = map[protocol.ServiceFlag]map[topics.Topic]struct{}{
 		topics.Response:      {},
 		topics.GetAddrs:      {},
 	},
-	// Voucher node
-	protocol.VoucherNode: {
-		topics.Addr:      {},
-		topics.Challenge: {},
-		topics.Response:  {},
-		topics.GetAddrs:  {},
-		topics.Ping:      {},
-		topics.Pong:      {},
-	},
 }
 
 func canRoute(services protocol.ServiceFlag, topic topics.Topic) bool {

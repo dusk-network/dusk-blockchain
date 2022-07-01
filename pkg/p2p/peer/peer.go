@@ -64,13 +64,6 @@ type GossipConnector struct {
 
 func (g *GossipConnector) Write(b, header []byte, priority byte) (int, error) {
 	if !canRoute(g.services, topics.Topic(b[0])) {
-		if g.services != protocol.VoucherNode {
-			l.WithField("topic", topics.Topic(b[0]).String()).
-				WithField("service flag", g.services).
-				WithField("r_addr", g.RemoteAddr().String()).
-				Trace("dropping message")
-		}
-
 		return 0, nil
 	}
 
@@ -282,19 +275,13 @@ func (p *Reader) ReadLoop(ctx context.Context, ringBuf *ring.Buffer) {
 		_ = p.Conn.Close()
 	}()
 
-	trw := config.Get().Timeout.TimeoutReadWrite
-	if trw == 0 {
-		trw = defaultTimeoutReadWrite
-	}
+	trw := defaultTimeoutReadWrite
 
 	readWriteTimeout := time.Duration(trw) * time.Second
 
 	// Set up a timer, which triggers the sending of a `keepalive` message
 	// when fired.
-	kat := config.Get().Timeout.TimeoutKeepAliveTime
-	if kat == 0 {
-		kat = defaultKeepAliveTime
-	}
+	kat := defaultKeepAliveTime
 
 	keepAliveTime := time.Duration(kat) * time.Second
 
@@ -390,10 +377,7 @@ func (c *Connection) keepAlive() error {
 // Conn needs to be locked, as this function can be called both by the WriteLoop,
 // and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
-	wt := config.Get().Timeout.TimeoutReadWrite
-	if wt == 0 {
-		wt = 1
-	}
+	wt := 1
 
 	writeTimeout := time.Duration(wt) * time.Second // Max idle time for a peer
 

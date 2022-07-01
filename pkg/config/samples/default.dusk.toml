@@ -1,32 +1,6 @@
-# Configs marked with #live# can be modified without node restart
-
 # general node configs
 [general]
-network = "devnet"
-# walletonly will prevent the node from starting consensus components when the wallet is loaded
-walletonly = false
-# configure callback listeners
-safecallbacklistener = "true"
-
-# Timeout cfg for rpcBus calls
-[timeout]
-timeoutgetlastcommittee = 5
-timeoutgetlastcertificate = 5
-timeoutgetmempooltxsbysize = 4
-timeoutgetlastblock = 5
-timeoutgetcandidate = 5
-timeoutclearwalletdatabase = 0
-timeoutverifycandidateblock = 5
-timeoutsendstaketx = 5
-timeoutgetmempooltxs = 3
-timeoutgetroundresults = 5
-timeoutbrokergetcandidate = 2
-timeoutdial = 5
-
-# timeoutkeepalivetime must be always smaller than timeoutreadwrite
-# otherwise the node will disconnect due to read timeout error
-timeoutreadwrite = 60
-timeoutkeepalivetime = 30
+network = "testnet"
 
 # logger configs
 [logger]
@@ -34,28 +8,10 @@ timeoutkeepalivetime = 30
 level = "debug"
 # 'stdout' or file name without ext
 # result filename would be $output$network.port.log
-output = "debug"
-[logger.monitor]
-# enabling log based monitoring
-enabled = false
-rpc="grpc"
-# transport
-transport="unix"
-# target
-address="/tmp/dusk-monitor.sock"
-
-# tell logger to stream errors and warnings to monitoring process
-streamErrors=true
+output = "dusk"
     
 # Gossip peer settings
 [network]
-
-# listens on all available unicast and anycast
-# IP addresses of the local system.
-
-# port for the node to bind on
-port=7000
-
 # Maximum number of items that can be registered by a single DupeMap
 # Up to ~0.3MB per DupeMap instance could be allocated if maxDupeMapItems=300000
 maxDupeMapItems=300000
@@ -63,31 +19,13 @@ maxDupeMapItems=300000
 # Ideally should be less than 15s - average consensus time
 maxDupeMapExpire=20
 
-minimumConnections = 5
-maxConnections = 50
-
 # Node service flag
 # 1 = full node
-# 2 = light node (unimplemented)
-# 3 = voucher node
 serviceFlag = 1
-
-[network.seeder]
-# array of seeder servers
-addresses=["127.0.0.1:8081"]
-#addresses=["voucher.dusk.network:8081"]
-# fixed network addresses to setup local P2P network
-# supported only in testnet
-fixed = []
-
-[network.monitor]
-enabled = false
-address="monitor.dusk.network:1337"
 
 # Kadcast peer settings
 [kadcast]
-# if disabled, gossip protocol is active
-enabled=false
+enabled=true
 
 # grpc client connection config
 [kadcast.grpc]
@@ -102,13 +40,7 @@ dialTimeout = 10
 driver = "heavy_v0.1.0"
 # backend storage path -- should be different from wallet db dir
 dir = "chain"
-
-[wallet]
-# wallet file path 
-file = "wallet.dat"
-# wallet database path -- should be different from blockchain db dir
-store = "walletDB"
-
+ 
 [mempool]
 # Max size of memory of the accepted txs to keep
 maxSizeMB = 100
@@ -130,32 +62,17 @@ numNodes = 3
 # backend storage path applicable for diskpool type
 diskpoolDir = "mempool.db"
 
-# gRPC API service
-[rpc]
-# network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
-network="unix"
-# in case the network is unix, 
-# address must be a path to a unix socket (e.g /tmp/file.sock)
-# in case the network is tcp*,
-# address must be in form of a IP address (e.g 127.0.0.1:9000)
-address="/tmp/dusk-grpc.sock"
-# duration of the session for the grpc services exposed by the node
-sessionDurationMins = 5
-# do not require session
-requireSession = true
-
-enableTLS=false
-# server TLS certificate file
-certFile=""
-# server TLS key file
-keyFile=""
-
 [rpc.rusk]
-
 # timeout for internal GRPC calls expressed in milliseconds
 contractTimeout=20000
 defaultTimeout=200
 connectionTimeout = 10000
+
+# State-related configuration
+[state]
+# Period of state persistance attempts (in blocks)
+persistEvery = 100
+blockGasLimit = 5_000_000_000
 
 # GraphQL API service
 [gql]
@@ -213,22 +130,15 @@ accumulatorWorkers = 4
 # Path to a file that stores Consensus Keys / BLS public and secret keys
 # if file does not exist, it will be created at startup.
 keysfile = "/path/consensus.keys"
-# default amount of blocks to lock the consensus transaction up for
-defaultlocktime = 250000
-# default amount, in whole units of DUSK, to send for consensus transactions.
-defaultamount = 5
 # the timeout for consensus step timers
 consensustimeout = 5
 # useCompressedKeys determines if AggregatePks works with compressed or uncompressed pks.
 useCompressedKeys = false
 
-# State-related configuration
-[state]
-# Period of state persistance attempts (in blocks)
-persistEvery = 100
-
-[genesis]
-legacy = false
+# Timeout cfg for rpcBus calls
+[timeout]
+  timeoutgetmempooltxsbysize = 4
+  timeoutgetmempooltxs = 3
 
 [api]
 # enable consensus API service
@@ -239,3 +149,22 @@ address="127.0.0.1:9199"
 #5 mins
 expirationtime=300
 
+# gRPC API service
+[rpc]
+# network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
+network="unix"
+# in case the network is unix, 
+# address must be a path to a unix socket (e.g /tmp/file.sock)
+# in case the network is tcp*,
+# address must be in form of a IP address (e.g 127.0.0.1:9000)
+address="/tmp/dusk-grpc.sock"
+# duration of the session for the grpc services exposed by the node
+sessionDurationMins = 5
+# do not require session
+requireSession = true
+
+enableTLS=false
+# server TLS certificate file
+certFile=""
+# server TLS key file
+keyFile=""

@@ -11,7 +11,6 @@ import (
 	"crypto/sha256"
 	"os"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
@@ -27,7 +26,7 @@ func CompleteChallenge(srcPeerID string, m message.Message) ([]bytes.Buffer, err
 
 	resp := &message.Response{
 		HashedChallenge: hash.Sum(nil),
-		Port:            cfg.Get().Network.Port,
+		Port:            "unknown",
 	}
 
 	responseBuf := new(bytes.Buffer)
