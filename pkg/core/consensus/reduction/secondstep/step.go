@@ -95,6 +95,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 	// first we send our own Selection
+
 	if p.handler.AmMember(r.Round, step) {
 		m, _ := p.SendReduction(r.Round, step, p.firstStepVotesMsg.Candidate)
 

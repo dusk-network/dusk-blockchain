@@ -225,6 +225,7 @@ func (s *Loop) createWinningBlock(ctx context.Context, hash []byte, cert *block.
 	}
 
 	cm.Header.Certificate = cert
+
 	return cm, nil
 }
 
@@ -305,6 +306,22 @@ func (s *Loop) processCollectedVotes(ctx context.Context, handler *handler, evs 
 	blk, err := s.createWinningBlock(ctx, evs[0].State().BlockHash, cert)
 	if err != nil {
 		lg.WithError(err).Errorln("failed to create a winning block")
+	} else {
+		// Double check certificate
+		if e := CheckBlockCertificate(handler.Provisioners, blk, r.Seed); e != nil {
+			lg.WithError(e).
+				WithField("round", r.Round).
+				WithField("step", agAgreement.State().Step).
+				WithField("hash", util.StringifyBytes(evs[0].State().BlockHash)).
+				WithField("stepvotes", evs[0].VotesPerStep).
+				WithField("short-circuit", true).
+				WithField("action", "collected_votes").
+				Error("certificate verification failed")
+
+			logStepVotes(evs[0].State().Step, evs[0].State().Round, evs[0].State().BlockHash, handler, evs[0].VotesPerStep, r)
+
+			return consensus.Results{Blk: *block.NewBlock(), Err: err}
+		}
 	}
 
 	return consensus.Results{Blk: blk, Err: err}
@@ -373,6 +390,20 @@ func (s *Loop) processAggrAgreement(ctx context.Context, h *handler, msg message
 	blk, err = s.createWinningBlock(ctx, aggro.State().BlockHash, aggro.GenerateCertificate())
 	if err != nil {
 		lg.WithError(err).Errorln("failed to create a winning block")
+		return nil, err
+	}
+
+	// Double check certificate.
+	if err := CheckBlockCertificate(h.Provisioners, blk, r.Seed); err != nil {
+		lg.WithError(err).
+			WithField("round", r.Round).
+			WithField("step", hdr.Step).
+			WithField("hash", util.StringifyBytes(hdr.BlockHash)).
+			WithField("stepvotes", aggro.VotesPerStep).
+			WithField("short-circuit", true).
+			Error("certificate verification failed")
+
+		logStepVotes(hdr.Step, hdr.Round, hdr.BlockHash, h, aggro.VotesPerStep, r)
 		return nil, err
 	}
 
