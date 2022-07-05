@@ -7,6 +7,8 @@
 package agreement
 
 import (
+	"fmt"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -44,6 +46,13 @@ func checkBlockCertificateForStep(batchedSig []byte, bitSet uint64, round uint64
 	size := committeeSize(provisioners.SubsetSizeAt(round))
 	committee := provisioners.CreateVotingCommittee(seed, round, step, size)
 	subcommittee := committee.IntersectCluster(bitSet)
+
+	stepVoters := subcommittee.TotalOccurrences()
+	quorumTarget := quorum(size)
+
+	if stepVoters < quorumTarget {
+		return fmt.Errorf("vote set too small - %v/%v", stepVoters, quorumTarget)
+	}
 
 	apk, err := AggregatePks(&provisioners, subcommittee.Set)
 	if err != nil {
