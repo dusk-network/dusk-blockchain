@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Call VerifyStateTransition in Reduction 2 only if it is a committee member [#1357]
 - Drop topics.Block messages with invalid header.hash value [#1425]
 - Request candidate block from arbitrary active nodes [#1359]
+- Clone message.Agreement on notifying the consumer [#1433]
 
 ### Security
 - Ensure candidate block hash is equal to the BlockHash of the msg.header [#1364]
