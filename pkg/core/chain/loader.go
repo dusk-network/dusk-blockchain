@@ -213,7 +213,8 @@ func (l *DBLoader) LoadTip() (*block.Block, []byte, error) {
 		hash, e := t.FetchBlockHashByHeight(nextHeight)
 		// Check if error is nil and the hash is set
 		if e == nil && len(hash) > 0 {
-			return fmt.Errorf("state points at %d height but the tip is higher", tip.Header.Height)
+			err = fmt.Errorf("state points at %d height but the tip is higher", tip.Header.Height)
+			log.WithError(err).Warn("loader failed")
 		}
 		// TODO: this throws ErrBlockNotFound in tests. Should we propagate the
 		// error?

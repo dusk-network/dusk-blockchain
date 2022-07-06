@@ -259,10 +259,11 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 	if cmp == header.Before {
 		lg.
 			WithFields(log.Fields{
-				"topic":          m.Category(),
-				"round":          hdr.Round,
-				"step":           hdr.Step,
-				"expected round": round,
+				"topic":      m.Category(),
+				"msg_round":  hdr.Round,
+				"msg_step":   hdr.Step,
+				"curr_round": round,
+				"curr_step":  step,
 			}).
 			Debugln("discarding obsolete event")
 		return false

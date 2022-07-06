@@ -16,6 +16,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
@@ -565,7 +566,7 @@ func (c *Chain) isValidBlock(newBlock, prevBlock block.Block, provisioners user.
 	l.Debug("verifying block certificate")
 
 	var err error
-	if err = verifiers.CheckBlockCertificate(provisioners, newBlock, prevBlock.Header.Seed); err != nil {
+	if err = agreement.CheckBlockCertificate(provisioners, newBlock, prevBlock.Header.Seed); err != nil {
 		l.WithError(err).Error("certificate verification failed")
 		return err
 	}
