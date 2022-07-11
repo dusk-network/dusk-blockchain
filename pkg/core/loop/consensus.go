@@ -88,7 +88,7 @@ func New(e *consensus.Emitter) *Consensus {
 	aggrAgreementChan := make(chan message.Message, msgChanSize)
 
 	// subscribe agreement phase to message.Agreement
-	aChan := eventbus.NewChanListener(agreementChan)
+	aChan := eventbus.NewSafeChanListener(agreementChan)
 	e.EventBus.Subscribe(topics.Agreement, aChan)
 	listeners = append(listeners, aChan)
 	// subscribe agreement phase to message.AggrAgreement

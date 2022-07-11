@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drop topics.Block messages with invalid header.hash value [#1425]
 - Request candidate block from arbitrary active nodes [#1359]
 - Allow verifyFn to report errors correctly #1436
+- Clone message.Agreement on notifying the consumer [#1433]
+
 
 ### Security
 - Ensure candidate block hash is equal to the BlockHash of the msg.header [#1364]
