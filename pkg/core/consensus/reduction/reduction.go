@@ -72,7 +72,7 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 		lg.
 			WithField("timeout", r.TimeOut).
 			WithField("round", round).
-			Error("max_timeout_reached")
+			Warn("max_timeout_reached")
 
 		r.TimeOut = 60 * time.Second
 	}

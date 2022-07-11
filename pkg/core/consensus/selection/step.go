@@ -241,7 +241,7 @@ func (p *Phase) increaseTimeOut() {
 	if p.timeout > 60*time.Second {
 		lg.
 			WithField("timeout", p.timeout).
-			Error("max_timeout_reached")
+			Warn("max_timeout_reached")
 
 		p.timeout = 60 * time.Second
 	}
