@@ -179,14 +179,22 @@ func ShouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 
 	cmp := hdr.CompareRoundAndStep(round, step)
 	if cmp == header.Before {
-		lg.
+		l := lg.
 			WithFields(log.Fields{
-				"topic":          m.Category(),
+				"topic":          m.Category().String(),
 				"round":          hdr.Round,
 				"step":           hdr.Step,
 				"expected round": round,
-			}).
-			Debugln("discarding obsolete event")
+			})
+
+		// Report as a warning an event of discarding newblock while in a
+		// reduction phase.
+		if m.Category() == topics.NewBlock {
+			l.Warnln("discarding obsolete event")
+		} else {
+			l.Debugln("discarding obsolete event")
+		}
+
 		return false
 	}
 

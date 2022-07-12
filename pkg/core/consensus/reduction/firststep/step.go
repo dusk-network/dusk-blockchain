@@ -146,7 +146,6 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 					return p.gotoNextPhase(sv)
 				}
 			}
-
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
 			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step, *block.NewBlock())
