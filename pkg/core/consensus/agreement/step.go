@@ -314,7 +314,6 @@ func (s *Loop) processCollectedVotes(ctx context.Context, handler *handler, evs 
 				WithField("step", agAgreement.State().Step).
 				WithField("hash", util.StringifyBytes(evs[0].State().BlockHash)).
 				WithField("stepvotes", evs[0].VotesPerStep).
-				WithField("short-circuit", true).
 				WithField("action", "collected_votes").
 				Error("certificate verification failed")
 

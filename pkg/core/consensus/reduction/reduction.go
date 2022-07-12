@@ -8,6 +8,7 @@ package reduction
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -21,7 +22,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var errEmptyBlockHash = errors.New("empty hash")
+var (
+	// ErrLowBlockHeight block height is lower or equal than blockchain tip height.
+	ErrLowBlockHeight = errors.New("block height is low")
+	errEmptyBlockHash = errors.New("empty hash")
+)
 
 // EmptyStepVotes ...
 var EmptyStepVotes = message.StepVotes{}
@@ -67,7 +72,7 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 		lg.
 			WithField("timeout", r.TimeOut).
 			WithField("round", round).
-			Error("max_timeout_reached")
+			Warn("max_timeout_reached")
 
 		r.TimeOut = 60 * time.Second
 	}
@@ -133,16 +138,7 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) (message.Message, []byte) {
 	voteHash, err := r.verifyWithDelay(candidate, step)
 	if err != nil {
-		if err != errEmptyBlockHash {
-			log.
-				WithError(err).
-				WithField("round", round).
-				WithField("step", step).
-				Error("verifyfn failed")
-		}
-
-		// errEmptyBlockHash could be returned here if either Selection or
-		// 1st_reduction steps experience a timeout event
+		logVerifyErr(err, round, step, candidate)
 
 		// Vote for an empty hash
 		voteHash = block.EmptyHash[:]
@@ -222,4 +218,29 @@ func ShouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 	}
 
 	return true
+}
+
+func logVerifyErr(err error, round uint64, step uint8, candidate *block.Block) {
+	l := log.
+		WithError(err).
+		WithField("round", round).
+		WithField("step", step)
+
+	if candidate != nil && candidate.Header != nil {
+		l = l.WithField("candidate_hash", hex.EncodeToString(candidate.Header.Hash)).
+			WithField("candidate_height", candidate.Header.Height)
+	}
+
+	// errEmptyBlockHash could be returned here if either Selection or
+	// 1st_reduction steps experience a timeout event
+
+	// ErrLowBlockHeight could be returned if consensus state is behind the chain state.
+
+	switch err {
+	case errEmptyBlockHash, ErrLowBlockHeight:
+		l.Debug("verifyfn failed")
+	default:
+		// a problem to report as an error to investigate
+		l.Error("verifyfn failed")
+	}
 }

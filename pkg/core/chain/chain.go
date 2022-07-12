@@ -18,6 +18,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
@@ -691,7 +692,7 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 
 // VerifyCandidateBlock can be used as a callback for the consensus in order to
 // verify potential winning candidates.
-func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
+func (c *Chain) VerifyCandidateBlock(candidate block.Block) error {
 	var (
 		err       error
 		chainTip  block.Block
@@ -702,19 +703,26 @@ func (c *Chain) VerifyCandidateBlock(blk block.Block) error {
 	chainTip = c.tip.Copy().(block.Block)
 	c.lock.Unlock()
 
+	// A edge case where the next valid block is received from the network while
+	// consensus loop is still running over an old state.
+	if chainTip.Header.Height >= candidate.Header.Height {
+		return reduction.ErrLowBlockHeight
+	}
+
 	// We first perform a quick check on the Block Header and
-	err = c.verifier.SanityCheckBlock(chainTip, blk)
+	err = c.verifier.SanityCheckBlock(chainTip, candidate)
 	if err != nil {
 		return err
 	}
 
-	stateRoot, err = c.proxy.Executor().VerifyStateTransition(c.ctx, blk.Txs, blk.Header.GasLimit, blk.Header.Height, blk.Header.GeneratorBlsPubkey)
+	stateRoot, err = c.proxy.Executor().VerifyStateTransition(c.ctx, candidate.Txs, candidate.Header.GasLimit,
+		candidate.Header.Height, candidate.Header.GeneratorBlsPubkey)
 	if err != nil {
 		return err
 	}
 
-	if !bytes.Equal(stateRoot, blk.Header.StateHash) {
-		log.WithField("block_state_hash", hex.EncodeToString(blk.Header.StateHash)).
+	if !bytes.Equal(stateRoot, candidate.Header.StateHash) {
+		log.WithField("candidate_state_hash", hex.EncodeToString(candidate.Header.StateHash)).
 			WithField("vst_state_hash", hex.EncodeToString(stateRoot)).Error(errUnexpectedStateHash.Error())
 
 		return errUnexpectedStateHash

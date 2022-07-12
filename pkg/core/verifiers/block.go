@@ -82,14 +82,14 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 		return err
 	}
 
+	// blk.Headerheight = prevHeaderHeight +1
+	if blk.Header.Height != prevBlock.Header.Height+1 {
+		return errors.New("invalid block height")
+	}
+
 	// blk.Headerhash = prevHeaderHash
 	if !bytes.Equal(blk.Header.PrevBlockHash, prevBlock.Header.Hash) {
 		return ErrPrevBlockHash
-	}
-
-	// blk.Headerheight = prevHeaderHeight +1
-	if blk.Header.Height != prevBlock.Header.Height+1 {
-		return errors.New("current block height is not one plus the previous block height")
 	}
 
 	// blk.Timestamp > prevTimestamp
