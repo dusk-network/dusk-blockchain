@@ -108,6 +108,9 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 	p.handler = NewHandler(p.Keys, r.P, r.Seed)
 
+	collector := candidate.NewCollector(p.EventBus, p.handler.Handler, p.db, r.Round)
+	collector.UpdateStep(step, "selection")
+
 	isMember := p.handler.AmMember(r.Round, step)
 
 	if log.GetLevel() >= logrus.DebugLevel {
@@ -144,7 +147,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		case ev := <-evChan:
 			if shouldProcess(ev, r.Round, step, queue) {
 				b := ev.Payload().(message.NewBlock)
-				if err := p.collectNewBlock(b, ev.Header()); err != nil {
+				if err := collector.Collect(b, ev.Header()); err != nil {
 					continue
 				}
 
@@ -212,6 +215,7 @@ func (p *Phase) collectNewBlock(msg message.NewBlock, msgHeader []byte) error {
 
 	// Persist Candidate Block on disk.
 	if err := p.db.Update(func(t database.Transaction) error {
+		// TODO:
 		return t.StoreCandidateMessage(msg.Candidate)
 	}); err != nil {
 		lg.WithError(err).Errorln("could not store candidate")
