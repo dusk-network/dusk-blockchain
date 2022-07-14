@@ -87,13 +87,17 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 		tlog.Traceln("ending first reduction step")
 	}()
 
+	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
+
+	collector := candidate.NewCollector(p.EventBus, p.handler.Handler, p.db, r.Round)
+	collector.UpdateStep(step, "1st_reduction")
+
 	if log.GetLevel() >= logrus.DebugLevel {
 		c := p.selectionResult.Candidate
 		tlog.WithField("hash", util.StringifyBytes(c.Header.Hash)).
 			Debug("initialized")
 	}
 
-	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 	// first we send our own Selection
 	if p.handler.AmMember(r.Round, step) {
 		m, _ := p.SendReduction(r.Round, step, &p.selectionResult.Candidate)
@@ -131,21 +135,31 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	for {
 		select {
 		case ev := <-evChan:
-			if reduction.ShouldProcess(ev, r.Round, step, queue) {
-				rMsg := ev.Payload().(message.Reduction)
-				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
-					continue
-				}
 
-				sv := p.collectReduction(ctx, rMsg, r.Round, step, ev.Header())
-				if sv != nil {
-					// preventing timeout leakage
-					go func() {
-						<-timeoutChan
-					}()
-					return p.gotoNextPhase(sv)
+			switch ev.Category() {
+			case topics.NewBlock:
+				// Collect and repropagate the candidate block of this iteration.
+				b := ev.Payload().(message.NewBlock)
+				_ = collector.Collect(b, ev.Header())
+
+			case topics.Reduction:
+				if reduction.ShouldProcess(ev, r.Round, step, queue) {
+					rMsg := ev.Payload().(message.Reduction)
+					if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
+						continue
+					}
+
+					sv := p.collectReduction(ctx, rMsg, r.Round, step, ev.Header())
+					if sv != nil {
+						// preventing timeout leakage
+						go func() {
+							<-timeoutChan
+						}()
+						return p.gotoNextPhase(sv)
+					}
 				}
 			}
+
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
 			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step, *block.NewBlock())
