@@ -77,7 +77,13 @@ func (c *Collector) Collect(msg message.NewBlock, msgHeader []byte) error {
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
 	m := message.NewWithHeader(topics.NewBlock, msg, msgHeader)
-	_ = c.eventbus.Publish(topics.Kadcast, m)
+	buf, err := message.Marshal(m)
+	if err != nil {
+		return err
+	}
+
+	serialized := message.NewWithHeader(m.Category(), buf, m.Header())
+	_ = c.eventbus.Publish(topics.Kadcast, serialized)
 
 	return nil
 }

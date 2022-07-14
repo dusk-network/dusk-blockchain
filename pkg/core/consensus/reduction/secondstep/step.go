@@ -13,10 +13,12 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
@@ -39,6 +41,7 @@ type Phase struct {
 	*reduction.Reduction
 	handler    *reduction.Handler
 	aggregator *reduction.Aggregator
+	db         database.DB
 
 	firstStepVotesMsg message.StepVotesMsg
 
@@ -51,13 +54,14 @@ type Phase struct {
 // NB: we cannot push the agreement directly within the agreementChannel
 // until we have a way to deduplicate it from the peer (the dupemap will not be
 // notified of duplicates).
-func New(e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration) *Phase {
+func New(e *consensus.Emitter, verifyFn consensus.CandidateVerificationFunc, timeOut time.Duration, db database.DB) *Phase {
 	return &Phase{
 		Reduction: &reduction.Reduction{
 			Emitter:  e,
 			TimeOut:  timeOut,
 			VerifyFn: verifyFn,
 		},
+		db: db,
 	}
 }
 
@@ -94,6 +98,10 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
+
+	collector := candidate.NewCollector(p.EventBus, p.handler.Handler, p.db, r.Round)
+	collector.UpdateStep(step, "2nd_reduction")
+
 	// first we send our own Selection
 
 	if p.handler.AmMember(r.Round, step) {

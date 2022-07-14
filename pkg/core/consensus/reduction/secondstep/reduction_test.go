@@ -37,7 +37,7 @@ func TestSendReduction(t *testing.T) {
 	timeout := time.Second
 
 	hlp := reduction.NewHelper(messageToSpawn, timeout)
-	secondStep := New(hlp.Emitter, verifyFn, 10*time.Second)
+	secondStep := New(hlp.Emitter, verifyFn, 10*time.Second, db)
 
 	// Generate second StepVotes
 	svs := message.GenVotes(hash, []byte{0, 0, 0, 0}, 1, 2, hlp.ProvisionersKeys, hlp.P)
