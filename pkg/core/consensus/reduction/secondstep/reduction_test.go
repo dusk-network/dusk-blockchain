@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -33,6 +34,9 @@ func TestSendReduction(t *testing.T) {
 	messageToSpawn := 50
 	hash, err := crypto.RandEntropy(32)
 	require.NoError(t, err)
+
+	_, db := lite.CreateDBConnection()
+	defer db.Close()
 
 	timeout := time.Second
 
@@ -140,6 +144,9 @@ func TestSecondStepReduction(t *testing.T) {
 	hash, err := crypto.RandEntropy(32)
 	require.NoError(t, err)
 
+	_, db := lite.CreateDBConnection()
+	defer db.Close()
+
 	timeout := time.Second
 
 	table := initiateTableTest(timeout, hash, round, step)
@@ -173,7 +180,7 @@ func TestSecondStepReduction(t *testing.T) {
 			}
 
 			// spin secondStepVotes
-			secondStepReduction := New(hlp.Emitter, verifyFn, timeout)
+			secondStepReduction := New(hlp.Emitter, verifyFn, timeout, db)
 
 			// Generate second StepVotes
 			svs := message.GenVotes(hash, []byte{0, 0, 0, 0}, 1, 2, hlp.ProvisionersKeys, hlp.P)
