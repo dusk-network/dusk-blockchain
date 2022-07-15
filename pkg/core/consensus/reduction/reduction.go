@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -242,5 +243,14 @@ func logVerifyErr(err error, round uint64, step uint8, candidate *block.Block) {
 	default:
 		// a problem to report as an error to investigate
 		l.Error("verifyfn failed")
+	}
+}
+
+// Recover wraps recover with adding round and step fields on a panic.
+func Recover(round uint64, step uint8) {
+	if r := recover(); r != nil {
+		log.WithField("round", round).WithField("step", step).
+			WithError(fmt.Errorf("%+v", r)).
+			Errorln("panic in sendreduction ")
 	}
 }

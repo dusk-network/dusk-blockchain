@@ -98,17 +98,9 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	if p.handler.AmMember(r.Round, step) {
 		go func() {
-			defer func() {
-				// handle panic on writing to closed evChan.
-				a := recover()
-				if a != nil {
-					logrus.WithField("round", r.Round).
-						Error("RECOVER", a)
-				}
-			}()
+			defer reduction.Recover(r.Round, step)
 
 			m, _ := p.SendReduction(r.Round, step, p.firstStepVotesMsg.Candidate)
-
 			// Queue my own vote to be registered locally
 			evChan <- m
 		}()
