@@ -7,10 +7,7 @@
 package selection
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
-	"errors"
 	"os"
 	"strconv"
 	"time"
@@ -20,7 +17,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/util"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -31,11 +27,6 @@ import (
 )
 
 var lg = log.WithField("process", "consensus").WithField("phase", "selector")
-
-var (
-	errInvalidHash       = errors.New("candidate hash is different from message.header hash")
-	errNotBlockGenerator = errors.New("newblock msg is not signed by a block generator")
-)
 
 // Phase is the implementation of the Selection step component.
 type Phase struct {
@@ -171,72 +162,6 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 func (p *Phase) endSelection(result message.NewBlock) consensus.PhaseFn {
 	return p.next.Initialize(result)
-}
-
-// verifyNewBlock executes a set of check points to ensure the hash of the
-// candidate block has been signed by the single committee member of selection
-// step of this iteration.
-func (p *Phase) verifyNewBlock(msg message.NewBlock) error {
-	if !p.handler.IsMember(msg.State().PubKeyBLS, msg.State().Round, msg.State().Step) {
-		return errNotBlockGenerator
-	}
-
-	// Verify message signagure
-	if err := p.handler.VerifySignature(msg); err != nil {
-		return err
-	}
-
-	// Sanity-check the candidate block
-	if err := candidate.SanityCheckCandidate(msg.Candidate); err != nil {
-		return err
-	}
-
-	// Ensure candidate block hash is equal to the BlockHash of the msg.header
-	hash, err := msg.Candidate.CalculateHash()
-	if err != nil {
-		return err
-	}
-
-	if !bytes.Equal(msg.State().BlockHash, hash) {
-		return errInvalidHash
-	}
-
-	return nil
-}
-
-func (p *Phase) collectNewBlock(msg message.NewBlock, msgHeader []byte) error {
-	if err := p.verifyNewBlock(msg); err != nil {
-		msg.WithFields(lg).
-			WithField("seed", hex.EncodeToString(p.handler.Seed())).
-			WithError(err).Error("failed to verify newblock")
-
-		return err
-	}
-
-	// Persist Candidate Block on disk.
-	if err := p.db.Update(func(t database.Transaction) error {
-		// TODO:
-		return t.StoreCandidateMessage(msg.Candidate)
-	}); err != nil {
-		lg.WithError(err).Errorln("could not store candidate")
-	}
-
-	if log.GetLevel() >= logrus.DebugLevel {
-		log := consensus.WithFields(msg.State().Round, msg.State().Step, "newblock_collected",
-			msg.Candidate.Header.Hash, p.Keys.BLSPubKey, nil, nil, nil)
-
-		log.WithField("sender", util.StringifyBytes(msg.State().PubKeyBLS)).Debug()
-	}
-
-	// Once the event is verified, and has passed all preliminary checks,
-	// we can republish it to the network.
-	m := message.NewWithHeader(topics.NewBlock, msg, msgHeader)
-	if err := p.Republish(m); err != nil {
-		lg.WithError(err).
-			Error("could not republish score event")
-	}
-
-	return nil
 }
 
 // increaseTimeOut increases the timeout after a failed selection.

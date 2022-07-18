@@ -22,12 +22,21 @@ import (
 )
 
 var (
-	ErrInvalidNewBlock   = errors.New("invalid newblock message")
-	ErrInvalidBlockHash  = errors.New("invalid block hash")
+	// ErrInvalidNewBlock error invalid newblock message.
+	ErrInvalidNewBlock = errors.New("invalid newblock message")
+	// ErrInvalidBlockHash ...
+	ErrInvalidBlockHash = errors.New("invalid block hash")
+	// ErrNotBlockGenerator ...
 	ErrNotBlockGenerator = errors.New("message not signed by generator")
-	ErrInvalidMsgRound   = errors.New("invalid message round")
+	// ErrInvalidMsgRound ...
+	ErrInvalidMsgRound = errors.New("invalid message round")
+	// ErrInvalidStep ...
+	ErrInvalidStep = errors.New("invalid newblock step")
+	// ErrMaxStepExceeded ...
+	ErrMaxStepExceeded = errors.New("max step exceeded")
 )
 
+// Collector implements a procedure of collecting candidate block from a wire message (newblock).
 type Collector struct {
 	eventbus *eventbus.EventBus
 	handler  *committee.Handler
@@ -38,6 +47,7 @@ type Collector struct {
 	stepName string
 }
 
+// NewCollector instantiates Collector.
 func NewCollector(e *eventbus.EventBus, h *committee.Handler, db database.DB, round uint64) *Collector {
 	return &Collector{
 		eventbus: e,
@@ -47,19 +57,30 @@ func NewCollector(e *eventbus.EventBus, h *committee.Handler, db database.DB, ro
 	}
 }
 
-// UpdateStep set step/stepName
+// UpdateStep set step/stepName.
 func (c *Collector) UpdateStep(step uint8, name string) {
 	c.step = step
 	c.stepName = name
 }
 
-// Collect put the candidate block from message.Block to DB, if message is valid.
+// Collect put a candidate block from message.Block to DB, if message is valid.
 func (c *Collector) Collect(msg message.NewBlock, msgHeader []byte) error {
 	if msg.State().Round != c.round {
 		return ErrInvalidMsgRound
 	}
 
-	// TODO: check msg.State().Step belongs to this Round and Iteration
+	msgStep := msg.State().Step
+
+	if msgStep >= config.ConsensusMaxStep {
+		return ErrMaxStepExceeded
+	}
+
+	// Check msg.State().Step belongs to current iteration
+	if msgStep == 0 ||
+		(msgStep-1)/3 != (c.step-1)/3 {
+		return errors.New("invalid newblock step")
+	}
+
 	log := logrus.WithField("process", c.stepName)
 
 	if err := c.verify(msg); err != nil {
@@ -77,6 +98,7 @@ func (c *Collector) Collect(msg message.NewBlock, msgHeader []byte) error {
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
 	m := message.NewWithHeader(topics.NewBlock, msg, msgHeader)
+
 	buf, err := message.Marshal(m)
 	if err != nil {
 		return err

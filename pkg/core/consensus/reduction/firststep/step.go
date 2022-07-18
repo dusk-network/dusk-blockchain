@@ -135,7 +135,6 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	for {
 		select {
 		case ev := <-evChan:
-
 			switch ev.Category() {
 			case topics.NewBlock:
 				// Collect and repropagate the candidate block of this iteration.
