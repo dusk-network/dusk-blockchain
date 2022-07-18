@@ -497,12 +497,18 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 }
 
 func (t transaction) StoreCandidateMessage(cm block.Block) error {
+	key := append(CandidatePrefix, cm.Header.Hash...)
+
+	_, err := t.snapshot.Get(key, nil)
+	if err == nil {
+		return nil
+	}
+
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, &cm); err != nil {
 		return err
 	}
 
-	key := append(CandidatePrefix, cm.Header.Hash...)
 	t.put(key, buf.Bytes())
 	return nil
 }
