@@ -8,9 +8,11 @@ package reduction
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -61,7 +63,9 @@ type Reduction struct {
 	// VerifyFn verifies candidate block
 	VerifyFn consensus.CandidateVerificationFunc
 
-	VerifiedHash []byte
+	verifiedHash []byte
+
+	lock sync.RWMutex
 }
 
 // IncreaseTimeout is used when reduction does not reach the quorum or
@@ -79,10 +83,18 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 	}
 }
 
+func (r *Reduction) isVerified(hash []byte) bool {
+	if r.verifiedHash != nil && bytes.Equal(r.verifiedHash, hash) {
+		return true
+	}
+
+	return false
+}
+
 // verifyWithDelay calls verifyFn upon the candidate block but also incorporates a
 // delay on success verification.
 // vHash param is hash of block that has been already verified.
-func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte, error) {
+func (r *Reduction) verifyWithDelay(ctx context.Context, candidate *block.Block, step uint8) ([]byte, error) {
 	if candidate == nil {
 		return nil, errors.New("nil candidate")
 	}
@@ -96,22 +108,14 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 		return nil, err
 	}
 
-	// Handle cases when VerifiedHash is not empty
-	if len(r.VerifiedHash) == 32 && !bytes.Equal(r.VerifiedHash, block.EmptyHash[:]) {
-		// Check if we have already verified this block.
-		if bytes.Equal(r.VerifiedHash, hash) {
-			lg.WithField("verified_hash", util.StringifyBytes(r.VerifiedHash)).Debug("block already verified")
-			return hash, nil
-		}
-
-		lg.WithField("verified_hash", util.StringifyBytes(r.VerifiedHash)).
-			WithField("hash", util.StringifyBytes(hash)).
-			Warn("verified_hash and hash are different")
+	if r.isVerified(hash) {
+		lg.WithField("verified_hash", util.StringifyBytes(hash)).Info("block already verified")
+		return hash, nil
 	}
 
 	st := time.Now().UnixMilli()
 
-	if err := r.VerifyFn(*candidate); err != nil {
+	if err := r.VerifyFn(ctx, *candidate); err != nil {
 		return nil, err
 	}
 
@@ -134,15 +138,36 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 	return hash, nil
 }
 
+func (r *Reduction) addVerified(hash []byte) {
+	var cpy [32]byte
+	copy(cpy[:], hash)
+
+	if cpy != block.EmptyHash {
+		r.verifiedHash = cpy[:]
+	}
+}
+
 // SendReduction propagates a signed vote for the candidate block, if block is
 // fully valid. A full block validation will be performed if Candidate Hash differs from r.VerifiedHash.
-func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) (message.Message, []byte) {
-	voteHash, err := r.verifyWithDelay(candidate, step)
+// Error is returned only if the reduction should be not be registered locally.
+func (r *Reduction) SendReduction(ctx context.Context, round uint64, step uint8, candidate *block.Block) (message.Message, []byte, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	voteHash, err := r.verifyWithDelay(ctx, candidate, step)
 	if err != nil {
 		logVerifyErr(err, round, step, candidate)
 
+		// On these errors the provisioner should not vote with emptyHash.
+		switch err {
+		case ErrLowBlockHeight, context.Canceled:
+			return nil, nil, err
+		}
+
 		// Vote for an empty hash
 		voteHash = block.EmptyHash[:]
+	} else {
+		r.addVerified(voteHash)
 	}
 
 	// Generate Reduction message to propagate my vote.
@@ -153,8 +178,6 @@ func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Blo
 		PubKeyBLS: r.Keys.BLSPubKey,
 	}
 
-	r.VerifiedHash = voteHash
-
 	sig, err := r.Sign(hdr)
 	if err != nil {
 		panic(err)
@@ -164,11 +187,57 @@ func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Blo
 	red.SignedHash = sig
 
 	m := message.NewWithHeader(topics.Reduction, *red, config.KadcastInitHeader)
-	if err := r.Republish(m); err != nil {
-		panic(err)
-	}
+	return m, voteHash, nil
+}
 
-	return m, voteHash
+// GetVerifiedHash get verifiedHash.
+func (r *Reduction) GetVerifiedHash() []byte {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	return r.verifiedHash
+}
+
+// SetVerifiedHash set verifiedHash.
+func (r *Reduction) SetVerifiedHash(hash []byte) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	r.verifiedHash = hash
+}
+
+// SendReductionAsync call SendReduction within a separate goroutine.
+func (r *Reduction) SendReductionAsync(ctx context.Context, wg *sync.WaitGroup, evChan chan message.Message,
+	round uint64, step uint8, candidate *block.Block,
+) context.CancelFunc {
+	ctx, cancel := context.WithCancel(ctx)
+
+	wg.Add(1)
+
+	go func() {
+		defer func() {
+			wg.Done()
+
+			if r := recover(); r != nil {
+				log.WithField("round", round).WithField("step", step).
+					WithError(fmt.Errorf("%+v", r)).
+					Errorln("sending reduction err")
+			}
+		}()
+
+		m, _, err := r.SendReduction(ctx, round, step, candidate)
+		if err != nil {
+			return
+		}
+
+		// Queue my own vote to be registered locally
+		select {
+		case evChan <- m:
+		default:
+		}
+	}()
+
+	return cancel
 }
 
 // ShouldProcess checks whether a message is consistent with the current round
@@ -242,15 +311,6 @@ func logVerifyErr(err error, round uint64, step uint8, candidate *block.Block) {
 		l.Debug("verifyfn failed")
 	default:
 		// a problem to report as an error to investigate
-		l.Error("verifyfn failed")
-	}
-}
-
-// Recover wraps recover with adding round and step fields on a panic.
-func Recover(round uint64, step uint8) {
-	if r := recover(); r != nil {
-		log.WithField("round", round).WithField("step", step).
-			WithError(fmt.Errorf("%+v", r)).
-			Errorln("panic in sendreduction ")
+		l.WithError(err).Error("verifyfn failed")
 	}
 }
