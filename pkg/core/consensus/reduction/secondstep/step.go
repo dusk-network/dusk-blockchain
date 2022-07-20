@@ -101,8 +101,6 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	var wg sync.WaitGroup
 	var cancel context.CancelFunc
 
-	defer wg.Wait()
-
 	if p.handler.AmMember(r.Round, step) {
 		cancel = p.SendReductionAsync(ctx, &wg, evChan,
 			r.Round, step, p.firstStepVotesMsg.Candidate)
