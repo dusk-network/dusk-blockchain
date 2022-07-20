@@ -98,14 +98,10 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	// send our own Selection
 	var wg sync.WaitGroup
-	var cancel context.CancelFunc
-
-	defer wg.Wait()
 
 	if p.handler.AmMember(r.Round, step) {
-		cancel = p.SendReductionAsync(ctx, &wg, evChan,
+		_ = p.SendReductionAsync(ctx, &wg, evChan,
 			r.Round, step, &p.selectionResult.Candidate)
-		defer cancel()
 	}
 
 	// Process queued reduction messages
@@ -130,7 +126,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 				go func() {
 					<-timeoutChan
 				}()
-				return p.gotoNextPhase(sv, nil, nil)
+				return p.gotoNextPhase(sv)
 			}
 		}
 	}
@@ -150,14 +146,14 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 					go func() {
 						<-timeoutChan
 					}()
-					return p.gotoNextPhase(sv, cancel, &wg)
+					return p.gotoNextPhase(sv)
 				}
 			}
 
 		case <-timeoutChan:
 			// in case of timeout we proceed in the consensus with an empty hash
 			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step, *block.NewBlock())
-			return p.gotoNextPhase(sv, cancel, &wg)
+			return p.gotoNextPhase(sv)
 
 		case <-ctx.Done():
 			// preventing timeout leakage
@@ -169,14 +165,8 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 }
 
-func (p *Phase) gotoNextPhase(msg *message.StepVotesMsg, cancel context.CancelFunc, wg *sync.WaitGroup) consensus.PhaseFn {
+func (p *Phase) gotoNextPhase(msg *message.StepVotesMsg) consensus.PhaseFn {
 	if msg != nil {
-		if cancel != nil && wg != nil {
-			// wait for SendReduction
-			cancel()
-			wg.Wait()
-		}
-
 		msg.VerifiedHash = p.GetVerifiedHash()
 	}
 
