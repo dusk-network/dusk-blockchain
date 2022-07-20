@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 )
@@ -23,6 +24,12 @@ const All uint64 = math.MaxUint64
 
 // Set is an ordered set of big.Int.
 type Set []*big.Int
+
+// SafeSet is a wrapper of Set but with explicit Lock/Unlock methods.
+type SafeSet struct {
+	Set
+	mu *sync.RWMutex
+}
 
 // Len complies with the Sort interface.
 func (v Set) Len() int { return len(v) }
@@ -36,6 +43,14 @@ func (v Set) Less(i, j int) bool { return v[i].Cmp(v[j]) < 0 }
 // New creates a new instance of a sorted set.
 func New() Set {
 	return make([]*big.Int, 0)
+}
+
+// NewSafeSet creates SafeSet.
+func NewSafeSet() SafeSet {
+	return SafeSet{
+		Set: New(),
+		mu:  &sync.RWMutex{},
+	}
 }
 
 // Equal tests a set for equality.
@@ -214,4 +229,21 @@ func (v *Set) Contains(b []byte) bool {
 	iRepr := new(big.Int).SetBytes(b)
 	_, found := v.indexOf(iRepr)
 	return found
+}
+
+// Lock locks underlying data explicitly.
+func (v *SafeSet) Lock() {
+	v.mu.Lock()
+}
+
+// Unlock unlocks underlying data explicitly.
+func (v *SafeSet) Unlock() {
+	v.mu.Unlock()
+}
+
+// Reset resets underlying data.
+func (v *SafeSet) Reset() {
+	v.mu.Lock()
+	v.Set = New()
+	v.mu.Unlock()
 }
