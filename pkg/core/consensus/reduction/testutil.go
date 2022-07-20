@@ -133,7 +133,7 @@ func (hlp *Helper) shouldFailVerification() bool {
 
 // ProcessCandidateVerificationRequest is a callback used by the firststep
 // reduction to verify potential winning candidates.
-func (hlp *Helper) ProcessCandidateVerificationRequest(blk block.Block) error {
+func (hlp *Helper) ProcessCandidateVerificationRequest(ctx context.Context, blk block.Block) error {
 	if hlp.shouldFailVerification() {
 		return errors.New("verification failed")
 	}
