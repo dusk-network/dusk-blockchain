@@ -692,7 +692,7 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 
 // VerifyCandidateBlock can be used as a callback for the consensus in order to
 // verify potential winning candidates.
-func (c *Chain) VerifyCandidateBlock(candidate block.Block) error {
+func (c *Chain) VerifyCandidateBlock(ctx context.Context, candidate block.Block) error {
 	var (
 		err       error
 		chainTip  block.Block
@@ -715,7 +715,7 @@ func (c *Chain) VerifyCandidateBlock(candidate block.Block) error {
 		return err
 	}
 
-	stateRoot, err = c.proxy.Executor().VerifyStateTransition(c.ctx, candidate.Txs, candidate.Header.GasLimit,
+	stateRoot, err = c.proxy.Executor().VerifyStateTransition(ctx, candidate.Txs, candidate.Header.GasLimit,
 		candidate.Header.Height, candidate.Header.GeneratorBlsPubkey)
 	if err != nil {
 		return err
