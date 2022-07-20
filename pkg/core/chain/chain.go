@@ -32,6 +32,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/sirupsen/logrus"
 	logger "github.com/sirupsen/logrus"
@@ -111,6 +112,7 @@ type Chain struct {
 	ctx context.Context
 
 	blacklisted dupemap.TmpMap
+	verified    sortedset.SafeSet
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -129,6 +131,7 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		loop:              loop,
 		stopConsensusChan: make(chan struct{}),
 		blacklisted:       *dupemap.NewTmpMap(1000, 120),
+		verified:          sortedset.NewSafeSet(),
 	}
 
 	chain.synchronizer = newSynchronizer(db, chain)
@@ -615,6 +618,7 @@ func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 	}
 
 	c.tip = b
+	c.verified.Reset()
 
 	// 5. Perform all post-events on accepting a block
 	c.postAcceptBlock(*b, l)
@@ -715,11 +719,23 @@ func (c *Chain) VerifyCandidateBlock(ctx context.Context, candidate block.Block)
 		return err
 	}
 
+	// Locking here would enable Chain to perform VST calls in a row, checking
+	// hash against cached hashes firstly.
+	c.verified.Lock()
+	defer c.verified.Unlock()
+
+	if c.verified.Contains(candidate.Header.Hash) {
+		// already verified
+		return nil
+	}
+
 	stateRoot, err = c.proxy.Executor().VerifyStateTransition(ctx, candidate.Txs, candidate.Header.GasLimit,
 		candidate.Header.Height, candidate.Header.GeneratorBlsPubkey)
 	if err != nil {
 		return err
 	}
+
+	c.verified.Insert(candidate.Header.Hash)
 
 	if !bytes.Equal(stateRoot, candidate.Header.StateHash) {
 		log.WithField("candidate_state_hash", hex.EncodeToString(candidate.Header.StateHash)).
