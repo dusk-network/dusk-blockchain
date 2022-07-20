@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func verifyFn(block.Block) error {
+func verifyFn(context.Context, block.Block) error {
 	return nil
 }
 

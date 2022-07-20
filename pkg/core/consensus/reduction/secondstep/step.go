@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -74,7 +75,7 @@ func (p *Phase) String() string {
 // Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.firstStepVotesMsg = re.(message.StepVotesMsg)
-	p.VerifiedHash = p.firstStepVotesMsg.VerifiedHash
+	p.SetVerifiedHash(p.firstStepVotesMsg.VerifiedHash)
 	return p
 }
 
@@ -96,14 +97,16 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 	// first we send our own Selection
 
-	if p.handler.AmMember(r.Round, step) {
-		go func() {
-			defer reduction.Recover(r.Round, step)
+	// wait group
+	var wg sync.WaitGroup
+	var cancel context.CancelFunc
 
-			m, _ := p.SendReduction(r.Round, step, p.firstStepVotesMsg.Candidate)
-			// Queue my own vote to be registered locally
-			evChan <- m
-		}()
+	defer wg.Wait()
+
+	if p.handler.AmMember(r.Round, step) {
+		cancel = p.SendReductionAsync(ctx, &wg, evChan,
+			r.Round, step, p.firstStepVotesMsg.Candidate)
+		defer cancel()
 	}
 
 	timeoutChan := time.After(p.TimeOut)
