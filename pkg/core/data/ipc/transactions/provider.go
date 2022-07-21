@@ -19,6 +19,8 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+const extraDelay = 7 * time.Second
+
 // UnconfirmedTxProber performs verification of contract calls (transactions).
 type UnconfirmedTxProber interface {
 	// VerifyTransaction verifies a contract call transaction.
@@ -149,6 +151,7 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 
 	ruskCtx := injectRuskVersion(ctx)
 
+	time.Sleep(extraDelay)
 	resp, err := e.stateClient.VerifyStateTransition(ruskCtx, vstr)
 	if err != nil {
 		return nil, err
@@ -176,6 +179,7 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 
 	ruskCtx := injectRuskVersion(ctx)
 
+	time.Sleep(extraDelay)
 	// No deadline grpc call. It's all or nothing. This is to avoid a scenario
 	// where grpc call returns DeadlineExceeded error which may end up into an
 	// inconsistency between rusk and dusk service states.
@@ -227,6 +231,8 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 	}
 
 	ruskCtx := injectRuskVersion(ctx)
+
+	time.Sleep(extraDelay)
 
 	// No deadline grpc call. It's all or nothing. This is to avoid a scenario
 	// where grpc call returns DeadlineExceeded error which may end up into an
@@ -282,6 +288,8 @@ func (e *executor) ExecuteStateTransition(ctx context.Context, calls []ContractC
 	defer cancel()
 
 	ruskCtx := injectRuskVersion(ctx)
+
+	time.Sleep(extraDelay)
 
 	res, err := e.stateClient.ExecuteStateTransition(ruskCtx, vstr)
 	if err != nil {

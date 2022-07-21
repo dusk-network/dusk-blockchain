@@ -235,6 +235,10 @@ func (r *Reduction) SendReductionAsync(ctx context.Context, wg *sync.WaitGroup, 
 		case evChan <- m:
 		default:
 		}
+
+		if err := r.Republish(m); err != nil {
+			panic(err)
+		}
 	}()
 
 	return cancel
