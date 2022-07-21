@@ -99,10 +99,10 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	// send our own Selection
 	var wg sync.WaitGroup
 
-	if p.handler.AmMember(r.Round, step) {
-		_ = p.SendReductionAsync(ctx, &wg, evChan,
-			r.Round, step, &p.selectionResult.Candidate)
-	}
+	// if p.handler.AmMember(r.Round, step) {
+	_ = p.SendReductionAsync(ctx, &wg, evChan,
+		r.Round, step, &p.selectionResult.Candidate)
+	//}
 
 	// Process queued reduction messages
 	timeoutChan := time.After(p.TimeOut)
