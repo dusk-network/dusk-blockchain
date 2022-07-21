@@ -75,7 +75,6 @@ func (p *Phase) String() string {
 // Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.selectionResult = re.(message.NewBlock)
-	p.SetVerifiedHash(nil)
 	return p
 }
 
@@ -102,7 +101,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	// if p.handler.AmMember(r.Round, step) {
 	_ = p.SendReductionAsync(ctx, &wg, evChan,
 		r.Round, step, &p.selectionResult.Candidate)
-	//}
+	// }
 
 	// Process queued reduction messages
 	timeoutChan := time.After(p.TimeOut)
@@ -166,10 +165,6 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 }
 
 func (p *Phase) gotoNextPhase(msg *message.StepVotesMsg) consensus.PhaseFn {
-	if msg != nil {
-		msg.VerifiedHash = p.GetVerifiedHash()
-	}
-
 	return p.next.Initialize(*msg)
 }
 

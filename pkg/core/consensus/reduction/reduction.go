@@ -7,7 +7,6 @@
 package reduction
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -62,10 +61,6 @@ type Reduction struct {
 
 	// VerifyFn verifies candidate block
 	VerifyFn consensus.CandidateVerificationFunc
-
-	verifiedHash []byte
-
-	lock sync.RWMutex
 }
 
 // IncreaseTimeout is used when reduction does not reach the quorum or
@@ -83,14 +78,6 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 	}
 }
 
-func (r *Reduction) isVerified(hash []byte) bool {
-	if r.verifiedHash != nil && bytes.Equal(r.verifiedHash, hash) {
-		return true
-	}
-
-	return false
-}
-
 // verifyWithDelay calls verifyFn upon the candidate block but also incorporates a
 // delay on success verification.
 // vHash param is hash of block that has been already verified.
@@ -106,11 +93,6 @@ func (r *Reduction) verifyWithDelay(ctx context.Context, candidate *block.Block,
 	hash, err := candidate.CalculateHash()
 	if err != nil {
 		return nil, err
-	}
-
-	if r.isVerified(hash) {
-		lg.WithField("verified_hash", util.StringifyBytes(hash)).Info("block already verified")
-		return hash, nil
 	}
 
 	st := time.Now().UnixMilli()
@@ -138,22 +120,10 @@ func (r *Reduction) verifyWithDelay(ctx context.Context, candidate *block.Block,
 	return hash, nil
 }
 
-func (r *Reduction) addVerified(hash []byte) {
-	var cpy [32]byte
-	copy(cpy[:], hash)
-
-	if cpy != block.EmptyHash {
-		r.verifiedHash = cpy[:]
-	}
-}
-
 // SendReduction propagates a signed vote for the candidate block, if block is
 // fully valid. A full block validation will be performed if Candidate Hash differs from r.VerifiedHash.
 // Error is returned only if the reduction should be not be registered locally.
 func (r *Reduction) SendReduction(ctx context.Context, round uint64, step uint8, candidate *block.Block) (message.Message, []byte, error) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
 	voteHash, err := r.verifyWithDelay(ctx, candidate, step)
 	if err != nil {
 		logVerifyErr(err, round, step, candidate)
@@ -166,8 +136,6 @@ func (r *Reduction) SendReduction(ctx context.Context, round uint64, step uint8,
 
 		// Vote for an empty hash
 		voteHash = block.EmptyHash[:]
-	} else {
-		r.addVerified(voteHash)
 	}
 
 	// Generate Reduction message to propagate my vote.
@@ -188,22 +156,6 @@ func (r *Reduction) SendReduction(ctx context.Context, round uint64, step uint8,
 
 	m := message.NewWithHeader(topics.Reduction, *red, config.KadcastInitHeader)
 	return m, voteHash, nil
-}
-
-// GetVerifiedHash get verifiedHash.
-func (r *Reduction) GetVerifiedHash() []byte {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-
-	return r.verifiedHash
-}
-
-// SetVerifiedHash set verifiedHash.
-func (r *Reduction) SetVerifiedHash(hash []byte) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.verifiedHash = hash
 }
 
 // SendReductionAsync call SendReduction within a separate goroutine.

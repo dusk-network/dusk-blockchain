@@ -75,7 +75,6 @@ func (p *Phase) String() string {
 // Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.firstStepVotesMsg = re.(message.StepVotesMsg)
-	p.SetVerifiedHash(p.firstStepVotesMsg.VerifiedHash)
 	return p
 }
 
