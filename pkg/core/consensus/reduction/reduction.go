@@ -10,8 +10,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
-	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -156,44 +154,6 @@ func (r *Reduction) SendReduction(ctx context.Context, round uint64, step uint8,
 
 	m := message.NewWithHeader(topics.Reduction, *red, config.KadcastInitHeader)
 	return m, voteHash, nil
-}
-
-// SendReductionAsync call SendReduction within a separate goroutine.
-func (r *Reduction) SendReductionAsync(ctx context.Context, wg *sync.WaitGroup, evChan chan message.Message,
-	round uint64, step uint8, candidate *block.Block,
-) context.CancelFunc {
-	ctx, cancel := context.WithCancel(ctx)
-
-	wg.Add(1)
-
-	go func() {
-		defer func() {
-			wg.Done()
-
-			if r := recover(); r != nil {
-				log.WithField("round", round).WithField("step", step).
-					WithError(fmt.Errorf("%+v", r)).
-					Errorln("sending reduction err")
-			}
-		}()
-
-		m, _, err := r.SendReduction(ctx, round, step, candidate)
-		if err != nil {
-			return
-		}
-
-		// Queue my own vote to be registered locally
-		select {
-		case evChan <- m:
-		default:
-		}
-
-		if err := r.Republish(m); err != nil {
-			panic(err)
-		}
-	}()
-
-	return cancel
 }
 
 // ShouldProcess checks whether a message is consistent with the current round
