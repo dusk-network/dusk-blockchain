@@ -155,8 +155,12 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			}
 
 		case <-timeoutChan:
+			l := lg.WithField("event", "timeout").WithField("duration", p.TimeOut.String())
+			p.aggregator.Log(l, r.Round, step)
+
 			// in case of timeout we proceed in the consensus with an empty hash
 			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step, *block.NewBlock())
+
 			return p.gotoNextPhase(sv)
 
 		case <-ctx.Done():

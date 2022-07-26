@@ -121,10 +121,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		if err != nil {
 			lg.WithError(err).Errorln("candidate block generation failed")
 		} else {
-			if log.GetLevel() >= logrus.DebugLevel {
-				consensus.WithFields(r.Round, step, "candidate_generated",
-					scr.State().BlockHash, p.Keys.BLSPubKey, nil, nil, nil).Debug()
-			}
+			logNewBlock(r.Round, step, scr.State().BlockHash, p.Keys.BLSPubKey)
 
 			buf := message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
 			evChan <- buf
@@ -298,4 +295,19 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 	}
 
 	return true
+}
+
+func logNewBlock(round uint64, step uint8, hash []byte, keys []byte) {
+	label := "new candidate"
+
+	if log.GetLevel() >= logrus.DebugLevel {
+		consensus.WithFields(round, step, label,
+			hash, keys, nil, nil, nil).Debug()
+	} else {
+		log.WithField("is_member", true).
+			WithField("round", round).
+			WithField("step", step).
+			WithField("hash", util.StringifyBytes(hash)).
+			Info(label)
+	}
 }
