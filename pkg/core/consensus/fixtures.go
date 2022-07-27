@@ -120,7 +120,7 @@ func (m *mockPhase) String() string {
 }
 
 // nolint
-func (m *mockPhase) Run(ctx context.Context, queue *Queue, evChan chan message.Message, r RoundUpdate, step uint8) PhaseFn {
+func (m *mockPhase) Run(ctx context.Context, queue *Queue, _, _ chan message.Message, r RoundUpdate, step uint8) PhaseFn {
 	ctx = context.WithValue(ctx, "Packet", m.packet)
 	if stop := m.callback(ctx); stop {
 		return nil
@@ -179,7 +179,7 @@ func (t *TestPhase) Initialize(sv InternalPacket) PhaseFn {
 }
 
 // Run does nothing else than delegating to the specified callback.
-func (t *TestPhase) Run(_ context.Context, queue *Queue, _ chan message.Message, _ RoundUpdate, step uint8) PhaseFn {
+func (t *TestPhase) Run(_ context.Context, queue *Queue, _, _ chan message.Message, _ RoundUpdate, step uint8) PhaseFn {
 	t.callback(t.req, t.packet, t.streamer, t.aChan)
 	return nil
 }

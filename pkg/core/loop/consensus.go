@@ -52,7 +52,8 @@ type Consensus struct {
 
 	agreementChan     chan message.Message
 	aggrAgreementChan chan message.Message
-	eventChan         chan message.Message
+	newBlockChan      chan message.Message
+	reductionChan     chan message.Message
 
 	listeners []eventbus.Listener
 }
@@ -84,7 +85,8 @@ func New(e *consensus.Emitter) *Consensus {
 	listeners := make([]eventbus.Listener, 0)
 
 	agreementChan := make(chan message.Message, msgChanSize)
-	eventChan := make(chan message.Message, msgChanSize)
+	newBlockChan := make(chan message.Message, msgChanSize)
+	reductionChan := make(chan message.Message, msgChanSize)
 	aggrAgreementChan := make(chan message.Message, msgChanSize)
 
 	// subscribe agreement phase to message.Agreement
@@ -96,12 +98,14 @@ func New(e *consensus.Emitter) *Consensus {
 	e.EventBus.Subscribe(topics.AggrAgreement, aggrAgChan)
 	listeners = append(listeners, aggrAgChan)
 
-	// subscribe topics to eventChan
-	evSub := eventbus.NewChanListener(eventChan)
-	listeners = append(listeners, evSub)
+	// subscribe selection phase to message.NewBlock
+	newBlockListener := eventbus.NewChanListener(newBlockChan)
+	e.EventBus.Subscribe(topics.NewBlock, newBlockListener)
+	listeners = append(listeners, newBlockListener)
 
-	e.EventBus.AddDefaultTopic(topics.Reduction, topics.NewBlock)
-	e.EventBus.SubscribeDefault(evSub)
+	reductionListener := eventbus.NewChanListener(reductionChan)
+	e.EventBus.Subscribe(topics.Reduction, reductionListener)
+	listeners = append(listeners, reductionListener)
 
 	c := &Consensus{
 		Emitter:           e,
@@ -109,7 +113,8 @@ func New(e *consensus.Emitter) *Consensus {
 		eventQueue:        consensus.NewQueue(),
 		roundQueue:        consensus.NewQueue(),
 		agreementChan:     agreementChan,
-		eventChan:         eventChan,
+		newBlockChan:      newBlockChan,
+		reductionChan:     reductionChan,
 		aggrAgreementChan: aggrAgreementChan,
 		listeners:         listeners,
 	}
@@ -171,7 +176,7 @@ func (c *Consensus) Spin(ctx context.Context, scr consensus.Phase, ag consensus.
 	// synchronous consensus loop keeps running until the agreement invokes
 	// context.Done or the context is canceled some other way
 	for step := uint8(1); ; step++ {
-		phaseFunction = phaseFunction.Run(stepCtx, c.eventQueue, c.eventChan, round, step)
+		phaseFunction = phaseFunction.Run(stepCtx, c.eventQueue, c.newBlockChan, c.reductionChan, round, step)
 		// if result is nil, this round is over
 		if phaseFunction == nil {
 			lg.

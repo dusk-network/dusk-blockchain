@@ -80,7 +80,7 @@ func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 
 // Run the first reduction step until either there is a timeout, we reach 64%
 // of votes, or we experience an unrecoverable error.
-func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
+func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	tlog := getLog(r.Round, step)
 
 	defer func() {
@@ -101,10 +101,10 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	a := reduction.NewAsyncSend(p.Reduction, r.Round, step, &p.selectionResult.Candidate)
 
 	if p.handler.AmMember(r.Round, step) {
-		_ = a.Go(ctx, &wg, evChan, reduction.Republish)
+		_ = a.Go(ctx, &wg, reductionChan, reduction.Republish)
 	} else {
 		if p.handler.AmMember(r.Round, step+1) {
-			_ = a.Go(ctx, &wg, evChan, reduction.ValidateOnly)
+			_ = a.Go(ctx, &wg, reductionChan, reduction.ValidateOnly)
 		}
 	}
 
@@ -137,7 +137,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	for {
 		select {
-		case ev := <-evChan:
+		case ev := <-reductionChan:
 			if reduction.ShouldProcess(ev, r.Round, step, queue) {
 				rMsg := ev.Payload().(message.Reduction)
 				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {

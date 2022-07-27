@@ -98,7 +98,7 @@ func (p *Phase) String() string {
 
 // Run executes the logic for this phase.
 // In this case the selection listens to NewBlock messages.
-func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
+func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, newBlockChan, _ chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	ctx, cancel := context.WithCancel(parentCtx)
 
 	defer func() {
@@ -123,14 +123,22 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		} else {
 			logNewBlock(r.Round, step, scr.State().BlockHash, p.Keys.BLSPubKey)
 
-			buf := message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
-			evChan <- buf
+			// Broadcast the candidate block for this round/iteration.
+			m := message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
+			if err := p.Republish(m); err != nil {
+				lg.WithError(err).
+					Error("could not republish new block")
+			}
+
+			// register new candidate in local state without propagating it.
+			m = message.NewWithHeader(topics.NewBlock, *scr, []byte{0})
+			newBlockChan <- m
 		}
 	}
 
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.NewBlock {
-			evChan <- ev
+			newBlockChan <- ev
 		}
 	}
 
@@ -138,7 +146,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 	for {
 		select {
-		case ev := <-evChan:
+		case ev := <-newBlockChan:
 			if shouldProcess(ev, r.Round, step, queue) {
 				b := ev.Payload().(message.NewBlock)
 				if err := p.collectNewBlock(b, ev.Header()); err != nil {
@@ -226,7 +234,7 @@ func (p *Phase) collectNewBlock(msg message.NewBlock, msgHeader []byte) error {
 	m := message.NewWithHeader(topics.NewBlock, msg, msgHeader)
 	if err := p.Republish(m); err != nil {
 		lg.WithError(err).
-			Error("could not republish score event")
+			Error("could not republish new block")
 	}
 
 	return nil
