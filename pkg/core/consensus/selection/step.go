@@ -160,6 +160,12 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, newBlockC
 				return p.endSelection(b)
 			}
 		case <-timeoutChan:
+			lg.WithField("event", "timeout").
+				WithField("duration", p.timeout.String()).
+				WithField("round", r.Round).
+				WithField("step", step).
+				Info("")
+
 			return p.endSelection(message.EmptyNewBlock())
 		case <-ctx.Done():
 			// preventing timeout leakage
