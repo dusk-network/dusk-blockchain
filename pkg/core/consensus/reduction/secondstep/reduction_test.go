@@ -185,11 +185,11 @@ func TestSecondStepReduction(t *testing.T) {
 			// injecting the stepVotes into secondStep
 			secondStepReduction.Initialize(msg)
 
-			runTestCallback := secondStepReduction.Run(ctx, queue, evChan, r, step)
+			runTestCallback := secondStepReduction.Run(ctx, queue, evChan, evChan, r, step)
 			// testing the status of the step
 			ttest.testStep(t, secondStepReduction)
 			// here the tests are performed on the result of the step
-			_ = runTestCallback.Run(ctx, queue, evChan, r, step+1)
+			_ = runTestCallback.Run(ctx, queue, evChan, evChan, r, step+1)
 		})
 
 		hlp.EventBus.Unsubscribe(topics.Gossip, id)

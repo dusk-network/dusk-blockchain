@@ -45,7 +45,7 @@ func PrepareSendReductionTest(hlp *Helper, stepFn consensus.PhaseFn) func(t *tes
 		}(cancel)
 
 		evChan := make(chan message.Message, 1)
-		n := stepFn.Run(ctx, consensus.NewQueue(), evChan, consensus.MockRoundUpdate(uint64(1), hlp.P), uint8(2))
+		n := stepFn.Run(ctx, consensus.NewQueue(), evChan, evChan, consensus.MockRoundUpdate(uint64(1), hlp.P), uint8(2))
 		require.Nil(n)
 	}
 }
