@@ -253,6 +253,7 @@ func init() {
 	r.General.Network = devnet
 	r.Consensus.ConsensusTimeOut = DefaultConsensusTimeOutSeconds
 	r.Mempool.MaxInvItems = 10000
+	r.Mempool.ExtractionDelaySecs = 3
 	r.State.PersistEvery = 1
 	r.State.BlockGasLimit = DefaultBlockGasLimit
 }
