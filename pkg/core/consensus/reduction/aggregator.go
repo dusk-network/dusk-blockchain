@@ -125,3 +125,18 @@ func (a *Aggregator) addBitSet(sv *message.StepVotes, cluster sortedset.Cluster,
 	committee := a.handler.Committee(round, step)
 	sv.BitSet = committee.Bits(cluster.Set)
 }
+
+// Log dumps current state of voteSets in passed logrus.
+func (a *Aggregator) Log(l *logrus.Entry, round uint64, step uint8) {
+	target := a.handler.Quorum(round)
+
+	for hash, sv := range a.voteSets {
+		total := sv.Cluster.TotalOccurrences()
+
+		l.WithField("hash", util.StringifyBytes([]byte(hash))).
+			WithField("total", total).
+			WithField("round", round).
+			WithField("step", step).
+			WithField("quorum_target", target).Info()
+	}
+}

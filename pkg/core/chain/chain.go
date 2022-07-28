@@ -12,7 +12,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -32,6 +31,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/sirupsen/logrus"
 	logger "github.com/sirupsen/logrus"
@@ -111,6 +111,7 @@ type Chain struct {
 	ctx context.Context
 
 	blacklisted dupemap.TmpMap
+	verified    sortedset.SafeSet
 }
 
 // New returns a new chain object. It accepts the EventBus (for messages coming
@@ -129,6 +130,7 @@ func New(ctx context.Context, db database.DB, eventBus *eventbus.EventBus, rpcBu
 		loop:              loop,
 		stopConsensusChan: make(chan struct{}),
 		blacklisted:       *dupemap.NewTmpMap(1000, 120),
+		verified:          sortedset.NewSafeSet(),
 	}
 
 	chain.synchronizer = newSynchronizer(db, chain)
@@ -384,11 +386,13 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 // acceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
 func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
-	startTime := time.Now().UnixMilli()
-
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
 
-	prevBlockTimestamp := c.tip.Header.Timestamp
+	// TODO: Verify Certificate
+	if err := c.propagateBlock(blk, kadcastHeight); err != nil {
+		log.WithError(err).Error("block propagation failed")
+		return err
+	}
 
 	if err := c.acceptBlock(blk, true); err != nil {
 		return err
@@ -396,28 +400,6 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 
 	if blk.Header.Height > c.highestSeen {
 		c.highestSeen = blk.Header.Height
-	}
-
-	// Guarantee that the execution time of the entire process of accepting the
-	// next valid block (which includes rusk calls, block verification and
-	// persistence) will never be less than N Milliseconds.
-	// This won't be applied in cases when:
-	// node is in out-of-sync mode.
-	// block time is higher that ConsensusTimeThreshold
-	if prevBlockTimestamp+config.ConsensusTimeThreshold > blk.Header.Timestamp {
-		maxDelayMilli := config.Get().Consensus.ThrottleMilli
-		if maxDelayMilli == 0 {
-			maxDelayMilli = 2000
-		}
-
-		if d, err := util.Delay(startTime, maxDelayMilli); err == nil {
-			log.WithField("height", blk.Header.Height).WithField("sleep_for", d.String()).Trace("throttled")
-		}
-	}
-
-	if err := c.propagateBlock(blk, kadcastHeight); err != nil {
-		log.WithError(err).Error("block propagation failed")
-		return err
 	}
 
 	return nil
@@ -615,6 +597,7 @@ func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 	}
 
 	c.tip = b
+	c.verified.Reset()
 
 	// 5. Perform all post-events on accepting a block
 	c.postAcceptBlock(*b, l)
@@ -692,7 +675,7 @@ func (c *Chain) postAcceptBlock(blk block.Block, l *logrus.Entry) {
 
 // VerifyCandidateBlock can be used as a callback for the consensus in order to
 // verify potential winning candidates.
-func (c *Chain) VerifyCandidateBlock(candidate block.Block) error {
+func (c *Chain) VerifyCandidateBlock(ctx context.Context, candidate block.Block) error {
 	var (
 		err       error
 		chainTip  block.Block
@@ -715,11 +698,23 @@ func (c *Chain) VerifyCandidateBlock(candidate block.Block) error {
 		return err
 	}
 
-	stateRoot, err = c.proxy.Executor().VerifyStateTransition(c.ctx, candidate.Txs, candidate.Header.GasLimit,
+	// Locking here would enable Chain to perform VST calls in a row, checking
+	// hash against cached hashes firstly.
+	c.verified.Lock()
+	defer c.verified.Unlock()
+
+	if c.verified.Contains(candidate.Header.Hash) {
+		// already verified
+		return nil
+	}
+
+	stateRoot, err = c.proxy.Executor().VerifyStateTransition(ctx, candidate.Txs, candidate.Header.GasLimit,
 		candidate.Header.Height, candidate.Header.GeneratorBlsPubkey)
 	if err != nil {
 		return err
 	}
+
+	c.verified.Insert(candidate.Header.Hash)
 
 	if !bytes.Equal(stateRoot, candidate.Header.StateHash) {
 		log.WithField("candidate_state_hash", hex.EncodeToString(candidate.Header.StateHash)).

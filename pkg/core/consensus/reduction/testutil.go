@@ -45,7 +45,7 @@ func PrepareSendReductionTest(hlp *Helper, stepFn consensus.PhaseFn) func(t *tes
 		}(cancel)
 
 		evChan := make(chan message.Message, 1)
-		n := stepFn.Run(ctx, consensus.NewQueue(), evChan, consensus.MockRoundUpdate(uint64(1), hlp.P), uint8(2))
+		n := stepFn.Run(ctx, consensus.NewQueue(), evChan, evChan, consensus.MockRoundUpdate(uint64(1), hlp.P), uint8(2))
 		require.Nil(n)
 	}
 }
@@ -133,7 +133,7 @@ func (hlp *Helper) shouldFailVerification() bool {
 
 // ProcessCandidateVerificationRequest is a callback used by the firststep
 // reduction to verify potential winning candidates.
-func (hlp *Helper) ProcessCandidateVerificationRequest(blk block.Block) error {
+func (hlp *Helper) ProcessCandidateVerificationRequest(ctx context.Context, blk block.Block) error {
 	if hlp.shouldFailVerification() {
 		return errors.New("verification failed")
 	}

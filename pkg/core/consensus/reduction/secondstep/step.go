@@ -74,13 +74,12 @@ func (p *Phase) String() string {
 // Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.firstStepVotesMsg = re.(message.StepVotesMsg)
-	p.VerifiedHash = p.firstStepVotesMsg.VerifiedHash
 	return p
 }
 
 // Run the first reduction step until either there is a timeout, we reach 64%
 // of votes, or we experience an unrecoverable error.
-func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
+func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	tlog := getLog(r.Round, step)
 
 	defer func() {
@@ -96,11 +95,13 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 	// first we send our own Selection
 
-	if p.handler.AmMember(r.Round, step) {
-		m, _ := p.SendReduction(r.Round, step, p.firstStepVotesMsg.Candidate)
+	var cancel context.CancelFunc
 
-		// Queue my own vote to be registered locally
-		evChan <- m
+	a := reduction.NewAsyncSend(p.Reduction, r.Round, step, p.firstStepVotesMsg.Candidate)
+
+	if p.handler.AmMember(r.Round, step) {
+		cancel = a.Go(ctx, reductionChan, reduction.Republish)
+		defer cancel()
 	}
 
 	timeoutChan := time.After(p.TimeOut)
@@ -131,7 +132,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	for {
 		select {
-		case ev := <-evChan:
+		case ev := <-reductionChan:
 			if reduction.ShouldProcess(ev, r.Round, step, queue) {
 				rMsg := ev.Payload().(message.Reduction)
 				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
@@ -142,6 +143,9 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 				if svm == nil {
 					continue
 				}
+
+				l := lg.WithField("event", "timeout").WithField("duration", p.TimeOut.String())
+				p.aggregator.Log(l, r.Round, step)
 
 				go func() { // preventing timeout leakage
 					<-timeoutChan
@@ -155,6 +159,9 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			}
 
 		case <-timeoutChan:
+			l := lg.WithField("event", "timeout").WithField("duration", p.TimeOut.String())
+			p.aggregator.Log(l, r.Round, step)
+
 			// in case of timeout we increase the timeout and that's it
 			p.IncreaseTimeout(r.Round)
 			return p.next.Initialize(nil)

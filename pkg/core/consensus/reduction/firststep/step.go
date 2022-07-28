@@ -74,13 +74,12 @@ func (p *Phase) String() string {
 // Initialize passes to this reduction step the best score collected during selection.
 func (p *Phase) Initialize(re consensus.InternalPacket) consensus.PhaseFn {
 	p.selectionResult = re.(message.NewBlock)
-	p.VerifiedHash = nil
 	return p
 }
 
 // Run the first reduction step until either there is a timeout, we reach 64%
 // of votes, or we experience an unrecoverable error.
-func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
+func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	tlog := getLog(r.Round, step)
 
 	defer func() {
@@ -94,14 +93,19 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 	}
 
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
-	// first we send our own Selection
-	if p.handler.AmMember(r.Round, step) {
-		m, _ := p.SendReduction(r.Round, step, &p.selectionResult.Candidate)
 
-		// Queue my own vote to be registered locally
-		evChan <- m
+	// send our own Selection
+	a := reduction.NewAsyncSend(p.Reduction, r.Round, step, &p.selectionResult.Candidate)
+
+	if p.handler.AmMember(r.Round, step) {
+		_ = a.Go(ctx, reductionChan, reduction.Republish)
+	} else {
+		if p.handler.AmMember(r.Round, step+1) {
+			_ = a.Go(ctx, reductionChan, reduction.ValidateOnly)
+		}
 	}
 
+	// Process queued reduction messages
 	timeoutChan := time.After(p.TimeOut)
 	p.aggregator = reduction.NewAggregator(p.handler)
 
@@ -130,7 +134,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 
 	for {
 		select {
-		case ev := <-evChan:
+		case ev := <-reductionChan:
 			if reduction.ShouldProcess(ev, r.Round, step, queue) {
 				rMsg := ev.Payload().(message.Reduction)
 				if !p.handler.IsMember(rMsg.Sender(), r.Round, step) {
@@ -148,8 +152,12 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 			}
 
 		case <-timeoutChan:
+			l := lg.WithField("event", "timeout").WithField("duration", p.TimeOut.String())
+			p.aggregator.Log(l, r.Round, step)
+
 			// in case of timeout we proceed in the consensus with an empty hash
 			sv := p.createStepVoteMessage(reduction.EmptyResult, r.Round, step, *block.NewBlock())
+
 			return p.gotoNextPhase(sv)
 
 		case <-ctx.Done():
@@ -163,10 +171,6 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, evChan chan mes
 }
 
 func (p *Phase) gotoNextPhase(msg *message.StepVotesMsg) consensus.PhaseFn {
-	if msg != nil {
-		msg.VerifiedHash = p.VerifiedHash
-	}
-
 	return p.next.Initialize(*msg)
 }
 

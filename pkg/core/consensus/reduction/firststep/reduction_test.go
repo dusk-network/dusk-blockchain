@@ -136,11 +136,11 @@ func TestFirstStepReduction(t *testing.T) {
 				Seed:  hash,
 			}
 
-			runTestCallback := firstStepReduction.Run(ctx, queue, evChan, r, step)
+			runTestCallback := firstStepReduction.Run(ctx, queue, evChan, evChan, r, step)
 			// testing the status of the step
 			ttest.testStep(t, firstStepReduction)
 			// here the tests are performed on the result of the step
-			_ = runTestCallback.Run(ctx, queue, evChan, r, step+1)
+			_ = runTestCallback.Run(ctx, queue, evChan, evChan, r, step+1)
 		})
 	}
 }

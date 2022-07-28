@@ -7,7 +7,7 @@
 package reduction
 
 import (
-	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"time"
@@ -59,8 +59,6 @@ type Reduction struct {
 
 	// VerifyFn verifies candidate block
 	VerifyFn consensus.CandidateVerificationFunc
-
-	VerifiedHash []byte
 }
 
 // IncreaseTimeout is used when reduction does not reach the quorum or
@@ -81,7 +79,7 @@ func (r *Reduction) IncreaseTimeout(round uint64) {
 // verifyWithDelay calls verifyFn upon the candidate block but also incorporates a
 // delay on success verification.
 // vHash param is hash of block that has been already verified.
-func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte, error) {
+func (r *Reduction) verifyWithDelay(ctx context.Context, candidate *block.Block, step uint8) ([]byte, error) {
 	if candidate == nil {
 		return nil, errors.New("nil candidate")
 	}
@@ -95,22 +93,9 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 		return nil, err
 	}
 
-	// Handle cases when VerifiedHash is not empty
-	if len(r.VerifiedHash) == 32 && !bytes.Equal(r.VerifiedHash, block.EmptyHash[:]) {
-		// Check if we have already verified this block.
-		if bytes.Equal(r.VerifiedHash, hash) {
-			lg.WithField("verified_hash", util.StringifyBytes(r.VerifiedHash)).Debug("block already verified")
-			return hash, nil
-		}
-
-		lg.WithField("verified_hash", util.StringifyBytes(r.VerifiedHash)).
-			WithField("hash", util.StringifyBytes(hash)).
-			Warn("verified_hash and hash are different")
-	}
-
 	st := time.Now().UnixMilli()
 
-	if err := r.VerifyFn(*candidate); err != nil {
+	if err := r.VerifyFn(ctx, *candidate); err != nil {
 		return nil, err
 	}
 
@@ -135,10 +120,17 @@ func (r *Reduction) verifyWithDelay(candidate *block.Block, step uint8) ([]byte,
 
 // SendReduction propagates a signed vote for the candidate block, if block is
 // fully valid. A full block validation will be performed if Candidate Hash differs from r.VerifiedHash.
-func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Block) (message.Message, []byte) {
-	voteHash, err := r.verifyWithDelay(candidate, step)
+// Error is returned only if the reduction should be not be registered locally.
+func (r *Reduction) SendReduction(ctx context.Context, round uint64, step uint8, candidate *block.Block) (message.Message, []byte, error) {
+	voteHash, err := r.verifyWithDelay(ctx, candidate, step)
 	if err != nil {
 		logVerifyErr(err, round, step, candidate)
+
+		// On these errors the provisioner should not vote with emptyHash.
+		switch err {
+		case ErrLowBlockHeight, context.Canceled:
+			return nil, nil, err
+		}
 
 		// Vote for an empty hash
 		voteHash = block.EmptyHash[:]
@@ -152,8 +144,6 @@ func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Blo
 		PubKeyBLS: r.Keys.BLSPubKey,
 	}
 
-	r.VerifiedHash = voteHash
-
 	sig, err := r.Sign(hdr)
 	if err != nil {
 		panic(err)
@@ -163,11 +153,7 @@ func (r *Reduction) SendReduction(round uint64, step uint8, candidate *block.Blo
 	red.SignedHash = sig
 
 	m := message.NewWithHeader(topics.Reduction, *red, config.KadcastInitHeader)
-	if err := r.Republish(m); err != nil {
-		panic(err)
-	}
-
-	return m, voteHash
+	return m, voteHash, nil
 }
 
 // ShouldProcess checks whether a message is consistent with the current round
@@ -241,6 +227,6 @@ func logVerifyErr(err error, round uint64, step uint8, candidate *block.Block) {
 		l.Debug("verifyfn failed")
 	default:
 		// a problem to report as an error to investigate
-		l.Error("verifyfn failed")
+		l.WithError(err).Error("verifyfn failed")
 	}
 }

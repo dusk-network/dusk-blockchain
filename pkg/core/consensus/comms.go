@@ -39,7 +39,7 @@ type (
 
 	// CandidateVerificationFunc is a callback used to verify candidate blocks
 	// after the conclusion of the first reduction step.
-	CandidateVerificationFunc func(block.Block) error
+	CandidateVerificationFunc func(context.Context, block.Block) error
 
 	// ExecuteTxsFunc is a callback used to retrieve a valid set of txs.
 	ExecuteTxsFunc func(ctx context.Context, txs []transactions.ContractCall, blockHeight uint64, gasLimit uint64, generator []byte) ([]transactions.ContractCall, []byte, error)

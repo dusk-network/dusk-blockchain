@@ -44,8 +44,7 @@ type (
 	StepVotesMsg struct {
 		header.Header
 		StepVotes
-		Candidate    *block.Block
-		VerifiedHash []byte
+		Candidate *block.Block
 	}
 
 	// Agreement is the Event created at the end of the Reduction process. It includes

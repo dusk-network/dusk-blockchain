@@ -98,7 +98,7 @@ func (p *Phase) String() string {
 
 // Run executes the logic for this phase.
 // In this case the selection listens to NewBlock messages.
-func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
+func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, newBlockChan, _ chan message.Message, r consensus.RoundUpdate, step uint8) consensus.PhaseFn {
 	ctx, cancel := context.WithCancel(parentCtx)
 
 	defer func() {
@@ -121,19 +121,24 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 		if err != nil {
 			lg.WithError(err).Errorln("candidate block generation failed")
 		} else {
-			if log.GetLevel() >= logrus.DebugLevel {
-				consensus.WithFields(r.Round, step, "candidate_generated",
-					scr.State().BlockHash, p.Keys.BLSPubKey, nil, nil, nil).Debug()
+			logNewBlock(r.Round, step, scr.State().BlockHash, p.Keys.BLSPubKey)
+
+			// Broadcast the candidate block for this round/iteration.
+			m := message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
+			if err := p.Republish(m); err != nil {
+				lg.WithError(err).
+					Error("could not republish new block")
 			}
 
-			buf := message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
-			evChan <- buf
+			// register new candidate in local state without propagating it.
+			m = message.NewWithHeader(topics.NewBlock, *scr, []byte{0})
+			newBlockChan <- m
 		}
 	}
 
 	for _, ev := range queue.GetEvents(r.Round, step) {
 		if ev.Category() == topics.NewBlock {
-			evChan <- ev
+			newBlockChan <- ev
 		}
 	}
 
@@ -141,7 +146,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 
 	for {
 		select {
-		case ev := <-evChan:
+		case ev := <-newBlockChan:
 			if shouldProcess(ev, r.Round, step, queue) {
 				b := ev.Payload().(message.NewBlock)
 				if err := p.collectNewBlock(b, ev.Header()); err != nil {
@@ -155,6 +160,12 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, evChan ch
 				return p.endSelection(b)
 			}
 		case <-timeoutChan:
+			lg.WithField("event", "timeout").
+				WithField("duration", p.timeout.String()).
+				WithField("round", r.Round).
+				WithField("step", step).
+				Info("")
+
 			return p.endSelection(message.EmptyNewBlock())
 		case <-ctx.Done():
 			// preventing timeout leakage
@@ -229,7 +240,7 @@ func (p *Phase) collectNewBlock(msg message.NewBlock, msgHeader []byte) error {
 	m := message.NewWithHeader(topics.NewBlock, msg, msgHeader)
 	if err := p.Republish(m); err != nil {
 		lg.WithError(err).
-			Error("could not republish score event")
+			Error("could not republish new block")
 	}
 
 	return nil
@@ -298,4 +309,19 @@ func shouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 	}
 
 	return true
+}
+
+func logNewBlock(round uint64, step uint8, hash []byte, keys []byte) {
+	label := "new candidate"
+
+	if log.GetLevel() >= logrus.DebugLevel {
+		consensus.WithFields(round, step, label,
+			hash, keys, nil, nil, nil).Debug()
+	} else {
+		log.WithField("is_member", true).
+			WithField("round", round).
+			WithField("step", step).
+			WithField("hash", util.StringifyBytes(hash)).
+			Info(label)
+	}
 }

@@ -66,7 +66,7 @@ func (h *step) String() string {
 	return "step"
 }
 
-func (h *step) Run(ctx context.Context, _ *consensus.Queue, _ chan message.Message, _ consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
+func (h *step) Run(ctx context.Context, _ *consensus.Queue, _, _ chan message.Message, _ consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
 	h.wg.Done()
 
 	// if this does not get canceled, the test will timeout
@@ -121,7 +121,7 @@ func (h *stallingStep) String() string {
 }
 
 // Run simply returns a phase function that sleeps and returns itself until canceled.
-func (h *stallingStep) Run(ctx context.Context, _ *consensus.Queue, _ chan message.Message, _ consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
+func (h *stallingStep) Run(ctx context.Context, _ *consensus.Queue, _, _ chan message.Message, _ consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
 	time.Sleep(time.Millisecond)
 	return h
 }
@@ -161,7 +161,7 @@ func (q *queueingStep) String() string {
 	return "queueing"
 }
 
-func (q *queueingStep) Run(ctx context.Context, queue *consensus.Queue, _ chan message.Message, round consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
+func (q *queueingStep) Run(ctx context.Context, queue *consensus.Queue, _, _ chan message.Message, round consensus.RoundUpdate, _ uint8) consensus.PhaseFn {
 	queue.PutEvent(round.Round, 7, message.New(topics.Addr, message.Addr{}))
 
 	q.wg.Done()

@@ -62,8 +62,8 @@ func TestSelection(t *testing.T) {
 					msgChan <- message.New(topics.NewBlock, msg)
 				}
 			}(msgs)
-			testCallbackPhase := selFn.Run(context.Background(), consensus.NewQueue(), msgChan, hlp.RoundUpdate(), hlp.Step)
-			_ = testCallbackPhase.Run(context.Background(), nil, nil, hlp.RoundUpdate(), hlp.Step+1)
+			testCallbackPhase := selFn.Run(context.Background(), consensus.NewQueue(), msgChan, msgChan, hlp.RoundUpdate(), hlp.Step)
+			_ = testCallbackPhase.Run(context.Background(), nil, nil, nil, hlp.RoundUpdate(), hlp.Step+1)
 		})
 	}
 }
