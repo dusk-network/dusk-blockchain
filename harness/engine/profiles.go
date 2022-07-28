@@ -64,7 +64,7 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 	// viper.Set("mempool.preallocTxs", "100")
 	viper.Set("mempool.poolType", "diskpool")
 	viper.Set("mempool.diskpoolDir", node.Dir+"/mempool.db")
-	viper.Set("mempool.extractionDelaySecs", "3")
+	// viper.Set("mempool.extractionDelaySecs", "3")
 
 	viper.Set("mempool.maxInvItems", "10000")
 	viper.Set("mempool.propagateTimeout", "100ms")
