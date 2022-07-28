@@ -34,7 +34,7 @@ func GenerateGenesisBlock(e *consensus.Emitter) (string, error) {
 	// TODO: do we need to generate correct proof and score
 	seed, _ := crypto.RandEntropy(33)
 
-	b, err := g.GenerateBlock(0, seed, make([]byte, 32), time.Now().Unix(), [][]byte{{0}})
+	b, err := g.GenerateBlock(context.Background(), 0, seed, make([]byte, 32), time.Now().Unix(), [][]byte{{0}})
 	if err != nil {
 		return "", err
 	}

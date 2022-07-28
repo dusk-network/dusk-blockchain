@@ -80,7 +80,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 		return nil, err
 	}
 
-	blk, err := bg.Generate(seed, committee, r)
+	blk, err := bg.Generate(ctx, seed, committee, r)
 	if err != nil {
 		log.
 			WithError(err).
@@ -110,8 +110,8 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 }
 
 // Generate a Block.
-func (bg *generator) Generate(seed []byte, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
-	return bg.GenerateBlock(r.Round, seed, r.Hash, r.Timestamp, keys)
+func (bg *generator) Generate(ctx context.Context, seed []byte, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
+	return bg.GenerateBlock(ctx, r.Round, seed, r.Hash, r.Timestamp, keys)
 }
 
 func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCall, round uint64, gasLimit uint64) ([]transactions.ContractCall, []byte, error) {
@@ -129,13 +129,13 @@ func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCal
 
 // fetchOrTimeout will keep trying to FetchMempoolTxs() until either
 // we get some txs or the timeout expires.
-func (bg *generator) fetchOrTimeout(keys [][]byte) ([]transactions.ContractCall, error) {
+func (bg *generator) fetchOrTimeout(ctx context.Context, keys [][]byte) ([]transactions.ContractCall, error) {
 	delay := config.Get().Mempool.ExtractionDelaySecs
-	if delay == 0 {
+	if delay == 0 || config.Get().Consensus.ConsensusTimeOut < delay {
 		return bg.FetchMempoolTxs(keys)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(delay)*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(delay)*time.Second)
 	defer cancel()
 
 	tick := time.NewTicker(500 * time.Millisecond)
@@ -160,8 +160,8 @@ func (bg *generator) fetchOrTimeout(keys [][]byte) ([]transactions.ContractCall,
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
-func (bg *generator) GenerateBlock(round uint64, seed, prevBlockHash []byte, prevBlockTimestamp int64, keys [][]byte) (*block.Block, error) {
-	txs, err := bg.fetchOrTimeout(keys)
+func (bg *generator) GenerateBlock(ctx context.Context, round uint64, seed, prevBlockHash []byte, prevBlockTimestamp int64, keys [][]byte) (*block.Block, error) {
+	txs, err := bg.fetchOrTimeout(ctx, keys)
 	if err != nil {
 		return nil, err
 	}

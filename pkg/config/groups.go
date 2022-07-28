@@ -138,7 +138,8 @@ type mempoolConfiguration struct {
 	// Enables mempool updates at startup
 	Updates updates
 
-	ExtractionDelaySecs uint32
+	// Artificial delay applied when mempool is empty
+	ExtractionDelaySecs int64
 }
 
 type updates struct {
