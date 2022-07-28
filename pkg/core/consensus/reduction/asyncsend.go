@@ -9,7 +9,6 @@ package reduction
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -44,14 +43,11 @@ func NewAsyncSend(r *Reduction, round uint64, step uint8, candidate *block.Block
 
 // Go executes SendReduction in a separate goroutine.
 // Returns cancel func for canceling the started job.
-func (a AsyncSend) Go(ctx context.Context, wg *sync.WaitGroup, resp chan message.Message, flags int) context.CancelFunc {
+func (a AsyncSend) Go(ctx context.Context, resp chan message.Message, flags int) context.CancelFunc {
 	ctx, cancel := context.WithCancel(ctx)
-
-	wg.Add(1)
 
 	go func() {
 		defer a.recover()
-		defer wg.Done()
 
 		m, _, err := a.SendReduction(ctx, a.round, a.step, a.candidate)
 		if err != nil {

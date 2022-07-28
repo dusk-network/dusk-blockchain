@@ -10,7 +10,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -96,14 +95,12 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionCha
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 	// first we send our own Selection
 
-	// wait group
-	var wg sync.WaitGroup
 	var cancel context.CancelFunc
 
 	a := reduction.NewAsyncSend(p.Reduction, r.Round, step, p.firstStepVotesMsg.Candidate)
 
 	if p.handler.AmMember(r.Round, step) {
-		cancel = a.Go(ctx, &wg, reductionChan, reduction.Republish)
+		cancel = a.Go(ctx, reductionChan, reduction.Republish)
 		defer cancel()
 	}
 

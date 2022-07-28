@@ -9,7 +9,6 @@ package firststep
 import (
 	"bytes"
 	"context"
-	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
@@ -96,15 +95,13 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionCha
 	p.handler = reduction.NewHandler(p.Keys, r.P, r.Seed)
 
 	// send our own Selection
-	var wg sync.WaitGroup
-
 	a := reduction.NewAsyncSend(p.Reduction, r.Round, step, &p.selectionResult.Candidate)
 
 	if p.handler.AmMember(r.Round, step) {
-		_ = a.Go(ctx, &wg, reductionChan, reduction.Republish)
+		_ = a.Go(ctx, reductionChan, reduction.Republish)
 	} else {
 		if p.handler.AmMember(r.Round, step+1) {
-			_ = a.Go(ctx, &wg, reductionChan, reduction.ValidateOnly)
+			_ = a.Go(ctx, reductionChan, reduction.ValidateOnly)
 		}
 	}
 
