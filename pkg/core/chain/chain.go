@@ -360,7 +360,7 @@ func (c *Chain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
 
 	l := log.WithFields(fields)
 
-	return c.isValidBlock(blk, *c.tip, *c.p, l, true)
+	return c.isValidHeader(blk, *c.tip, *c.p, l, true)
 }
 
 // ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
@@ -388,7 +388,7 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
 
-	if err := c.isValidBlock(blk, *c.tip, *c.p, log, true); err != nil {
+	if err := c.isValidHeader(blk, *c.tip, *c.p, log, true); err != nil {
 		log.WithError(err).Error("invalid block")
 		return err
 	}
@@ -536,12 +536,12 @@ func (c *Chain) sanityCheckStateHash() error {
 	return nil
 }
 
-func (c *Chain) isValidBlock(newBlock, prevBlock block.Block, provisioners user.Provisioners, l *logrus.Entry, withSanityCheck bool) error {
-	l.Debug("verifying block")
+func (c *Chain) isValidHeader(newBlock, prevBlock block.Block, provisioners user.Provisioners, l *logrus.Entry, withSanityCheck bool) error {
+	l.Debug("verifying block header")
 	// Check that stateless and stateful checks pass
 	if withSanityCheck {
 		if err := c.verifier.SanityCheckBlock(prevBlock, newBlock); err != nil {
-			l.WithError(err).Error("block verification failed")
+			l.WithError(err).Error("block header verification failed")
 			return err
 		}
 	}
@@ -579,7 +579,7 @@ func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 	var err error
 
 	// 1. Ensure block fields and certificate are valid
-	if err = c.isValidBlock(blk, *c.tip, *c.p, l, withSanityCheck); err != nil {
+	if err = c.isValidHeader(blk, *c.tip, *c.p, l, withSanityCheck); err != nil {
 		l.WithError(err).Error("invalid block error")
 		return err
 	}
