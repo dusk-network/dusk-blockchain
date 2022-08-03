@@ -360,7 +360,7 @@ func (c *Chain) TryNextConsecutiveBlockIsValid(blk block.Block) error {
 
 	l := log.WithFields(fields)
 
-	return c.isValidBlock(blk, *c.tip, *c.p, l, true)
+	return c.isValidHeader(blk, *c.tip, *c.p, l, true)
 }
 
 // ProcessSyncTimerExpired called by outsync timer when a peer does not provide GetData response.
@@ -388,8 +388,12 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
 
-	// TODO: Verify Certificate
-	if err := c.propagateBlock(blk, kadcastHeight); err != nil {
+	if err := c.isValidHeader(blk, *c.tip, *c.p, log, true); err != nil {
+		log.WithError(err).Error("invalid block")
+		return err
+	}
+
+	if err := c.kadcastBlock(blk, kadcastHeight); err != nil {
 		log.WithError(err).Error("block propagation failed")
 		return err
 	}
@@ -532,12 +536,12 @@ func (c *Chain) sanityCheckStateHash() error {
 	return nil
 }
 
-func (c *Chain) isValidBlock(newBlock, prevBlock block.Block, provisioners user.Provisioners, l *logrus.Entry, withSanityCheck bool) error {
-	l.Debug("verifying block")
+func (c *Chain) isValidHeader(newBlock, prevBlock block.Block, provisioners user.Provisioners, l *logrus.Entry, withSanityCheck bool) error {
+	l.Debug("verifying block header")
 	// Check that stateless and stateful checks pass
 	if withSanityCheck {
 		if err := c.verifier.SanityCheckBlock(prevBlock, newBlock); err != nil {
-			l.WithError(err).Error("block verification failed")
+			l.WithError(err).Error("block header verification failed")
 			return err
 		}
 	}
@@ -575,7 +579,7 @@ func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 	var err error
 
 	// 1. Ensure block fields and certificate are valid
-	if err = c.isValidBlock(blk, *c.tip, *c.p, l, withSanityCheck); err != nil {
+	if err = c.isValidHeader(blk, *c.tip, *c.p, l, withSanityCheck); err != nil {
 		l.WithError(err).Error("invalid block error")
 		return err
 	}
@@ -731,40 +735,10 @@ func (c *Chain) ExecuteStateTransition(ctx context.Context, txs []transactions.C
 	return c.proxy.Executor().ExecuteStateTransition(c.ctx, txs, blockGasLimit, blockHeight, generator)
 }
 
-// propagateBlock send inventory message to all peers in gossip network or rebroadcast block in kadcast network.
-func (c *Chain) propagateBlock(b block.Block, kadcastHeight byte) error {
-	// Disable gossiping messages if kadcast mode
-	if config.Get().Kadcast.Enabled {
-		log.WithField("blk_height", b.Header.Height).
-			WithField("kadcast_h", kadcastHeight).Trace("propagate block")
-		return c.kadcastBlock(b, kadcastHeight)
-	}
-
-	log.WithField("blk_height", b.Header.Height).Trace("propagate block")
-
-	msg := &message.Inv{}
-
-	msg.AddItem(message.InvTypeBlock, b.Header.Hash)
-
-	buf := new(bytes.Buffer)
-	if err := msg.Encode(buf); err != nil {
-		// TODO: shall this really panic ?
-		log.Panic(err)
-	}
-
-	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		// TODO: shall this really panic ?
-		log.Panic(err)
-	}
-
-	m := message.New(topics.Inv, *buf)
-	errList := c.eventBus.Publish(topics.Gossip, m)
-
-	diagnostics.LogPublishErrors("chain/chain.go, topics.Gossip, topics.Inv", errList)
-	return nil
-}
-
 func (c *Chain) kadcastBlock(blk block.Block, kadcastHeight byte) error {
+	log.WithField("blk_height", blk.Header.Height).
+		WithField("kadcast_h", kadcastHeight).Trace("propagate block")
+
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, &blk); err != nil {
 		return err

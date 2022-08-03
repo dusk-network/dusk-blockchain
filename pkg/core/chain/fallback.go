@@ -35,7 +35,7 @@ func (c *Chain) allowFallback(b block.Block, l *logrus.Entry) error {
 
 	// Ensure block fields and certificate are valid against previous block and
 	// current provisioners set.
-	if err = c.isValidBlock(b, prevBlk, *c.p, l, true); err != nil {
+	if err = c.isValidHeader(b, prevBlk, *c.p, l, true); err != nil {
 		return err
 	}
 
@@ -231,7 +231,7 @@ func (c *Chain) isBlockFromFork(b block.Block) (bool, error) {
 	// A weak assumption is made here that provisioners state has not changed
 	// since recvBlk.Header.Height
 
-	err = c.isValidBlock(b, *pb, *c.p, log, true)
+	err = c.isValidHeader(b, *pb, *c.p, log, true)
 	if err != nil {
 		return false, err
 	}

@@ -30,7 +30,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/sirupsen/logrus"
 	assert "github.com/stretchr/testify/require"
 )
 
@@ -90,45 +89,6 @@ func mutateFirstChan(propagatedHeight uint64, eb eventbus.Publisher, acceptedBlo
 	// subscriber_2 collecting propagated block
 	blkMsg2 := <-acceptedBlock2Chan
 	return blkMsg2.Payload().(block.Block)
-}
-
-// This test ensures the correct behavior from the Chain, when
-// accepting a block from a peer.
-func TestAcceptFromPeer(t *testing.T) {
-	logrus.SetLevel(logrus.InfoLevel)
-
-	assert := assert.New(t)
-
-	startingHeight := uint64(1)
-	eb, c := setupChainTest(t, startingHeight)
-
-	streamer := eventbus.NewGossipStreamer()
-	l := eventbus.NewStreamListener(streamer)
-	eb.Subscribe(topics.Gossip, l)
-
-	blk := mockAcceptableBlock(*c.tip)
-
-	c.TryNextConsecutiveBlockInSync(*blk, 0)
-
-	// the order of received stuff cannot be guaranteed. So we just search for
-	// getRoundResult topic. If it hasn't been received the test fails.
-	// One message should be the block gossip. The other, the round result
-	for i := 0; i < 2; i++ {
-		m, err := streamer.Read()
-		assert.NoError(err)
-
-		if streamer.SeenTopics()[i] == topics.Inv {
-			// Read hash of the advertised block
-			var decoder message.Inv
-
-			decoder.Decode(bytes.NewBuffer(m))
-			assert.Equal(decoder.InvList[0].Type, message.InvTypeBlock)
-			assert.True(bytes.Equal(decoder.InvList[0].Hash, blk.Header.Hash))
-			return
-		}
-	}
-
-	assert.Fail("expected a round result to be received, but it is not in the ringbuffer")
 }
 
 // This test ensures the correct behavior when accepting a block
