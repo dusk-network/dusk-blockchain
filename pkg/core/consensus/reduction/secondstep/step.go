@@ -12,7 +12,6 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
@@ -117,7 +116,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionCha
 
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
-			svm := p.collectReduction(rMsg, r.Round, step, ev.Header())
+			svm := p.collectReduction(rMsg, r.Round, step, ev.Metadata())
 			if svm == nil {
 				continue
 			}
@@ -139,7 +138,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionCha
 					continue
 				}
 
-				svm := p.collectReduction(rMsg, r.Round, step, ev.Header())
+				svm := p.collectReduction(rMsg, r.Round, step, ev.Metadata())
 				if svm == nil {
 					continue
 				}
@@ -177,7 +176,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionCha
 	}
 }
 
-func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8, msgHeader []byte) *message.StepVotesMsg {
+func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8, metadata *message.Metadata) *message.StepVotesMsg {
 	hdr := r.State()
 
 	if err := p.handler.VerifySignature(r.Copy().(message.Reduction)); err != nil {
@@ -201,7 +200,7 @@ func (p *Phase) collectReduction(r message.Reduction, round uint64, step uint8, 
 			Debug("")
 	}
 
-	m := message.NewWithHeader(topics.Reduction, r.Copy().(message.Reduction), msgHeader)
+	m := message.NewWithMetadata(topics.Reduction, r.Copy().(message.Reduction), metadata)
 
 	// Once the event is verified, we can republish it.
 	if err := p.Emitter.Republish(m); err != nil {
@@ -279,7 +278,7 @@ func (p *Phase) sendAgreement(round uint64, step uint8, svm *message.StepVotesMs
 
 	// Publishing Agreement internally so that it's the internal Agreement process(goroutine)
 	// that should register it locally and only then broadcast it.
-	m := message.NewWithHeader(topics.Agreement, *ev, config.KadcastInitHeader)
+	m := message.New(topics.Agreement, *ev)
 	p.EventBus.Publish(topics.Agreement, m)
 }
 

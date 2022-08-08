@@ -11,7 +11,6 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -63,7 +62,7 @@ func TestWireTransaction(t *testing.T) {
 
 	buffer := bytes.NewBuffer(m)
 
-	message, err := message.Unmarshal(buffer, config.KadcastInitHeader)
+	message, err := message.Unmarshal(buffer, nil)
 	if err != nil {
 		t.Fatalf("Unable to unmarshal: %v", err)
 	}

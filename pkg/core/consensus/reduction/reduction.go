@@ -152,7 +152,7 @@ func (r *Reduction) SendReduction(ctx context.Context, round uint64, step uint8,
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
 
-	m := message.NewWithHeader(topics.Reduction, *red, config.KadcastInitHeader)
+	m := message.New(topics.Reduction, *red)
 	return m, voteHash, nil
 }
 

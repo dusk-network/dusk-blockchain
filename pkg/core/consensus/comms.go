@@ -152,7 +152,7 @@ func (e *Emitter) Kadcast(msg message.Message) error {
 		return err
 	}
 
-	serialized := message.NewWithHeader(msg.Category(), buf, msg.Header())
+	serialized := message.NewWithMetadata(msg.Category(), buf, msg.Metadata())
 	e.EventBus.Publish(topics.Kadcast, serialized)
 	return nil
 }

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -89,6 +90,43 @@ func TestListenStreamReader(t *testing.T) {
 	srv.Stop()
 }
 
+// TestNoBroadcastWriter tests the kadcli.Writer by broadcasting
+// a block message that should not be repropagated.
+func TestNoBroadcastWriter(t *testing.T) {
+	// assert := assert.New(t)
+	rcvChan := make(chan *rusk.BroadcastMessage)
+
+	// Basic infrastructure
+	eb := eventbus.New()
+	g := protocol.NewGossip()
+
+	// create a mock client
+	cli := NewMockNetworkClient(rcvChan)
+
+	// create our kadcli Writer
+	_ = writer.NewBroadcast(context.Background(), eb, g, cli)
+
+	// create a mock message
+	buf, err := createBlockMessage()
+	if err != nil {
+		t.Errorf("fail to create msg: %v", err)
+	}
+
+	// prepare a message to not being repropagated
+	pubm := message.NewWithMetadata(topics.Block, *buf, &message.Metadata{KadcastHeight: 0})
+
+	errList := eb.Publish(topics.Kadcast, pubm)
+	if len(errList) > 0 {
+		t.Fatal("error publishing to evt bus")
+	}
+
+	select {
+	case m := <-rcvChan:
+		t.Fatal("Received message with height ", m.KadcastHeight)
+	case <-time.After(3 * time.Second):
+	}
+}
+
 // TestBroadcastWriter tests the kadcli.Writer by broadcasting
 // a block message through a mocked rusk client.
 func TestBroadcastWriter(t *testing.T) {
@@ -111,8 +149,10 @@ func TestBroadcastWriter(t *testing.T) {
 		t.Errorf("fail to create msg: %v", err)
 	}
 
+	var testBroadcastHeight uint32 = 5
+
 	// send a broadcast message
-	pubm := message.NewWithHeader(topics.Block, *buf, []byte{127})
+	pubm := message.NewWithMetadata(topics.Block, *buf, &message.Metadata{KadcastHeight: byte(testBroadcastHeight)})
 
 	errList := eb.Publish(topics.Kadcast, pubm)
 	if len(errList) > 0 {
@@ -121,7 +161,7 @@ func TestBroadcastWriter(t *testing.T) {
 
 	// process status/output
 	m := <-rcvChan
-	assert.True(m.KadcastHeight == 127-1)
+	assert.True(m.KadcastHeight == testBroadcastHeight-1)
 
 	// attempt to read the message
 	reader := bytes.NewReader(m.Message)
@@ -149,7 +189,7 @@ func TestBroadcastWriter(t *testing.T) {
 	topic := topics.Topic(rb.Bytes()[0])
 	assert.True(topic == topics.Block)
 	// unmarshal message
-	res, err := message.Unmarshal(rb, []byte{})
+	res, err := message.Unmarshal(rb, nil)
 	if err != nil {
 		t.Error("failed to unmarshal")
 	}

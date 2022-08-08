@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -244,7 +243,7 @@ func collectAgreement(h *handler, accumulator *Accumulator, ev message.Message, 
 		return
 	}
 
-	m := message.NewWithHeader(topics.Agreement, a.Copy().(message.Agreement), ev.Header())
+	m := message.NewWithMetadata(topics.Agreement, a.Copy().(message.Agreement), ev.Metadata())
 
 	// Once the event is verified, we can republish it.
 	if err := e.Republish(m); err != nil {
@@ -288,9 +287,9 @@ func (s *Loop) processCollectedVotes(ctx context.Context, handler *handler, evs 
 	bits := comm.Bits(*pubs)
 	agAgreement := message.NewAggrAgreement(evs[0], bits, sig)
 
-	m := message.NewWithHeader(topics.AggrAgreement, agAgreement, config.KadcastInitHeader)
+	m := message.New(topics.AggrAgreement, agAgreement)
 	if err := s.Emitter.Republish(m); err != nil {
-		lg.WithError(err).Error("could not republish aggregated agreement event")
+		lg.WithError(err).Error("could broadcast aggregated agreement event")
 	} else {
 		lg.
 			WithField("round", r.Round).
@@ -380,7 +379,7 @@ func (s *Loop) processAggrAgreement(ctx context.Context, h *handler, msg message
 	}
 
 	// Broadcast
-	m := message.NewWithHeader(topics.AggrAgreement, aggro.Copy(), config.KadcastInitHeader)
+	m := message.NewWithMetadata(topics.AggrAgreement, aggro.Copy(), msg.Metadata())
 	if err = e.Republish(m); err != nil {
 		lg.WithError(err).Errorln("could not republish aggragreement event")
 		return nil, err

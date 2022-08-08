@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -46,8 +47,8 @@ func (w *SendToMany) Subscribe() {
 }
 
 // Write ...
-func (w *SendToMany) Write(data, header []byte, priority byte) (int, error) {
-	if err := w.sendToMany(data, header, priority); err != nil {
+func (w *SendToMany) Write(data []byte, metadata *message.Metadata, priority byte) (int, error) {
+	if err := w.sendToMany(data, metadata, priority); err != nil {
 		log.WithError(err).Warn("write failed")
 	}
 
@@ -55,13 +56,13 @@ func (w *SendToMany) Write(data, header []byte, priority byte) (int, error) {
 }
 
 // sendToMany sends a message to N random endpoints returned by AliveNodes.
-func (w *SendToMany) sendToMany(data, header []byte, _ byte) error {
-	if len(header) == 0 || header[0] == 0 {
-		return errors.New("empty message header")
+func (w *SendToMany) sendToMany(data []byte, metadata *message.Metadata, _ byte) error {
+	if metadata == nil {
+		return errors.New("empty message metadata")
 	}
 
 	// get N active nodes
-	req := &rusk.AliveNodesRequest{MaxNodes: uint32(header[0])}
+	req := &rusk.AliveNodesRequest{MaxNodes: uint32(metadata.NumNodes)}
 
 	resp, err := w.client.AliveNodes(w.ctx, req)
 	if err != nil {

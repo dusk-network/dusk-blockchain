@@ -97,10 +97,13 @@ func (r *Reader) processMessage(msg *rusk.Message) {
 		return
 	}
 
-	h := []byte{byte(msg.Metadata.KadcastHeight)}
+	metadata := message.Metadata{
+		KadcastHeight: byte(msg.Metadata.KadcastHeight),
+		Source:        msg.Metadata.SrcAddress,
+	}
 
 	// collect (process) the message
-	respBufs, err := r.processor.Collect(msg.Metadata.SrcAddress, m, nil, protocol.FullNode, h)
+	respBufs, err := r.processor.Collect(msg.Metadata.SrcAddress, m, nil, protocol.FullNode, &metadata)
 	if err != nil {
 		var topic string
 		if len(m) > 0 {
@@ -117,7 +120,7 @@ func (r *Reader) processMessage(msg *rusk.Message) {
 	for i := 0; i < len(respBufs); i++ {
 		log.WithField("r_addr", msg.Metadata.SrcAddress).Trace("send point-to-point message")
 		// send Kadcast point-to-point message with source address as destination
-		msg := message.NewWithHeader(topics.KadcastSendToOne, respBufs[i], []byte(msg.Metadata.SrcAddress))
+		msg := message.NewWithMetadata(topics.KadcastSendToOne, respBufs[i], &metadata)
 		r.publisher.Publish(topics.KadcastSendToOne, msg)
 	}
 }

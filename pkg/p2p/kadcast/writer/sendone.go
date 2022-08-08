@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -45,18 +46,18 @@ func (w *SendToOne) Subscribe() {
 }
 
 // Write implements. ring.Writer.
-func (w *SendToOne) Write(data, header []byte, priority byte) (int, error) {
-	if err := w.sendToOne(data, header, priority); err != nil {
+func (w *SendToOne) Write(data []byte, metadata *message.Metadata, priority byte) (int, error) {
+	if err := w.sendToOne(data, metadata, priority); err != nil {
 		log.WithError(err).Warn("write failed")
 	}
 
 	return 0, nil
 }
 
-func (w *SendToOne) sendToOne(data, header []byte, _ byte) error {
-	if len(header) == 0 {
-		return errors.New("empty message header")
+func (w *SendToOne) sendToOne(data []byte, metadata *message.Metadata, _ byte) error {
+	if metadata == nil {
+		return errors.New("empty message metadata")
 	}
 
-	return w.Send(data, string(header))
+	return w.Send(data, metadata.Source)
 }

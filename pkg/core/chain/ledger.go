@@ -6,12 +6,15 @@
 
 package chain
 
-import "github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+import (
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+)
 
 // Ledger is the Chain interface used in tests.
 type Ledger interface {
-	TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error
-	TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error
+	TryNextConsecutiveBlockInSync(blk block.Block, metadata *message.Metadata) error
+	TryNextConsecutiveBlockOutSync(blk block.Block, metadata *message.Metadata) error
 	TryNextConsecutiveBlockIsValid(blk block.Block) error
 
 	// RestartConsensus Stop and Start Consensus.

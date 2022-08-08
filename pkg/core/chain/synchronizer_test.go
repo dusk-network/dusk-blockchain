@@ -15,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	assert "github.com/stretchr/testify/require"
 )
@@ -25,7 +26,7 @@ func TestSuccessiveBlocks(t *testing.T) {
 
 	// tipHeight will be 0, so make the successive block
 	blk := helper.RandomBlock(1, 1)
-	res, err := s.processBlock("", 0, *blk, 0)
+	res, err := s.processBlock("", 0, *blk, nil)
 	assert.NoError(err)
 	assert.Nil(res)
 
@@ -40,7 +41,7 @@ func TestFutureBlocks(t *testing.T) {
 
 	height := uint64(10)
 	blk := helper.RandomBlock(height, 1)
-	resp, err := s.processBlock("", 0, *blk, 0)
+	resp, err := s.processBlock("", 0, *blk, nil)
 	assert.NoError(err)
 
 	// Response should be of the GetBlocks topic
@@ -75,12 +76,12 @@ func (m *mockChain) CurrentHeight() uint64 {
 	return m.tipHeight
 }
 
-func (m *mockChain) TryNextConsecutiveBlockInSync(blk block.Block, _ byte) error {
+func (m *mockChain) TryNextConsecutiveBlockInSync(blk block.Block, _ *message.Metadata) error {
 	m.catchBlockChan <- consensus.Results{Blk: blk, Err: nil}
 	return nil
 }
 
-func (m *mockChain) TryNextConsecutiveBlockOutSync(_ block.Block, _ byte) error {
+func (m *mockChain) TryNextConsecutiveBlockOutSync(_ block.Block, _ *message.Metadata) error {
 	return nil
 }
 

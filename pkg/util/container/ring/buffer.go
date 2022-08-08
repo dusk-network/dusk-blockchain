@@ -10,12 +10,14 @@ import (
 	"bytes"
 	"sync"
 	"sync/atomic"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
 // Elem single data unit of a ring buffer.
 type Elem struct {
 	Data     []byte
-	Header   []byte
+	Metadata *message.Metadata
 	Priority byte
 }
 

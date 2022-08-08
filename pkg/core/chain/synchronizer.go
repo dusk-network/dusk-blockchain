@@ -26,9 +26,9 @@ const (
 
 var slog = logrus.WithField("process", "sync")
 
-type syncState func(srcPeerAddr string, currentHeight uint64, blk block.Block, kadcastHeight byte) ([]bytes.Buffer, error)
+type syncState func(srcPeerAddr string, currentHeight uint64, blk block.Block, metadata *message.Metadata) ([]bytes.Buffer, error)
 
-func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk block.Block, kadcastHeight byte) ([]bytes.Buffer, error) {
+func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk block.Block, metadata *message.Metadata) ([]bytes.Buffer, error) {
 	if blk.Header.Height > currentHeight+1 {
 		s.sequencer.add(blk)
 
@@ -43,12 +43,12 @@ func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk bloc
 		s.timer.Start(srcPeerAddr)
 
 		s.state = s.outSync
-		b, err := s.startSync(srcPeerAddr, blk.Header.Height, currentHeight, kadcastHeight)
+		b, err := s.startSync(srcPeerAddr, blk.Header.Height, currentHeight, metadata)
 		return b, err
 	}
 
 	// Otherwise notify the chain (and the consensus loop).
-	if err := s.chain.TryNextConsecutiveBlockInSync(blk, kadcastHeight); err != nil {
+	if err := s.chain.TryNextConsecutiveBlockInSync(blk, metadata); err != nil {
 		slog.WithField("blk_height", blk.Header.Height).
 			WithField("blk_hash", hex.EncodeToString(blk.Header.Hash)).
 			WithField("state", "insync").
@@ -60,7 +60,7 @@ func (s *synchronizer) inSync(srcPeerAddr string, currentHeight uint64, blk bloc
 	return nil, nil
 }
 
-func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk block.Block, kadcastHeight byte) ([]bytes.Buffer, error) {
+func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk block.Block, metadata *message.Metadata) ([]bytes.Buffer, error) {
 	var err error
 
 	// Once we validate successfully the next block from the syncing
@@ -102,7 +102,7 @@ func (s *synchronizer) outSync(srcPeerAddr string, currentHeight uint64, blk blo
 
 	for _, blk := range blks {
 		// append them all to the ledger
-		if err = s.chain.TryNextConsecutiveBlockOutSync(blk, kadcastHeight); err != nil {
+		if err = s.chain.TryNextConsecutiveBlockOutSync(blk, metadata); err != nil {
 			slog.WithError(err).WithField("state", "outsync").
 				Warn("could not accept block")
 
@@ -171,17 +171,17 @@ func newSynchronizer(db database.DB, chain Ledger) *synchronizer {
 }
 
 // processBlock handles an incoming block from the network.
-func (s *synchronizer) processBlock(srcPeerID string, currentHeight uint64, blk block.Block, kadcastHeight byte) (res []bytes.Buffer, err error) {
+func (s *synchronizer) processBlock(srcPeerID string, currentHeight uint64, blk block.Block, metadata *message.Metadata) (res []bytes.Buffer, err error) {
 	// Clean up sequencer
 	s.sequencer.cleanup(currentHeight)
 	s.sequencer.dump()
 
 	currState := s.state
-	res, err = currState(srcPeerID, currentHeight, blk, kadcastHeight)
+	res, err = currState(srcPeerID, currentHeight, blk, metadata)
 	return
 }
 
-func (s *synchronizer) startSync(strPeerAddr string, tipHeight, currentHeight uint64, _ byte) ([]bytes.Buffer, error) {
+func (s *synchronizer) startSync(strPeerAddr string, tipHeight, currentHeight uint64, _ *message.Metadata) ([]bytes.Buffer, error) {
 	s.hrange.from = currentHeight
 	s.setSyncTarget(tipHeight, currentHeight+config.MaxInvBlocks)
 

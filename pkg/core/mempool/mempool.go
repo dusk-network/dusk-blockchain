@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -214,8 +215,8 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 	}
 
 	var h byte
-	if len(msg.Header()) > 0 {
-		h = msg.Header()[0]
+	if msg.Metadata() != nil {
+		h = msg.Metadata().KadcastHeight
 	}
 
 	t := TxDesc{
@@ -508,7 +509,8 @@ func (m *Mempool) kadcastTx(t TxDesc) error {
 		return err
 	}
 
-	msg := message.NewWithHeader(topics.Tx, *buf, []byte{t.kadHeight})
+	metadata := message.Metadata{KadcastHeight: t.kadHeight}
+	msg := message.NewWithMetadata(topics.Tx, *buf, &metadata)
 
 	m.eventBus.Publish(topics.Kadcast, msg)
 	return nil
@@ -536,7 +538,8 @@ func (m *Mempool) RequestUpdates() {
 		panic(err)
 	}
 
-	msg := message.NewWithHeader(topics.MemPool, buf, []byte{numNodes})
+	metadata := message.Metadata{NumNodes: numNodes}
+	msg := message.NewWithMetadata(topics.MemPool, buf, &metadata)
 	m.eventBus.Publish(topics.KadcastSendToMany, msg)
 }
 
