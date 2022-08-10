@@ -753,15 +753,18 @@ func (c *Chain) kadcastBlock(blk block.Block, kadcastHeight byte) error {
 	return nil
 }
 
+// getRoundUpdate constructs RoundUpdate and returns a deep copy.
 func (c *Chain) getRoundUpdate() consensus.RoundUpdate {
-	return consensus.RoundUpdate{
+	r := consensus.RoundUpdate{
 		Round:           c.tip.Header.Height + 1,
-		P:               c.p.Copy(),
+		P:               *c.p,
 		Seed:            c.tip.Header.Seed,
 		Hash:            c.tip.Header.Hash,
 		LastCertificate: c.tip.Header.Certificate,
 		Timestamp:       c.tip.Header.Timestamp,
 	}
+
+	return r.Copy().(consensus.RoundUpdate)
 }
 
 // GetSyncProgress returns how close the node is to being synced to the tip,

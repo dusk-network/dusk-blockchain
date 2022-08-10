@@ -597,7 +597,7 @@ func (n *Network) MonitorTPS(delay time.Duration) {
 			continue
 		}
 
-		if lastHeight == h {
+		if lastHeight == h || h == 1 {
 			// do not print if height is the same
 			continue
 		}

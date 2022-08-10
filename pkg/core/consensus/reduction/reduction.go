@@ -176,19 +176,22 @@ func ShouldProcess(m message.Message, round uint64, step uint8, queue *consensus
 		return false
 	}
 
-	// Only store events up to 10 rounds into the future
 	// XXX: According to protocol specs, we should abandon consensus
 	// if we notice valid messages from far into the future.
-	if cmp == header.After && hdr.Round-round < 10 {
-		lg.
-			WithFields(log.Fields{
-				"topic":          m.Category(),
-				"round":          hdr.Round,
-				"step":           hdr.Step,
-				"expected round": round,
-			}).
-			Debugln("storing future event for later")
-		queue.PutEvent(hdr.Round, hdr.Step, m)
+	if cmp == header.After {
+		// Only store events up to 10 rounds into the future
+		if hdr.Round-round < 10 {
+			lg.
+				WithFields(log.Fields{
+					"topic":          m.Category(),
+					"round":          hdr.Round,
+					"step":           hdr.Step,
+					"expected round": round,
+				}).
+				Debugln("storing future event for later")
+			queue.PutEvent(hdr.Round, hdr.Step, m)
+		}
+
 		return false
 	}
 
