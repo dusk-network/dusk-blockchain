@@ -53,7 +53,7 @@ type Message interface {
 	// created internally and never serialized, this should return an empty buffer.
 	CachedBinary() bytes.Buffer
 
-	Header() []byte
+	Metadata() *Metadata
 }
 
 // Serializable allows to set a payload.
@@ -81,8 +81,8 @@ type simple struct {
 	payload payload.Safe
 	// cached marshaled form with Category.
 	marshaled *bytes.Buffer
-	// header used as metadata (e.g kadcast.height).
-	header []byte
+	// metadata from kadcast network.
+	metadata *Metadata
 }
 
 // Clone creates a new Message which carries a copy of the payload.
@@ -97,7 +97,7 @@ func Clone(m Message) (Message, error) {
 		category:  m.Category(),
 		marshaled: &b,
 		payload:   m.Payload().Copy(),
-		header:    m.Header(),
+		metadata:  m.Metadata(),
 	}, nil
 }
 
@@ -133,10 +133,6 @@ func (m simple) String() string {
 	_, _ = sb.WriteString("\n]\n")
 	_, _ = sb.WriteString("\n")
 	return sb.String()
-}
-
-func (m simple) Header() []byte {
-	return m.header
 }
 
 // Id is the Id the Message.
@@ -215,10 +211,10 @@ func New(top topics.Topic, p interface{}) Message {
 	return &simple{category: top, payload: safePayload}
 }
 
-// NewWithHeader creates a new Message with non-nil header.
-func NewWithHeader(t topics.Topic, payload interface{}, header []byte) Message {
+// NewWithMetadata creates a new Message with non-nil metadata.
+func NewWithMetadata(t topics.Topic, payload interface{}, metadata *Metadata) Message {
 	safePayload := convertToSafePayload(payload)
-	return &simple{category: t, payload: safePayload, header: header}
+	return &simple{category: t, payload: safePayload, metadata: metadata}
 }
 
 func (m *simple) initPayloadBuffer(b bytes.Buffer) {
@@ -230,10 +226,10 @@ func (m *simple) initPayloadBuffer(b bytes.Buffer) {
 // Unmarshal mutates the buffer by extracting the topic. It create the Message
 // by setting the topic and unmarshaling the payload into the proper structure
 // It also caches the serialized form within the message.
-func Unmarshal(b *bytes.Buffer, h []byte) (Message, error) {
+func Unmarshal(b *bytes.Buffer, h *Metadata) (Message, error) {
 	var err error
 
-	msg := &simple{header: h}
+	msg := &simple{metadata: h}
 	msg.initPayloadBuffer(*b)
 
 	topic, err := topics.Extract(b)

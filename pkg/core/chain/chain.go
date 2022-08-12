@@ -256,10 +256,8 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 	l := log.WithField("recv_blk_h", blk.Header.Height).
 		WithField("curr_h", c.tip.Header.Height)
 
-	var kh byte = 255
-	if len(m.Header()) > 0 {
-		kh = m.Header()[0]
-		l = l.WithField("kad_h", kh)
+	if m.Metadata() != nil {
+		l = l.WithField("kad_h", m.Metadata().KadcastHeight)
 	}
 
 	l.Trace("block received")
@@ -293,7 +291,7 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 			// out if any other node propagates it back when this node is syncing up.
 			c.blacklisted.Add(bytes.NewBuffer(hash))
 
-			return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kh)
+			return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, m.Metadata())
 		}
 	case blk.Header.Height < c.tip.Header.Height:
 		l.Debug("discard block")
@@ -318,22 +316,22 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 		c.highestSeen = blk.Header.Height
 	}
 
-	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, kh)
+	return c.synchronizer.processBlock(srcPeerID, c.tip.Header.Height, blk, m.Metadata())
 }
 
 // TryNextConsecutiveBlockOutSync is the processing path for accepting a block
 // from the network during out-of-sync state.
-func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, kadcastHeight byte) error {
+func (c *Chain) TryNextConsecutiveBlockOutSync(blk block.Block, metadata *message.Metadata) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting sync block")
 	return c.acceptBlock(blk, true)
 }
 
 // TryNextConsecutiveBlockInSync is the processing path for accepting a block
 // from the network during in-sync state. Returns err if the block is not valid.
-func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, kadcastHeight byte) error {
+func (c *Chain) TryNextConsecutiveBlockInSync(blk block.Block, metadata *message.Metadata) error {
 	// Make an attempt to accept a new block. If succeeds, we could safely restart the Consensus Loop.
 	// If not, peer reputation score should be decreased.
-	if err := c.acceptSuccessiveBlock(blk, kadcastHeight); err != nil {
+	if err := c.acceptSuccessiveBlock(blk, metadata); err != nil {
 		return err
 	}
 
@@ -385,7 +383,7 @@ func (c *Chain) ProcessSyncTimerExpired(strPeerAddr string) error {
 
 // acceptSuccessiveBlock will accept a block which directly follows the chain
 // tip, and advertises it to the node's peers.
-func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error {
+func (c *Chain) acceptSuccessiveBlock(blk block.Block, metadata *message.Metadata) error {
 	log.WithField("height", blk.Header.Height).Trace("accepting succeeding block")
 
 	if err := c.isValidHeader(blk, *c.tip, *c.p, log, true); err != nil {
@@ -393,7 +391,7 @@ func (c *Chain) acceptSuccessiveBlock(blk block.Block, kadcastHeight byte) error
 		return err
 	}
 
-	if err := c.kadcastBlock(blk, kadcastHeight); err != nil {
+	if err := c.kadcastBlock(blk, metadata); err != nil {
 		log.WithError(err).Error("block propagation failed")
 		return err
 	}
@@ -735,9 +733,8 @@ func (c *Chain) ExecuteStateTransition(ctx context.Context, txs []transactions.C
 	return c.proxy.Executor().ExecuteStateTransition(c.ctx, txs, blockGasLimit, blockHeight, generator)
 }
 
-func (c *Chain) kadcastBlock(blk block.Block, kadcastHeight byte) error {
-	log.WithField("blk_height", blk.Header.Height).
-		WithField("kadcast_h", kadcastHeight).Trace("propagate block")
+func (c *Chain) kadcastBlock(blk block.Block, metadata *message.Metadata) error {
+	log.WithField("blk_height", blk.Header.Height).Trace("propagate block")
 
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, &blk); err != nil {
@@ -748,8 +745,7 @@ func (c *Chain) kadcastBlock(blk block.Block, kadcastHeight byte) error {
 		return err
 	}
 
-	c.eventBus.Publish(topics.Kadcast,
-		message.NewWithHeader(topics.Block, *buf, []byte{kadcastHeight}))
+	c.eventBus.Publish(topics.Kadcast, message.NewWithMetadata(topics.Block, *buf, metadata))
 	return nil
 }
 

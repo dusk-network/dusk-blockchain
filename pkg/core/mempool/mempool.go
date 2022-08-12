@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -213,9 +214,14 @@ func (m *Mempool) ProcessTx(srcPeerID string, msg message.Message) ([]bytes.Buff
 		return nil, errors.New("mempool is full, dropping transaction")
 	}
 
-	var h byte
-	if len(msg.Header()) > 0 {
-		h = msg.Header()[0]
+	// Initializing `h=0` or `h=KadcastInitialHeight` will not work.
+	// This because `h` will be decremented by the kadcast writer as per
+	// it's interpreted as "the kadcast height at which it's been received"
+	// Hence, `h=0` will not be broadcasted at all and
+	// `h=KadcastInitialHeight` will miss the broadcast to the first bucket
+	var h byte = math.MaxUint8
+	if msg.Metadata() != nil {
+		h = msg.Metadata().KadcastHeight
 	}
 
 	t := TxDesc{
@@ -494,10 +500,6 @@ func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{
 
 // kadcastTx (re)propagates transaction in kadcast network.
 func (m *Mempool) kadcastTx(t TxDesc) error {
-	if t.kadHeight > config.KadcastInitialHeight {
-		return errors.New("invalid kadcast height")
-	}
-
 	/// repropagate
 	buf := new(bytes.Buffer)
 	if err := transactions.Marshal(buf, t.tx); err != nil {
@@ -508,7 +510,8 @@ func (m *Mempool) kadcastTx(t TxDesc) error {
 		return err
 	}
 
-	msg := message.NewWithHeader(topics.Tx, *buf, []byte{t.kadHeight})
+	metadata := message.Metadata{KadcastHeight: t.kadHeight}
+	msg := message.NewWithMetadata(topics.Tx, *buf, &metadata)
 
 	m.eventBus.Publish(topics.Kadcast, msg)
 	return nil
@@ -536,7 +539,8 @@ func (m *Mempool) RequestUpdates() {
 		panic(err)
 	}
 
-	msg := message.NewWithHeader(topics.MemPool, buf, []byte{numNodes})
+	metadata := message.Metadata{NumNodes: numNodes}
+	msg := message.NewWithMetadata(topics.MemPool, buf, &metadata)
 	m.eventBus.Publish(topics.KadcastSendToMany, msg)
 }
 

@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -90,7 +89,7 @@ func TestAccumulatorProcessingAggregation(t *testing.T) {
 	// Verify certificate
 	comm = handler.Committee(hdr.Round, hdr.Step)
 
-	msg := message.NewWithHeader(topics.AggrAgreement, aggro, config.KadcastInitHeader)
+	msg := message.New(topics.AggrAgreement, aggro)
 	buf, err := message.Marshal(msg)
 	assert.Nil(t, err, "failed to marshal aggragreement")
 

@@ -87,7 +87,7 @@ func (r *Requestor) publishGetCandidate(hash []byte) error {
 		return err
 	}
 
-	m := message.NewWithHeader(topics.GetCandidate, *buf, config.KadcastInitHeader)
+	m := message.New(topics.GetCandidate, *buf)
 
 	r.publisher.Publish(topics.Kadcast, m)
 	return nil
@@ -102,7 +102,7 @@ func (r *Requestor) sendGetCandidate(hash []byte) error {
 		return err
 	}
 
-	msg := message.NewWithHeader(topics.GetCandidate, buf, []byte{config.GetCandidateReceivers})
+	msg := message.NewWithMetadata(topics.GetCandidate, buf, &message.Metadata{NumNodes: config.GetCandidateReceivers})
 	r.publisher.Publish(topics.KadcastSendToMany, msg)
 	return nil
 }

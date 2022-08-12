@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/blockgenerator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -124,14 +123,14 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, newBlockC
 			logNewBlock(r.Round, step, scr.State().BlockHash, p.Keys.BLSPubKey)
 
 			// Broadcast the candidate block for this round/iteration.
-			m := message.NewWithHeader(topics.NewBlock, *scr, []byte{config.KadcastInitialHeight})
+			m := message.New(topics.NewBlock, *scr)
 			if err := p.Republish(m); err != nil {
 				lg.WithError(err).
 					Error("could not republish new block")
 			}
 
 			// register new candidate in local state without propagating it.
-			m = message.NewWithHeader(topics.NewBlock, *scr, []byte{0})
+			m = message.NewWithMetadata(topics.NewBlock, *scr, &message.Metadata{KadcastHeight: 0})
 			newBlockChan <- m
 		}
 	}
@@ -149,7 +148,7 @@ func (p *Phase) Run(parentCtx context.Context, queue *consensus.Queue, newBlockC
 		case ev := <-newBlockChan:
 			if shouldProcess(ev, r.Round, step, queue) {
 				b := ev.Payload().(message.NewBlock)
-				if err := p.collectNewBlock(b, ev.Header()); err != nil {
+				if err := p.collectNewBlock(b, ev.Metadata()); err != nil {
 					continue
 				}
 
@@ -212,7 +211,7 @@ func (p *Phase) verifyNewBlock(msg message.NewBlock) error {
 	return nil
 }
 
-func (p *Phase) collectNewBlock(msg message.NewBlock, msgHeader []byte) error {
+func (p *Phase) collectNewBlock(msg message.NewBlock, metadata *message.Metadata) error {
 	if err := p.verifyNewBlock(msg); err != nil {
 		msg.WithFields(lg).
 			WithField("seed", hex.EncodeToString(p.handler.Seed())).
@@ -237,7 +236,7 @@ func (p *Phase) collectNewBlock(msg message.NewBlock, msgHeader []byte) error {
 
 	// Once the event is verified, and has passed all preliminary checks,
 	// we can republish it to the network.
-	m := message.NewWithHeader(topics.NewBlock, msg, msgHeader)
+	m := message.NewWithMetadata(topics.NewBlock, msg, metadata)
 	if err := p.Republish(m); err != nil {
 		lg.WithError(err).
 			Error("could not republish new block")

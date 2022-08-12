@@ -123,7 +123,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionCha
 
 			// if collectReduction returns a StepVote, it means we reached
 			// consensus and can go to the next step
-			if sv := p.collectReduction(ctx, rMsg, r.Round, step, ev.Header()); sv != nil {
+			if sv := p.collectReduction(ctx, rMsg, r.Round, step, ev.Metadata()); sv != nil {
 				go func() {
 					<-timeoutChan
 				}()
@@ -141,7 +141,7 @@ func (p *Phase) Run(ctx context.Context, queue *consensus.Queue, _, reductionCha
 					continue
 				}
 
-				sv := p.collectReduction(ctx, rMsg, r.Round, step, ev.Header())
+				sv := p.collectReduction(ctx, rMsg, r.Round, step, ev.Metadata())
 				if sv != nil {
 					// preventing timeout leakage
 					go func() {
@@ -174,7 +174,7 @@ func (p *Phase) gotoNextPhase(msg *message.StepVotesMsg) consensus.PhaseFn {
 	return p.next.Initialize(*msg)
 }
 
-func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round uint64, step uint8, msgHeader []byte) *message.StepVotesMsg {
+func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round uint64, step uint8, metadata *message.Metadata) *message.StepVotesMsg {
 	if err := p.handler.VerifySignature(r.Copy().(message.Reduction)); err != nil {
 		lg.
 			WithError(err).
@@ -194,7 +194,7 @@ func (p *Phase) collectReduction(ctx context.Context, r message.Reduction, round
 			Debug("")
 	}
 
-	m := message.NewWithHeader(topics.Reduction, r, msgHeader)
+	m := message.NewWithMetadata(topics.Reduction, r, metadata)
 
 	// Once the event is verified, we can republish it.
 	if err := p.Emitter.Republish(m); err != nil {

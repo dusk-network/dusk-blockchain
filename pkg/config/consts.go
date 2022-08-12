@@ -25,7 +25,7 @@ const (
 	MaxBlockTime = 360 // maximum block time in seconds
 
 	// KadcastInitialHeight sets the default initial height for Kadcast broadcast algorithm.
-	KadcastInitialHeight byte = 128 + 1
+	KadcastInitialHeight byte = 128
 
 	// The dusk-blockchain executable version.
 	NodeVersion = "0.6.0-rc"
@@ -63,6 +63,3 @@ const (
 	// GetCandidateReceivers is a redundancy factor on retrieving a missing candidate block.
 	GetCandidateReceivers = 7
 )
-
-// KadcastInitHeader is used as default initial kadcast message header.
-var KadcastInitHeader = []byte{KadcastInitialHeight}

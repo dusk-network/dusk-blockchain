@@ -149,7 +149,7 @@ func NewSimpleStreamer() *SimpleStreamer {
 
 // Write receives the packets from the ringbuffer and writes it on the internal
 // pipe immediately.
-func (ms *SimpleStreamer) Write(data, header []byte, priority byte) (n int, err error) {
+func (ms *SimpleStreamer) Write(data []byte, _ *message.Metadata, priority byte) (n int, err error) {
 	b := bytes.NewBuffer(data)
 	if e := ms.gossip.Process(b); e != nil {
 		return 0, e

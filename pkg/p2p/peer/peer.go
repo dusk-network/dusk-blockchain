@@ -22,6 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -62,7 +63,7 @@ type GossipConnector struct {
 	*Connection
 }
 
-func (g *GossipConnector) Write(b, header []byte, priority byte) (int, error) {
+func (g *GossipConnector) Write(b []byte, _ *message.Metadata, priority byte) (int, error) {
 	if !canRoute(g.services, topics.Topic(b[0])) {
 		return 0, nil
 	}

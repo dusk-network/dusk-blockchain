@@ -49,7 +49,7 @@ func (m *MessageProcessor) Register(topic topics.Topic, fn ProcessorFunc) {
 
 // Collect a message from the network. The message is unmarshaled and passed down
 // to the processing function.
-func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf *ring.Buffer, services protocol.ServiceFlag, header []byte) ([]bytes.Buffer, error) {
+func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf *ring.Buffer, services protocol.ServiceFlag, metadata *message.Metadata) ([]bytes.Buffer, error) {
 	if len(packet) == 0 {
 		return nil, errors.New("empty packet provided")
 	}
@@ -58,7 +58,7 @@ func (m *MessageProcessor) Collect(srcPeerID string, packet []byte, respRingBuf 
 	b := bytes.NewBuffer(packet)
 	topic := topics.Topic(b.Bytes()[0])
 
-	msg, err := message.Unmarshal(b, header)
+	msg, err := message.Unmarshal(b, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("error while unmarshaling: %s - topic: %s", err, topic)
 	}

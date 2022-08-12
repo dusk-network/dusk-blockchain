@@ -70,7 +70,7 @@ func (c *Chain) acceptConsensusResults(ctx context.Context, winnerChan chan cons
 				return
 			}
 
-			if err = c.acceptSuccessiveBlock(block, config.KadcastInitialHeight); err != nil {
+			if err = c.acceptSuccessiveBlock(block, nil); err != nil {
 				log.WithError(err).Error("block acceptance failed")
 				c.lock.Unlock()
 				return

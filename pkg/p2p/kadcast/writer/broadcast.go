@@ -9,8 +9,9 @@ package writer
 import (
 	"bytes"
 	"context"
-	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -64,8 +65,8 @@ func (w *Broadcast) Subscribe() {
 }
 
 // Write implements. ring.Writer.
-func (w *Broadcast) Write(data, header []byte, priority byte) (int, error) {
-	if err := w.broadcast(data, header, priority); err != nil {
+func (w *Broadcast) Write(data []byte, metadata *message.Metadata, priority byte) (int, error) {
+	if err := w.broadcast(data, metadata, priority); err != nil {
 		// A returned error here is treated as unrecoverable err.
 		log.WithError(err).WithField("handler", w.topic.String()).Warn("write failed")
 	}
@@ -74,23 +75,20 @@ func (w *Broadcast) Write(data, header []byte, priority byte) (int, error) {
 }
 
 // broadcast broadcasts message to the entire network.
-// The kadcast height is read from message Header.
-func (w *Broadcast) broadcast(data, header []byte, _ byte) error {
-	// check header
-	if len(header) == 0 {
-		return errors.New("empty message header")
-	}
+// The kadcast height is read from message metadata.
+func (w *Broadcast) broadcast(data []byte, metadata *message.Metadata, _ byte) error {
+	h := config.KadcastInitialHeight
 
 	// extract kadcast height
-	h := uint32(header[0])
-	if h == 0 {
-		// Apparently, this node is the last peer in a bucket of height 0. We
-		// should not repropagate.
-		return nil
+	if metadata != nil {
+		if metadata.KadcastHeight == 0 {
+			// Apparently, this node is the last peer in a bucket of height 0. We
+			// should not repropagate.
+			return nil
+		}
+		// Decrement kadcast height
+		h = metadata.KadcastHeight - 1
 	}
-
-	// Decrement kadcast height
-	h--
 
 	// create the message
 	b := bytes.NewBuffer(data)
@@ -100,7 +98,7 @@ func (w *Broadcast) broadcast(data, header []byte, _ byte) error {
 
 	// prepare message
 	m := &rusk.BroadcastMessage{
-		KadcastHeight: h,
+		KadcastHeight: uint32(h),
 		Message:       b.Bytes(),
 	}
 	// broadcast message
