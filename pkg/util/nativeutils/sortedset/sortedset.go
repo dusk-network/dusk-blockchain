@@ -31,6 +31,9 @@ type SafeSet struct {
 	mu *sync.RWMutex
 }
 
+// Bytes returns bytes of item at position `i` in zero-extended slice up to len of `size`.
+func (v Set) Bytes(i int, size int) []byte { return v[i].FillBytes(make([]byte, size)) }
+
 // Len complies with the Sort interface.
 func (v Set) Len() int { return len(v) }
 
