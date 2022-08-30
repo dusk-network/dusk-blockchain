@@ -124,7 +124,7 @@ func NewProvisioners() *Provisioners {
 // Add a Member to the Provisioners by using the bytes of a BLS public key.
 func (p *Provisioners) Add(pubKeyBLS []byte, value, reward, counter, eligibility uint64) error {
 	if len(pubKeyBLS) != BlsKeySize {
-		return fmt.Errorf("public key is %v bytes long instead of 96", len(pubKeyBLS))
+		return fmt.Errorf("public key is %v bytes long instead of %d", len(pubKeyBLS), BlsKeySize)
 	}
 
 	i := string(pubKeyBLS)
@@ -200,7 +200,7 @@ func (p Provisioners) GetMember(pubKeyBLS []byte) *Member {
 // and return their stake.
 func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 	if len(pubKeyBLS) != BlsKeySize {
-		return 0, fmt.Errorf("public key is %v bytes long instead of 96", len(pubKeyBLS))
+		return 0, fmt.Errorf("public key is %v bytes long instead of %d", len(pubKeyBLS), BlsKeySize)
 	}
 
 	m, found := p.Members[string(pubKeyBLS)]
