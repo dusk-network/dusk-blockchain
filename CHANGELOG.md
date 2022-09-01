@@ -14,8 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mempool updates its state at start-up automatically [#1258]
 - Mempool discards any transaction with repeated nullifier [#1388]
 - Detect any occurrences of missed fallback procedure [#1413] 
+- Send reduction concurrently without blocking votes broadcast [#1442]
 
 ### Changed
+
 - Extraction from mempool consider Gas expenditure estimation [#1421]
 - Add GasLimit to the Block's header [#1416]
 - Reduce wire messages needed for propagating an Agreement vote
@@ -25,14 +27,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Call VerifyStateTransition in Reduction 2 only if it is a committee member [#1357]
 - Drop topics.Block messages with invalid header.hash value [#1425]
 - Request candidate block from arbitrary active nodes [#1359]
-- Allow verifyFn to report errors correctly #1436
+- Allow verifyFn to report errors correctly [#1436]
 - Clone message.Agreement on notifying the consumer [#1433]
-
+- Solve newblock msg errors [#1443]
 
 ### Security
 - Ensure candidate block hash is equal to the BlockHash of the msg.header [#1364]
 - Check quorum per each reduction step on agreement msg verification [#1373]
 - Extend reduction 1 verification procedure with VST call [#1358]
+- Verify block certificate prior to broadcast [#1446]
+- Add support in sortition for bls public keys that starts with zeros [#1457]
+- Discard aggrAgreement messages with invalid StepVotes [#1430]
+- Check quorum target on certificate verification [#1432] 
 
 ### Fixed
 - Default configuration values loading [#1419] 

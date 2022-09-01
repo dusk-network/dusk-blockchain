@@ -117,3 +117,20 @@ func TestRemoveStake(t *testing.T) {
 
 	assert.NotPanics(t, func() { p.CreateVotingCommittee(seed, 1, 1, 10) })
 }
+
+func TestZeroExtended(t *testing.T) {
+	committee := &user.VotingCommittee{sortedset.NewCluster()}
+
+	blsMockedKey := []byte{0, 0, 1, 2, 3, 4}
+
+	bk := (&big.Int{}).SetBytes(blsMockedKey)
+	committee.Set = append(committee.Set, bk)
+
+	// Should not use Int.Bytes but Int.FillBytes
+	assert.False(t, bytes.Equal(committee.Set[0].Bytes(), blsMockedKey))
+
+	// Read bytes
+	output := committee.Set.Bytes(0, len(blsMockedKey))
+
+	assert.True(t, bytes.Equal(output, blsMockedKey))
+}

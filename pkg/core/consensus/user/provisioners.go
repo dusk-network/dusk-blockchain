@@ -16,6 +16,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
 
+// BlsKeySize size of public key.
+const BlsKeySize = 96
+
 type (
 	// Member contains the bytes of a provisioner's Ed25519 public key,
 	// the bytes of his BLS public key, and how much he has staked.
@@ -120,8 +123,8 @@ func NewProvisioners() *Provisioners {
 
 // Add a Member to the Provisioners by using the bytes of a BLS public key.
 func (p *Provisioners) Add(pubKeyBLS []byte, value, reward, counter, eligibility uint64) error {
-	if len(pubKeyBLS) != 96 {
-		return fmt.Errorf("public key is %v bytes long instead of 96", len(pubKeyBLS))
+	if len(pubKeyBLS) != BlsKeySize {
+		return fmt.Errorf("public key is %v bytes long instead of %d", len(pubKeyBLS), BlsKeySize)
 	}
 
 	i := string(pubKeyBLS)
@@ -184,8 +187,8 @@ func (p Provisioners) MemberAt(i int) (*Member, error) {
 		return nil, errors.New("index out of bound")
 	}
 
-	bigI := p.Set[i]
-	return p.Members[string(bigI.Bytes())], nil
+	b := p.Set.Bytes(i, BlsKeySize)
+	return p.Members[string(b)], nil
 }
 
 // GetMember returns a member of the provisioners from its BLS public key.
@@ -196,8 +199,8 @@ func (p Provisioners) GetMember(pubKeyBLS []byte) *Member {
 // GetStake will find a certain provisioner in the committee by BLS public key,
 // and return their stake.
 func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
-	if len(pubKeyBLS) != 96 {
-		return 0, fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
+	if len(pubKeyBLS) != BlsKeySize {
+		return 0, fmt.Errorf("public key is %v bytes long instead of %d", len(pubKeyBLS), BlsKeySize)
 	}
 
 	m, found := p.Members[string(pubKeyBLS)]
