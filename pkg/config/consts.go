@@ -31,10 +31,18 @@ const (
 	NodeVersion = "0.6.0-rc"
 
 	// TESTNET_GENESIS_HASH is the default genesis hash for testnet.
-	TESTNET_GENESIS_HASH = "9919cd6b088014d31f89142f54ce9866d88ced250597596cfb68ef12d49f03d9"
+	TESTNET_GENESIS_HASH = "1c0125633b32cec077a6723ca943435b0effb89343c439c70793ff1d6f8066db"
 
-	// DEFAULT_STATE_ROOT is the state root result of "rusk make state".
-	DEFAULT_STATE_ROOT string = "d8a2b6dde8fac1854ff2b4b8b37e161a16305ce96d90810671b9c27ea8a6a4de"
+	// TESTNET_STATE_ROOT is the state root result of
+	// "rusk `RUSK_PREBUILT_CONTRACTS=true RUSK_BUILD_TESTNET=true make state`".
+	TESTNET_STATE_ROOT string = "ff3e64a0ce8332396a43827094b9c3de7a29741fd81edc9b493f4e236d3228fb"
+
+	// HARNESS_GENESIS_HASH is the default genesis hash for harness (local net).
+	HARNESS_GENESIS_HASH = "cf1bec522ee62aa832ef2cad62b2b73dda5ea6c95110add9a074f2600517bf42"
+
+	// HARNESS_STATE_ROOT is the state root result of
+	// "rusk `RUSK_PREBUILT_CONTRACTS=true RUSK_BUILD_TESTNET=false make state`".
+	HARNESS_STATE_ROOT string = "bf07fa6a5e43168c1cba95b17d0d414f6dc050b2d6056905f6049e66bb4ed307"
 
 	// Consensus-related settings
 	// Protocol-based consensus step time.

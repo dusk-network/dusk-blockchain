@@ -27,7 +27,7 @@ func Profile1(index int, node *DuskNode, consensusKeysPath string) {
 	consensusKeysFileName := "node_" + strconv.Itoa(index) + ".keys"
 
 	viper.Reset()
-	viper.Set("general.network", "testnet")
+	viper.Set("general.network", "harness")
 	viper.Set("general.testharness", "true")
 
 	viper.Set("network.serviceflag", 1)
