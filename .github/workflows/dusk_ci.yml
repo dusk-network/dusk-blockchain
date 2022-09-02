@@ -25,6 +25,7 @@ jobs:
       run: rm -rf $HOME/.cache/golangci-lint || true && make lint
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - name: Install Go
       uses: actions/setup-go@v2
@@ -38,6 +39,7 @@ jobs:
       run: bash <(curl -s https://codecov.io/bash)
   test-harness:
     runs-on: core
+    timeout-minutes: 10
     steps:
     - name: Install Go
       uses: actions/setup-go@v2
