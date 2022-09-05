@@ -370,7 +370,11 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 
 	// CREATE THE RUSK STATE for the local rusk
 	stateExec := name + "-recovery-state"
-	cmd := exec.Command(stateExec)
+
+	// "-f" force -> delete the previous state folder
+	// "-w" write -> build a state from scratch instead of downloading it
+	// "-c" contracts -> use prebuilt contracts
+	cmd := exec.Command(stateExec, "-f", "-w", "-c")
 	cmd.Env = append(envWithNoRusk, "TMPDIR="+nodeDir, "RUSK_PROFILE_PATH="+nodeDir)
 
 	cmd.Start()

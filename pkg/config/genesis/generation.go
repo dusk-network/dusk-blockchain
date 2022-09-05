@@ -29,7 +29,7 @@ func Generate(c Config) *block.Block {
 	var state_root []byte
 	var err error
 
-	state_root_str := config.DEFAULT_STATE_ROOT
+	state_root_str := c.stateRoot
 
 	if state_root_override := os.Getenv("RUSK_STATE_ROOT"); len(state_root_override) > 0 {
 		state_root_str = state_root_override

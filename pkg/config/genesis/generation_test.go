@@ -16,7 +16,7 @@ import (
 
 // A generated genesis block should be entirely deterministic.
 func TestEquality(t *testing.T) {
-	cfg, err := genesis.GetPresetConfig("devnet")
+	cfg, err := genesis.GetPresetConfig("test")
 	assert.NoError(t, err)
 
 	cfg.Transactions = make([]transactions.ContractCall, 0)

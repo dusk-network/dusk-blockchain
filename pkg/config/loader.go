@@ -25,6 +25,7 @@ const (
 	searchPath2 = "$HOME/.dusk/"
 	testnet     = "testnet" //nolint
 	devnet      = "devnet"
+	test        = "test"
 )
 
 var r *Registry
@@ -250,7 +251,7 @@ func init() {
 	r = new(Registry)
 	r.lock = new(sync.RWMutex)
 	r.Database.Driver = "lite_v0.1.0"
-	r.General.Network = devnet
+	r.General.Network = test
 	r.Consensus.ConsensusTimeOut = DefaultConsensusTimeOutSeconds
 	r.Mempool.MaxInvItems = 10000
 	r.Mempool.ExtractionDelaySecs = 3
