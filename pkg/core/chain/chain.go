@@ -181,11 +181,13 @@ func (c *Chain) syncWithRusk() error {
 			return err
 		}
 
-		if !bytes.Equal(persitedBlock.Header.StateHash, ruskStateHash) {
-			log.WithField("rusk", hex.EncodeToString(ruskStateHash)).
-				WithField("node", hex.EncodeToString(persitedBlock.Header.StateHash)).
-				Error("invalid state detected")
-			return errors.New("invalid state detected")
+		if persitedBlock.Header.Height > 0 {
+			if !bytes.Equal(persitedBlock.Header.StateHash, ruskStateHash) {
+				log.WithField("rusk", hex.EncodeToString(ruskStateHash)).
+					WithField("node", hex.EncodeToString(persitedBlock.Header.StateHash)).
+					Error("invalid state detected")
+				return errors.New("invalid state detected")
+			}
 		}
 
 		return err
@@ -512,6 +514,10 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 
 // sanityCheckStateHash ensures most recent local statehash and rusk statehash are the same.
 func (c *Chain) sanityCheckStateHash() error {
+	if c.tip.Header.Height == 0 {
+		return nil
+	}
+
 	// Ensure that both (co-deployed) services node and rusk are on the same
 	// state. If not, we should trigger a recovery procedure so both are
 	// always synced up.
