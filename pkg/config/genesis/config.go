@@ -19,11 +19,6 @@ type Config struct {
 	seed      []byte
 
 	Transactions []transactions.ContractCall
-
-	// Expected genesis block hash used as a sanity check
-	hash string
-
-	stateRoot string
 }
 
 // NewConfig will construct a new genesis config. This function does sanity checks

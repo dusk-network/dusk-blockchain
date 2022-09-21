@@ -30,20 +30,6 @@ const (
 	// The dusk-blockchain executable version.
 	NodeVersion = "0.6.0"
 
-	// TESTNET_GENESIS_HASH is the default genesis hash for testnet.
-	TESTNET_GENESIS_HASH = "1c0125633b32cec077a6723ca943435b0effb89343c439c70793ff1d6f8066db"
-
-	// TESTNET_STATE_ROOT is the state root result of
-	// "rusk `RUSK_PREBUILT_CONTRACTS=true RUSK_BUILD_TESTNET=true make state`".
-	TESTNET_STATE_ROOT string = "ff3e64a0ce8332396a43827094b9c3de7a29741fd81edc9b493f4e236d3228fb"
-
-	// HARNESS_GENESIS_HASH is the default genesis hash for harness (local net).
-	HARNESS_GENESIS_HASH = "cf1bec522ee62aa832ef2cad62b2b73dda5ea6c95110add9a074f2600517bf42"
-
-	// HARNESS_STATE_ROOT is the state root result of
-	// "rusk `RUSK_PREBUILT_CONTRACTS=true RUSK_BUILD_TESTNET=false make state`".
-	HARNESS_STATE_ROOT string = "bf07fa6a5e43168c1cba95b17d0d414f6dc050b2d6056905f6049e66bb4ed307"
-
 	// Consensus-related settings
 	// Protocol-based consensus step time.
 	DefaultConsensusTimeOutSeconds = 5

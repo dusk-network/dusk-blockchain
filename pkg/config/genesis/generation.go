@@ -7,14 +7,9 @@
 package genesis
 
 import (
-	"bytes"
-	"encoding/hex"
-	"os"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
-	"github.com/sirupsen/logrus"
 )
 
 // Generate a genesis block. The constitution of the block depends on the passed
@@ -26,18 +21,7 @@ func Generate(c Config) *block.Block {
 		c.Transactions = append(c.Transactions, transactions.MockTx())
 	}
 
-	var state_root []byte
-	var err error
-
-	state_root_str := c.stateRoot
-
-	if state_root_override := os.Getenv("RUSK_STATE_ROOT"); len(state_root_override) > 0 {
-		state_root_str = state_root_override
-	}
-
-	if state_root, err = hex.DecodeString(state_root_str); err != nil {
-		panic(err)
-	}
+	state_root := make([]byte, 32)
 
 	h := &block.Header{
 		Version:            0,
@@ -59,19 +43,6 @@ func Generate(c Config) *block.Block {
 	hash, err := b.CalculateHash()
 	if err != nil {
 		panic(err)
-	}
-
-	// ensure the genesis hash is the expected one
-	if len(c.hash) > 0 {
-		expected, _ := hex.DecodeString(c.hash)
-		if !bytes.Equal(hash, expected) {
-			logrus.
-				WithField("expected", hex.EncodeToString(expected)).
-				WithField("actual", hex.EncodeToString(hash)).
-				Error("Generated genesis block hash does not match expected hash")
-			// The panic will be fired if testnet genesis block changes.
-			panic("calculated hash is not correct")
-		}
 	}
 
 	b.Header.Hash = hash
