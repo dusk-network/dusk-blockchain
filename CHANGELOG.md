@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `blocksrange` filter to GQL transaction lookup [#1468]
+
+### Changed
+- Remove hardcoded genesis checks [#1464]
+
 ## [0.6.0] - 2022-09-07 
 
 ### Added
@@ -19,7 +25,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Send reduction concurrently without blocking votes broadcast [#1442]
 
 ### Changed
-
 - Extraction from mempool consider Gas expenditure estimation [#1421]
 - Add GasLimit to the Block's header [#1416]
 - Reduce wire messages needed for propagating an Agreement vote
@@ -82,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Issues -->
 
+[#1464]: https://github.com/dusk-network/dusk-blockchain/issues/1464
+[#1468]: https://github.com/dusk-network/dusk-blockchain/issues/1468
 [#1457]: https://github.com/dusk-network/dusk-blockchain/issues/1457
 [#1446]: https://github.com/dusk-network/dusk-blockchain/issues/1446
 [#1443]: https://github.com/dusk-network/dusk-blockchain/issues/1443
