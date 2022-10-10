@@ -95,6 +95,9 @@ var Transaction = graphql.NewObject(
 			"blocktimestamp": &graphql.Field{
 				Type: UnixTimestamp,
 			},
+			"blockheight": &graphql.Field{
+				Type: graphql.Float,
+			},
 			"score": &graphql.Field{
 				Type: Hex,
 			},

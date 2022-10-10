@@ -61,7 +61,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 		txs := make([]queryTx, 0)
 
 		for i := 0; i < len(r); i++ {
-			d, err := newQueryTx(r[i], nil, 0)
+			d, err := newQueryTx(r[i], nil, 0, 0)
 			if err == nil {
 				txs = append(txs, d)
 			}
