@@ -373,9 +373,9 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 
 	stateToml := filepath.Join(filepath.Dir(stateExec), "../harness/tests/rusk_localnet_state.toml")
 
-	// "-w" write -> build a state from scratch instead of downloading it
+	// "-f" force -> remove the previous state (if any)
 	// "-i" input -> state configuration
-	cmd := exec.Command(stateExec, "-w", "-i", stateToml)
+	cmd := exec.Command(stateExec, "-f", "-i", stateToml)
 
 	cmd.Env = append(envWithNoRusk, "TMPDIR="+nodeDir, "RUSK_PROFILE_PATH="+nodeDir)
 
