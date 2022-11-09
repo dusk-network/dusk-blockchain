@@ -464,11 +464,21 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 		for iteration := uint8(0); iteration < missedIterations; iteration++ {
 			step := iteration*3 + 1
 			committee := c.p.CreateVotingCommittee(tipBlk.Header.Seed, blk.Header.Height, step, config.ConsensusSelectionMaxCommitteeSize)
-			expectedkey, _ := base58.Encode(committee.MemberKeys()[0])
-			logger.WithField("provisioner", expectedkey).
-				WithField("iteration", iteration+1).
-				WithField("height", blk.Header.Height).
-				Warn("Missed block from provisioner")
+			committeeKeys := committee.MemberKeys()
+
+			if len(committeeKeys) == 1 {
+				expectedkey, _ := base58.Encode(committeeKeys[0])
+				log.
+					WithField("iteration", iteration+1).
+					WithField("height", blk.Header.Height).
+					WithField("generator", expectedkey).
+					Warn("Missed block from provisioner")
+			} else {
+				log.
+					WithField("iteration", iteration+1).
+					WithField("height", blk.Header.Height).
+					Error("Unable to generate voting committee for missed block")
+			}
 		}
 
 		// Tentative block. non-first iteration consensus agreement.
@@ -522,7 +532,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 		Info("state transition completed")
 
 	provisioner, _ := base58.Encode(blk.Header.GeneratorBlsPubkey)
-	logger.WithField("provisioner", provisioner).
+	logger.WithField("generator", provisioner).
 		WithField("iteration", blk.Header.Certificate.Step/3).
 		WithField("height", blk.Header.Height).
 		Info("Accepted block from provisioner")
