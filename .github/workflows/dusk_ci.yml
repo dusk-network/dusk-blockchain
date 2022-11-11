@@ -50,7 +50,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: nightly-2022-02-19
+        toolchain: nightly-2022-08-28
         override: true
     - run: rustup target add wasm32-unknown-unknown
     - run: rustup component add rustfmt rust-src

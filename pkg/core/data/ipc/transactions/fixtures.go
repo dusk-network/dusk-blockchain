@@ -15,6 +15,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/rusk"
 )
@@ -31,9 +32,11 @@ type PermissiveExecutor struct {
 
 // MockExecutor returns an instance of PermissiveExecutor.
 func MockExecutor(height uint64) *PermissiveExecutor {
+	p := user.NewProvisioners()
+	_ = p.Add(key.NewRandKeys().BLSPubKey, 1, 1, 1, 0)
 	return &PermissiveExecutor{
 		height: height,
-		P:      user.NewProvisioners(),
+		P:      p,
 	}
 }
 
