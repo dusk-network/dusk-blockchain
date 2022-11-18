@@ -75,10 +75,14 @@ func (a *Aggregator) CollectVote(ev message.Reduction) *Result {
 	// Aggregated Signatures
 	if err := sv.StepVotes.Add(ev.SignedHash); err != nil {
 		// adding the vote to the cluster failed. This is a programming error
-		panic(err)
+		// panic(err)
 	}
 
 	votes := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
+	if votes == 0 {
+		return nil
+	}
+
 	for i := 0; i < votes; i++ {
 		sv.Cluster.Insert(hdr.PubKeyBLS)
 	}

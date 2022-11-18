@@ -1,6 +1,6 @@
 # general node configs
 [general]
-network = "testnet"
+network = "devnet"
 
 # logger configs
 [logger]

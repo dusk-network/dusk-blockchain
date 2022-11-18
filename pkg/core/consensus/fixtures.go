@@ -76,6 +76,9 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.Keys) {
 
 	for i := 0; i < amount; i++ {
 		keys := key.NewRandKeys()
+		keys.BLSPubKey = make([]byte, 96)
+		keys.BLSPubKey[0] = byte(i)
+
 		member := MockMember(keys)
 
 		p.Members[string(keys.BLSPubKey)] = member
@@ -95,12 +98,12 @@ func MockMember(keys key.Keys) *user.Member {
 	member.RawPublicKeyBLS, err = bls.PkToRaw(keys.BLSPubKey)
 
 	if err != nil {
-		panic(err)
+		// panic(err)
 	}
 
 	member.Stakes = make([]user.Stake, 1)
-	member.Stakes[0].Value = 500
-	member.Stakes[0].Eligibility = 1
+	member.Stakes[0].Value = 1000 * user.DUSK
+	member.Stakes[0].Eligibility = 0
 
 	return member
 }

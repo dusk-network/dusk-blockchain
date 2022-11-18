@@ -8,6 +8,7 @@ package message_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
@@ -22,11 +23,24 @@ func TestEncodeDecodeBlock(t *testing.T) {
 	assert := assert.New(t)
 
 	// random block
-	blk := helper.RandomBlock(200, 2)
+	blk := helper.RandomBlock(200, 0)
 
 	// Encode block into a buffer
 	buf := new(bytes.Buffer)
 	assert.NoError(message.MarshalBlock(buf, blk))
+
+	result := "vec!["
+	for i, v := range buf.Bytes() {
+		result += fmt.Sprintf("%d", v)
+
+		if i != buf.Len()-1 {
+			result += ","
+		}
+	}
+
+	result += "];"
+
+	t.Log(result)
 
 	// Decode buffer into a block struct
 	decBlk := block.NewBlock()

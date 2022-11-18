@@ -54,11 +54,11 @@ func TestMain(m *testing.M) {
 	workspace = path.Join(os.TempDir(), "localnet")
 
 	if !localNet.Reuse {
-		if err := os.Mkdir(workspace, 0700); err != nil {
+		if err := os.Mkdir(workspace, 0o700); err != nil {
 			fmt.Println("Cleaning temp directory", workspace)
 
 			if err := os.RemoveAll(workspace); err == nil {
-				os.Mkdir(workspace, 0700)
+				os.Mkdir(workspace, 0o700)
 			}
 		}
 	} else {

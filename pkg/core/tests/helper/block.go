@@ -8,7 +8,6 @@ package helper
 
 import (
 	"testing"
-	"time"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -69,18 +68,28 @@ func RandomCertificate() *block.Certificate {
 	return block.EmptyCertificate()
 }
 
+func binary(val byte, size int) []byte {
+	buf := make([]byte, size)
+	for i := range buf {
+		buf[i] = val
+	}
+
+	return buf
+}
+
 // RandomHeader returns a random header for testing. `height` randomness is up
 // to the caller. A global atomic counter per pkg can handle it.
 func RandomHeader(height uint64) *block.Header {
 	return &block.Header{
 		Version:   0,
 		Height:    height,
-		Timestamp: time.Now().Unix(),
+		Timestamp: 11112222,
+		GasLimit:  123456,
 
-		PrevBlockHash:      transactions.Rand32Bytes(),
-		Seed:               RandomBLSSignature(),
-		GeneratorBlsPubkey: key.NewRandKeys().BLSPubKey,
-		StateHash:          make([]byte, 32),
+		PrevBlockHash:      binary(10, 32),
+		Seed:               binary(11, 32),
+		GeneratorBlsPubkey: binary(12, 96),
+		StateHash:          binary(13, 32),
 
 		Certificate: RandomCertificate(),
 	}

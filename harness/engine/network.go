@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -175,8 +176,14 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	// Foreach node read localNet.Nodes, configure and run new nodes
 	for i, node := range n.nodes {
-		if err := n.StartNode(i, node, workspace); err != nil {
-			return err
+		if true {
+			if err := n.StartNode(i, node, workspace); err != nil {
+				return err
+			}
+		} else {
+			if err := n.StartRuskNode(i, len(n.nodes), node, workspace); err != nil {
+				return err
+			}
 		}
 
 		// avoid stressing dusk-seeder
@@ -298,6 +305,37 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	return nil
 }
 
+func (n *Network) StartRuskNode(i int, preloaded_prov int, node *DuskNode, workspace string) error {
+	ruskNodeExec := "/home/tech/repo/dusk-network/dusk-blockchain-rust/consensus/target/release/examples/node"
+
+	// create node folder
+	nodeDir := workspace + "/node-" + node.Id
+	node.Dir = nodeDir
+
+	// Generate node default config file
+	_, tomlErr := n.generateConfig(i)
+	if tomlErr != nil {
+		return tomlErr
+	}
+
+	// (nodeDir, cfg.BootstrapAddr, cfg.Address, addr, port)
+	// ./target/release/examples/node --bootstrap cfg.BootstrapAddr --provisioner-unique-id=$i --preloaded-num=$PROV_NUM --address "127.0.0.1:$PORT" --log-level=info
+
+	// TODO: Executable Var
+	// TODO: Log file
+	if err := n.runProcess(ruskNodeExec, nodeDir, "rust-node",
+		"--bootstrap", node.Cfg.Kadcast.BootstrapAddr[0],
+		"--address", node.Cfg.Kadcast.Address,
+		"--log-level", "info",
+		"--provisioner-unique-id", strconv.Itoa(i),
+		"--preloaded-num=", strconv.Itoa(preloaded_prov),
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // GetGrpcConn gets a connection to the GRPC server of a node. It delegates
 // eventual sessions to the underlying client.
 func (n *Network) GetGrpcConn(i uint, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
@@ -354,6 +392,41 @@ func (n *Network) generateConfig(nodeIndex int) (string, error) {
 	}
 
 	return configPath, nil
+}
+
+func (n *Network) runProcess(executable string, nodeDir string, name string, arg ...string) error {
+	env := os.Environ()
+
+	cmd := exec.Command(executable)
+	cmd.Env = append(env, "TMPDIR="+nodeDir)
+
+	// Redirect both STDOUT and STDERR to separate files
+	if len(nodeDir) > 0 {
+		id := filepath.Base(name)
+
+		stdOutFile, err := os.Create(nodeDir + "/" + id + "_stdout")
+		if err != nil {
+			log.Info(err)
+		}
+
+		var stdErrFile *os.File
+
+		stdErrFile, err = os.Create(nodeDir + "/" + id + "_stderr")
+		if err != nil {
+			log.Info(err)
+		}
+
+		cmd.Stdout = stdOutFile
+		cmd.Stderr = stdErrFile
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	n.processes = append(n.processes, cmd.Process)
+
+	return nil
 }
 
 // Start an OS process with TMPDIR=nodeDir, manageable by the network.

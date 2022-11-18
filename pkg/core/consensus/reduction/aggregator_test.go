@@ -7,9 +7,11 @@
 package reduction
 
 import (
+	"encoding/hex"
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/require"
 )
@@ -87,6 +89,48 @@ func TestAggregation(t *testing.T) {
 			}
 
 			tt.tCb(require, hlp, res)
+		})
+	}
+}
+
+func TestAggregation2(t *testing.T) {
+	hash, _ := hex.DecodeString("b70189c7e7a347989f4fbc1205ce612f755dfc489ecf28f9f883800acf078bd5")
+
+	round := uint64(1)
+	step := uint8(1)
+
+	for testName, tt := range ttest {
+		t.Run(testName, func(t *testing.T) {
+			// making sure that parallelism does not interfere with the test
+			tt := tt
+			// creting the require instance from this subtest
+
+			// setting up the helper and the aggregator
+			hlp := NewHelper(5, 1*time.Second)
+			aggregator := NewAggregator(hlp.Handler)
+
+			// running test-specific setup on the Helper
+			tt.setup(hlp)
+
+			// creating the messages
+			evs := make([]message.Reduction, 0)
+			for i := 0; i < 4; i++ {
+				ev := message.MockReduction(hash, round, step, hlp.ProvisionersKeys, i)
+				evs = append(evs, ev)
+			}
+
+			// sending Reduction messages to the aggregator
+			var res *Result
+
+			for _, ev := range evs {
+				// if the aggregator returns a result, the quorum has been
+				// reached. Otherwise it returns nil
+				if res = aggregator.CollectVote(ev); res != nil {
+
+					t.Logf("%s %d", hex.EncodeToString(res.Hash), res.SV.BitSet)
+					break
+				}
+			}
 		})
 	}
 }

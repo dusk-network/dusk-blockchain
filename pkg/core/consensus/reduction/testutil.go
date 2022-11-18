@@ -69,7 +69,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 
 	emitter := consensus.MockEmitter(timeOut)
 	emitter.Keys = provisionersKeys[0]
-	seed := []byte{0, 0, 0, 0}
+	seed := make([]byte, 32)
 
 	hlp := &Helper{
 		failOnVerification: false,
@@ -105,13 +105,8 @@ func (hlp *Helper) Spawn(hash []byte, round uint64, step uint8) []message.Reduct
 	evs := make([]message.Reduction, 0, hlp.Nr)
 	i := 0
 
-	for count := 0; count < hlp.Handler.Quorum(round); {
-		ev := message.MockReduction(hash, round, step, hlp.ProvisionersKeys, i)
-		evs = append(evs, ev)
-
-		i++
-		count += hlp.Handler.VotesFor(hlp.ProvisionersKeys[i].BLSPubKey, round, step)
-	}
+	ev := message.MockReduction(hash, round, step, hlp.ProvisionersKeys, i)
+	evs = append(evs, ev)
 
 	return evs
 }

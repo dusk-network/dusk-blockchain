@@ -178,7 +178,7 @@ func MockReduction(hash []byte, round uint64, step uint8, keys []key.Keys, itera
 
 	sigma, err := bls.Sign(keys[idx].BLSSecretKey, keys[idx].BLSPubKey, r.Bytes())
 	if err != nil {
-		panic(err)
+		// panic(err)
 	}
 
 	return Reduction{

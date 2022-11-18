@@ -16,7 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message/payload"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/sirupsen/logrus"
 )
 
@@ -177,14 +176,21 @@ func MarshalNewBlock(r *bytes.Buffer, sev NewBlock) error {
 	return nil
 }
 
+func binary(val byte, size int) []byte {
+	buf := make([]byte, size)
+	for i := range buf {
+		buf[i] = val
+	}
+
+	return buf
+}
+
 // MockNewBlock mocks a NewBlock and returns it.
 func MockNewBlock(hdr header.Header, c block.Block) NewBlock {
-	prevHash, _ := crypto.RandEntropy(32)
-
 	return NewBlock{
 		hdr:        hdr,
-		PrevHash:   prevHash,
+		PrevHash:   binary(14, 32),
 		Candidate:  c,
-		SignedHash: make([]byte, 50),
+		SignedHash: binary(15, 48),
 	}
 }

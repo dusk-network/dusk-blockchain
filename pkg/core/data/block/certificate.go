@@ -42,8 +42,8 @@ func (c *Certificate) Copy() *Certificate {
 // EmptyCertificate returns an empty Certificate instance.
 func EmptyCertificate() *Certificate {
 	return &Certificate{
-		StepOneBatchedSig: make([]byte, 33),
-		StepTwoBatchedSig: make([]byte, 33),
+		StepOneBatchedSig: make([]byte, 48),
+		StepTwoBatchedSig: make([]byte, 48),
 		Step:              0,
 		StepOneCommittee:  0,
 		StepTwoCommittee:  0,
