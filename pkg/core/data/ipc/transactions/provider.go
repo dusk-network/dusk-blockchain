@@ -247,10 +247,12 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 	provisioners := user.NewProvisioners()
 	memberMap := make(map[string]*user.Member)
 
+	logrus.Info("Before Get Provisioners")
 	pres, err := e.stateClient.GetProvisioners(ruskCtx, &rusk.GetProvisionersRequest{})
 	if err != nil {
 		return nil, user.Provisioners{}, nil, err
 	}
+	logrus.Info("After Get Provisioners")
 
 	for i := range pres.Provisioners {
 		member := new(user.Member)
@@ -258,6 +260,8 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 		memberMap[string(member.PublicKeyBLS)] = member
 		provisioners.Set.Insert(member.PublicKeyBLS)
 	}
+
+	logrus.Info("After Provisioners deep copy")
 
 	resCalls, err := e.convertToContractCall(res.Txs)
 	if err != nil {
