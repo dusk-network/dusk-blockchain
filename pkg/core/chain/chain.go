@@ -230,6 +230,11 @@ func (c *Chain) syncWithRusk() error {
 			break
 		}
 
+		if err := c.kadcastBlock(*blk, nil); err != nil {
+			log.WithError(err).Error("block propagation failed")
+			// return err
+		}
+
 		// Re-accepting all blocks that have not been persisted in Rusk.
 		// This will re-execute accept/finalize accordingly and update chain tip.
 		if err := c.acceptBlock(*blk, false); err != nil {
