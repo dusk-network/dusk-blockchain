@@ -230,9 +230,8 @@ func (c *Chain) syncWithRusk() error {
 			break
 		}
 
-		if err := c.kadcastBlock(*blk, nil); err != nil {
-			log.WithError(err).Error("block propagation failed")
-			// return err
+		if err := c.sendBlockToMany(*blk); err != nil {
+			log.WithError(err).Error("block send-to-many failed")
 		}
 
 		// Re-accepting all blocks that have not been persisted in Rusk.
@@ -785,6 +784,20 @@ func (c *Chain) kadcastBlock(blk block.Block, metadata *message.Metadata) error 
 	}
 
 	c.eventBus.Publish(topics.Kadcast, message.NewWithMetadata(topics.Block, *buf, metadata))
+	return nil
+}
+
+func (c *Chain) sendBlockToMany(blk block.Block) error {
+	buf := new(bytes.Buffer)
+	if err := message.MarshalBlock(buf, &blk); err != nil {
+		return err
+	}
+
+	if err := topics.Prepend(buf, topics.Block); err != nil {
+		return err
+	}
+
+	c.eventBus.Publish(topics.KadcastSendToMany, message.NewWithMetadata(topics.Block, *buf, &message.Metadata{NumNodes: 255}))
 	return nil
 }
 
