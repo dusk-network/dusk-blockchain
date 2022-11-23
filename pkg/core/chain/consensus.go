@@ -23,6 +23,10 @@ func (c *Chain) RestartConsensus() error {
 	return c.startConsensus()
 }
 
+func (c *Chain) GetTip() uint64 {
+	return c.tip.Header.Height
+}
+
 // startConsensus will start the consensus loop. It can be halted at any point by
 // sending a signal through the `stopConsensus` channel (`StopConsensus`
 // as exposed by the `Ledger` interface).

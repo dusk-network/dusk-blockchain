@@ -230,10 +230,6 @@ func (c *Chain) syncWithRusk() error {
 			break
 		}
 
-		if err := c.sendBlockToMany(*blk, 300); err != nil {
-			log.WithError(err).Error("block send-to-many failed")
-		}
-
 		// Re-accepting all blocks that have not been persisted in Rusk.
 		// This will re-execute accept/finalize accordingly and update chain tip.
 		if err := c.acceptBlock(*blk, false); err != nil {
@@ -242,6 +238,12 @@ func (c *Chain) syncWithRusk() error {
 	}
 
 	return nil
+}
+
+func (c *Chain) ResendBlockhainTip(numNodes uint32) {
+	if err := c.sendBlockToMany(*c.tip, numNodes); err != nil {
+		log.WithError(err).Error("block send-to-many failed")
+	}
 }
 
 // ProcessBlockFromNetwork will handle blocks incoming from the network.

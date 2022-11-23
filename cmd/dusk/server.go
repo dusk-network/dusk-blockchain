@@ -184,6 +184,11 @@ func Setup() *Server {
 	kcfg := cfg.Get().Kadcast
 	if kcfg.Enabled {
 		srv.launchKadcastPeer(parentCtx, processor, gossip)
+
+		// Wait for the kadcast client setup
+		time.Sleep(3 * time.Second)
+
+		c.ResendBlockhainTip(300)
 	}
 
 	// Schedule mempool updates requesting a few seconds after all components
