@@ -10,7 +10,7 @@ package message
 type Metadata struct {
 	KadcastHeight byte
 	Source        string
-	NumNodes      byte
+	NumNodes      uint32
 }
 
 func (m simple) Metadata() *Metadata {

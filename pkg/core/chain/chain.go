@@ -230,7 +230,7 @@ func (c *Chain) syncWithRusk() error {
 			break
 		}
 
-		if err := c.sendBlockToMany(*blk); err != nil {
+		if err := c.sendBlockToMany(*blk, 300); err != nil {
 			log.WithError(err).Error("block send-to-many failed")
 		}
 
@@ -787,7 +787,7 @@ func (c *Chain) kadcastBlock(blk block.Block, metadata *message.Metadata) error 
 	return nil
 }
 
-func (c *Chain) sendBlockToMany(blk block.Block) error {
+func (c *Chain) sendBlockToMany(blk block.Block, numNodes uint32) error {
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, &blk); err != nil {
 		return err
@@ -797,7 +797,7 @@ func (c *Chain) sendBlockToMany(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Publish(topics.KadcastSendToMany, message.NewWithMetadata(topics.Block, *buf, &message.Metadata{NumNodes: 255}))
+	c.eventBus.Publish(topics.KadcastSendToMany, message.NewWithMetadata(topics.Block, *buf, &message.Metadata{NumNodes: numNodes}))
 	return nil
 }
 

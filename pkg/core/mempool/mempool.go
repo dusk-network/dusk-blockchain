@@ -539,7 +539,7 @@ func (m *Mempool) RequestUpdates() {
 		panic(err)
 	}
 
-	metadata := message.Metadata{NumNodes: numNodes}
+	metadata := message.Metadata{NumNodes: uint32(numNodes)}
 	msg := message.NewWithMetadata(topics.MemPool, buf, &metadata)
 	m.eventBus.Publish(topics.KadcastSendToMany, msg)
 }

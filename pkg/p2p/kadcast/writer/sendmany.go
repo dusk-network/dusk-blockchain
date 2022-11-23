@@ -62,7 +62,7 @@ func (w *SendToMany) sendToMany(data []byte, metadata *message.Metadata, _ byte)
 	}
 
 	// get N active nodes
-	req := &rusk.AliveNodesRequest{MaxNodes: uint32(metadata.NumNodes)}
+	req := &rusk.AliveNodesRequest{MaxNodes: metadata.NumNodes}
 
 	resp, err := w.client.AliveNodes(w.ctx, req)
 	if err != nil {
