@@ -24,10 +24,11 @@ const (
 	txsFetchLimit       = 10000
 	txsBlocksFetchLimit = 10000
 
-	txidArg     = "txid"
-	txidsArg    = "txids"
-	txlastArg   = "last"
-	txblocksArg = "blocks"
+	txidArg       = "txid"
+	txidsArg      = "txids"
+	txlastArg     = "last"
+	txblocksArg   = "blocks"
+	txblocksRange = "blocksrange"
 )
 
 type (
@@ -47,7 +48,8 @@ type (
 
 		// Non-StandardTx data fields.
 		BlockHash      []byte
-		BlockTimestamp int64 `json:"blocktimestamp"` // Block timestamp
+		BlockTimestamp int64  `json:"blocktimestamp"` // Block timestamp
+		BlockHeight    uint64 `json:"blockheight"`    // Block height
 		Size           int
 		JSON           string
 		TxError        string
@@ -59,7 +61,7 @@ type transactions struct{}
 
 // newQueryTx constructs query tx data from core tx and block hash.
 //nolint
-func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryTx, error) {
+func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64, blockheight uint64) (queryTx, error) {
 	txID, err := tx.CalculateHash()
 	if err != nil {
 		return queryTx{}, err
@@ -81,6 +83,7 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64) (queryT
 
 	qd.BlockHash = blockHash
 	qd.BlockTimestamp = timestamp
+	qd.BlockHeight = blockheight
 
 	// Consider Transaction payload length as transaction size
 	qd.Size = len(tx.StandardTx().Data)
@@ -123,6 +126,9 @@ func (t transactions) getQuery() *graphql.Field {
 			txblocksArg: &graphql.ArgumentConfig{
 				Type: graphql.Int,
 			},
+			txblocksRange: &graphql.ArgumentConfig{
+				Type: graphql.NewList(graphql.Int),
+			},
 		},
 		Resolve: t.resolve,
 	}
@@ -145,6 +151,21 @@ func (t transactions) resolve(p graphql.ResolveParams) (interface{}, error) {
 	ids, ok := p.Args[txidsArg].([]interface{})
 	if ok {
 		return t.fetchTxsByHash(db, ids)
+	}
+
+	heightRange, found := p.Args[txblocksRange].([]interface{})
+	if found && len(heightRange) == 2 {
+		from, isint := heightRange[0].(int)
+		if !isint {
+			return nil, errors.New("range `from` value not int64")
+		}
+
+		to, isint := heightRange[1].(int)
+		if !isint {
+			return nil, errors.New("range `to` value not int64")
+		}
+
+		return t.fetchTxsByBlocksHeights(db, int64(from), int64(to))
 	}
 
 	count, ok := p.Args[txlastArg].(int)
@@ -186,7 +207,7 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]que
 				return err
 			}
 
-			d, err := newQueryTx(tx, header.Hash, header.Timestamp)
+			d, err := newQueryTx(tx, header.Hash, header.Timestamp, header.Height)
 			if err == nil {
 				txs = append(txs, d)
 			}
@@ -246,7 +267,7 @@ func (t transactions) fetchLastTxs(db database.DB, count int, maxBlocks int) ([]
 			}
 
 			for _, tx := range blockTxs {
-				d, err := newQueryTx(tx, header.Hash, header.Timestamp)
+				d, err := newQueryTx(tx, header.Hash, header.Timestamp, header.Height)
 				if err == nil {
 					txs = append(txs, d)
 				}
@@ -266,6 +287,61 @@ func (t transactions) fetchLastTxs(db database.DB, count int, maxBlocks int) ([]
 			}
 
 			height--
+		}
+
+		return nil
+	})
+
+	return txs, err
+}
+
+// Fetch all txs within a range of block heights.
+func (t transactions) fetchTxsByBlocksHeights(db database.DB, from, to int64) ([]queryTx, error) {
+	txs := make([]queryTx, 0)
+
+	if from > to {
+		msg := "invalid range"
+		log.WithField("from", from).
+			WithField("to", to).
+			Warn(msg)
+		return txs, errors.New(msg)
+	}
+
+	if (to - from) > txsBlocksFetchLimit {
+		msg := "requested txs blocks count exceeds the limit"
+		log.WithField("txsBlocksFetchLimit", txsBlocksFetchLimit).
+			Warn(msg)
+		return txs, errors.New(msg)
+	}
+
+	err := db.View(func(t database.Transaction) error {
+		tip, err := t.FetchCurrentHeight()
+		if err != nil {
+			return err
+		}
+		for height := from; height <= to && uint64(height) <= tip; height++ {
+			hash, err := t.FetchBlockHashByHeight(uint64(height))
+			if err != nil {
+				return err
+			}
+
+			blockTxs, err := t.FetchBlockTxs(hash)
+			if err != nil {
+				return err
+			}
+
+			header, err := t.FetchBlockHeader(hash)
+			if err != nil {
+				return err
+			}
+
+			for _, tx := range blockTxs {
+				d, err := newQueryTx(tx, header.Hash, header.Timestamp, header.Height)
+				if err == nil {
+					txs = append(txs, d)
+				}
+			}
+
 		}
 
 		return nil

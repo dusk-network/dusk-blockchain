@@ -19,6 +19,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/capi"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/data/base58"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -181,11 +182,13 @@ func (c *Chain) syncWithRusk() error {
 			return err
 		}
 
-		if !bytes.Equal(persitedBlock.Header.StateHash, ruskStateHash) {
-			log.WithField("rusk", hex.EncodeToString(ruskStateHash)).
-				WithField("node", hex.EncodeToString(persitedBlock.Header.StateHash)).
-				Error("invalid state detected")
-			return errors.New("invalid state detected")
+		if persitedBlock.Header.Height > 0 {
+			if !bytes.Equal(persitedBlock.Header.StateHash, ruskStateHash) {
+				log.WithField("rusk", hex.EncodeToString(ruskStateHash)).
+					WithField("node", hex.EncodeToString(persitedBlock.Header.StateHash)).
+					Error("invalid state detected")
+				return errors.New("invalid state detected")
+			}
 		}
 
 		return err
@@ -457,6 +460,27 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			return block.NewBlock(), err
 		}
 	default:
+		missedIterations := blk.Header.Step/3 - 1
+		for iteration := uint8(0); iteration < missedIterations; iteration++ {
+			step := iteration*3 + 1
+			committee := c.p.CreateVotingCommittee(tipBlk.Header.Seed, blk.Header.Height, step, config.ConsensusSelectionMaxCommitteeSize)
+			committeeKeys := committee.MemberKeys()
+
+			if len(committeeKeys) == 1 {
+				expectedkey, _ := base58.Encode(committeeKeys[0])
+				log.
+					WithField("iteration", iteration+1).
+					WithField("height", blk.Header.Height).
+					WithField("generator", expectedkey).
+					Warn("Missed block from provisioner")
+			} else {
+				log.
+					WithField("iteration", iteration+1).
+					WithField("height", blk.Header.Height).
+					Error("Unable to generate voting committee for missed block")
+			}
+		}
+
 		// Tentative block. non-first iteration consensus agreement.
 		txs, provisionersUpdated, respStateHash, err = c.proxy.Executor().Accept(c.ctx,
 			blk.Txs,
@@ -507,11 +531,21 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 		WithField("state_hash", util.StringifyBytes(respStateHash)).WithField("e_prov", eligibleProvisioners).
 		Info("state transition completed")
 
+	provisioner, _ := base58.Encode(blk.Header.GeneratorBlsPubkey)
+	logger.WithField("generator", provisioner).
+		WithField("iteration", blk.Header.Certificate.Step/3).
+		WithField("height", blk.Header.Height).
+		Info("Accepted block from provisioner")
+
 	return &blk, nil
 }
 
 // sanityCheckStateHash ensures most recent local statehash and rusk statehash are the same.
 func (c *Chain) sanityCheckStateHash() error {
+	if c.tip.Header.Height == 0 {
+		return nil
+	}
+
 	// Ensure that both (co-deployed) services node and rusk are on the same
 	// state. If not, we should trigger a recovery procedure so both are
 	// always synced up.

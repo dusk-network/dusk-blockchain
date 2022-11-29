@@ -443,7 +443,13 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 
 	// CREATE THE RUSK STATE for the local rusk
 	stateExec := name + "-recovery-state"
-	cmd := exec.Command(stateExec)
+
+	stateToml := filepath.Join(filepath.Dir(stateExec), "../harness/tests/rusk_localnet_state.toml")
+
+	// "-f" force -> remove the previous state (if any)
+	// "-i" input -> state configuration
+	cmd := exec.Command(stateExec, "-f", "-i", stateToml)
+
 	cmd.Env = append(envWithNoRusk, "TMPDIR="+nodeDir, "RUSK_PROFILE_PATH="+nodeDir)
 
 	cmd.Start()

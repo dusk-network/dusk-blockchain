@@ -28,13 +28,7 @@ const (
 	KadcastInitialHeight byte = 128
 
 	// The dusk-blockchain executable version.
-	NodeVersion = "0.6.0-rc"
-
-	// TESTNET_GENESIS_HASH is the default genesis hash for testnet.
-	TESTNET_GENESIS_HASH = "9919cd6b088014d31f89142f54ce9866d88ced250597596cfb68ef12d49f03d9"
-
-	// DEFAULT_STATE_ROOT is the state root result of "rusk make state".
-	DEFAULT_STATE_ROOT string = "d8a2b6dde8fac1854ff2b4b8b37e161a16305ce96d90810671b9c27ea8a6a4de"
+	NodeVersion = "0.6.0"
 
 	// Consensus-related settings
 	// Protocol-based consensus step time.

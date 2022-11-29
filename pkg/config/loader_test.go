@@ -33,7 +33,7 @@ func TestDefaultConfigTOML(t *testing.T) {
 		t.Errorf("Failed parse: %v", err)
 	}
 
-	if Get().General.Network != "testnet" { //nolint
+	if Get().General.Network != "test" { //nolint
 		t.Error("Invalid general/network value")
 	}
 
@@ -151,7 +151,7 @@ func TestSecondaryRegistry(t *testing.T) {
 		t.Errorf("Failed parse: %v", err)
 	}
 
-	if Get().General.Network != "testnet" {
+	if Get().General.Network != "test" {
 		t.Errorf("Invalid Network value: %s", Get().General.Network)
 	}
 

@@ -25,6 +25,7 @@ jobs:
       run: rm -rf $HOME/.cache/golangci-lint || true && make lint
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - name: Install Go
       uses: actions/setup-go@v2
@@ -33,11 +34,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Test
-      run: go get ./... && RUSK_STATE_ROOT=0000000000000000000000000000000000000000000000000000000000000000 go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+      run: go get ./... && go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
     - name: Upload coverage report
       run: bash <(curl -s https://codecov.io/bash)
   test-harness:
     runs-on: core
+    timeout-minutes: 10
     steps:
     - name: Install Go
       uses: actions/setup-go@v2
@@ -48,7 +50,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: nightly-2022-02-19
+        toolchain: nightly-2022-08-28
         override: true
     - run: rustup target add wasm32-unknown-unknown
     - run: rustup component add rustfmt rust-src

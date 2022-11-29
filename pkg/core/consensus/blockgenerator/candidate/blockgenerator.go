@@ -56,15 +56,6 @@ func New(e *consensus.Emitter, executeFn consensus.ExecuteTxsFunc) Generator {
 	}
 }
 
-func (bg *generator) regenerateCommittee(r consensus.RoundUpdate) [][]byte {
-	size := r.P.SubsetSizeAt(r.Round - 1)
-	if size > config.ConsensusMaxCommitteeSize {
-		size = config.ConsensusMaxCommitteeSize
-	}
-
-	return r.P.CreateVotingCommittee(r.Seed, r.Round-1, r.LastCertificate.Step, size).MemberKeys()
-}
-
 // PropagateBlockAndScore runs the generation of a `Score` and a candidate `block.Block`.
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
@@ -73,14 +64,12 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 		WithField("round", r.Round).
 		WithField("step", step)
 
-	committee := bg.regenerateCommittee(r)
-
 	seed, err := bg.sign(r.Seed)
 	if err != nil {
 		return nil, err
 	}
 
-	blk, err := bg.Generate(ctx, seed, committee, r)
+	blk, err := bg.Generate(ctx, seed, r)
 	if err != nil {
 		log.
 			WithError(err).
@@ -110,8 +99,8 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 }
 
 // Generate a Block.
-func (bg *generator) Generate(ctx context.Context, seed []byte, keys [][]byte, r consensus.RoundUpdate) (*block.Block, error) {
-	return bg.GenerateBlock(ctx, r.Round, seed, r.Hash, r.Timestamp, keys)
+func (bg *generator) Generate(ctx context.Context, seed []byte, r consensus.RoundUpdate) (*block.Block, error) {
+	return bg.GenerateBlock(ctx, r.Round, seed, r.Hash, r.Timestamp)
 }
 
 func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCall, round uint64, gasLimit uint64) ([]transactions.ContractCall, []byte, error) {
@@ -129,10 +118,10 @@ func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCal
 
 // fetchOrTimeout will keep trying to FetchMempoolTxs() until either
 // we get some txs or the timeout expires.
-func (bg *generator) fetchOrTimeout(ctx context.Context, keys [][]byte) ([]transactions.ContractCall, error) {
+func (bg *generator) fetchOrTimeout(ctx context.Context) ([]transactions.ContractCall, error) {
 	delay := config.Get().Mempool.ExtractionDelaySecs
 	if delay == 0 || config.Get().Consensus.ConsensusTimeOut < delay {
-		return bg.FetchMempoolTxs(keys)
+		return bg.FetchMempoolTxs()
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(delay)*time.Second)
@@ -144,9 +133,9 @@ func (bg *generator) fetchOrTimeout(ctx context.Context, keys [][]byte) ([]trans
 	for {
 		select {
 		case <-ctx.Done():
-			return bg.FetchMempoolTxs(keys)
+			return bg.FetchMempoolTxs()
 		case <-tick.C:
-			txs, err := bg.FetchMempoolTxs(keys)
+			txs, err := bg.FetchMempoolTxs()
 			if err != nil {
 				return nil, err
 			}
@@ -160,8 +149,8 @@ func (bg *generator) fetchOrTimeout(ctx context.Context, keys [][]byte) ([]trans
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
-func (bg *generator) GenerateBlock(ctx context.Context, round uint64, seed, prevBlockHash []byte, prevBlockTimestamp int64, keys [][]byte) (*block.Block, error) {
-	txs, err := bg.fetchOrTimeout(ctx, keys)
+func (bg *generator) GenerateBlock(ctx context.Context, round uint64, seed, prevBlockHash []byte, prevBlockTimestamp int64) (*block.Block, error) {
+	txs, err := bg.fetchOrTimeout(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +204,7 @@ func (bg *generator) GenerateBlock(ctx context.Context, round uint64, seed, prev
 }
 
 // FetchMempoolTxs will fetch all valid transactions from the mempool.
-func (bg *generator) FetchMempoolTxs(keys [][]byte) ([]transactions.ContractCall, error) {
+func (bg *generator) FetchMempoolTxs() ([]transactions.ContractCall, error) {
 	// Retrieve and append the verified transactions from Mempool
 	// Max transaction size param
 	param := new(bytes.Buffer)

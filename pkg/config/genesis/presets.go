@@ -9,7 +9,6 @@ package genesis
 import (
 	"fmt"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/ipc/transactions"
 )
 
@@ -29,14 +28,15 @@ var configurations = map[string]Config{
 		// March 9, 2022 16:10:22 GMT
 		timestamp: 1646842222,
 		seed:      make([]byte, 33),
-		hash:      config.TESTNET_GENESIS_HASH,
 	},
-	"devnet": {
+	"harness": {
+		// test harness
 		// March 9, 2022 16:10:22 GMT
 		timestamp: 1646842222,
 		seed:      make([]byte, 33),
 	},
-	"stressnet": {
+	"test": {
+		// This is for unit tests
 		// March 9, 2022 16:10:22 GMT
 		timestamp: 1646842222,
 		seed:      make([]byte, 33),
