@@ -452,7 +452,9 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			tipBlk.Header.StateHash,
 			blk.Header.Height,
 			blk.Header.GasLimit,
-			blk.Header.GeneratorBlsPubkey)
+			blk.Header.GeneratorBlsPubkey,
+			c.p,
+		)
 		if err != nil {
 			l.WithError(err).
 				WithField("grpc", "finalize").
@@ -486,7 +488,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			blk.Txs,
 			tipBlk.Header.StateHash,
 			blk.Header.Height,
-			blk.Header.GasLimit, blk.Header.GeneratorBlsPubkey)
+			blk.Header.GasLimit, blk.Header.GeneratorBlsPubkey, c.p)
 		if err != nil {
 			l.WithError(err).
 				WithField("grpc", "accept").
