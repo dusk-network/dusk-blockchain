@@ -36,10 +36,10 @@ type Executor interface {
 	ExecuteStateTransition(context.Context, []ContractCall, uint64, uint64, []byte) ([]ContractCall, []byte, error)
 
 	// Accept creates an ephemeral state transition.
-	Accept(context.Context, []ContractCall, []byte, uint64, uint64, []byte) ([]ContractCall, user.Provisioners, []byte, error)
+	Accept(context.Context, []ContractCall, []byte, uint64, uint64, []byte, *user.Provisioners) ([]ContractCall, user.Provisioners, []byte, error)
 
 	// Finalize creates a finalized state transition.
-	Finalize(context.Context, []ContractCall, []byte, uint64, uint64, []byte) ([]ContractCall, user.Provisioners, []byte, error)
+	Finalize(context.Context, []ContractCall, []byte, uint64, uint64, []byte, *user.Provisioners) ([]ContractCall, user.Provisioners, []byte, error)
 
 	// GetProvisioners returns the current set of provisioners.
 	GetProvisioners(ctx context.Context) (user.Provisioners, error)
@@ -162,7 +162,7 @@ func (e *executor) VerifyStateTransition(ctx context.Context, calls []ContractCa
 }
 
 // Finalize proxy call performs both Finalize and GetProvisioners grpc calls.
-func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64, blockGasLimit uint64, generator []byte) ([]ContractCall, user.Provisioners, []byte, error) {
+func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot []byte, height uint64, blockGasLimit uint64, generator []byte, prevProvisioners *user.Provisioners) ([]ContractCall, user.Provisioners, []byte, error) {
 	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
@@ -190,7 +190,17 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 		return nil, user.Provisioners{}, nil, err
 	}
 
+	resCalls, err := e.convertToContractCall(res.Txs)
+	if err != nil {
+		return nil, user.Provisioners{}, nil, err
+	}
+
+	if !shouldUpdateProvisioners(height, resCalls) {
+		return resCalls, *prevProvisioners, res.StateRoot, nil
+	}
+
 	provisioners := user.NewProvisioners()
+
 	memberMap := make(map[string]*user.Member)
 
 	pres, err := e.stateClient.GetProvisioners(ruskCtx, &rusk.GetProvisionersRequest{})
@@ -205,18 +215,39 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 		provisioners.Set.Insert(member.PublicKeyBLS)
 	}
 
-	resCalls, err := e.convertToContractCall(res.Txs)
-	if err != nil {
-		return nil, user.Provisioners{}, nil, err
-	}
-
 	provisioners.Members = memberMap
 
 	return resCalls, *provisioners, res.StateRoot, nil
 }
 
+func shouldUpdateProvisioners(blockHeight uint64, txs []ContractCall) bool {
+	if blockHeight%config.EPOCH == 0 {
+		return true
+	}
+
+	const TX_STAKE = byte(0x00)
+	const TX_UNSTAKE = byte(0x01)
+
+	for _, tx := range txs {
+		if tx.TxError() != nil {
+			continue
+		}
+
+		if payload, err := tx.Decode(); err == nil && payload.Call != nil {
+			switch payload.Call.CallData[0] {
+			case TX_STAKE, TX_UNSTAKE:
+				{
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 // Accept proxy call performs both Accept and GetProvisioners grpc calls.
-func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height, blockGasLimit uint64, generator []byte) ([]ContractCall, user.Provisioners, []byte, error) {
+func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot []byte, height, blockGasLimit uint64, generator []byte, prevProvisioners *user.Provisioners) ([]ContractCall, user.Provisioners, []byte, error) {
 	vstr := new(rusk.StateTransitionRequest)
 	vstr.Txs = make([]*rusk.Transaction, len(calls))
 	vstr.BlockHeight = height
@@ -244,6 +275,15 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 		return nil, user.Provisioners{}, nil, err
 	}
 
+	resCalls, err := e.convertToContractCall(res.Txs)
+	if err != nil {
+		return nil, user.Provisioners{}, nil, err
+	}
+
+	if !shouldUpdateProvisioners(height, resCalls) {
+		return resCalls, *prevProvisioners, res.StateRoot, nil
+	}
+
 	provisioners := user.NewProvisioners()
 	memberMap := make(map[string]*user.Member)
 
@@ -257,11 +297,6 @@ func (e *executor) Accept(ctx context.Context, calls []ContractCall, stateRoot [
 		UMember(pres.Provisioners[i], member)
 		memberMap[string(member.PublicKeyBLS)] = member
 		provisioners.Set.Insert(member.PublicKeyBLS)
-	}
-
-	resCalls, err := e.convertToContractCall(res.Txs)
-	if err != nil {
-		return nil, user.Provisioners{}, nil, err
 	}
 
 	provisioners.Members = memberMap

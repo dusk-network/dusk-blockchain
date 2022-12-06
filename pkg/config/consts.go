@@ -56,4 +56,7 @@ const (
 
 	// GetCandidateReceivers is a redundancy factor on retrieving a missing candidate block.
 	GetCandidateReceivers = 7
+
+	// EPOCH used for stake operations.
+	EPOCH = 2160
 )
