@@ -54,6 +54,7 @@ type (
 		JSON           string
 		TxError        string
 		ContractInfo   *contractInfo `json:"contractinfo"`
+		Raw            []byte
 	}
 )
 
@@ -80,6 +81,7 @@ func newQueryTx(tx core.ContractCall, blockHash []byte, timestamp int64, blockhe
 	qd.GasPrice = decoded.Fee.GasPrice
 
 	qd.GasSpent = tx.GasSpent()
+	qd.Raw = tx.StandardTx().Data
 
 	qd.BlockHash = blockHash
 	qd.BlockTimestamp = timestamp
