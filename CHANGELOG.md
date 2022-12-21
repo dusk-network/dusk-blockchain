@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add `raw` field to GQL transaction object [#1481]
 - Add `blocksrange` filter to GQL transaction lookup [#1468]
 
-### Changed
+### Removed
 - Remove hardcoded genesis checks [#1464]
+- Remove provisioners list updates at every block [#1479]
 
 ## [0.6.0] - 2022-09-07 
 
@@ -87,6 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Issues -->
 
+[#1481]: https://github.com/dusk-network/dusk-blockchain/issues/1481
+[#1479]: https://github.com/dusk-network/dusk-blockchain/issues/1479
 [#1464]: https://github.com/dusk-network/dusk-blockchain/issues/1464
 [#1468]: https://github.com/dusk-network/dusk-blockchain/issues/1468
 [#1457]: https://github.com/dusk-network/dusk-blockchain/issues/1457
