@@ -28,7 +28,7 @@ const (
 	KadcastInitialHeight byte = 128
 
 	// The dusk-blockchain executable version.
-	NodeVersion = "0.6.1"
+	NodeVersion = "0.6.2-rc.0"
 
 	// Consensus-related settings
 	// Protocol-based consensus step time.
