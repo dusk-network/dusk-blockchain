@@ -7,6 +7,7 @@
 package query
 
 import (
+	b64 "encoding/base64"
 	"encoding/hex"
 	"time"
 
@@ -122,6 +123,9 @@ var Transaction = graphql.NewObject(
 			"contractinfo": &graphql.Field{
 				Type: ContractInfo,
 			},
+			"raw": &graphql.Field{
+				Type: Base64,
+			},
 		},
 	},
 )
@@ -163,6 +167,31 @@ var Hex = graphql.NewScalar(graphql.ScalarConfig{
 		default:
 			return nil
 		}
+	},
+	// ParseLiteral parses GraphQL AST value to `CustomID`.
+	ParseLiteral: func(valueAST ast.Value) interface{} {
+		// not implemented
+		return nil
+	},
+})
+
+// Base64 is the graphql object representing a base64 scalar.
+var Base64 = graphql.NewScalar(graphql.ScalarConfig{
+	Name:        "Base64",
+	Description: "Base64 scalar type represents a byte array",
+	// Serialize serializes `CustomID` to string.
+	Serialize: func(value interface{}) interface{} {
+		switch value := value.(type) {
+		case []byte:
+			return b64.StdEncoding.EncodeToString(value)
+		default:
+			return nil
+		}
+	},
+	// ParseValue parses GraphQL variables from `string` to `[]byte`.
+	ParseValue: func(value interface{}) interface{} {
+		// not implemented
+		return nil
 	},
 	// ParseLiteral parses GraphQL AST value to `CustomID`.
 	ParseLiteral: func(valueAST ast.Value) interface{} {

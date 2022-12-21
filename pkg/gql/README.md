@@ -89,6 +89,7 @@ NB: The examples from below represent only query structures. To send a query as 
       gasprice
       gasspent
       json
+      raw
       size
       txerror
       txid
