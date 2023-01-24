@@ -154,6 +154,11 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	return *votingCommittee
 }
 
+/* REMARK:
+	"until we reach zero" seems incorrect.
+	Given that we return when 'stake >= score', this should be:
+	"until the score's value is lower than the currently processed stake."
+*/
 // extractCommitteeMember walks through the committee set, while deducting
 // each node's stake from the passed score until we reach zero. The public key
 // of the node that the function ends on will be returned as a hexadecimal string.
