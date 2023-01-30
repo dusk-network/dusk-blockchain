@@ -154,9 +154,9 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	return *votingCommittee
 }
 
-// extractCommitteeMember walks through the committee set, while deducting
-// each node's stake from the passed score until we reach zero. The public key
-// of the node that the function ends on will be returned as a hexadecimal string.
+// extractCommitteeMember loops through the provisioners set, subtracting each member's stake
+// from the passed score until it gets lower than the currently processed stake.
+// The function returns the BLS key of the provisioner on which the loop ended.
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	var m *Member
 	var e error
