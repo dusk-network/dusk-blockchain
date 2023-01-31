@@ -76,7 +76,8 @@ func (v VotingCommittee) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
-// createSortitionMessage will return the hash of the passed sortition information.
+// createSortitionHash takes Seed value 'seed', round number 'round', step number 'step', and iteration number 'i',
+// and returns the SHA3-256 hash of their concatenation (i.e., H(round||i||step||seed)).
 func createSortitionHash(seed []byte, round uint64, step uint8, i int) ([]byte, error) {
 	msg := make([]byte, 12)
 
@@ -154,9 +155,9 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	return *votingCommittee
 }
 
-// extractCommitteeMember loops through the provisioners set, subtracting each member's stake
-// from the passed score until it gets lower than the currently processed stake.
-// The function returns the BLS key of the provisioner on which the loop ended.
+// extractCommitteeMember walks through the committee set, while deducting
+// each node's stake from the passed score until we reach zero. The public key
+// of the node that the function ends on will be returned as a hexadecimal string.
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	var m *Member
 	var e error
