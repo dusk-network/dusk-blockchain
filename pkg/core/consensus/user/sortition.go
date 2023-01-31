@@ -90,7 +90,9 @@ func createSortitionHash(seed []byte, round uint64, step uint8, i int) ([]byte, 
 	return hash.Sha3256(msg)
 }
 
-// Generate a score from the given hash and total stake weight.
+// generateSortitionScore generates a score value from the sortition hash 'hash' and the total stake weight 'W'.
+// It returns score=(hashNum % W), where 'hashNum' is the numeric interpretation of 'hash'.
+//Generate a score from the given hash and total stake weight.
 func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 	hashNum := new(big.Int).SetBytes(hash)
 	return new(big.Int).Mod(hashNum, W).Uint64()
