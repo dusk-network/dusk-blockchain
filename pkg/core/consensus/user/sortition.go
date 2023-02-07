@@ -132,7 +132,6 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	// Build votingCommittee, adding one extracted provisioner at a time
 	// From each member, we deduct up to 1 DUSK from their stake
 	for i := 0; votingCommittee.Size() < size; i++ {
-
 		// If we run out of staked DUSK, we can't add new members to the committee
 		// If this happens, we leave the votingCommittee partially complete
 		if W.Uint64() == 0 {
@@ -238,12 +237,14 @@ func (p Provisioners) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
+// subtractFromTotalWeight subtract 'amount' from the total weight 'W'.
 func subtractFromTotalWeight(W *big.Int, amount uint64) {
 	if W.Uint64() > amount {
 		W.Sub(W, big.NewInt(int64(amount)))
 		return
 	}
 
+	// If 'amount' is bigger than 'W', set 'W' to 0
 	W.Set(big.NewInt(0))
 }
 
