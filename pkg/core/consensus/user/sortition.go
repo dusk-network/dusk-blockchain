@@ -65,7 +65,7 @@ func (v VotingCommittee) Format(f fmt.State, c rune) {
 	_, _ = f.Write([]byte(r))
 }
 
-// MarshalJSON ...
+// MarshalJSON allows to print VotingCommittee list in JSONFormatter.
 func (v VotingCommittee) MarshalJSON() ([]byte, error) {
 	data := make([]string, 0)
 
