@@ -163,17 +163,18 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	return *votingCommittee
 }
 
-// extractCommitteeMember walks through the committee set, while deducting
-// each node's stake from the passed score until we reach zero. The public key
-// of the node that the function ends on will be returned as a hexadecimal string.
+// extractCommitteeMember walks through the provisioners set, while deducting each stake
+// from the sortition 'score', until this is lower than the current stake.
+// When this occurs, it returns the BLS key of the provisioner on which it stops (i.e. the extracted member).
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	var m *Member
 	var e error
 
 	for i := 0; ; i++ {
+		// If a provisioner is missing, we use the provisioner at position 0
 		if m, e = p.MemberAt(i); e != nil {
-			// handling the eventuality of an out of bound error
-			m, e = p.MemberAt(0)
+			// If provisioner 0 is also missing, panic
+			m, e = p.MemberAt(0)			
 			if e != nil {
 				// FIXME: shall this panic?
 				log.Panic(e)
@@ -190,6 +191,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 			log.Panic(fmt.Errorf("pk: %s err: %v", util.StringifyBytes(m.PublicKeyBLS), err))
 		}
 
+		// If the current stake is higher than the score, return the current provisioner's BLS key
 		if stake >= score {
 			return m.PublicKeyBLS
 		}
