@@ -48,7 +48,7 @@ func (v VotingCommittee) MemberKeys() [][]byte {
 	return v.Unravel()
 }
 
-// Equal checks if two VotingCommittees are the same.
+// Equal checks if two VotingCommittees are equal (i.e. they contain the same set of provisioners).
 func (v VotingCommittee) Equal(other *VotingCommittee) bool {
 	return v.Cluster.Equal(other.Cluster)
 }
