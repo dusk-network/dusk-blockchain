@@ -98,8 +98,8 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 	return new(big.Int).Mod(hashNum, W).Uint64()
 }
 
-// CreateVotingCommittee will run the deterministic sortition function, which determines
-// who will be in the committee for a given step and round.
+// CreateVotingCommittee executes the Deterministic Sortition algorithm
+// to determine the committee members for a given step and round.
 // TODO: running this with weird setup causes infinite looping (to reproduce, hardcode `3` on MockProvisioners when calling agreement.NewHelper in the agreement tests).
 func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint8, size int) VotingCommittee {
 	votingCommittee := newCommittee()
@@ -109,7 +109,7 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	members := copyMembers(p.Members)
 	p.Members = members
 
-	// Remove stakes which have not yet become active, or have expired
+	// Remove stakes which have not yet "mature"
 	for _, m := range p.Members {
 		i := 0
 
@@ -129,28 +129,34 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 		}
 	}
 
+	// Build votingCommittee, adding one extracted provisioner at a time
+	// From each member, we deduct up to 1 DUSK from their stake
 	for i := 0; votingCommittee.Size() < size; i++ {
+
+		// If we run out of staked DUSK, we can't add new members to the committee
+		// If this happens, we leave the votingCommittee partially complete
 		if W.Uint64() == 0 {
-			// We ran out of staked DUSK, so we return the result prematurely
 			break
 		}
 
+		// Create Sortition Hash
 		hashSort, err := createSortitionHash(seed, round, step, i)
 		if err != nil {
 			log.Panic(err)
 		}
 
+		// Generate Score
 		score := generateSortitionScore(hashSort, W)
 
+		// Extract new committee member
 		blsPk := p.extractCommitteeMember(score)
 		votingCommittee.Insert(blsPk)
 
-		// Subtract up to one DUSK from the extracted committee member.
+		// Deduct up to 1 DUSK from the extracted member's stake.
 		m := p.GetMember(blsPk)
 		subtracted := m.SubtractFromStake(1 * DUSK)
 
-		// Also subtract the subtracted amount from the total weight, to ensure
-		// consistency.
+		// Subtract the deducted amount from the total weight, to ensure consistency.
 		subtractFromTotalWeight(W, subtracted)
 	}
 
