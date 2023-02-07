@@ -31,6 +31,7 @@ type VotingCommittee struct {
 	sortedset.Cluster
 }
 
+// newCommittee creates a new VotingCommittee set.
 func newCommittee() *VotingCommittee {
 	return &VotingCommittee{
 		Cluster: sortedset.NewCluster(),
