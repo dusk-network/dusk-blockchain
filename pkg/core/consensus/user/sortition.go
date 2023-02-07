@@ -172,8 +172,9 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	for i := 0; ; i++ {
 		// If a provisioner is missing, we use the provisioner at position 0
 		if m, e = p.MemberAt(i); e != nil {
+			m, e = p.MemberAt(0)
+
 			// If provisioner 0 is also missing, panic
-			m, e = p.MemberAt(0)			
 			if e != nil {
 				// FIXME: shall this panic?
 				log.Panic(e)
