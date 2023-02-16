@@ -200,7 +200,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	}
 }
 
-// GenerateCommittees pre-generates an `amount` of VotingCommittee of a specified `size` for different `steps`.
+// GenerateCommittees pre-generates an `amount` of voting committees of a specified 'size', starting from step 'step'.
 func (p Provisioners) GenerateCommittees(seed []byte, round uint64, amount, step uint8, size int) []VotingCommittee {
 	if step >= math.MaxUint8-amount {
 		amount = math.MaxUint8 - step
@@ -208,7 +208,7 @@ func (p Provisioners) GenerateCommittees(seed []byte, round uint64, amount, step
 
 	committees := make([]VotingCommittee, amount)
 
-	// Create a voting committee of size 'size' for each step between 0 and 'amount'-1
+	// Create 'amount' voting committees of size 'size' for steps between 'step' and 'step'+('amount'-1)
 	for i := 0; i < int(amount); i++ {
 		votingCommittee := p.CreateVotingCommittee(seed, round, step+uint8(i), size)
 		committees[i] = votingCommittee
@@ -238,7 +238,8 @@ func (p Provisioners) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
-// subtractFromTotalWeight subtract 'amount' from the total weight 'W'.
+// subtractFromTotalWeight subtracts 'amount' from the total weight 'W'.
+// If 'amount' is bigger than 'W', it sets 'W' to 0.
 func subtractFromTotalWeight(W *big.Int, amount uint64) {
 	if W.Uint64() > amount {
 		W.Sub(W, big.NewInt(int64(amount)))
