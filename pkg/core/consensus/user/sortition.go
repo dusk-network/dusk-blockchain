@@ -31,6 +31,7 @@ type VotingCommittee struct {
 	sortedset.Cluster
 }
 
+// newCommittee creates a new VotingCommittee set.
 func newCommittee() *VotingCommittee {
 	return &VotingCommittee{
 		Cluster: sortedset.NewCluster(),
@@ -47,7 +48,7 @@ func (v VotingCommittee) MemberKeys() [][]byte {
 	return v.Unravel()
 }
 
-// Equal checks if two VotingCommittees are the same.
+// Equal checks if two VotingCommittees are equal (i.e. they contain the same set of provisioners).
 func (v VotingCommittee) Equal(other *VotingCommittee) bool {
 	return v.Cluster.Equal(other.Cluster)
 }
@@ -64,7 +65,7 @@ func (v VotingCommittee) Format(f fmt.State, c rune) {
 	_, _ = f.Write([]byte(r))
 }
 
-// MarshalJSON ...
+// MarshalJSON allows to print VotingCommittee list in JSONFormatter.
 func (v VotingCommittee) MarshalJSON() ([]byte, error) {
 	data := make([]string, 0)
 
@@ -76,7 +77,8 @@ func (v VotingCommittee) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
-// createSortitionMessage will return the hash of the passed sortition information.
+// createSortitionHash takes Seed value 'seed', round number 'round', step number 'step', and iteration number 'i',
+// and returns the SHA3-256 hash of their concatenation (i.e., H(round||i||step||seed)).
 func createSortitionHash(seed []byte, round uint64, step uint8, i int) ([]byte, error) {
 	msg := make([]byte, 12)
 
@@ -89,14 +91,15 @@ func createSortitionHash(seed []byte, round uint64, step uint8, i int) ([]byte, 
 	return hash.Sha3256(msg)
 }
 
-// Generate a score from the given hash and total stake weight.
+// generateSortitionScore generates a score value from the sortition hash 'hash' and the total stake weight 'W'.
+// It returns score=(hashNum % W), where 'hashNum' is the integer interpretation of 'hash'.
 func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 	hashNum := new(big.Int).SetBytes(hash)
 	return new(big.Int).Mod(hashNum, W).Uint64()
 }
 
-// CreateVotingCommittee will run the deterministic sortition function, which determines
-// who will be in the committee for a given step and round.
+// CreateVotingCommittee executes the Deterministic Sortition algorithm
+// to determine the committee members for a given step and round.
 // TODO: running this with weird setup causes infinite looping (to reproduce, hardcode `3` on MockProvisioners when calling agreement.NewHelper in the agreement tests).
 func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint8, size int) VotingCommittee {
 	votingCommittee := newCommittee()
@@ -106,7 +109,7 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	members := copyMembers(p.Members)
 	p.Members = members
 
-	// Remove stakes which have not yet become active, or have expired
+	// Remove stakes which have not yet "mature"
 	for _, m := range p.Members {
 		i := 0
 
@@ -126,45 +129,52 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 		}
 	}
 
+	// Build votingCommittee, adding one extracted provisioner at a time
+	// From each member, we deduct up to 1 DUSK from their stake
 	for i := 0; votingCommittee.Size() < size; i++ {
+		// If we run out of staked DUSK, we can't add new members to the committee
+		// If this happens, we leave the votingCommittee partially complete
 		if W.Uint64() == 0 {
-			// We ran out of staked DUSK, so we return the result prematurely
 			break
 		}
 
+		// Create Sortition Hash
 		hashSort, err := createSortitionHash(seed, round, step, i)
 		if err != nil {
 			log.Panic(err)
 		}
 
+		// Generate Score
 		score := generateSortitionScore(hashSort, W)
 
+		// Extract new committee member
 		blsPk := p.extractCommitteeMember(score)
 		votingCommittee.Insert(blsPk)
 
-		// Subtract up to one DUSK from the extracted committee member.
+		// Deduct up to 1 DUSK from the extracted member's stake.
 		m := p.GetMember(blsPk)
 		subtracted := m.SubtractFromStake(1 * DUSK)
 
-		// Also subtract the subtracted amount from the total weight, to ensure
-		// consistency.
+		// Subtract the deducted amount from the total weight, to ensure consistency.
 		subtractFromTotalWeight(W, subtracted)
 	}
 
 	return *votingCommittee
 }
 
-// extractCommitteeMember walks through the committee set, while deducting
-// each node's stake from the passed score until we reach zero. The public key
-// of the node that the function ends on will be returned as a hexadecimal string.
+// extractCommitteeMember walks through the provisioners set, while deducting each stake
+// from the sortition 'score', until this is lower than the current stake.
+// When this occurs, it returns the BLS key of the provisioner on which it stops (i.e. the extracted member).
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	var m *Member
 	var e error
 
 	for i := 0; ; i++ {
+		// If a provisioner is missing, we use the provisioner at position 0
 		if m, e = p.MemberAt(i); e != nil {
-			// handling the eventuality of an out of bound error
 			m, e = p.MemberAt(0)
+
+			// If provisioner 0 is also missing, panic
 			if e != nil {
 				// FIXME: shall this panic?
 				log.Panic(e)
@@ -181,6 +191,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 			log.Panic(fmt.Errorf("pk: %s err: %v", util.StringifyBytes(m.PublicKeyBLS), err))
 		}
 
+		// If the current stake is higher than the score, return the current provisioner's BLS key
 		if stake >= score {
 			return m.PublicKeyBLS
 		}
@@ -189,7 +200,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	}
 }
 
-// GenerateCommittees pre-generates an `amount` of VotingCommittee of a specified `size` from a given `step`.
+// GenerateCommittees pre-generates an `amount` of voting committees of a specified 'size', starting from step 'step'.
 func (p Provisioners) GenerateCommittees(seed []byte, round uint64, amount, step uint8, size int) []VotingCommittee {
 	if step >= math.MaxUint8-amount {
 		amount = math.MaxUint8 - step
@@ -197,6 +208,7 @@ func (p Provisioners) GenerateCommittees(seed []byte, round uint64, amount, step
 
 	committees := make([]VotingCommittee, amount)
 
+	// Create 'amount' voting committees of size 'size' for steps between 'step' and 'step'+('amount'-1)
 	for i := 0; i < int(amount); i++ {
 		votingCommittee := p.CreateVotingCommittee(seed, round, step+uint8(i), size)
 		committees[i] = votingCommittee
@@ -226,12 +238,15 @@ func (p Provisioners) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
+// subtractFromTotalWeight subtracts 'amount' from the total weight 'W'.
+// If 'amount' is bigger than 'W', it sets 'W' to 0.
 func subtractFromTotalWeight(W *big.Int, amount uint64) {
 	if W.Uint64() > amount {
 		W.Sub(W, big.NewInt(int64(amount)))
 		return
 	}
 
+	// If 'amount' is bigger than 'W', set 'W' to 0
 	W.Set(big.NewInt(0))
 }
 
