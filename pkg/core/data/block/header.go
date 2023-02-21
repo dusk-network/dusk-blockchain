@@ -29,6 +29,7 @@ type Header struct {
 	Height    uint64 `json:"height"`    // Block height
 	Timestamp int64  `json:"timestamp"` // Block timestamp
 	GasLimit  uint64 `json:"gaslimit"`  // Block gas limit
+	Iteration uint8  `json:"iteration"` // Iteration at which block is produced
 
 	PrevBlockHash      []byte `json:"prev-hash"`  // Hash of previous block (32 bytes)
 	Seed               []byte `json:"seed"`       // Marshaled BLS signature or hash of the previous block seed (32 bytes)
@@ -62,6 +63,7 @@ func (b *Header) Copy() *Header {
 		Height:      b.Height,
 		Timestamp:   b.Timestamp,
 		GasLimit:    b.GasLimit,
+		Iteration:   b.Iteration,
 	}
 
 	h.PrevBlockHash = make([]byte, len(b.PrevBlockHash))
@@ -131,6 +133,10 @@ func (b *Header) Equals(other *Header) bool {
 		return false
 	}
 
+	if b.Iteration != other.Iteration {
+		return false
+	}
+
 	return true
 }
 
@@ -164,6 +170,10 @@ func marshalHashable(b *bytes.Buffer, h *Header) error {
 	}
 
 	if err := binary.Write(b, binary.LittleEndian, h.GasLimit); err != nil {
+		return err
+	}
+
+	if err := b.WriteByte(h.Iteration); err != nil {
 		return err
 	}
 

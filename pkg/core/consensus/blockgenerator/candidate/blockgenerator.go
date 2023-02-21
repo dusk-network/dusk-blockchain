@@ -60,8 +60,10 @@ func New(e *consensus.Emitter, executeFn consensus.ExecuteTxsFunc) Generator {
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
 func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.RoundUpdate, step uint8) (*message.NewBlock, error) {
+	iteration := step/3 + 1
 	log := lg.
 		WithField("round", r.Round).
+		WithField("iteration", iteration).
 		WithField("step", step)
 
 	seed, err := bg.sign(r.Seed)
@@ -69,7 +71,7 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 		return nil, err
 	}
 
-	blk, err := bg.Generate(ctx, seed, r)
+	blk, err := bg.Generate(ctx, seed, r, iteration)
 	if err != nil {
 		log.
 			WithError(err).
@@ -99,8 +101,8 @@ func (bg *generator) GenerateCandidateMessage(ctx context.Context, r consensus.R
 }
 
 // Generate a Block.
-func (bg *generator) Generate(ctx context.Context, seed []byte, r consensus.RoundUpdate) (*block.Block, error) {
-	return bg.GenerateBlock(ctx, r.Round, seed, r.Hash, r.Timestamp)
+func (bg *generator) Generate(ctx context.Context, seed []byte, r consensus.RoundUpdate, iteration uint8) (*block.Block, error) {
+	return bg.GenerateBlock(ctx, r.Round, seed, r.Hash, r.Timestamp, iteration)
 }
 
 func (bg *generator) execute(ctx context.Context, txs []transactions.ContractCall, round uint64, gasLimit uint64) ([]transactions.ContractCall, []byte, error) {
@@ -149,7 +151,7 @@ func (bg *generator) fetchOrTimeout(ctx context.Context) ([]transactions.Contrac
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
 // with transactions from the mempool.
-func (bg *generator) GenerateBlock(ctx context.Context, round uint64, seed, prevBlockHash []byte, prevBlockTimestamp int64) (*block.Block, error) {
+func (bg *generator) GenerateBlock(ctx context.Context, round uint64, seed, prevBlockHash []byte, prevBlockTimestamp int64, iteration uint8) (*block.Block, error) {
 	txs, err := bg.fetchOrTimeout(ctx)
 	if err != nil {
 		return nil, err
@@ -185,6 +187,7 @@ func (bg *generator) GenerateBlock(ctx context.Context, round uint64, seed, prev
 		Certificate:        block.EmptyCertificate(),
 		StateHash:          stateHash,
 		GasLimit:           blockGasLimit,
+		Iteration:          iteration,
 	}
 
 	// Construct the candidate block

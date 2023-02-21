@@ -113,6 +113,10 @@ func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
+	if err := encoding.WriteUint8(r, h.Iteration); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -171,6 +175,10 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	}
 
 	if err := encoding.ReadUint64LE(r, &h.GasLimit); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint8(r, &h.Iteration); err != nil {
 		return err
 	}
 
