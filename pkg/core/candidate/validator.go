@@ -28,6 +28,11 @@ func SanityCheckCandidate(cm block.Block) error {
 		return errors.New("invalid candidate received")
 	}
 
+	if err := checkRoot(&cm); err != nil {
+		log.WithError(err).Errorln("validation failed")
+		return errors.New("invalid candidate received")
+	}
+
 	return nil
 }
 
@@ -39,6 +44,19 @@ func checkHash(blk *block.Block) error {
 
 	if !bytes.Equal(hash, blk.Header.Hash) {
 		return errors.New("invalid block hash")
+	}
+
+	return nil
+}
+
+func checkRoot(blk *block.Block) error {
+	root, err := blk.CalculateTxRoot()
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(root, blk.Header.TxRoot) {
+		return errors.New("invalid merkle root hash")
 	}
 
 	return nil

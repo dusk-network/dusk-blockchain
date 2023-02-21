@@ -183,6 +183,7 @@ func (bg *generator) GenerateBlock(ctx context.Context, round uint64, seed, prev
 		Height:             round,
 		PrevBlockHash:      prevBlockHash,
 		GeneratorBlsPubkey: bg.Keys.BLSPubKey,
+		TxRoot:             nil,
 		Seed:               seed,
 		Certificate:        block.EmptyCertificate(),
 		StateHash:          stateHash,
@@ -195,6 +196,17 @@ func (bg *generator) GenerateBlock(ctx context.Context, round uint64, seed, prev
 		Header: h,
 		Txs:    txs,
 	}
+
+	// Update TxRoot
+	root, err := candidateBlock.CalculateTxRoot()
+	if err != nil {
+		lg.
+			WithError(err).
+			Error("failed to CalculateRoot")
+		return nil, err
+	}
+
+	candidateBlock.Header.TxRoot = root
 
 	// Generate the block hash
 	hash, err := candidateBlock.CalculateHash()

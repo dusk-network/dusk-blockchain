@@ -36,6 +36,11 @@ func twoLinkedBlocks(t *testing.T, change int64) (*block.Block, *block.Block) {
 	blk1.Header.Height = blk0.Header.Height + 1
 	blk1.Header.Timestamp = blk0.Header.Timestamp + change
 
+	root, err := blk1.CalculateTxRoot()
+	assert.Nil(t, err)
+
+	blk1.Header.TxRoot = root
+
 	hash, err = blk1.CalculateHash()
 	assert.Nil(t, err)
 

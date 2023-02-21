@@ -173,7 +173,7 @@ func TestRemoveAccepted(t *testing.T) {
 	m, bus, rb, _ := startMempoolTest(ctx)
 
 	// Create a random block
-	b := helper.RandomBlock(200, 0)
+	b := helper.RandomBlock(200, 1)
 	b.Txs = make([]transactions.ContractCall, 0)
 
 	// generate 3*4 random txs
@@ -193,6 +193,8 @@ func TestRemoveAccepted(t *testing.T) {
 		}
 	}
 
+	root, _ := b.CalculateTxRoot()
+	b.Header.TxRoot = root
 	blockMsg := message.New(topics.AcceptedBlock, *b)
 	errList := bus.Publish(topics.AcceptedBlock, blockMsg)
 	assert.Empty(errList)

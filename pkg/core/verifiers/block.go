@@ -107,6 +107,16 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 		return errors.New("invalid state hash")
 	}
 
+	// Merkle tree check -- Check is here as the root is not calculated on decode
+	root, err := blk.CalculateTxRoot()
+	if err != nil {
+		return errors.New("could not calculate the merkle tree root for this header")
+	}
+
+	if !bytes.Equal(root, blk.Header.TxRoot) {
+		return errors.New("merkle root mismatch")
+	}
+
 	return nil
 }
 
