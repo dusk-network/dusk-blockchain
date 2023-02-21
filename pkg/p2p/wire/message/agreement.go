@@ -220,7 +220,6 @@ func (a Agreement) GenerateCertificate() *block.Certificate {
 	return &block.Certificate{
 		StepOneBatchedSig: a.VotesPerStep[0].Signature,
 		StepTwoBatchedSig: a.VotesPerStep[1].Signature,
-		Step:              a.State().Step,
 		StepOneCommittee:  a.VotesPerStep[0].BitSet,
 		StepTwoCommittee:  a.VotesPerStep[1].BitSet,
 	}

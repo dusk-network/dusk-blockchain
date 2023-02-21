@@ -204,10 +204,6 @@ func MarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 		return err
 	}
 
-	if err := encoding.WriteUint8(r, c.Step); err != nil {
-		return err
-	}
-
 	if err := encoding.WriteUint64LE(r, c.StepOneCommittee); err != nil {
 		return err
 	}
@@ -228,10 +224,6 @@ func UnmarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 
 	c.StepTwoBatchedSig = make([]byte, 0)
 	if err := encoding.ReadVarBytes(r, &c.StepTwoBatchedSig); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(r, &c.Step); err != nil {
 		return err
 	}
 

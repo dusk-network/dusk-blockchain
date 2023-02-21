@@ -300,13 +300,13 @@ func (c *Chain) ProcessBlockFromNetwork(srcPeerID string, m message.Message) ([]
 		l.Debug("discard block")
 
 		// Due to a network glitch, the fallback procedure may be skipped.
-		// In this case, network may continue on a branch with higher cert_step value.
+		// In this case, network may continue on a branch with higher iteration value.
 		// Here we try to detect the above edge case.
 		if res, err := c.isBlockFromFork(blk); err != nil {
 			l.WithError(err).Warn("invalid block")
 		} else {
 			if res {
-				l.WithField("recv_blk_step", blk.Header.Certificate.Step).
+				l.WithField("recv_blk_iteration", blk.Header.Iteration).
 					WithField("recv_blk_hash", hex.EncodeToString(h)).
 					WithField("event", "fallback").Error("fork detected")
 			}
@@ -421,7 +421,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 		fields = logger.Fields{
 			"event":      "accept_block",
 			"height":     blk.Header.Height,
-			"cert_step":  blk.Header.Certificate.Step,
+			"iteration":  blk.Header.Iteration,
 			"hash":       util.StringifyBytes(blk.Header.Hash),
 			"curr_h":     c.tip.Header.Height,
 			"block_time": blk.Header.Timestamp - tipBlk.Header.Timestamp,
@@ -444,8 +444,8 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 
 	var txs []transactions.ContractCall
 
-	switch blk.Header.Certificate.Step {
-	case 3:
+	switch blk.Header.Iteration {
+	case 1:
 		// Finalized block. first iteration consensus agreement.
 		txs, provisionersUpdated, respStateHash, err = c.proxy.Executor().Finalize(c.ctx,
 			blk.Txs,
@@ -462,7 +462,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 			return block.NewBlock(), err
 		}
 	default:
-		missedIterations := blk.Header.Step/3 - 1
+		missedIterations := blk.Header.Iteration - 1
 		for iteration := uint8(0); iteration < missedIterations; iteration++ {
 			step := iteration*3 + 1
 			committee := c.p.CreateVotingCommittee(tipBlk.Header.Seed, blk.Header.Height, step, config.ConsensusSelectionMaxCommitteeSize)
@@ -535,7 +535,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 
 	provisioner, _ := base58.Encode(blk.Header.GeneratorBlsPubkey)
 	logger.WithField("generator", provisioner).
-		WithField("iteration", blk.Header.Certificate.Step/3).
+		WithField("iteration", blk.Header.Iteration).
 		WithField("height", blk.Header.Height).
 		Info("Accepted block from provisioner")
 
@@ -603,7 +603,7 @@ func (c *Chain) acceptBlock(blk block.Block, withSanityCheck bool) error {
 	fields := logger.Fields{
 		"event":     "accept_block",
 		"height":    blk.Header.Height,
-		"cert_step": blk.Header.Certificate.Step,
+		"iteration": blk.Header.Iteration,
 		"hash":      util.StringifyBytes(blk.Header.Hash),
 		"curr_h":    c.tip.Header.Height,
 		"prov_num":  c.p.Set.Len(),
