@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `Iteration` to block header [#1500]
+
+### Removed
+- Remove `step` from block header certificate [#1500]
+
 ## [0.6.1] - 2022-12-21 
 
 ### Added
@@ -91,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Issues -->
 
+[#1500]: https://github.com/dusk-network/dusk-blockchain/issues/1500
 [#1481]: https://github.com/dusk-network/dusk-blockchain/issues/1481
 [#1479]: https://github.com/dusk-network/dusk-blockchain/issues/1479
 [#1464]: https://github.com/dusk-network/dusk-blockchain/issues/1464
