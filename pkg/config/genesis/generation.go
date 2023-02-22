@@ -29,6 +29,7 @@ func Generate(c Config) *block.Block {
 		Height:             0,
 		PrevBlockHash:      state_root,
 		GeneratorBlsPubkey: make([]byte, 96),
+		TxRoot:             nil,
 		Seed:               c.seed,
 		Certificate:        block.EmptyCertificate(),
 		StateHash:          state_root,
@@ -39,6 +40,14 @@ func Generate(c Config) *block.Block {
 		Header: h,
 		Txs:    c.Transactions,
 	}
+
+	// Set root and hash, since they have changed because of the adding of txs.
+	root, err := b.CalculateTxRoot()
+	if err != nil {
+		panic(err)
+	}
+
+	b.Header.TxRoot = root
 
 	hash, err := b.CalculateHash()
 	if err != nil {

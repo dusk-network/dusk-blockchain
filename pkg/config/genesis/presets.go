@@ -50,10 +50,10 @@ func addDefaultTxs(name string, c Config) Config {
 	// the other hand, in order to be aligned with default testnet genesis hash
 	// we need one empty tx in testnet genesis block.
 	switch name {
-	case "testnet":
-		c.Transactions = append(c.Transactions, transactions.EmptyTx())
-	default:
+	case "test":
 		c.Transactions = append(c.Transactions, transactions.MockTx())
+	default:
+		c.Transactions = append(c.Transactions, transactions.EmptyTx())
 	}
 
 	return c

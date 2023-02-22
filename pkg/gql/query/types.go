@@ -60,6 +60,9 @@ var Header = graphql.NewObject(
 			"generatorblspubkey": &graphql.Field{
 				Type: Hex,
 			},
+			"txroot": &graphql.Field{
+				Type: Hex,
+			},
 			"timestamp": &graphql.Field{
 				Type: UnixTimestamp,
 			},
