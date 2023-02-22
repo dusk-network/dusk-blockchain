@@ -291,7 +291,7 @@ func resolveStep(p graphql.ResolveParams) (interface{}, error) {
 				return err
 			}
 
-			step = int(h.Certificate.Step)
+			step = int(h.Iteration * 3)
 			return nil
 		})
 

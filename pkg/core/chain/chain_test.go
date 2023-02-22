@@ -108,7 +108,7 @@ func TestAcceptBlock(t *testing.T) {
 	// Make a certificate with a different step, to do a proper equality
 	// check later
 	cert := block.EmptyCertificate()
-	cert.Step = 5
+	blk.Header.Iteration = 2
 	blk.Header.Certificate = cert
 
 	assert.NoError(c.acceptBlock(*blk, true), true)
@@ -180,7 +180,7 @@ func TestFallbackProcedure(t *testing.T) {
 	blk1 := helper.RandomBlock(1, 3)
 
 	cert1 := block.EmptyCertificate()
-	cert1.Step = 6
+	blk1.Header.Iteration = 2
 	blk1.Header.Certificate = cert1
 
 	chain.ProcessBlockFromNetwork("", message.New(topics.Block, *blk1))
@@ -195,7 +195,7 @@ func TestFallbackProcedure(t *testing.T) {
 	blk2 := helper.RandomBlock(1, 3)
 
 	cert2 := block.EmptyCertificate()
-	cert2.Step = 3 // (first iteration certificate)
+	blk1.Header.Iteration = 1
 	blk2.Header.Certificate = cert2
 
 	chain.ProcessBlockFromNetwork("", message.New(topics.Block, *blk2))

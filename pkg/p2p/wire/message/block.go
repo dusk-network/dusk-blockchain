@@ -113,6 +113,10 @@ func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
+	if err := encoding.WriteUint8(r, h.Iteration); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -174,6 +178,10 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
+	if err := encoding.ReadUint8(r, &h.Iteration); err != nil {
+		return err
+	}
+
 	if err := UnmarshalCertificate(r, h.Certificate); err != nil {
 		return err
 	}
@@ -193,10 +201,6 @@ func MarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 	}
 
 	if err := encoding.WriteVarBytes(r, c.StepTwoBatchedSig); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(r, c.Step); err != nil {
 		return err
 	}
 
@@ -220,10 +224,6 @@ func UnmarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 
 	c.StepTwoBatchedSig = make([]byte, 0)
 	if err := encoding.ReadVarBytes(r, &c.StepTwoBatchedSig); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(r, &c.Step); err != nil {
 		return err
 	}
 

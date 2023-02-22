@@ -28,8 +28,8 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block, seed
 
 	// First, lets get the actual reduction steps
 	// These would be the two steps preceding the one on the certificate
-	stepOne := blk.Header.Certificate.Step - 1
-	stepTwo := blk.Header.Certificate.Step
+	stepOne := (blk.Header.Iteration-1)*3 + 2
+	stepTwo := (blk.Header.Iteration-1)*3 + 3
 
 	stepOneBatchedSig := blk.Header.Certificate.StepOneBatchedSig
 	stepTwoBatchedSig := blk.Header.Certificate.StepTwoBatchedSig

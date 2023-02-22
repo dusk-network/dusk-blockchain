@@ -22,7 +22,7 @@ import (
 // allowFallback performs major verification to allow or disallow a fallback procedure.
 func (c *Chain) allowFallback(b block.Block, l *logrus.Entry) error {
 	// Prioritize the lowest iteration
-	if b.Header.Certificate.Step > c.tip.Header.Certificate.Step {
+	if b.Header.Iteration > c.tip.Header.Iteration {
 		// We already know a winning block from lower consensus iteration.
 		return errors.New("lower cetificate step")
 	}
@@ -39,7 +39,7 @@ func (c *Chain) allowFallback(b block.Block, l *logrus.Entry) error {
 		return err
 	}
 
-	if b.Header.Certificate.Step == c.tip.Header.Certificate.Step {
+	if b.Header.Iteration == c.tip.Header.Iteration {
 		return errors.New("more the one winning block for the same iteration")
 	}
 
@@ -53,8 +53,8 @@ func (c *Chain) tryFallback(b block.Block) error {
 		err       error
 
 		llog = log.WithField("curr_h", th).
-			WithField("curr_step", c.tip.Header.Certificate.Step).
-			WithField("recv_blk_step", b.Header.Certificate.Step).
+			WithField("curr_iteration", c.tip.Header.Iteration).
+			WithField("recv_blk_iteration", b.Header.Iteration).
 			WithField("event", "fallback")
 	)
 
