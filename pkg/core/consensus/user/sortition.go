@@ -77,8 +77,9 @@ func (v VotingCommittee) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
-// createSortitionHash takes Seed value 'seed', round number 'round', step number 'step', and iteration number 'i',
-// and returns the SHA3-256 hash of their concatenation (i.e., H(round||i||step||seed)).
+// createSortitionHash takes the Seed value 'seed', the round number 'round', the step number 'step',
+// the index 'i' of the committee member to extract,
+// and returns the hash (SHA3-256) of their concatenation (i.e., H(round||i||step||seed)).
 func createSortitionHash(seed []byte, round uint64, step uint8, i int) ([]byte, error) {
 	msg := make([]byte, 12)
 
