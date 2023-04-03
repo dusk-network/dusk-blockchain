@@ -52,7 +52,7 @@ const (
 	ConsensusSelectionMaxCommitteeSize = 1
 
 	// RuskVersion is the version of the supported rusk binary.
-	RuskVersion = "0.5.0"
+	RuskVersion = "0.6.0"
 
 	// GetCandidateReceivers is a redundancy factor on retrieving a missing candidate block.
 	GetCandidateReceivers = 7

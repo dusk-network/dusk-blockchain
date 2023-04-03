@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `Iteration` to block header [#1500]
 - Add `TxRoot` to block header [#1499]
 
+### Changed
+- Change rusk-version compatibility to `0.6.0` [#1514]
+
 ### Removed
 - Remove `step` from block header certificate [#1500]
 
@@ -98,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Issues -->
 
+[#1514]: https://github.com/dusk-network/dusk-blockchain/issues/1514
 [#1500]: https://github.com/dusk-network/dusk-blockchain/issues/1500
 [#1499]: https://github.com/dusk-network/dusk-blockchain/issues/1499
 [#1481]: https://github.com/dusk-network/dusk-blockchain/issues/1481

@@ -387,8 +387,8 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 	if err != nil {
 		log.Panic(err)
 	}
-	targetCrs := filepath.Join(extProfilePath, ".rusk", "dev.crs")
-	newCrs := filepath.Join(nodeDir, ".rusk", "dev.crs")
+	targetCrs := filepath.Join(extProfilePath, ".rusk", "dev-piecrust.crs")
+	newCrs := filepath.Join(nodeDir, ".rusk", "dev-piecrust.crs")
 	os.Symlink(targetCrs, newCrs)
 
 	// LINK THE ORIGINAL keys
