@@ -13,16 +13,12 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
 	log "github.com/sirupsen/logrus"
 )
-
-// DUSK is one whole unit of DUSK. This is duplicated from wallet since
-// otherwise we get into an import cycle including the transactions and users
-// packages.
-const DUSK = uint64(100000000)
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain
 // point in the consensus. The set is sorted by the int value of the public key in
@@ -154,7 +150,7 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 
 		// Deduct up to 1 DUSK from the extracted member's stake.
 		m := p.GetMember(blsPk)
-		subtracted := m.SubtractFromStake(1 * DUSK)
+		subtracted := m.SubtractFromStake(1 * config.DUSK)
 
 		// Subtract the deducted amount from the total weight, to ensure consistency.
 		subtractFromTotalWeight(W, subtracted)
