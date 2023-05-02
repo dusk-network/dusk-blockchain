@@ -85,6 +85,7 @@ func (b *Handler) generateCommittees(seed []byte, round uint64, step uint8, maxS
 	}
 }
 
+//TODO: update this comment
 // CommitteeSize returns the size of a VotingCommittee, depending on
 // how many provisioners are in the set.
 func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
