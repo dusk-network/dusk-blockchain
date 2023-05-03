@@ -72,7 +72,7 @@ func (a *handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
 
 // Quorum returns the amount of committee members necessary to reach a quorum.
 func (a *handler) Quorum(round uint64) int {
-	return quorum(a.CommitteeSize(round, config.ConsensusMaxCommitteeSize))
+	return quorum(config.ConsensusMaxCommitteeSize)
 }
 
 func quorum(committeeSize int) int {

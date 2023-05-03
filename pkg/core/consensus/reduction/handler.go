@@ -67,7 +67,7 @@ func (b *Handler) VerifySignature(red message.Reduction) error {
 
 // Quorum returns the amount of committee votes to reach a quorum.
 func (b *Handler) Quorum(round uint64) int {
-	return int(math.Ceil(float64(b.CommitteeSize(round, config.ConsensusMaxCommitteeSize)) * config.ConsensusQuorumThreshold))
+	return int(math.Ceil(float64(config.ConsensusMaxCommitteeSize) * config.ConsensusQuorumThreshold))
 }
 
 // Committee returns a VotingCommittee for a given round and step.
