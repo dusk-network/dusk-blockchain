@@ -63,11 +63,11 @@ Parameters:
 
 Procedure:
 ```
-i = 0                                           // Start with provisioner at index 0
+i = 0                                           // Start with the first provisioner in the list
 loop:
     1. provisioner = Provisioners[i]            // Get provisioner at index `i`
     2. if provisioner.stake >= score            // If the provisioner's stake is higher than `score`,
         return provisioner                      // extract the provisioner
     4. score = score - provisioner.stake        // Otherwise, decrement the score by the provisioner's stake
-    5. i++                                      // And move to the next provisioner
+    5. i++ % Provisioners.size()                // And move to the next provisioner (loop over when reaching the last index)
 ```

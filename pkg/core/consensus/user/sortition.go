@@ -159,41 +159,39 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	return *votingCommittee
 }
 
-// extractCommitteeMember walks through the provisioners set, while deducting each stake
+// extractCommitteeMember loops over the provisioners set, deducting each stake
 // from the sortition 'score', until this is lower than the current stake.
-// When this occurs, it returns the BLS key of the provisioner on which it stops (i.e. the extracted member).
+// When this occurs, it returns the BLS key of the provisioner on which the loop stops (i.e. the extracted member).
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
-	var m *Member
-	var e error
-
-	for i := 0; ; i++ {
-		// If a provisioner is missing, we use the provisioner at position 0
-		if m, e = p.MemberAt(i); e != nil {
-			m, e = p.MemberAt(0)
-
-			// If provisioner 0 is also missing, panic
-			if e != nil {
-				// FIXME: shall this panic?
-				log.Panic(e)
+	// Loop over provisioners
+	for {
+		// NB: We tried to simplify this loop, using `for _, m := range p.Members`
+		// However, this was not deterministic due to the insertion mechanisms of the map.
+		// This indeterminism results in a "newblock msg is not signed by a block generator" error
+		// Hence we switch back to previous implementation using `i` as index
+		for i := 0; i < p.Set.Len(); i++ {
+			m, err := p.MemberAt(i)
+			if err != nil {
+				// This should never happen, but we check, just in case.
+				log.Panic(fmt.Errorf("no member: #%d err: %v", i, err))
 			}
 
-			i = 0
-		}
+			stake, err := p.GetStake(m.PublicKeyBLS)
+			if err != nil {
+				// This should never happen, but we check, just in case.
+				// If we get an error from GetStake, it means we either got a public key of a
+				// provisioner who is no longer in the set, or we got a malformed public key.
+				// We can't repair our committee on the fly, so we have to panic.
+				log.Panic(fmt.Errorf("pk: %s err: %v", util.StringifyBytes(m.PublicKeyBLS), err))
+			}
 
-		stake, err := p.GetStake(m.PublicKeyBLS)
-		if err != nil {
-			// If we get an error from GetStake, it means we either got a public key of a
-			// provisioner who is no longer in the set, or we got a malformed public key.
-			// We can't repair our committee on the fly, so we have to panic.
-			log.Panic(fmt.Errorf("pk: %s err: %v", util.StringifyBytes(m.PublicKeyBLS), err))
-		}
+			// If the current stake is higher than the score, return the current provisioner's BLS key
+			if stake >= score {
+				return m.PublicKeyBLS
+			}
 
-		// If the current stake is higher than the score, return the current provisioner's BLS key
-		if stake >= score {
-			return m.PublicKeyBLS
+			score -= stake
 		}
-
-		score -= stake
 	}
 }
 
