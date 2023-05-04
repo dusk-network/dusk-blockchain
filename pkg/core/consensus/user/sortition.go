@@ -165,10 +165,23 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	// Loop over provisioners
 	for {
-		for _, m := range p.Members {
+		// NB: We tried to simplify this loop, using `for _, m := range p.Members`
+		// However, this was not deterministic due to the insertion mechanisms of the map.
+		// This indeterminism results in a "newblock msg is not signed by a block generator" error
+		// Hence we switch back to previous implementation using `i` as index
+		for i := 0; i < p.Set.Len(); i++ {
+			m, err := p.MemberAt(i)
+			if err != nil {
+				// This should never happen, but we check, just in case.
+				log.Panic(fmt.Errorf("no member: #%d err: %v", i, err))
+			}
+
 			stake, err := p.GetStake(m.PublicKeyBLS)
 			if err != nil {
 				// This should never happen, but we check, just in case.
+				// If we get an error from GetStake, it means we either got a public key of a
+				// provisioner who is no longer in the set, or we got a malformed public key.
+				// We can't repair our committee on the fly, so we have to panic.
 				log.Panic(fmt.Errorf("pk: %s err: %v", util.StringifyBytes(m.PublicKeyBLS), err))
 			}
 
