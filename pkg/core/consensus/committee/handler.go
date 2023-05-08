@@ -87,6 +87,7 @@ func (b *Handler) generateCommittees(seed []byte, round uint64, step uint8, maxS
 
 // CommitteeSize returns the size of a VotingCommittee, depending on
 // how many provisioners are in the set.
+// TODO: update this comment: CommitteeSize should not depend on the number of provisioners.
 func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 	b.lock.RLock()
 	size := b.Provisioners.SubsetSizeAt(round)
