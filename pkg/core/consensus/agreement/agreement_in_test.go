@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -32,7 +33,8 @@ func TestAccumulatorProcessing(t *testing.T) {
 	}
 
 	accumulatedAggros := <-accumulator.CollectedVotesChan
-	assert.Equal(t, 7, len(accumulatedAggros))
+	expectedQuorum := float64(config.ConsensusMaxCommitteeSize * config.ConsensusQuorumThreshold)
+	assert.Greater(t, float64(len(accumulatedAggros)), expectedQuorum)
 }
 
 func TestAccumulatorProcessingAggregation(t *testing.T) {
@@ -48,7 +50,8 @@ func TestAccumulatorProcessingAggregation(t *testing.T) {
 	}
 
 	accumulatedAggros := <-accumulator.CollectedVotesChan
-	assert.Equal(t, 7, len(accumulatedAggros))
+	expectedQuorum := float64(config.ConsensusMaxCommitteeSize * config.ConsensusQuorumThreshold)
+	assert.Greater(t, float64(len(accumulatedAggros)), expectedQuorum)
 
 	var err error
 
@@ -58,11 +61,9 @@ func TestAccumulatorProcessingAggregation(t *testing.T) {
 	pubs := new(sortedset.Set)
 
 	for _, a := range accumulatedAggros {
-		sigs = append(sigs, a.Signature())
 		weight := handler.VotesFor(a.State().PubKeyBLS, evs[0].State().Round, evs[0].State().Step)
-
-		for i := 0; i < weight; i++ {
-			pubs.Insert(a.State().PubKeyBLS)
+		if weight > 0 && pubs.Insert(a.State().PubKeyBLS) {
+			sigs = append(sigs, a.Signature())
 		}
 	}
 

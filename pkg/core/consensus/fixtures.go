@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/config/genesis"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
@@ -99,7 +100,7 @@ func MockMember(keys key.Keys) *user.Member {
 	}
 
 	member.Stakes = make([]user.Stake, 1)
-	member.Stakes[0].Value = 500
+	member.Stakes[0].Value = 1000 * config.DUSK
 	member.Stakes[0].Eligibility = 1
 
 	return member

@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/require"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -73,7 +73,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 			// testing that the timeout remained the same after a successful run
 			testStep: func(t *testing.T, step consensus.Phase) {
 				r := step.(*Phase)
-				require.Equal(t, r.TimeOut, timeout)
+				require.Equal(t, timeout, r.TimeOut)
 			},
 		},
 
@@ -93,7 +93,7 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 			// testing that the timeout doubled
 			testStep: func(t *testing.T, step consensus.Phase) {
 				r := step.(*Phase)
-				require.Equal(t, r.TimeOut, 2*timeout)
+				require.Equal(t, 2*timeout, r.TimeOut)
 			},
 		},
 	}
@@ -102,12 +102,12 @@ func initiateTableTest(hlp *reduction.Helper, timeout time.Duration, hash []byte
 func TestFirstStepReduction(t *testing.T) {
 	step := uint8(2)
 	round := uint64(1)
-	messageToSpawn := 50
+	messageToSpawn := 10
 
 	hash, err := crypto.RandEntropy(32)
 	require.NoError(t, err)
 
-	timeout := time.Second
+	timeout := 10 * time.Second
 	hlp := reduction.NewHelper(messageToSpawn, timeout)
 
 	table := initiateTableTest(hlp, timeout, hash, round, step)

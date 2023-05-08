@@ -13,7 +13,6 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
@@ -131,7 +130,8 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	for i := 0; votingCommittee.Size() < size; i++ {
 		// If we run out of staked DUSK, we can't add new members to the committee
 		// If this happens, we leave the votingCommittee partially complete
-		if W.Uint64() == 0 {
+		totalWeight := W.Uint64()
+		if totalWeight == 0 {
 			break
 		}
 
@@ -150,7 +150,7 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 
 		// Deduct up to 1 DUSK from the extracted member's stake.
 		m := p.GetMember(blsPk)
-		subtracted := m.SubtractFromStake(1 * config.DUSK)
+		subtracted := m.SubtractFromStake(10)
 
 		// Subtract the deducted amount from the total weight, to ensure consistency.
 		subtractFromTotalWeight(W, subtracted)
