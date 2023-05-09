@@ -33,7 +33,7 @@ func TestAccumulatorProcessing(t *testing.T) {
 	}
 
 	accumulatedAggros := <-accumulator.CollectedVotesChan
-	expectedQuorum := float64(config.ConsensusMaxCommitteeSize * config.ConsensusQuorumThreshold)
+	expectedQuorum := float64(config.ConsensusCommitteeSize * config.ConsensusQuorumThreshold)
 	assert.Greater(t, float64(len(accumulatedAggros)), expectedQuorum)
 }
 
@@ -50,7 +50,7 @@ func TestAccumulatorProcessingAggregation(t *testing.T) {
 	}
 
 	accumulatedAggros := <-accumulator.CollectedVotesChan
-	expectedQuorum := float64(config.ConsensusMaxCommitteeSize * config.ConsensusQuorumThreshold)
+	expectedQuorum := float64(config.ConsensusCommitteeSize * config.ConsensusQuorumThreshold)
 	assert.Greater(t, float64(len(accumulatedAggros)), expectedQuorum)
 
 	var err error

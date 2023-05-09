@@ -90,7 +90,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, round uint64, step uint8) error {
 	seed := []byte{0, 0, 0, 0}
 
-	vc := hlp.P.CreateVotingCommittee(seed, round, step, config.ConsensusMaxCommitteeSize)
+	vc := hlp.P.CreateVotingCommittee(seed, round, step, config.ConsensusCommitteeSize)
 	sub := vc.IntersectCluster(sv.BitSet)
 
 	apk, err := agreement.AggregatePks(hlp.P, sub.Set)

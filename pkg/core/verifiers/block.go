@@ -49,7 +49,7 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block, seed
 }
 
 func checkBlockCertificateForStep(batchedSig []byte, bitSet uint64, round uint64, step uint8, provisioners user.Provisioners, blockHash, seed []byte) error {
-	size := config.ConsensusMaxCommitteeSize
+	size := config.ConsensusCommitteeSize
 	committee := provisioners.CreateVotingCommittee(seed, round, step, size)
 	subcommittee := committee.IntersectCluster(bitSet)
 

@@ -50,29 +50,29 @@ func NewHandler(keys key.Keys, p user.Provisioners, seed []byte) *handler {
 
 // AmMember checks if we are part of the committee.
 func (a *handler) AmMember(round uint64, step uint8) bool {
-	return a.Handler.AmMember(round, step, config.ConsensusMaxCommitteeSize)
+	return a.Handler.AmMember(round, step, config.ConsensusCommitteeSize)
 }
 
 // IsMember delegates the committee.Handler to check if a Provisioner is in the
 // committee for a specified round and step.
 func (a *handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	return a.Handler.IsMember(pubKeyBLS, round, step, config.ConsensusMaxCommitteeSize)
+	return a.Handler.IsMember(pubKeyBLS, round, step, config.ConsensusCommitteeSize)
 }
 
 // Committee returns a VotingCommittee for a given round and step.
 func (a *handler) Committee(round uint64, step uint8) user.VotingCommittee {
-	return a.Handler.Committee(round, step, config.ConsensusMaxCommitteeSize)
+	return a.Handler.Committee(round, step, config.ConsensusCommitteeSize)
 }
 
 // VotesFor delegates embedded committee.Handler to accumulate a vote for a
 // given round.
 func (a *handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
-	return a.Handler.VotesFor(pubKeyBLS, round, step, config.ConsensusMaxCommitteeSize)
+	return a.Handler.VotesFor(pubKeyBLS, round, step, config.ConsensusCommitteeSize)
 }
 
 // Quorum returns the amount of committee members necessary to reach a quorum.
 func (a *handler) Quorum(round uint64) int {
-	return quorum(config.ConsensusMaxCommitteeSize)
+	return quorum(config.ConsensusCommitteeSize)
 }
 
 func quorum(committeeSize int) int {

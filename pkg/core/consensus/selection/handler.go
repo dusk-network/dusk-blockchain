@@ -36,13 +36,13 @@ func NewHandler(keys key.Keys, p user.Provisioners, seed []byte) *Handler {
 
 // AmMember checks if we are part of the committee.
 func (b *Handler) AmMember(round uint64, step uint8) bool {
-	return b.Handler.AmMember(round, step, config.ConsensusSelectionMaxCommitteeSize)
+	return b.Handler.AmMember(round, step, config.ConsensusSelectionCommitteeSize)
 }
 
 // IsMember delegates the committee.Handler to check if a BLS public key belongs
 // to a committee for the specified round and step.
 func (b *Handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	return b.Handler.IsMember(pubKeyBLS, round, step, config.ConsensusSelectionMaxCommitteeSize)
+	return b.Handler.IsMember(pubKeyBLS, round, step, config.ConsensusSelectionCommitteeSize)
 }
 
 // VerifySignature verifies the BLS signature of the NewBlock event. Since the
@@ -60,5 +60,5 @@ func (b *Handler) VerifySignature(scr message.NewBlock) error {
 
 // Committee returns a VotingCommittee for a given round and step.
 func (b *Handler) Committee(round uint64, step uint8) user.VotingCommittee {
-	return b.Handler.Committee(round, step, config.ConsensusSelectionMaxCommitteeSize)
+	return b.Handler.Committee(round, step, config.ConsensusSelectionCommitteeSize)
 }

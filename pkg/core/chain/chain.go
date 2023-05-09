@@ -465,7 +465,7 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 		missedIterations := blk.Header.Iteration - 1
 		for iteration := uint8(0); iteration < missedIterations; iteration++ {
 			step := iteration*3 + 1
-			committee := c.p.CreateVotingCommittee(tipBlk.Header.Seed, blk.Header.Height, step, config.ConsensusSelectionMaxCommitteeSize)
+			committee := c.p.CreateVotingCommittee(tipBlk.Header.Seed, blk.Header.Height, step, config.ConsensusSelectionCommitteeSize)
 			committeeKeys := committee.MemberKeys()
 
 			if len(committeeKeys) == 1 {
