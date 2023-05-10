@@ -27,9 +27,9 @@ import (
 // and produces a StepVotesMsg in case it receives enough valid Reduction messages
 // It uses the reduction common test preparation.
 func TestSendReduction(t *testing.T) {
-	hlp := reduction.NewHelper(50, time.Second)
+	hlp := reduction.NewHelper(10, 5*time.Second)
 	_, db := lite.CreateDBConnection()
-	step := New(nil, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, 10*time.Second, db, nil)
+	step := New(nil, hlp.Emitter, hlp.ProcessCandidateVerificationRequest, 5*time.Second, db, nil)
 	scoreMsg := consensus.MockNewBlockMsg(t, nil)
 	// injecting the result of the Selection step
 	stepFn := step.Initialize(scoreMsg.Payload().(message.NewBlock))

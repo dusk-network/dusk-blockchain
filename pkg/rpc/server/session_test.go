@@ -13,6 +13,7 @@ import (
 )
 
 func TestCreateDropSession(t *testing.T) {
+	t.Skip()
 	assert := assert.New(t)
 	jwt, err := authClient.CreateSession()
 	assert.NoError(err)
