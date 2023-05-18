@@ -43,12 +43,12 @@ const (
 	// ConsensusMaxStep consensus max step number.
 	ConsensusMaxStep = uint8(213)
 
-	// ConsensusCommitteeSize represents the maximum size of the committee in
+	// ConsensusCommitteeSize is the (constant) size of the committee in
 	// 1st_Reduction, 2th_Reduction and Agreement phases.
 	ConsensusCommitteeSize = 64
 
-	// ConsensusCommitteeSize represents the maximum size of the committee in
-	// Selection phase.
+	// ConsensusSelectionCommitteeSize is the size of the committee in
+	// the Selection phase.
 	ConsensusSelectionCommitteeSize = 1
 
 	// RuskVersion is the version of the supported rusk binary.
