@@ -16,6 +16,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/bls12_381-sign/go/cgo/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -436,7 +437,7 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 // It includes a vararg iterativeIdx to help avoiding duplicates when testing.
 func MockAgreement(hash []byte, round uint64, step uint8, keys []key.Keys, p *user.Provisioners, iterativeIdx ...int) Agreement {
 	// Make sure we create an event made by an actual voting committee member
-	c := p.CreateVotingCommittee(mockSeed, round, step, len(keys))
+	c := p.CreateVotingCommittee(mockSeed, round, step, config.ConsensusCommitteeSize)
 	cKeys := createCommitteeKeySet(c, keys)
 
 	idx := 0
@@ -491,15 +492,15 @@ func GenVotes(hash, seed []byte, round uint64, step uint8, keys []key.Keys, p *u
 	}
 
 	// Create committee key sets
-	keySet1 := createCommitteeKeySet(p.CreateVotingCommittee(seed, round, step-1, len(keys)), keys)
-	keySet2 := createCommitteeKeySet(p.CreateVotingCommittee(seed, round, step, len(keys)), keys)
+	keySet1 := createCommitteeKeySet(p.CreateVotingCommittee(seed, round, step-1, config.ConsensusCommitteeSize), keys)
+	keySet2 := createCommitteeKeySet(p.CreateVotingCommittee(seed, round, step, config.ConsensusCommitteeSize), keys)
 
 	stepVotes1, set1 := createStepVotesAndSet(hash, round, step-1, keySet1)
 	stepVotes2, set2 := createStepVotesAndSet(hash, round, step, keySet2)
 
-	bitSet1 := createBitSet(set1, seed, round, step-1, len(keySet1), p)
+	bitSet1 := createBitSet(set1, seed, round, step-1, config.ConsensusCommitteeSize, p)
 	stepVotes1.BitSet = bitSet1
-	bitSet2 := createBitSet(set2, seed, round, step, len(keySet2), p)
+	bitSet2 := createBitSet(set2, seed, round, step, config.ConsensusCommitteeSize, p)
 	stepVotes2.BitSet = bitSet2
 
 	return []*StepVotes{stepVotes1, stepVotes2}
@@ -513,8 +514,8 @@ func createBitSet(set sortedset.Set, seed []byte, round uint64, step uint8, size
 func createCommitteeKeySet(c user.VotingCommittee, k []key.Keys) (keys []key.Keys) {
 	committeeKeys := c.MemberKeys()
 
-	for _, cKey := range committeeKeys {
-		for _, key := range k {
+	for _, key := range k {
+		for _, cKey := range committeeKeys {
 			if bytes.Equal(cKey, key.BLSPubKey) {
 				keys = append(keys, key)
 				break
@@ -531,8 +532,7 @@ func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Key
 
 	for _, k := range keys {
 		// We should not aggregate any given key more than once.
-		_, inserted := set.IndexOf(k.BLSPubKey)
-		if !inserted {
+		if set.Insert(k.BLSPubKey) {
 			h := header.Header{
 				BlockHash: hash,
 				Round:     round,
@@ -552,8 +552,6 @@ func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Key
 				panic(err)
 			}
 		}
-
-		set.Insert(k.BLSPubKey)
 	}
 
 	return stepVotes, set

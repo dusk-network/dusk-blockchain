@@ -37,19 +37,19 @@ func NewHandler(keys key.Keys, p user.Provisioners, seed []byte) *Handler {
 
 // AmMember checks if we are part of the committee.
 func (b *Handler) AmMember(round uint64, step uint8) bool {
-	return b.Handler.AmMember(round, step, config.ConsensusMaxCommitteeSize)
+	return b.Handler.AmMember(round, step, config.ConsensusCommitteeSize)
 }
 
 // IsMember delegates the committee.Handler to check if a BLS public key belongs
 // to a committee for the specified round and step.
 func (b *Handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	return b.Handler.IsMember(pubKeyBLS, round, step, config.ConsensusMaxCommitteeSize)
+	return b.Handler.IsMember(pubKeyBLS, round, step, config.ConsensusCommitteeSize)
 }
 
 // VotesFor delegates the committee.Handler to accumulate Votes for the
 // specified BLS public key identifying a Provisioner.
 func (b *Handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
-	return b.Handler.VotesFor(pubKeyBLS, round, step, config.ConsensusMaxCommitteeSize)
+	return b.Handler.VotesFor(pubKeyBLS, round, step, config.ConsensusCommitteeSize)
 }
 
 // VerifySignature verifies the BLS signature of the Reduction event. Since the
@@ -67,10 +67,10 @@ func (b *Handler) VerifySignature(red message.Reduction) error {
 
 // Quorum returns the amount of committee votes to reach a quorum.
 func (b *Handler) Quorum(round uint64) int {
-	return int(math.Ceil(float64(b.CommitteeSize(round, config.ConsensusMaxCommitteeSize)) * config.ConsensusQuorumThreshold))
+	return int(math.Ceil(float64(config.ConsensusCommitteeSize) * config.ConsensusQuorumThreshold))
 }
 
 // Committee returns a VotingCommittee for a given round and step.
 func (b *Handler) Committee(round uint64, step uint8) user.VotingCommittee {
-	return b.Handler.Committee(round, step, config.ConsensusMaxCommitteeSize)
+	return b.Handler.Committee(round, step, config.ConsensusCommitteeSize)
 }

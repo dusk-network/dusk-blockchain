@@ -12,6 +12,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -82,7 +83,7 @@ func TestGetMember(t *testing.T) {
 		m := p.GetMember(tk)
 		s, _ := p.GetStake(tk)
 
-		assert.Equal(t, uint64(500), s)
+		assert.Equal(t, 1000*config.DUSK, s)
 		assert.Equal(t, m.PublicKeyBLS, tk)
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/data/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/require"
@@ -89,7 +90,7 @@ func NewHelper(provisioners int, timeOut time.Duration) *Helper {
 func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, round uint64, step uint8) error {
 	seed := []byte{0, 0, 0, 0}
 
-	vc := hlp.P.CreateVotingCommittee(seed, round, step, hlp.Nr)
+	vc := hlp.P.CreateVotingCommittee(seed, round, step, config.ConsensusCommitteeSize)
 	sub := vc.IntersectCluster(sv.BitSet)
 
 	apk, err := agreement.AggregatePks(hlp.P, sub.Set)
@@ -103,16 +104,18 @@ func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, round uint64, step 
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus.
 func (hlp *Helper) Spawn(hash []byte, round uint64, step uint8) []message.Reduction {
 	evs := make([]message.Reduction, 0, hlp.Nr)
+	quorum := hlp.Handler.Quorum(round)
 	i := 0
 
-	for count := 0; count < hlp.Handler.Quorum(round); {
-		ev := message.MockReduction(hash, round, step, hlp.ProvisionersKeys, i)
-		evs = append(evs, ev)
+	for count := 0; count < quorum; {
+		if hlp.Handler.IsMember(hlp.ProvisionersKeys[i].BLSPubKey, round, step) {
+			ev := message.MockReduction(hash, round, step, hlp.ProvisionersKeys, i)
+			evs = append(evs, ev)
 
+			count += hlp.Handler.VotesFor(hlp.ProvisionersKeys[i].BLSPubKey, round, step)
+		}
 		i++
-		count += hlp.Handler.VotesFor(hlp.ProvisionersKeys[i].BLSPubKey, round, step)
 	}
-
 	return evs
 }
 

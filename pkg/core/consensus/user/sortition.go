@@ -131,7 +131,8 @@ func (p Provisioners) CreateVotingCommittee(seed []byte, round uint64, step uint
 	for i := 0; votingCommittee.Size() < size; i++ {
 		// If we run out of staked DUSK, we can't add new members to the committee
 		// If this happens, we leave the votingCommittee partially complete
-		if W.Uint64() == 0 {
+		totalWeight := W.Uint64()
+		if totalWeight == 0 {
 			break
 		}
 

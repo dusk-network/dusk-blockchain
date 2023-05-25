@@ -30,14 +30,14 @@ func verifyFn(context.Context, block.Block) error {
 // It uses the recution common test preparation.
 func TestSendReduction(t *testing.T) {
 	round := uint64(1)
-	messageToSpawn := 50
+	messageToSpawn := 10
 	hash, err := crypto.RandEntropy(32)
 	require.NoError(t, err)
 
 	timeout := time.Second
 
 	hlp := reduction.NewHelper(messageToSpawn, timeout)
-	secondStep := New(hlp.Emitter, verifyFn, 10*time.Second)
+	secondStep := New(hlp.Emitter, verifyFn, 5*time.Second)
 
 	// Generate second StepVotes
 	svs := message.GenVotes(hash, []byte{0, 0, 0, 0}, 1, 2, hlp.ProvisionersKeys, hlp.P)
@@ -83,7 +83,7 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 			testStep: func(t *testing.T, step consensus.Phase) {
 				r := step.(*Phase)
 
-				require.Equal(t, r.TimeOut, timeout)
+				require.Equal(t, timeout, r.TimeOut)
 			},
 		},
 
@@ -126,7 +126,7 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 			// testing that the timeout doubled
 			testStep: func(t *testing.T, step consensus.Phase) {
 				r := step.(*Phase)
-				require.Equal(t, r.TimeOut, 2*timeout)
+				require.Equal(t, 2*timeout, r.TimeOut)
 			},
 		},
 	}
@@ -135,12 +135,12 @@ func initiateTableTest(timeout time.Duration, hash []byte, round uint64, step ui
 func TestSecondStepReduction(t *testing.T) {
 	step := uint8(2)
 	round := uint64(1)
-	messageToSpawn := 50
+	messageToSpawn := 10
 
 	hash, err := crypto.RandEntropy(32)
 	require.NoError(t, err)
 
-	timeout := time.Second
+	timeout := 10 * time.Second
 
 	table := initiateTableTest(timeout, hash, round, step)
 	for name, ttest := range table {

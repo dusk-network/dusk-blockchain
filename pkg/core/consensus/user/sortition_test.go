@@ -12,6 +12,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -89,7 +90,7 @@ func TestSubtractStake(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		assert.Equal(t, uint64(500), stake)
+		assert.Equal(t, 1000*config.DUSK, stake)
 	}
 }
 

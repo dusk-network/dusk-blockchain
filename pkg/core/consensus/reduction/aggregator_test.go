@@ -63,7 +63,7 @@ func TestAggregation(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			// making sure that parallelism does not interfere with the test
 			tt := tt
-			// creting the require instance from this subtest
+			// creating the require instance from this subtest
 			require := require.New(t)
 			// setting up the helper and the aggregator
 			hlp := NewHelper(messageToSpawn+1, 1*time.Second)
