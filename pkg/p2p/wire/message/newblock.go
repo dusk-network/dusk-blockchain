@@ -154,7 +154,7 @@ func UnmarshalNewBlock(r *bytes.Buffer, sev *NewBlock) error {
 
 // MarshalNewBlock the buffer into a committee Event.
 // Field order is the following:
-// * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash].
+// * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]. //TODO-1508: remove score and blind-bid
 func MarshalNewBlock(r *bytes.Buffer, sev NewBlock) error {
 	// Marshaling header first
 	if err := header.Marshal(r, sev.hdr); err != nil {

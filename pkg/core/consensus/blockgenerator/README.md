@@ -1,3 +1,4 @@
+<!-- TODO-1508: update readme -->
 # Block Generator
 
 This package implements a full block generator component, to be used by participants of the blind-bid protocol in the SBA\* consensus. It is internally made up of two distinct components, a [score generator](./score/README.md), and a [candidate generator](./candidate/README.md).

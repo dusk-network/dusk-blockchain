@@ -74,21 +74,22 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 		return err
 	}
 
-	// blk.Headerheight = prevHeaderHeight +1
+	// blk.Height = prev.Height + 1
 	if blk.Header.Height != prevBlock.Header.Height+1 {
 		return errors.New("invalid block height")
 	}
 
-	// blk.Headerhash = prevHeaderHash
+	// blk.PrevBlockHash = prev.Hash
 	if !bytes.Equal(blk.Header.PrevBlockHash, prevBlock.Header.Hash) {
 		return ErrPrevBlockHash
 	}
 
-	// blk.Timestamp > prevTimestamp
+	// blk.Timestamp > prev.Timestamp
 	if blk.Header.Timestamp < prevBlock.Header.Timestamp {
 		return errors.New("current timestamp is less than the previous timestamp")
 	}
 
+	// blk.Timestamp < prev.Timestamp + MaxBlockTime
 	if blk.Header.Height > 1 {
 		if blk.Header.Timestamp > prevBlock.Header.Timestamp+config.MaxBlockTime {
 			return errors.New("current timestamp is bigger than the prev timestamp + maxblocktime")
@@ -99,7 +100,8 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 		return errors.New("invalid state hash")
 	}
 
-	// Merkle tree check -- Check is here as the root is not calculated on decode
+	// Check Merkle tree root. 
+	// Check is here as the root is not calculated on decode.
 	root, err := blk.CalculateTxRoot()
 	if err != nil {
 		return errors.New("could not calculate the merkle tree root for this header")

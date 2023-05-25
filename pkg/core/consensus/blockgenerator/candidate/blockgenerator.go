@@ -29,6 +29,7 @@ var lg = log.WithField("process", "consensus").WithField("actor", "candidate_gen
 
 var errEmptyStateHash = errors.New("empty state hash")
 
+// TODO-1508: delete 'score' references
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator interface {

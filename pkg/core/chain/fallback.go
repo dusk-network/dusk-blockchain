@@ -24,7 +24,7 @@ func (c *Chain) allowFallback(b block.Block, l *logrus.Entry) error {
 	// Prioritize the lowest iteration
 	if b.Header.Iteration > c.tip.Header.Iteration {
 		// We already know a winning block from lower consensus iteration.
-		return errors.New("lower cetificate step")
+		return errors.New("lower certificate step")
 	}
 
 	// Fetch Previous block

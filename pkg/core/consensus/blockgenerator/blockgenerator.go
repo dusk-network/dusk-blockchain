@@ -17,7 +17,7 @@ type blockGenerator struct {
 	candidateGenerator
 }
 
-// BlockGenerator ...
+// BlockGenerator ...//TODO-1508
 type BlockGenerator interface {
 	candidateGenerator
 }

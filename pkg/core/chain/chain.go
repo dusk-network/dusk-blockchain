@@ -174,18 +174,18 @@ func (c *Chain) syncWithRusk() error {
 	}
 
 	// Detect if both services are on the different state
-	var persitedBlock *block.Block
+	var persistedBlock *block.Block
 
 	err = c.db.View(func(t database.Transaction) error {
-		persitedBlock, err = t.FetchBlock(persistedHash)
+		persistedBlock, err = t.FetchBlock(persistedHash)
 		if err != nil {
 			return err
 		}
 
-		if persitedBlock.Header.Height > 0 {
-			if !bytes.Equal(persitedBlock.Header.StateHash, ruskStateHash) {
+		if persistedBlock.Header.Height > 0 {
+			if !bytes.Equal(persistedBlock.Header.StateHash, ruskStateHash) {
 				log.WithField("rusk", hex.EncodeToString(ruskStateHash)).
-					WithField("node", hex.EncodeToString(persitedBlock.Header.StateHash)).
+					WithField("node", hex.EncodeToString(persistedBlock.Header.StateHash)).
 					Error("invalid state detected")
 				return errors.New("invalid state detected")
 			}
@@ -198,7 +198,7 @@ func (c *Chain) syncWithRusk() error {
 	}
 
 	// Update blockchain tip (in-memory)
-	c.tip = persitedBlock
+	c.tip = persistedBlock
 
 	// If both persisted block hash and latest blockchain block hash are the
 	// same then there is no need to execute sync-up.
@@ -207,7 +207,7 @@ func (c *Chain) syncWithRusk() error {
 	}
 
 	// re-accept missing block in order to recover Rusk (unpersisted) state.
-	i := persitedBlock.Header.Height
+	i := persistedBlock.Header.Height
 
 	for {
 		i++
@@ -730,7 +730,7 @@ func (c *Chain) VerifyCandidateBlock(ctx context.Context, candidate block.Block)
 		return reduction.ErrLowBlockHeight
 	}
 
-	// We first perform a quick check on the Block Header and
+	// We first perform a quick check on the Block Header
 	err = c.verifier.SanityCheckBlock(chainTip, candidate)
 	if err != nil {
 		return err

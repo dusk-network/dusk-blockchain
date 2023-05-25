@@ -30,12 +30,12 @@ type DBLoader struct {
 	genesis *block.Block
 }
 
-// SanityCheckBlock will verify whether we have not seed the block before
-// (duplicate), perform a check on the block header and verifies the coinbase
-// transactions. It leaves the bulk of transaction verification to the executor
-// Return nil if the sanity check passes.
+// SanityCheckBlock verifies whether we have seen the block before (ie, it's a duplicate)
+// and checks the block header. 
+// It leaves the bulk of transaction verification to the executor
+// Returns nil if the sanity check passes.
 func (l *DBLoader) SanityCheckBlock(prevBlock block.Block, blk block.Block) error {
-	// 1. Check that we have not seen this block before
+	// Verify that we have not seen this block before
 	err := l.db.View(func(t database.Transaction) error {
 		_, err := t.FetchBlockExists(blk.Header.Hash)
 		return err
@@ -49,6 +49,7 @@ func (l *DBLoader) SanityCheckBlock(prevBlock block.Block, blk block.Block) erro
 		return err
 	}
 
+	// Verify the header validity
 	if err := verifiers.CheckBlockHeader(prevBlock, blk); err != nil {
 		return err
 	}
