@@ -9,6 +9,7 @@ package transactions
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 
 	"golang.org/x/crypto/blake2b"
 
@@ -116,6 +117,10 @@ func (p *TransactionPayloadDecoded) Hash(txType TxType) ([]byte, error) {
 			return nil, err
 		}
 
+		if _, err := hash.Write(p.Call.FnName); err != nil {
+			return nil, err
+		}
+
 		if _, err := hash.Write(p.Call.CallData); err != nil {
 			return nil, err
 		}
@@ -129,6 +134,10 @@ func (p *TransactionPayloadDecoded) Hash(txType TxType) ([]byte, error) {
 
 // UnmarshalTransactionPayloadDecoded reads a TransactionPayloadDecoded struct from a bytes.Buffer.
 func UnmarshalTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDecoded, txType TxType) error {
+	if err := encoding.Read256(r, f.Anchor); err != nil {
+		return err
+	}
+
 	var lenInputs uint64
 	if err := encoding.ReadUint64LE(r, &lenInputs); err != nil {
 		return err
@@ -155,20 +164,12 @@ func UnmarshalTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDe
 		}
 	}
 
-	if err := encoding.Read256(r, f.Anchor); err != nil {
-		return err
-	}
-
 	if err := UnmarshalFee(r, f.Fee); err != nil {
 		return err
 	}
 
-	if _, err := r.Read(f.SpendProof); err != nil {
-		return err
-	}
-
-	var crossoverFlag uint64
-	if err := encoding.ReadUint64LE(r, &crossoverFlag); err != nil {
+	var crossoverFlag uint8
+	if err := encoding.ReadUint8(r, &crossoverFlag); err != nil {
 		return err
 	}
 
@@ -179,8 +180,18 @@ func UnmarshalTransactionPayloadDecoded(r *bytes.Buffer, f *TransactionPayloadDe
 		}
 	}
 
-	var callFlag uint64
-	if err := encoding.ReadUint64LE(r, &callFlag); err != nil {
+	var lenProof uint64
+	if err := encoding.ReadUint64LE(r, &lenProof); err != nil {
+		return err
+	}
+
+	f.SpendProof = make([]byte, lenProof)
+	if _, err := io.ReadFull(r, f.SpendProof); err != nil {
+		return err
+	}
+
+	var callFlag uint8
+	if err := encoding.ReadUint8(r, &callFlag); err != nil {
 		return err
 	}
 
