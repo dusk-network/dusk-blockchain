@@ -148,6 +148,9 @@ func TestStakeTransaction(t *testing.T) {
 	assert.NotZero(decoded.Fee.GasPrice, "GasPrice should not be 0")
 	assert.NotEmpty(decoded.Nullifiers, "Nullifiers should be present")
 
+	assert.EqualValues(transactions.STAKE_CONTRACT_ID, decoded.Call.ContractID, "Contract id invalid")
+	assert.EqualValues(transactions.TX_STAKE, decoded.Call.FnName, "FnName id invalid")
+
 	hash, err := decoded.Hash(txdummy.TxType)
 	if err != nil {
 		t.Fatalf("Unable to calculate hash for staking: %v", err)

@@ -13,9 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Change rusk-version compatibility to `0.6.0` [#1514]
 - Change TX decode to support new phoenix structure [#1529]
+- Use constant Committee Size [#1520]
 
 ### Removed
 - Remove `step` from block header certificate [#1500]
+
+### Fixed
+- Fix acceptance of txs with empty payload [#1532]
 
 ## [0.6.1] - 2022-12-21 
 
@@ -102,7 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Issues -->
 
-[#1529]: https://github.com/dusk-network/dusk-blockchain/issues/1520
+[#1532]: https://github.com/dusk-network/dusk-blockchain/issues/1532
+[#1529]: https://github.com/dusk-network/dusk-blockchain/issues/1529
+[#1520]: https://github.com/dusk-network/dusk-blockchain/issues/1520
 [#1514]: https://github.com/dusk-network/dusk-blockchain/issues/1514
 [#1500]: https://github.com/dusk-network/dusk-blockchain/issues/1500
 [#1499]: https://github.com/dusk-network/dusk-blockchain/issues/1499

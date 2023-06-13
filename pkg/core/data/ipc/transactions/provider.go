@@ -7,6 +7,7 @@
 package transactions
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -220,13 +221,19 @@ func (e *executor) Finalize(ctx context.Context, calls []ContractCall, stateRoot
 	return resCalls, *provisioners, res.StateRoot, nil
 }
 
+// STAKE_CONTRACT_ID is the byte representation of the ModuleID of the StakeContract.
+var STAKE_CONTRACT_ID = []byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+
+// TX_STAKE is the byte representation of the string `stake`.
+var TX_STAKE = []byte("stake")
+
+// TX_UNSTAKE is the byte representation of the string "unstake".
+var TX_UNSTAKE = []byte("unstake")
+
 func shouldUpdateProvisioners(blockHeight uint64, txs []ContractCall) bool {
 	if blockHeight%config.EPOCH == 0 {
 		return true
 	}
-
-	const TX_STAKE = byte(0x00)
-	const TX_UNSTAKE = byte(0x01)
 
 	for _, tx := range txs {
 		if tx.TxError() != nil {
@@ -234,11 +241,16 @@ func shouldUpdateProvisioners(blockHeight uint64, txs []ContractCall) bool {
 		}
 
 		if payload, err := tx.Decode(); err == nil && payload.Call != nil {
-			switch payload.Call.CallData[0] {
-			case TX_STAKE, TX_UNSTAKE:
-				{
-					return true
-				}
+			if !bytes.Equal(payload.Call.ContractID, STAKE_CONTRACT_ID) {
+				continue
+			}
+
+			if !bytes.Equal(payload.Call.FnName, TX_STAKE) {
+				return true
+			}
+
+			if !bytes.Equal(payload.Call.FnName, TX_UNSTAKE) {
+				return true
 			}
 		}
 	}
