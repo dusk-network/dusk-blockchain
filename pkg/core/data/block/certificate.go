@@ -12,7 +12,7 @@ import (
 
 // Certificate defines a block certificate made as a result from the consensus.
 type Certificate struct {
-	StepOneBatchedSig []byte `json:"step-one-batched-sig"` // Batched BLS signature of the block reduction phase (33 bytes)
+	StepOneBatchedSig []byte `json:"step-one-batched-sig"` // Batched BLS signature of the block reduction phase (48 bytes)
 	StepTwoBatchedSig []byte `json:"step-two-batched-sig"`
 	StepOneCommittee  uint64 `json:"step-one-committee"` // Binary representation of the committee members who voted in favor of this block (8 bytes)
 	StepTwoCommittee  uint64 `json:"step-two-committee"`
@@ -40,8 +40,8 @@ func (c *Certificate) Copy() *Certificate {
 // EmptyCertificate returns an empty Certificate instance.
 func EmptyCertificate() *Certificate {
 	return &Certificate{
-		StepOneBatchedSig: make([]byte, 33),
-		StepTwoBatchedSig: make([]byte, 33),
+		StepOneBatchedSig: make([]byte, 48),
+		StepTwoBatchedSig: make([]byte, 48),
 		StepOneCommittee:  0,
 		StepTwoCommittee:  0,
 	}

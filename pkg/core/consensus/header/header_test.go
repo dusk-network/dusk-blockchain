@@ -23,7 +23,7 @@ func TestCopy(t *testing.T) {
 	red.Round = uint64(1)
 	red.Step = uint8(2)
 	red.BlockHash, _ = crypto.RandEntropy(32)
-	red.PubKeyBLS, _ = crypto.RandEntropy(33)
+	red.PubKeyBLS, _ = crypto.RandEntropy(96)
 
 	h := red.Copy().(header.Header)
 	assert.True(reflect.DeepEqual(red, h))

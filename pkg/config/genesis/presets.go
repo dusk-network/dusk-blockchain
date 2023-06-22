@@ -27,19 +27,19 @@ var configurations = map[string]Config{
 	"testnet": {
 		// March 9, 2022 16:10:22 GMT
 		timestamp: 1646842222,
-		seed:      make([]byte, 33),
+		seed:      make([]byte, 48),
 	},
 	"harness": {
 		// test harness
 		// March 9, 2022 16:10:22 GMT
 		timestamp: 1646842222,
-		seed:      make([]byte, 33),
+		seed:      make([]byte, 48),
 	},
 	"test": {
 		// This is for unit tests
 		// March 9, 2022 16:10:22 GMT
 		timestamp: 1646842222,
-		seed:      make([]byte, 33),
+		seed:      make([]byte, 48),
 	},
 }
 
