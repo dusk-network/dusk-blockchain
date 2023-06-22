@@ -54,7 +54,7 @@ const (
 // New will create a Header instance.
 func New() Header {
 	return Header{
-		PubKeyBLS: make([]byte, 33),
+		PubKeyBLS: make([]byte, 96),
 		Round:     uint64(0),
 		Step:      uint8(0),
 		BlockHash: make([]byte, 32),

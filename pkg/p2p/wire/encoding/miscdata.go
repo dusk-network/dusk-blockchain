@@ -85,29 +85,6 @@ func Write512(w *bytes.Buffer, b []byte) error {
 	return err
 }
 
-// ReadBLS will read a compressed bls signature (33 bytes) from r and return it as a slice of bytes.
-func ReadBLS(r *bytes.Buffer, b []byte) error {
-	if len(b) != 33 {
-		return errors.New("buffer for ReadBLS should be 33 bytes")
-	}
-
-	if _, err := r.Read(b); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// WriteBLS will write a compressed bls signature (33 bytes) to w.
-func WriteBLS(w *bytes.Buffer, b []byte) error {
-	if len(b) != 33 {
-		return fmt.Errorf("b is not proper size - expected 33 bytes, is actually %d bytes", len(b))
-	}
-
-	_, err := w.Write(b)
-	return err
-}
-
 // ReadBLSPKey will read a compressed bls public key (96 bytes) from r and return it as a slice of bytes.
 func ReadBLSPKey(r *bytes.Buffer, b []byte) error {
 	if len(b) != 96 {

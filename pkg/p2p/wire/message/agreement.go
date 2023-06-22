@@ -323,7 +323,7 @@ func newAgreement() *Agreement {
 	return &Agreement{
 		hdr:          header.Header{},
 		VotesPerStep: make([]*StepVotes, 2),
-		signature:    make([]byte, 33),
+		signature:    make([]byte, 48),
 		Repr:         new(big.Int),
 	}
 }

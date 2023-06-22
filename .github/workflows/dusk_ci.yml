@@ -52,8 +52,8 @@ jobs:
         profile: minimal
         toolchain: nightly-2022-08-28
         override: true
-    - run: rustup target add wasm32-unknown-unknown
     - run: rustup component add rustfmt rust-src
+    - run: rustup target add wasm32-unknown-unknown
     - name: Cache Cargo home
       uses: actions/cache@v2
       env:

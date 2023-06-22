@@ -148,60 +148,6 @@ func Test512Length(t *testing.T) {
 	}
 }
 
-func TestBLSEncodeDecode(t *testing.T) {
-	byte33, err := crypto.RandEntropy(33)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Serialize
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteBLS(buf, byte33); err != nil {
-		t.Fatal(err)
-	}
-
-	// Check if it serialized correctly
-	assert.Equal(t, buf.Bytes(), byte33)
-	assert.Equal(t, len(buf.Bytes()), 33)
-
-	// Deserialize
-	hash := make([]byte, 33)
-	if err := encoding.ReadBLS(buf, hash); err != nil {
-		t.Fatal(err)
-	}
-
-	// Content should be the same
-	assert.Equal(t, hash, byte33)
-}
-
-func TestBLSLength(t *testing.T) {
-	byte16, err := crypto.RandEntropy(16)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Serialize
-	buf := new(bytes.Buffer)
-
-	err = encoding.WriteBLS(buf, byte16) // This should fail
-	if err == nil {
-		t.Fatal("did not throw error when serializing byte slice of improper length")
-	}
-
-	buf.Reset()
-
-	byte80, err := crypto.RandEntropy(80)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Serialize
-	err = encoding.WriteBLS(buf, byte80) // This should also fail
-	if err == nil {
-		t.Fatal("did not throw error when serializing byte slice of improper length")
-	}
-}
-
 //// Benchmarks
 
 func BenchmarkReadBoolInterface(b *testing.B) {
@@ -326,48 +272,6 @@ func BenchmarkWrite512NoInterface(b *testing.B) {
 	}
 }
 
-func BenchmarkReadBLSInterface(b *testing.B) {
-	var bs []byte
-
-	for i := 0; i < b.N; i++ {
-		buf := bytes.NewBuffer(make([]byte, 33))
-		if err := ReadBLS(buf, &bs); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkReadBLSNoInterface(b *testing.B) {
-	bs := make([]byte, 33)
-
-	for i := 0; i < b.N; i++ {
-		buf := bytes.NewBuffer(make([]byte, 33))
-		if err := encoding.ReadBLS(buf, bs); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkWriteBLSInterface(b *testing.B) {
-	bs := make([]byte, 33)
-
-	for i := 0; i < b.N; i++ {
-		if err := WriteBLS(new(bytes.Buffer), bs); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkWriteBLSNoInterface(b *testing.B) {
-	bs := make([]byte, 33)
-
-	for i := 0; i < b.N; i++ {
-		if err := encoding.WriteBLS(new(bytes.Buffer), bs); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
 // TODO: add benchmark for BLS
 
 //// Old functions which make uses of interfaces
@@ -436,31 +340,6 @@ func Read512(r io.Reader, b *[]byte) error {
 func Write512(w io.Writer, b []byte) error {
 	if len(b) != 64 {
 		return fmt.Errorf("b is not proper size - expected 64 bytes, is actually %d bytes", len(b))
-	}
-
-	if _, err := w.Write(b); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// ReadBLS will read a compressed bls signature (33 bytes) from r into b.
-func ReadBLS(r io.Reader, b *[]byte) error {
-	*b = make([]byte, 33)
-
-	n, err := r.Read(*b)
-	if err != nil || n != len(*b) {
-		return fmt.Errorf("encoding: ReadBLS read %v/33 bytes - %v", n, err)
-	}
-
-	return nil
-}
-
-// WriteBLS will write a compressed bls signature (33 bytes) to w.
-func WriteBLS(w io.Writer, b []byte) error {
-	if len(b) != 33 {
-		return fmt.Errorf("b is not proper size - expected 33 bytes, is actually %d bytes", len(b))
 	}
 
 	if _, err := w.Write(b); err != nil {

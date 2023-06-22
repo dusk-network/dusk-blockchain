@@ -18,7 +18,6 @@ func Generate(c Config) *block.Block {
 	// TODO: Populate this with real txs data from Rusk Transfer and Stake Contract
 	if c.Transactions == nil {
 		c.Transactions = make([]transactions.ContractCall, 0)
-		c.Transactions = append(c.Transactions, transactions.MockTx())
 	}
 
 	state_root := make([]byte, 32)
