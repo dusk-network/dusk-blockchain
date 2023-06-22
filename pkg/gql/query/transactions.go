@@ -107,7 +107,7 @@ func decodeContractInfo(decoded *core.TransactionPayloadDecoded) *contractInfo {
 	var info contractInfo = contractInfo{}
 	if decoded.Call != nil {
 		info.Contract = decoded.Call.ContractID
-		info.Method = hex.EncodeToString(decoded.Call.CallData[:1])
+		info.Method = string(decoded.Call.FnName)
 	}
 	return &info
 }
