@@ -53,7 +53,6 @@ func addDefaultTxs(name string, c Config) Config {
 	case "test":
 		c.Transactions = append(c.Transactions, transactions.MockTx())
 	default:
-		c.Transactions = append(c.Transactions, transactions.EmptyTx())
 	}
 
 	return c
