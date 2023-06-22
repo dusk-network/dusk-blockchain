@@ -444,24 +444,17 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 
 	var txs []transactions.ContractCall
 
-	switch blk.Header.Iteration {
-	case 1:
-		// Finalized block. first iteration consensus agreement.
-		txs, provisionersUpdated, respStateHash, err = c.proxy.Executor().Finalize(c.ctx,
-			blk.Txs,
-			tipBlk.Header.StateHash,
-			blk.Header.Height,
-			blk.Header.GasLimit,
-			blk.Header.GeneratorBlsPubkey,
-			c.p,
-		)
-		if err != nil {
-			l.WithError(err).
-				WithField("grpc", "finalize").
-				Error("Error in executing the state transition")
-			return block.NewBlock(), err
-		}
-	default:
+	var executorFn func(context.Context, []transactions.ContractCall, []byte, uint64, uint64, []byte, *user.Provisioners) ([]transactions.ContractCall, user.Provisioners, []byte, error)
+	var gprcMethod string
+
+	if blk.Header.Iteration == 1 {
+		executorFn = c.proxy.Executor().Finalize
+		gprcMethod = "finalize"
+	} else {
+		executorFn = c.proxy.Executor().Accept
+		gprcMethod = "accept"
+
+		// Log missing blocks
 		missedIterations := blk.Header.Iteration - 1
 		for iteration := uint8(0); iteration < missedIterations; iteration++ {
 			step := iteration*3 + 1
@@ -482,20 +475,21 @@ func (c *Chain) runStateTransition(tipBlk, blk block.Block) (*block.Block, error
 					Error("Unable to generate voting committee for missed block")
 			}
 		}
+	}
 
-		// Tentative block. non-first iteration consensus agreement.
-		txs, provisionersUpdated, respStateHash, err = c.proxy.Executor().Accept(c.ctx,
-			blk.Txs,
-			tipBlk.Header.StateHash,
-			blk.Header.Height,
-			blk.Header.GasLimit, blk.Header.GeneratorBlsPubkey, c.p)
-		if err != nil {
-			l.WithError(err).
-				WithField("grpc", "accept").
-				Error("Error in executing the state transition")
-
-			return block.NewBlock(), err
-		}
+	txs, provisionersUpdated, respStateHash, err = executorFn(c.ctx,
+		blk.Txs,
+		tipBlk.Header.StateHash,
+		blk.Header.Height,
+		blk.Header.GasLimit,
+		blk.Header.GeneratorBlsPubkey,
+		c.p,
+	)
+	if err != nil {
+		l.WithError(err).
+			WithField("grpc", gprcMethod).
+			Error("Error in executing the state transition")
+		return block.NewBlock(), err
 	}
 
 	// Sanity check to ensure accepted block state_hash is the same as the one Finalize/Accept returned.
