@@ -17,7 +17,7 @@ test-harness-unit: build ## Run a specified harness unit test e.g make UNIT_TEST
 	go test -v --count=1 --test.timeout=0 ./harness/tests/ -run $(UNIT_TEST) -args -enable
 test-harness: ## Run harness tests
 	@go test -v --count=1 --test.timeout=0 ./harness/tests/ -args -enable
-test-harness-ci: stop rusk build
+test-harness-ci: stop build
 	DUSK_NETWORK_PROFILE=kadcast_uds RUSK_PATH=${PWD}/bin/rusk DUSK_NETWORK_SIZE=5 DUSK_UTILS=${PWD}/bin/utils DUSK_SEEDER=${PWD}/bin/voucher \
         DUSK_BLOCKCHAIN=${PWD}/bin/dusk DUSK_WALLET_PASS="password" make test-harness
 test-harness-alive: stop build
@@ -69,8 +69,10 @@ mockrusk: build
 	--walletfile=./harness/data/wallet-9000.dat
 rusk: 
 	rm -rf rusk_co
-	git clone https://github.com/dusk-network/rusk rusk_co \
+	git clone -b v0.6.0 https://github.com/dusk-network/rusk rusk_co \
 	&& cd rusk_co \
+	&& rustup component add rustfmt rust-src \
+	&& rustup target add wasm32-unknown-unknown \
 	&& make wasm \
 	&& cargo b --release -p rusk-recovery --features state -Z unstable-options --out-dir ../bin/ \
 	&& cargo b --release -p rusk -Z unstable-options --out-dir ../bin/ 
