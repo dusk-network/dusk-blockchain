@@ -33,16 +33,16 @@ NOTE: This guide assumes you are building and running from a UNIX-like operating
 
 ### Installation
 
-First, download the codebase and it's dependencies into your $GOPATH by running:
+Download the codebase and navigate into the folder:
 
 ```bash
-go get github.com/dusk-network/dusk-blockchain
+git clone git@github.com:dusk-network/dusk-blockchain.git && cd dusk-blockchain
 ```
 
-Then, navigate to the testnet folder, like so:
+Get the project dependencies by running:
 
 ```bash
-cd $GOPATH/src/github.com/dusk-network/dusk-blockchain
+go get github.com/dusk-network/dusk-blockchain/...
 ```
 
 To build the binary, simply run:
