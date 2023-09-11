@@ -1,6 +1,6 @@
 # Dusk Network Node
 
-Official reference implementation of the DUSK Network protocol in Golang.
+Official Golang reference implementation of the DUSK Network protocol.
 
 [![Actions Status](https://github.com/dusk-network/dusk-blockchain/workflows/Continuous%20Integration/badge.svg)](https://github.com/dusk-network/dusk-blockchain/actions) 
 [![codecov](https://codecov.io/gh/dusk-network/dusk-blockchain/branch/master/graph/badge.svg)](https://codecov.io/gh/dusk-network/dusk-blockchain)
@@ -9,17 +9,19 @@ Official reference implementation of the DUSK Network protocol in Golang.
 
 ## Specification Requirements
 
+The following requirements are defined for running an active Dusk node. Depending on the role your node plays and how much functionality it exposes, the utilization of the node might vary significantly. 
+
 ### Minimum Specifications
 
 | CPU | RAM | Storage | Network Connection |
 | :--- | :--- | :--- | :--- |
-| 2 cores; 2 GHz | 1 GB | 60 GB | 1 Mbps |
+| 4 cores; 2 GHz | 4 GB | 100 GB | 10 Mbps |
 
 ### Recommended Specifications
 
 | CPU | RAM | Storage | Network Connection |
 | :--- | :--- | :--- | :--- |
-| 4 cores; 2 GHz | 4 GB | 250 GB | 10 Mbps |
+| 8 cores; 2 GHz | 8 GB | 250 GB | +25 Mbps |
 
 ## Installation Guide
 
@@ -59,30 +61,19 @@ Finally, to start your node, type:
 
 ## Wallet
 
-The wallet is hosted in a separate folder, [found here](./cmd/wallet). 
-
-### Building the wallet
-
-The wallet is automatically built when running `make build`. You can then execute it by typing:
-
-```bash
-./bin/wallet
-```
-
-
-### Running the wallet
-
-Alternatively, to build and run the wallet in a single command, simply type:
-
-```bash
-make wallet
-```
+The wallet is hosted in a separate repository, [found here](https://github.com/dusk-network/wallet-cli). 
 
 ### How to use the wallet
 
-The wallet will show you a menu with available options, that you can navigate with the arrow keys and the enter key.
+For more information on how to install, configure and run the CLI wallet, see the documentation [here](https://github.com/dusk-network/wallet-cli/tree/main/src/bin).
 
-Note that the wallet is a seperate process from the node, and thus closing the wallet does not stop the node from running.
+## Rusk
+
+Rusk is an important separate service that should be ran next to the node. Rusk is a powerful wrapper around the VM/execution engine that provides the genesis contracts and gives the VM access to host functions. Rusk is hosted in a separate repository, [found here](https://github.com/dusk-network/rusk).
+
+### How to use Rusk
+
+For more information on how to install, configure and run the Rusk, see the documentation [here](https://github.com/dusk-network/rusk#readme).
 
 ## License
 
