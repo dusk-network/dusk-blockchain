@@ -1,6 +1,14 @@
-# Dusk Network Node
+# Dusk Blockchain Node
 
-Official Golang reference implementation of the DUSK Network protocol.
+## :warning: Deprecated :warning:
+
+This repository contains the legacy Golang implementation of the Dusk protocol. This implementation is deprecated and no longer maintained.
+
+For an up-to-date node implementation, consider using our Rust-based [Rusk](https://github.com/dusk-network/rusk) client.
+
+### Why is it Deprecated?
+
+We have transitioned to a Rust-based implementation for improved interoperability, security, and ease of contribution. 
 
 [![Actions Status](https://github.com/dusk-network/dusk-blockchain/workflows/Continuous%20Integration/badge.svg)](https://github.com/dusk-network/dusk-blockchain/actions) 
 [![codecov](https://codecov.io/gh/dusk-network/dusk-blockchain/branch/master/graph/badge.svg)](https://codecov.io/gh/dusk-network/dusk-blockchain)
