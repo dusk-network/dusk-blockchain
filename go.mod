@@ -28,13 +28,15 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/buntdb v1.2.4
 	github.com/urfave/cli v1.22.3
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	golang.org/x/crypto v0.1.0
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0
 	google.golang.org/grpc v1.29.0
 	google.golang.org/protobuf v1.23.0
 	lukechampine.com/blake3 v1.1.7
 
 )
+
+require golang.org/x/term v0.1.0 // indirect
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -82,9 +84,9 @@ require (
 	github.com/tidwall/rtred v0.1.2 // indirect
 	github.com/tidwall/tinyqueue v0.1.1 // indirect
 	go.etcd.io/bbolt v1.3.4 // indirect
-	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
-	golang.org/x/sys v0.0.0-20211103235746-7861aae1554b // indirect
-	golang.org/x/text v0.3.3 // indirect
+	golang.org/x/net v0.1.0 // indirect
+	golang.org/x/sys v0.1.0 // indirect
+	golang.org/x/text v0.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20200317114155-1f3552e48f24 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/ini.v1 v1.51.0 // indirect
