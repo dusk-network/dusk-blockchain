@@ -74,16 +74,15 @@ func (v VotingCommittee) MarshalJSON() ([]byte, error) {
 }
 
 // createSortitionHash takes the Seed value 'seed', the round number 'round', the step number 'step',
-// the index 'i' of the committee member to extract,
-// and returns the hash (SHA3-256) of their concatenation (i.e., H(round||i||step||seed)).
+// the index 'i' of the vote credit to assign, and returns the hash (SHA3-256) of their concatenation 
+// (i.e., H(seed||round||step||i).
 func createSortitionHash(seed []byte, round uint64, step uint8, i int) ([]byte, error) {
-	msg := make([]byte, 12)
+	msg := make([]byte, len(seed)+8+1+4)
 
-	binary.LittleEndian.PutUint64(msg[:8], round)
-	binary.LittleEndian.PutUint32(msg[8:12], uint32(i))
-
-	msg = append(msg, step)
-	msg = append(msg, seed...)
+	copy(msg, seed)
+	binary.LittleEndian.PutUint64(msg[len(seed):len(seed)+8], round)
+	msg[len(seed)+8] = step
+	binary.LittleEndian.PutUint32(msg[len(seed)+9:len(seed)+13], uint32(i))
 
 	return hash.Sha3256(msg)
 }
